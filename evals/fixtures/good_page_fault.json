@@ -1,0 +1,11 @@
+{
+  "short_id": "os_s18_page_fault",
+  "question": "What happens when the MMU reads a page table entry whose valid bit is clear?",
+  "beats": [
+    {"speaker":"interviewer","line":"What happens when the MMU reads a page table entry whose valid bit is clear?","on_screen":"Valid bit is clear","visual_ref":"title"},
+    {"speaker":"student","line":"The MMU raises a page fault trap to the operating system, because the page is not resident in physical memory.","on_screen":"MMU raises a page fault","visual_ref":"d_trap"},
+    {"speaker":"student","line":"The operating system locates the page on the backing store, selects a free frame, and issues the disk read.","on_screen":"OS finds a free frame","visual_ref":"d_frame"},
+    {"speaker":"student","line":"It then updates the page table entry and restarts the instruction that faulted, so the process resumes as if nothing happened.","on_screen":"Restart the instruction","visual_ref":"d_restart"},
+    {"speaker":"student","line":"The faulting process stays blocked for the whole duration of that disk read, which is why page faults are expensive.","on_screen":"Process blocked on disk I/O","visual_ref":"d_blocked"}
+  ]
+}

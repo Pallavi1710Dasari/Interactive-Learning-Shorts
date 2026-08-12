@@ -1,0 +1,9 @@
+{
+  "short_id": "os_s18_too_long",
+  "question": "How does address translation work?",
+  "beats": [
+    {"speaker":"interviewer","line":"How does address translation work?","on_screen":"Address translation","visual_ref":"title"},
+    {"speaker":"student","line":"A logical address is split into a page number and an offset, and the page number indexes the page table which stores the frame number holding that page, and the hardware concatenates the frame number with the offset to form the physical address, and each page table entry also carries a valid bit indicating whether the page is currently resident in physical memory, and if that bit is clear the memory management unit raises a page fault trap to the operating system which then locates the page on the backing store and selects a free frame and issues the disk read and updates the page table entry and restarts the instruction that faulted while the faulting process remains blocked for the entire duration of the disk input output operation which is typically several milliseconds and therefore enormously slower than a normal memory reference that completes in nanoseconds, and this whole mechanism is what allows a process to believe it has a contiguous address space when in reality its pages are scattered across whatever frames happened to be free at the time of allocation.","on_screen":"Page number and offset","visual_ref":"d1"},
+    {"speaker":"student","line":"Walking the page table on every memory reference would double memory traffic so the translation lookaside buffer caches recent mappings and on a hit the frame number is available immediately without touching the page table at all, and on a miss the hardware or the operating system walks the page table and installs the mapping for next time.","on_screen":"TLB caches translations","visual_ref":"d2"}
+  ]
+}

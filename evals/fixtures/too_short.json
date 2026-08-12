@@ -1,0 +1,9 @@
+{
+  "short_id": "os_s18_too_short",
+  "question": "What is internal fragmentation?",
+  "beats": [
+    {"speaker":"interviewer","line":"What is internal fragmentation?","on_screen":"Internal fragmentation","visual_ref":"title"},
+    {"speaker":"student","line":"Wasted space in the last page.","on_screen":"Waste in the last page","visual_ref":"d1"},
+    {"speaker":"student","line":"About half a page per process.","on_screen":"Half a page average","visual_ref":"d2"}
+  ]
+}

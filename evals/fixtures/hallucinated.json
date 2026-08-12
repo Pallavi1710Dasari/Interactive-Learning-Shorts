@@ -1,0 +1,11 @@
+{
+  "short_id": "os_s18_hallucinated",
+  "question": "How big is a page and why does that matter?",
+  "beats": [
+    {"speaker":"interviewer","line":"How big is a page and why does that matter?","on_screen":"Page size","visual_ref":"title"},
+    {"speaker":"student","line":"Linux defaults to four kilobyte pages, though transparent hugepages promote regions to two megabytes automatically under memory pressure.","on_screen":"Linux uses 4KB pages","visual_ref":"d1"},
+    {"speaker":"student","line":"Intel processors since Haswell also support one gigabyte pages, configured through the hugetlbfs pseudo filesystem at boot time.","on_screen":"1GB hugepages exist","visual_ref":"d2"},
+    {"speaker":"student","line":"Benchmarks from Google showed roughly fifteen percent throughput gains on database workloads after enabling hugepages across their fleet.","on_screen":"15 percent faster","visual_ref":"d3"},
+    {"speaker":"student","line":"So administrators tune the value per workload rather than accepting the kernel default configuration blindly.","on_screen":"Tune per workload","visual_ref":"d4"}
+  ]
+}

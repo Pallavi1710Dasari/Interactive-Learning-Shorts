@@ -1,0 +1,8 @@
+{
+  "short_id": "os_s18_monologue",
+  "question": "Why does paging exist?",
+  "beats": [
+    {"speaker":"interviewer","line":"Why does paging exist?","on_screen":"Why paging exists","visual_ref":"title"},
+    {"speaker":"student","line":"Contiguous allocation forces every process to occupy one unbroken block of physical memory, and over time this produces external fragmentation where enough total free memory exists but no single block is large enough to satisfy a request, so paging removes the requirement for contiguity entirely by dividing physical memory into fixed size frames and the logical address space into pages of the same size, letting any page sit in any free frame.","on_screen":"Paging removes contiguity","visual_ref":"d1"}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "short_id": "os_s18_overlay",
+  "question": "What does the TLB do?",
+  "beats": [
+    {"speaker":"interviewer","line":"What does the TLB do?","on_screen":"The TLB","visual_ref":"title"},
+    {"speaker":"student","line":"The Translation Lookaside Buffer is a small associative cache holding recent page to frame mappings, so a hit avoids touching the page table.","on_screen":"The Translation Lookaside Buffer is a small associative cache of recent page to frame mappings","visual_ref":"d1"},
+    {"speaker":"student","line":"On a miss the hardware or the operating system walks the page table and installs the mapping for next time.","on_screen":"On a miss, walk the page table and install the mapping so the next reference hits","visual_ref":"d2"},
+    {"speaker":"student","line":"Because the buffer caches translations for one address space, a context switch needs either a flush or address space identifiers.","on_screen":"Context switch needs a flush","visual_ref":"d3"}
+  ]
+}

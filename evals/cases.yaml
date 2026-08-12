@@ -1,0 +1,181 @@
+# ============================================================================
+# THE EVAL SET
+#
+# Every case is a real failure someone actually hit, frozen so it can never
+# come back. Re-run this file before every prompt change and before every merge.
+#
+# Case types:
+#   code_grader  - deterministic. Runs offline, free, in milliseconds.
+#   llm_judge    - needs meaning. Costs an API call. Run less often.
+#   golden       - a known-good output. Regression guard.
+#
+# Grow this file every time something breaks in production. That is the whole
+# self-evolving loop: bug -> eval case -> prompt fix -> case passes forever.
+# ============================================================================
+
+version: 1
+source_doc: content/session_18_paging.md
+
+cases:
+
+  # ---------------------------------------------------------------- code graders
+
+  - id: E001
+    name: A rambling script is rejected for length
+    why: "First real failure. Model ignored the word budget and wrote a 3-minute script."
+    type: code_grader
+    grader: timing
+    fixture: evals/fixtures/too_long.json
+    expect:
+      passed: false
+      reason_contains: "too long"
+
+  - id: E002
+    name: A thin script is rejected for being too short
+    why: "Model over-corrected after we tightened the length prompt and wrote 12 words."
+    type: code_grader
+    grader: timing
+    fixture: evals/fixtures/too_short.json
+    expect:
+      passed: false
+      reason_contains: "too short"
+
+  - id: E003
+    name: A well-sized script passes the timing gate
+    why: "Guards against a fix that rejects everything."
+    type: code_grader
+    grader: timing
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
+  - id: E004
+    name: Overlay text longer than 8 words is rejected
+    why: "Reviewer found on-screen text spilling off a phone screen in short 3."
+    type: code_grader
+    grader: overlays
+    fixture: evals/fixtures/overlay_too_wordy.json
+    expect:
+      passed: false
+      reason_contains: "over 8 words"
+
+  - id: E005
+    name: A one-block answer is rejected — split it so visuals can change
+    why: >
+      This case has now been inverted TWICE, so read before changing it again.
+      Originally: answers had to be split across 2-6 beats. Then the format moved
+      to a single continuous answer and this case was flipped to reject split
+      answers. Review rejected that: one long answer read as a wall of text, held
+      one diagram on screen for ~40 seconds, and drifted off the source. So the
+      rule is back to a split answer, now 3-5 beats with a 32-word cap per beat.
+      E011 is the success half. Change dialogue_shape and both cases together.
+    type: code_grader
+    grader: dialogue_shape
+    fixture: evals/fixtures/single_answer.json
+    expect:
+      passed: false
+      reason_contains: "at least 3"
+
+  - id: E011
+    name: A 3-5 beat answer with short beats is accepted
+    why: >
+      The success half of E005. Without it, the cheapest way to make dialogue_shape
+      green is to reject every shape, and the pair is what stops that.
+    type: code_grader
+    grader: dialogue_shape
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
+  - id: E006
+    name: Content invented outside the source section is caught
+    why: "Model added Linux hugepage details and a fake Google benchmark. Nothing in the doc."
+    type: code_grader
+    grader: grounding
+    section_id: "3.5"
+    fixture: evals/fixtures/hallucinated.json
+    expect:
+      passed: false
+      reason_contains: "appear in the source"
+
+  - id: E007
+    name: A grounded script passes the grounding check
+    why: "Guards against a grounding threshold set so high nothing passes."
+    type: code_grader
+    grader: grounding
+    section_id: "3.3"
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
+  # ------------------------------------------------------------------ llm judge
+
+  - id: E008
+    name: Judge flags the fabricated hugepage script
+    why: "The code grader catches it, but the judge must catch it too — subtler cases exist."
+    type: llm_judge
+    section_id: "3.5"
+    fixture: evals/fixtures/hallucinated.json
+    expect:
+      faithfulness_max: 2
+      passed: false
+
+  - id: E009
+    name: Judge approves the grounded page-fault script
+    why: "A judge that fails everything is useless. This is the false-positive guard."
+    type: llm_judge
+    section_id: "3.3"
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      faithfulness_min: 4
+      passed: true
+
+  # --------------------------------------------------------------------- golden
+
+  - id: E010
+    name: Skill 1 still selects the page fault path from session 18
+    why: "Topic selection silently drifted after a prompt edit and dropped the core concept."
+    type: golden
+    step: select
+    input: content/session_18_paging.md
+    expect:
+      must_include_sections: ["3.2", "3.3"]
+      topic_count_between: [4, 6]
+
+
+# ============================================================================
+# RUBRIC — what the LLM judge scores, 1 to 5. Keep the wording stable; changing
+# a rubric invalidates every historical score you have logged.
+# ============================================================================
+
+rubric:
+  faithfulness:
+    5: "Every claim is stated in or directly implied by the source section."
+    4: "Every claim traces to the source; one minor rewording is looser than ideal."
+    3: "One claim is plausible but not actually present in the section."
+    2: "Multiple claims are not in the section, or a specific number/name is invented."
+    1: "The script is substantially about something the section does not cover."
+
+  clarity:
+    5: "A learner who has not read the doc understands it on first listen."
+    4: "Clear, one sentence could be tighter."
+    3: "Understandable but requires re-listening."
+    2: "Jargon used before it is defined."
+    1: "Confusing or self-contradictory."
+
+  pace:
+    5: "Beats are evenly sized; no beat runs past ~12 seconds."
+    4: "Slightly uneven but watchable."
+    3: "One beat is noticeably long."
+    2: "Beats are wildly uneven."
+    1: "Effectively a monologue."
+
+  diagram_correct:
+    true: "Every diagram spec matches what the narration says at that moment and is technically accurate."
+    false: "Any diagram contradicts the narration or is technically wrong."
+
+pass_threshold:
+  faithfulness: 4
+  clarity: 4
+  pace: 3
+  diagram_correct: true

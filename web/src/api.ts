@@ -25,6 +25,8 @@ export type MaterialResult = {
   usage: UsageTotals;
   total: UsageTotals;
   doc_id: string;
+  /** Set when the model cited a section that does not exist and it was corrected. */
+  notes?: string[];
   sections: { section_id: string; title: string; chars: number; lines: string }[];
   topics: Topic[];
 };
@@ -55,14 +57,26 @@ export type ScriptResult = {
 export const makeScript = (doc_id: string, topic: Topic) =>
   post<ScriptResult>("/api/script", { doc_id, topic });
 
+export type BatchResult = {
+  results: { topic: Topic; qa?: QA; graders?: GraderResult[]; error?: string }[];
+  usage: UsageTotals;
+  total: UsageTotals;
+};
+
+/** Draft every topic in one request; the server runs them concurrently. */
+export const makeScripts = (doc_id: string, topics: Topic[]) =>
+  post<BatchResult>("/api/scripts", { doc_id, topics });
+
 export const regenerate = (
   doc_id: string,
   topic: Topic,
   instruction: string,
   target: "question" | "answer" | "script",
+  /** The script on screen — without it the model rewrites from scratch. */
+  qa?: QA,
 ) =>
   post<{ topic: Topic; qa: QA; graders: GraderResult[]; usage: UsageTotals; total: UsageTotals }>("/api/regenerate", {
-    doc_id, topic, instruction, target,
+    doc_id, topic, instruction, target, qa,
   });
 
 export const finalize = (doc_id: string, approved: { topic: Topic; qa: QA }[]) =>

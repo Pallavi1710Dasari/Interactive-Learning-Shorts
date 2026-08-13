@@ -46,8 +46,10 @@ class TopicList(BaseModel):
     @field_validator("topics")
     @classmethod
     def check_count(cls, v):
-        if not 3 <= len(v) <= 12:
-            raise ValueError(f"expected 3-12 topics, got {len(v)}")
+        # 1 is legitimate: a short reading may only contain one thing worth a
+        # short, and asking for one reel should not be rejected as malformed.
+        if not 1 <= len(v) <= 12:
+            raise ValueError(f"expected 1-12 topics, got {len(v)}")
         return v
 
 

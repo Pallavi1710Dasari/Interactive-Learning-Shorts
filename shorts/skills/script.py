@@ -55,7 +55,8 @@ Output JSON — one interviewer beat then 3-4 student beats:
 "line":"spoken words","on_screen":"<=8 words","visual_ref":"snake_case"}}]}}"""
 
 
-def write_script(topic: Topic, section: Section, feedback: str | None = None) -> Script:
+def write_script(topic: Topic, section: Section, feedback: str | None = None,
+                 current: Script | None = None) -> Script:
     user = f"""TOPIC: {topic.topic}
 WHY IT MATTERS: {topic.why_it_matters}
 SHORT_ID: {topic.id}
@@ -67,7 +68,18 @@ SOURCE SECTION [{section.section_id}] {section.title}
 
 Write the script. Stay inside the source section."""
 
+    # A targeted edit ("just fix the question") is impossible if the model cannot
+    # see what it is editing — it would rewrite from scratch and the reviewer's
+    # change would appear to do nothing. So the current script goes in verbatim.
+    if current is not None:
+        beats = "\n".join(
+            f'{i}. [{b.speaker}] {b.line}   (on_screen: "{b.on_screen}")'
+            for i, b in enumerate(current.beats)
+        )
+        user += (f"\n\nTHE CURRENT SCRIPT YOU ARE EDITING:\n{beats}\n\n"
+                 "Keep everything not mentioned below exactly as it is.")
+
     if feedback:
-        user += f"\n\nYOUR PREVIOUS ATTEMPT WAS REJECTED:\n{feedback}\nFix exactly this and try again."
+        user += f"\n\nWHAT MUST CHANGE:\n{feedback}\nFix exactly this and try again."
 
     return ask_json(SYSTEM, user, Script, max_tokens=2000, label="script")

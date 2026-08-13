@@ -3,6 +3,8 @@
 Non-negotiable: technical content becomes code-generated SVG, never an image
 model. Image models produce confident nonsense for page tables and flow diagrams.
 """
+from concurrent.futures import ThreadPoolExecutor
+
 from pydantic import BaseModel
 from ..schema import Script, Visual, Section
 from ..llm import ask_json
@@ -36,11 +38,26 @@ SVG_SYSTEM = """You draw a single technical diagram as an SVG for a VERTICAL pho
 CONSTRAINTS
 - viewBox="0 0 1080 1080". Nothing outside those bounds.
 - Transparent background. Do not draw a background rect.
-- Only these colours: #1D9E75 (highlight), #0F6E56 (dark teal), #E1F5EE (fill),
-  #2C2C2A (text), #8A8880 (muted). Nothing else.
+- Palette, and nothing outside it:
+    #E1F5EE  fill for boxes and panels
+    #1D9E75  primary stroke, arrows, headings
+    #0F6E56  deeper green for a second grouping
+    #F2B14B  AMBER — the one element the narration is about right now. Use it on
+             exactly one shape per diagram, never more. This is what the eye finds.
+    #E8735A  coral — only for a thing being rejected, lost, or wasted
+    #2C2C2A  text on light fills
+    #8A8880  muted labels and secondary text
+  A diagram drawn in a single colour reads as a wireframe; the amber accent is
+  what makes it look designed rather than generated.
 - font-family="Inter, Helvetica, sans-serif". Minimum font-size 34 — this is read
   on a phone at arm's length. Labels under 5 words.
-- Maximum 7 shapes. A short's diagram is glanceable, not a textbook figure.
+- 4 to 9 shapes. Glanceable, not a textbook figure — but do not leave it bare:
+  give boxes real labels, and draw the arrow or bracket that carries the idea.
+- Use ONE accent: highlight the single element the narration is about right now
+  (thicker stroke or the highlight fill), and leave the rest quiet. A diagram
+  where everything is emphasised communicates nothing.
+- Group related things visually — align them, or enclose them in one rounded
+  container — so the structure is readable before the labels are.
 - No <style> blocks, no external refs, no <image>, no scripts. Inline attributes only.
 
 ACCURACY BEATS DECORATION. If the narration says the valid bit is clear, the
@@ -58,13 +75,29 @@ def spec_visuals(script: Script) -> dict[str, Visual]:
 
 
 def render_diagrams(visuals: dict[str, Visual], script: Script, section: Section) -> dict[str, Visual]:
-    """Fill in .svg for every diagram-type visual. One LLM call per diagram."""
-    from ..llm import client
+    """
+    Fill in .svg for every diagram-type visual. One LLM call per diagram.
+
+    Drawn concurrently: a short has 4-5 diagrams and each call takes several
+    seconds, so doing them in sequence made building a single short the slowest
+    thing in the product. The calls are independent, so wall-clock time drops to
+    roughly one diagram instead of the sum of all of them.
+    """
     if config.STUB:
         return visuals                      # stub visuals are all type="text"
-    for ref, v in visuals.items():
-        if v.type != "diagram":
-            continue
+
+    todo = [(ref, v) for ref, v in visuals.items() if v.type == "diagram"]
+    if not todo:
+        return visuals
+    with ThreadPoolExecutor(max_workers=min(5, len(todo))) as pool:
+        list(pool.map(lambda rv: _draw_one(rv[0], rv[1], script, section), todo))
+    return visuals
+
+
+def _draw_one(ref: str, v: Visual, script: Script, section: Section) -> None:
+    """Draw one diagram, in place. Never raises — a missing SVG is a grader's job."""
+    from ..llm import client
+    try:
         narration = " ".join(b.line for b in script.beats if b.visual_ref == ref)
         resp = client().messages.create(
             model=config.MODEL_GENERATOR,
@@ -86,4 +119,5 @@ def render_diagrams(visuals: dict[str, Visual], script: Script, section: Section
         else:
             reason = "truncated" if resp.stop_reason == "max_tokens" else "no <svg> in output"
             print(f"    ! diagram {ref}: {reason} — leaving it unrendered")
-    return visuals
+    except Exception as e:
+        print(f"    ! diagram {ref}: {type(e).__name__}: {e} — leaving it unrendered")

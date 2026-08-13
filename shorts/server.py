@@ -16,6 +16,7 @@ Cost shape, worth knowing before clicking:
 So Step 2 is cheap and Step 3 is not. Only finalize what a human approved.
 """
 import json, re, uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
@@ -25,7 +26,7 @@ from pydantic import BaseModel
 
 from .schema import Script, Topic, Section, ShortUnit
 from .parse import parse_markdown, find_section
-from .skills.select import select_topics
+from .skills.select import select_topics_with_notes
 from .skills.script import write_script
 from .skills.visuals import spec_visuals, render_diagrams
 from .skills.audit import audit
@@ -55,9 +56,9 @@ def _sections(doc_id: str) -> list[Section]:
     return parse_markdown(_doc_path(doc_id))
 
 
-def _graders(script: Script, section: Section) -> list[dict]:
+def _graders(script: Script, section: Section, doc_text: str | None = None) -> list[dict]:
     return [{"name": r.name, "passed": r.passed, "reason": r.reason}
-            for r in checks.run_script_graders(script, section.text)]
+            for r in checks.run_script_graders(script, section.text, doc_text=doc_text)]
 
 
 def _as_qa(script: Script) -> dict:
@@ -130,9 +131,15 @@ async def material(
         )
 
     cursor = usage.mark()
-    topics = select_topics(sections, target=target)
+    try:
+        topics, notes = select_topics_with_notes(sections, target)
+    except ValueError as e:
+        # Every cited section was invented. That is a bad selection, not a bug —
+        # say so instead of returning a 500.
+        raise HTTPException(422, str(e))
     return {
         "usage": usage.since(cursor), "total": usage.totals(),
+        "notes": notes,
         "doc_id": doc_id,
         "sections": [{"section_id": s.section_id, "title": s.title,
                       "chars": len(s.text), "lines": f"{s.start_line}-{s.end_line}"}
@@ -158,11 +165,12 @@ def make_script(body: ScriptIn):
         raise HTTPException(422, str(e))
 
     cursor = usage.mark()
+    doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
     feedback, attempts = None, []
     script = None
     for attempt in range(1, 4):
         script = write_script(body.topic, section, feedback)
-        graders = _graders(script, section)
+        graders = _graders(script, section, doc_text)
         attempts.append({"attempt": attempt, "graders": graders})
         if all(g["passed"] for g in graders):
             break
@@ -175,11 +183,52 @@ def make_script(body: ScriptIn):
             "usage": usage.since(cursor), "total": usage.totals()}
 
 
+class ScriptsIn(BaseModel):
+    doc_id: str
+    topics: list[Topic]
+
+
+@app.post("/api/scripts")
+def make_scripts(body: ScriptsIn):
+    """
+    Draft every topic at once.
+
+    Drafting one topic at a time meant the reviewer watched a spinner per card and
+    the wall-clock cost was the sum of all of them. These calls are independent, so
+    they run concurrently and the wait becomes the slowest single draft.
+    """
+    cursor = usage.mark()
+    sections = _sections(body.doc_id)
+    doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
+
+    def one(topic: Topic) -> dict:
+        try:
+            section = find_section(sections, topic.source_section_id)
+        except KeyError as e:
+            return {"topic": topic.model_dump(), "error": str(e)}
+        feedback, script, graders = None, None, []
+        for _ in range(3):
+            script = write_script(topic, section, feedback)
+            graders = _graders(script, section, doc_text)
+            if all(g["passed"] for g in graders):
+                break
+            feedback = "\n".join(f"- {g['name']}: {g['reason']}"
+                                 for g in graders if not g["passed"])
+        return {"topic": topic.model_dump(), "section_id": section.section_id,
+                "qa": _as_qa(script), "graders": graders}
+
+    with ThreadPoolExecutor(max_workers=min(6, len(body.topics) or 1)) as pool:
+        results = list(pool.map(one, body.topics))
+
+    return {"results": results, "usage": usage.since(cursor), "total": usage.totals()}
+
+
 class RegenerateIn(BaseModel):
     doc_id: str
     topic: Topic
     instruction: str
     target: str = "script"          # "question" | "answer" | "script"
+    qa: dict | None = None          # the script on screen, so edits are targeted
 
 
 @app.post("/api/regenerate")
@@ -204,9 +253,21 @@ def regenerate(body: RegenerateIn):
         raise HTTPException(422, str(e))
 
     where = {
-        "question": "Change the interviewer's QUESTION as directed. Keep the answer.",
-        "answer": "Change the student's ANSWER as directed. Keep the question.",
+        "question": "Change ONLY the interviewer's question. Leave every answer beat "
+                    "word-for-word as it is.",
+        "answer": "Change ONLY the answer beats. Leave the interviewer's question "
+                  "word-for-word as it is.",
     }.get(body.target, "Revise the whole script as directed.")
+
+    # Without this the model rewrote from scratch and the reviewer's targeted edit
+    # looked like it had done nothing — the reported "regeneration not working".
+    current = None
+    if body.qa:
+        try:
+            current = Script(short_id=body.topic.id, question=body.qa["question"],
+                             beats=body.qa["beats"])
+        except Exception:
+            current = None
 
     note = body.instruction.strip()
     base = f"A human reviewer asked for this change:\n{note}\n\n{where}"
@@ -218,10 +279,11 @@ def regenerate(body: RegenerateIn):
     # alongside the mechanical complaint. The reviewer's intent is never dropped, and a
     # failure is only reported if it survives every attempt.
     cursor = usage.mark()
+    doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
     script, graders, feedback = None, [], base
     for _ in range(3):
-        script = write_script(body.topic, section, feedback)
-        graders = _graders(script, section)
+        script = write_script(body.topic, section, feedback, current=current)
+        graders = _graders(script, section, doc_text)
         if all(g["passed"] for g in graders):
             break
         broken = "\n".join(f"- {g['name']}: {g['reason']}"
@@ -252,38 +314,50 @@ def finalize(body: FinalizeIn):
     sections = _sections(body.doc_id)
     built, failed = [], []
 
-    for item in body.approved:
-        topic = Topic(**item["topic"])
+    def build_one(item: dict) -> tuple[str | None, dict | None]:
+        """One approved Q&A -> one unit on disk. Returns (short_id, failure)."""
         try:
+            topic = Topic(**item["topic"])
             section = find_section(sections, topic.source_section_id)
             script = Script(short_id=topic.id, question=item["qa"]["question"],
                             beats=item["qa"]["beats"])
         except Exception as e:
-            failed.append({"topic_id": item.get("topic", {}).get("id"), "error": str(e)})
-            continue
+            return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}
 
-        visuals = spec_visuals(script)
-        if body.do_svg:
-            visuals = render_diagrams(visuals, script, section)
+        try:
+            visuals = spec_visuals(script)
+            if body.do_svg:
+                visuals = render_diagrams(visuals, script, section)
 
-        unit = ShortUnit(
-            short_id=script.short_id,
-            session_id=Path(_doc_path(body.doc_id)).stem,
-            source_section_id=section.section_id,
-            question=script.question,
-            estimated_seconds=script.estimated_seconds,
-            beats=script.beats,
-            visuals=visuals,
-            status="approved",          # a human already approved it in step 2
-        )
+            unit = ShortUnit(
+                short_id=script.short_id,
+                session_id=Path(_doc_path(body.doc_id)).stem,
+                source_section_id=section.section_id,
+                question=script.question,
+                estimated_seconds=script.estimated_seconds,
+                beats=script.beats,
+                visuals=visuals,
+                status="approved",      # a human already approved it in step 2
+            )
+            if body.do_judge:
+                _, report = audit(script, section.text, unit)
+                if report:
+                    unit.eval = report
+            (config.OUTPUT_DIR / f"{unit.short_id}.json").write_text(
+                unit.model_dump_json(indent=2))
+            return unit.short_id, None
+        except Exception as e:
+            # One bad short must not lose the others in the batch — they have
+            # already been paid for by the time anything can go wrong here.
+            return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}
 
-        if body.do_judge:
-            _, report = audit(script, section.text, unit)
-            if report:
-                unit.eval = report
-        (config.OUTPUT_DIR / f"{unit.short_id}.json").write_text(
-            unit.model_dump_json(indent=2))
-        built.append(unit.short_id)
+    # Shorts are independent, so build them side by side rather than end to end.
+    with ThreadPoolExecutor(max_workers=min(4, len(body.approved))) as pool:
+        for short_id, failure in pool.map(build_one, body.approved):
+            if short_id:
+                built.append(short_id)
+            elif failure:
+                failed.append(failure)
 
     # Only what this build produced. Returning every unit in output/ meant
     # approving one short and then being shown seven, which is not what the

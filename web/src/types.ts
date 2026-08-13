@@ -67,7 +67,7 @@ export type ReviewItem = {
   topic: Topic;
   qa: QA | null;
   graders: GraderResult[];
-  state: "idle" | "loading" | "ready" | "error" | "approved";
+  state: "idle" | "loading" | "ready" | "error" | "approved" | "skipped";
   error?: string;
   note: string;
   target: "question" | "answer" | "script";

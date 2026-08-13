@@ -339,3 +339,99 @@ kbd {
   border-radius: 50%; background: rgba(255, 255, 255, 0.07); color: var(--muted);
   font-size: 10px; font-weight: 700;
 }
+
+/* ------------------------------------------------------------------ loading */
+.spin { display: inline-flex; align-items: center; gap: 8px; }
+.spin .ring {
+  width: 13px; height: 13px; flex: none; border-radius: 50%;
+  border: 2px solid currentColor; border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.drafting {
+  display: flex; align-items: center; gap: 10px; padding: 12px 15px; margin-bottom: 16px;
+  border-radius: var(--radius); background: rgba(29, 158, 117, 0.08);
+  border: 1px solid rgba(47, 211, 155, 0.22); color: var(--teal-hi); font-size: 13px;
+}
+.card.skipped { opacity: 0.45; }
+.card.skipped .qa, .card.skipped .graders, .card.skipped .redo { display: none; }
+
+.notes {
+  display: flex; flex-direction: column; gap: 4px; padding: 11px 14px; margin-bottom: 14px;
+  border-radius: var(--radius); background: rgba(240, 198, 116, 0.07);
+  border: 1px solid rgba(240, 198, 116, 0.22); color: #f0c674; font-size: 12px;
+}
+.notes b { font-size: 11.5px; font-weight: 700; }
+.notes span { color: rgba(240, 198, 116, 0.75); font-size: 11.5px; }
+
+/* ===========================================================================
+   REEL COLOUR — the feed used to be one dark green page repeated. Every short
+   now owns a hue derived from its id, so scrolling feels like moving between
+   posts rather than watching one long video.
+   =========================================================================== */
+.reel {
+  --accent: hsl(var(--hue) 72% 58%);
+  --accent-2: hsl(calc(var(--hue) + 48) 70% 52%);
+}
+.reelbg {
+  background:
+    radial-gradient(130% 85% at 50% -10%, hsl(var(--hue) 62% 26%) 0%, transparent 60%),
+    radial-gradient(100% 75% at 8% 105%, hsl(calc(var(--hue) + 48) 58% 22%) 0%, transparent 58%),
+    radial-gradient(90% 60% at 100% 60%, hsl(calc(var(--hue) - 40) 55% 20%) 0%, transparent 62%),
+    linear-gradient(168deg, #0b1215 0%, #05080a 100%);
+}
+/* a slow drift so a paused reel is not a dead rectangle */
+.reelbg::before {
+  content: ""; position: absolute; inset: -30%;
+  background: conic-gradient(from 0deg,
+    transparent 0deg, hsl(var(--hue) 80% 60% / 0.09) 60deg,
+    transparent 140deg, hsl(calc(var(--hue) + 60) 80% 60% / 0.07) 220deg, transparent 300deg);
+  animation: drift 26s linear infinite;
+}
+@keyframes drift { to { transform: rotate(360deg); } }
+
+/* the diagram sits on its own lifted card so it reads as content, not background */
+.stageinner {
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(255,255,255,.055), rgba(255,255,255,.014));
+  border: 1px solid rgba(255,255,255,.09);
+  box-shadow: 0 18px 50px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.07);
+  padding: 16px;
+  backdrop-filter: blur(3px);
+}
+.svgwrap svg { filter: drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
+
+/* the caption bubble picks up the short's colour */
+.bubble.right p {
+  background: linear-gradient(135deg,
+    hsl(var(--hue) 62% 30% / .92), hsl(calc(var(--hue) + 40) 58% 24% / .92));
+  border-color: hsl(var(--hue) 70% 60% / .4);
+  box-shadow: 0 10px 30px hsl(var(--hue) 70% 12% / .6);
+}
+.bubble.left p {
+  background: rgba(10, 15, 18, .88);
+  border-color: rgba(255,255,255,.14);
+}
+
+/* progress + speaker chip in the short's own colour */
+.segfill { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.bar { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.reelhead .who {
+  color: #06110d; font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 4px 16px hsl(var(--hue) 70% 40% / .45);
+}
+
+/* the speaking person gets a coloured glow */
+.scene .person.on { filter: drop-shadow(0 0 14px hsl(var(--hue) 80% 55% / .45)); }
+.micwave { stroke: var(--accent); }
+
+/* action rail: readable, and the like turns hot pink like every feed app */
+.rail .glyph { text-shadow: 0 2px 10px rgba(0,0,0,.75); }
+.rail button.on .glyph { color: #ff4d79; text-shadow: 0 0 16px rgba(255,77,121,.6); }
+
+.tap span {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #06110d; box-shadow: 0 10px 34px hsl(var(--hue) 70% 30% / .6);
+}
+.reel.live { box-shadow: 0 24px 80px hsl(var(--hue) 70% 8% / .8), 0 0 0 1px hsl(var(--hue) 60% 40% / .25); }

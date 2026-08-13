@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { submitMaterial, type MaterialResult } from "./api";
+import { Spinner } from "./Spinner";
 
 /**
  * Step 1 — paste or upload the reading material.
@@ -61,8 +62,8 @@ export function StepMaterial({ onDone }: { onDone: (r: MaterialResult) => void }
         <label className="inline">
           shorts to suggest
           <input
-            type="number" min={3} max={12} value={target}
-            onChange={(e) => setTarget(Math.max(3, Math.min(12, +e.target.value)))}
+            type="number" min={1} max={12} value={target}
+            onChange={(e) => setTarget(Math.max(1, Math.min(12, +e.target.value)))}
           />
         </label>
 
@@ -71,7 +72,7 @@ export function StepMaterial({ onDone }: { onDone: (r: MaterialResult) => void }
           {file ? "file selected" : `${text.trim().length} chars`}
         </span>
         <button className="primary" disabled={!ready} onClick={go}>
-          {busy ? "Reading & suggesting…" : "Suggest questions →"}
+          {busy ? <Spinner label="Reading & suggesting…" /> : "Suggest questions →"}
         </button>
       </div>
 

@@ -7,6 +7,8 @@ export type Beat = {
   line: string;
   on_screen: string;
   visual_ref: string;
+  /** The sentence of the source this beat restates; student beats only. */
+  source_quote?: string | null;
   /** Inline SVG, already stripped of <script> and on* handlers in Python. */
   svg?: string | null;
   start?: number;
@@ -30,7 +32,11 @@ export type GraderResult = { name: string; passed: boolean; reason: string };
 export type QA = {
   short_id: string;
   question: string;
-  answers: { index: number; line: string; on_screen: string; visual_ref: string }[];
+  answers: {
+    index: number; line: string; on_screen: string; visual_ref: string;
+    /** The sentence of the source this answer restates. Verified server-side. */
+    source_quote?: string | null;
+  }[];
   beats: Beat[];
   seconds: number;
   words: number;
@@ -51,6 +57,8 @@ export type Unit = {
   seconds: number;
   judge: Judge | null;
   diagrams: number;
+  /** A recorded neural track, when one was built. Null means browser speech. */
+  audio_url?: string | null;
   beats: ReelBeat[];
 };
 

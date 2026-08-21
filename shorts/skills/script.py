@@ -6,33 +6,48 @@ its quality. Tune it against the eval set, not by vibes.
 from ..schema import Script, Topic, Section, MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND
 from ..llm import ask_json
 
-MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 75
-MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 150
-TARGET_WORDS = 110
+MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 45
+MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
+TARGET_WORDS = 65
 
-SYSTEM = f"""You write 30-60 second interview-style video scripts that teach ONE concept.
+SYSTEM = f"""You write SHORT interview-style video scripts that teach ONE concept.
 
 FORMAT
 Beat 1: the interviewer asks ONE question.
-Beats 2-5: the student answers in 3 to 4 SHORT parts (5 parts maximum).
+Beats 2-4: the student answers in 3 SHORT parts (4 maximum).
 Every beat after the first is the student. No follow-up question.
 
-HARD WORD BUDGET
+BE BRIEF. THIS IS THE HARDEST PART AND THE MOST IMPORTANT.
 Total spoken words across ALL beats: {MIN_WORDS} minimum, {MAX_WORDS} maximum,
-{TARGET_WORDS} is the target. Speech runs 150 words per minute, so this IS the
-video length. Count your words before you answer. A script outside the budget is
-discarded — being UNDER {MIN_WORDS} fails just as hard as being over {MAX_WORDS}.
+{TARGET_WORDS} is the target — about 26 seconds. Speech runs 150 words per minute,
+so this IS the video length.
+
+Aim at the target, not the maximum. Three tight sentences that a learner
+understands the first time beat six that cover more ground. If you find yourself
+adding a fourth beat to fill time, stop — you are done.
+
+What brevity does NOT mean: dropping the part that makes it make sense. A short
+answer still has to be understandable on its own, to someone who has not read the
+material. Cut words, never cut the explanation.
 
 THE QUESTION (beat 1)
-- 8 to 20 words. Ask the thing a learner actually wonders, not a textbook prompt.
+- 8 to 18 words. Ask the thing a learner actually wonders, not a textbook prompt.
 - Best when it targets a misconception, so the answer corrects a wrong prediction.
+- THE QUESTION AND THE ANSWER MUST MATCH. Write the answer first if it helps, then
+  make the question the exact thing that answer answers. A question that promises
+  more than the answer delivers — asking about two things and explaining one, or
+  asking "how" and answering "what" — is the most common defect in these scripts.
+  If the material only supports a narrower question, ask the narrower question.
 
 EACH ANSWER BEAT
-- ONE idea only. 15 to 28 spoken words. NEVER more than 32 — a longer beat is
+- ONE idea only. 15 to 24 spoken words. NEVER more than 32 — a longer beat is
   rejected outright, because the diagram on screen has to change with the idea.
+- Each beat needs its OWN supporting sentence from the material. If you cannot find
+  a distinct sentence behind a beat, that beat should not exist — delete it and let
+  the answer be shorter.
 - Reads as speech, not prose. No "furthermore", no "it should be noted".
 - Builds on the beat before it. The last beat lands the takeaway.
-- Together the beats must flow as one continuous explanation, not four
+- Together the beats must flow as one continuous explanation, not three
   disconnected facts — someone reads the whole thing aloud in one take.
 
 on_screen (the text burned onto the video)
@@ -44,29 +59,110 @@ visual_ref
 - A short snake_case id you invent, e.g. "d_page_table_miss".
 - A DIFFERENT ref per beat, unless two consecutive beats really share one visual.
 
-FAITHFULNESS — the hardest rule
-Every claim must appear in, or follow directly from, the source section provided.
-Do not add version numbers, vendor names, benchmarks, dates, or statistics that
-are not in the source. If the section does not contain something you need,
-write around it. Inventing a plausible detail is the worst failure mode.
+source_quote — REQUIRED on every student beat
+Before you write a beat, find the sentence in the READING MATERIAL that the beat is
+a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTER.
+- Copy, do not retype from memory, and do not tidy it up. It is checked by exact
+  match against the material and a beat whose quote is not found is rejected.
+- At least 4 words. One sentence is ideal; two adjacent sentences are allowed.
+- Quote a sentence that STATES something. A heading, a title, or a list label is
+  not evidence — "What are header and heading elements in HTML?" is a question the
+  material asks, not a fact it establishes. Cite the sentence that answers it.
+- The quote must actually SUPPORT the beat, not merely share words with it. Sharing
+  a phrase is not support: a beat claiming a file extension causes rendering is not
+  supported by a sentence about telling the browser how to display elements, even
+  though both mention the browser. If the material does not establish your claim,
+  change the claim.
+- The beat's `line` must say what the quote says, in simpler words. If you cannot
+  find a quote that carries the claim, YOU MAY NOT MAKE THE CLAIM.
 
-Output JSON — one interviewer beat then 3-4 student beats:
-{{"short_id":"...","question":"...","beats":[{{"speaker":"interviewer|student",
-"line":"spoken words","on_screen":"<=8 words","visual_ref":"snake_case"}}]}}"""
+This is the order of work, and it is not optional: find the quote, then say it
+simply. Writing the line first and hunting for a quote afterwards is how wrong
+answers get made.
+
+STAY INSIDE THE READING MATERIAL
+The reading material is the ONLY thing you know. You have no other knowledge of
+this subject for the length of this task.
+- Never add a fact the material does not state — no version numbers, vendor names,
+  benchmarks, dates, statistics, or "typically it's around..." figures.
+- Use the material's OWN example. If it demonstrates with 1011, explain with 1011;
+  do not substitute a number you find neater.
+- Never contradict the material, and never "correct" it.
+- Padding with outside knowledge is the worst failure mode in this project.
+
+WHERE TO LOOK, AND NEVER REFUSE
+You are given the FULL reading material plus the ONE section this short is filed
+under. Work from that section first — it is where the topic came from.
+
+If the section does not contain the whole answer, FIND THE ANSWER ELSEWHERE IN THE
+MATERIAL. Reading material is not tidy: a question like "what is the difference
+between X and Y" is often answered in a summary or an FAQ several sections away,
+and the section headings do not always say where an answer lives. Search the whole
+document before concluding anything is missing.
+
+You must NEVER produce any of these:
+- "I can't answer that", "that's not covered here", "the section I have only
+  talks about ..."
+- any mention of the section, the source, the material, or what you do or do not
+  have. The viewer is watching a person explain an idea; that person does not
+  discuss their reference documents.
+
+If the material genuinely answers a NARROWER version of the question, answer the
+narrower version well and let the interviewer's question match what you answered.
+A clear answer to a slightly smaller question is a good short. A refusal is not a
+short at all.
+
+BE CORRECT, THEN BE SIMPLE
+- Say it the way you would to a friend who missed the class. Short sentences.
+  Everyday words.
+- Use a technical term only if the section itself introduces it. If you use one,
+  the beat that introduces it must say what it means.
+- Never imply a causal link ("so", "which means", "because") that the section does
+  not make. An invented explanation of a real fact is still an invention.
+- One idea per beat, and the beats in the order the section presents them.
+
+Output JSON — one interviewer beat then 3-4 student beats. Only the student beats
+carry source_quote:
+{{"short_id":"...","question":"...","beats":[
+{{"speaker":"interviewer","line":"the question","on_screen":"<=8 words","visual_ref":"snake_case"}},
+{{"speaker":"student","line":"spoken words","on_screen":"<=8 words","visual_ref":"snake_case",
+"source_quote":"copied verbatim from the section"}}]}}"""
 
 
 def write_script(topic: Topic, section: Section, feedback: str | None = None,
-                 current: Script | None = None) -> Script:
+                 current: Script | None = None, document: str | None = None) -> Script:
+    """
+    Write one script.
+
+    `document` is the whole reading material. Passing it is what stops the model
+    refusing: given only its own section, a topic whose answer lives in a summary or
+    an FAQ elsewhere in the document has no way to be answered, and the model does
+    the honest thing and says so — which reaches the reviewer as a broken card. With
+    the full material in front of it the answer is findable, and check_source_quotes
+    still holds every claim to a sentence that really exists.
+    """
     user = f"""TOPIC: {topic.topic}
 WHY IT MATTERS: {topic.why_it_matters}
 SHORT_ID: {topic.id}
+"""
 
-SOURCE SECTION [{section.section_id}] {section.title}
+    if document:
+        user += f"""
+THE FULL READING MATERIAL — everything you are allowed to know
+=============================================================
+{document}
+=============================================================
+"""
+
+    user += f"""
+THE SECTION THIS SHORT IS FILED UNDER — start here [{section.section_id}] {section.title}
 ---
 {section.text}
 ---
 
-Write the script. Stay inside the source section."""
+Write the script. Answer the topic from the section above where you can, and from
+elsewhere in the reading material where the section falls short. Do not refuse, and
+do not mention the material."""
 
     # A targeted edit ("just fix the question") is impossible if the model cannot
     # see what it is editing — it would rewrite from scratch and the reviewer's
@@ -82,4 +178,7 @@ Write the script. Stay inside the source section."""
     if feedback:
         user += f"\n\nWHAT MUST CHANGE:\n{feedback}\nFix exactly this and try again."
 
-    return ask_json(SYSTEM, user, Script, max_tokens=2000, label="script")
+    # 2000 was too tight: a script plus a verbatim quote per beat is a longer
+    # payload than a script alone, and a truncated response comes back with no
+    # text block at all (see the note in llm.py).
+    return ask_json(SYSTEM, user, Script, max_tokens=4000, label="script")

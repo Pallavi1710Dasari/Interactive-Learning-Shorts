@@ -271,6 +271,454 @@ def check_grounding(script: Script, source_text: str,
                         {"overlap": overlap, "unknown": unknown})
 
 
+# ----------------------------------------------------------------- source quotes
+#
+# Grounding above is a word-overlap proxy: it catches a script that invented a
+# whole topic, but it cannot catch a script that uses the section's vocabulary to
+# state something the section never said. That is the failure that actually
+# reaches a learner — a confident, on-topic, wrong answer.
+#
+# So every answer beat carries the span of the section it is a restatement of, and
+# this grader checks that the span is really there. A model cannot cite a sentence
+# that does not exist without the citation failing, and the failure comes back as
+# retry feedback naming the beat, so the next attempt is anchored rather than
+# scolded. Deterministic, free, and it runs before anything is paid for.
+
+_QUOTE_NOISE = re.compile(r"[^a-z0-9]+")
+MIN_QUOTE_WORDS = 4
+
+
+def _flatten(text: str) -> str:
+    """Collapse to bare alphanumerics so punctuation and whitespace cannot bite.
+
+    The model retypes a quote with a straight apostrophe where the source had a
+    curly one, or joins a line-wrapped sentence with a single space. Those are
+    faithful citations and must not be reported as invented, so both sides are
+    reduced to letters and digits before comparing.
+    """
+    return _QUOTE_NOISE.sub(" ", text.lower()).strip()
+
+
+# ---------------------------------------------------------------------- refusals
+#
+# The instruction to stay inside the source is strong, and it should be. But a
+# model handed a section that cannot answer its topic obeys that instruction by
+# refusing — "the section I have only talks about the p element", "I can't really
+# answer that from what I've got here" — and a refusal is a worse short than a
+# wrong one, because it teaches nothing and reads as broken.
+#
+# A refusal is a bug upstream (a topic paired with the wrong section) surfacing
+# downstream, so this grader exists to stop it reaching a human and to send the
+# retry loop the one instruction that fixes it: find the answer in the material.
+#
+# Matching is deliberately narrow — the meta-framing, not the words. A script may
+# legitimately say "the browser does not display it"; only a script talking ABOUT
+# its own source material trips this.
+_REFUSAL = re.compile(
+    r"""(
+      \b(can|could|cannot|can't|cant)\s*(not)?\s*(really\s+)?(answer|tell|say|explain|help)
+    | \bi\s+(don't|do\s+not|doesn't)\s+have\b
+    | \b(the|this|my)\s+(section|source|material|document|text|passage)\s+
+        (i\s+have\s+)?(only|just|doesn't|does\s+not|never|didn't)\b
+    | \b(not|isn't|aren't|never)\s+(covered|mentioned|discussed|explained|stated|given)\b
+    | \b(doesn't|does\s+not|don't)\s+(cover|mention|discuss|explain|say|state|include)\b
+    | \bfrom\s+what\s+i(\s+have|'ve|\s+was)\b
+    | \b(no|not\s+enough)\s+(information|detail|details|context)\b
+    | \b(outside|beyond)\s+(the\s+)?(scope|section|source|material)\b
+    | \bnot\s+in\s+the\s+(source|section|material)\b
+    )""",
+    re.I | re.X,
+)
+
+
+def check_no_refusal(script: Script) -> GraderResult:
+    """No beat may talk about the source material instead of teaching."""
+    hits = []
+    for i, beat in enumerate(script.beats):
+        for field, text in (("line", beat.line), ("on_screen", beat.on_screen)):
+            if m := _REFUSAL.search(text or ""):
+                hits.append(f'beat {i} {field}: "{m.group(0).strip()}"')
+
+    if hits:
+        return GraderResult("no_refusal", False,
+            "the script refuses to answer instead of teaching — " + "; ".join(hits[:3]) +
+            ". The answer IS in the reading material: find the part that answers this "
+            "question, quote it, and explain it. Never mention the source material, "
+            "the section, or what you do or do not have.",
+            {"hits": hits})
+    return GraderResult("no_refusal", True, "answers the question directly")
+
+
+def check_source_quotes(script: Script, source_text: str,
+                        doc_text: str | None = None) -> GraderResult:
+    """
+    Every answer beat must quote a span that actually occurs in the material.
+
+    Checked against the whole document when it is available, not only the cited
+    section. A question can legitimately need one sentence from a neighbouring
+    section — "what is the difference between X and Y" often does — and rejecting
+    that quote would push the model toward refusing rather than answering. The
+    guarantee that matters is unchanged: the sentence must exist in the material
+    the user supplied. Whether the short stayed on-topic for its section is the
+    judge's question, not this one's.
+    """
+    haystack = _flatten(source_text)
+    if doc_text:
+        haystack += "  " + _flatten(doc_text)
+    answers = [(i, b) for i, b in enumerate(script.beats) if b.speaker == "student"]
+    if not answers:
+        return GraderResult("source_quotes", False, "no answer beats to check")
+
+    missing, thin = [], []
+    for i, beat in answers:
+        quote = (beat.source_quote or "").strip()
+        if not quote:
+            missing.append(f"beat {i} has no source_quote")
+            continue
+        flat = _flatten(quote)
+        if len(flat.split()) < MIN_QUOTE_WORDS:
+            thin.append(f"beat {i} quote is only {len(flat.split())} words")
+            continue
+        if flat not in haystack:
+            missing.append(f'beat {i} quotes "{quote[:70]}" which is not in the material')
+
+    problems = missing + thin
+    if problems:
+        return GraderResult("source_quotes", False,
+            "; ".join(problems[:4]) +
+            ". Copy the sentence out of the reading material character for character. "
+            "The full quote is compared, so do not add words to it or run two "
+            "separated sentences together.",
+            {"problems": problems})
+
+    # One sentence propping up three beats. Whether a citation actually SUPPORTS its
+    # line is a meaning question and belongs to the judge, but this much is
+    # countable, and it is the shape the padded shorts had: an answer stretched to
+    # fill the length floor, with the extra beats citing whatever was nearest.
+    # Distinct evidence per beat is what a real explanation looks like.
+    #
+    # One repeat is allowed, because a closing takeaway legitimately lands on the
+    # same sentence an earlier beat introduced.
+    quotes = {_flatten(b.source_quote or "") for _, b in answers}
+    needed = max(2, len(answers) - 1)
+    if len(quotes) < needed:
+        return GraderResult("source_quotes", False,
+            f"{len(answers)} answer beats rest on only {len(quotes)} distinct "
+            f"sentence(s) from the material — that is one idea stretched to fill "
+            f"the time. Either give each beat its own supporting sentence, or use "
+            f"fewer beats and make the answer shorter.",
+            {"distinct": len(quotes), "beats": len(answers)})
+
+    return GraderResult("source_quotes", True,
+                        f"{len(answers)} answer beats, {len(quotes)} distinct "
+                        f"citations, all verbatim")
+
+
+def check_answers_its_section(script: Script, section_text: str) -> GraderResult:
+    """
+    At least one answer beat must quote the section the topic was filed under.
+
+    write_script is given the whole document so that a topic whose answer lives in a
+    summary elsewhere can still be answered instead of refused. The cost of that is
+    drift: with everything in view, a short can wander off and answer something
+    adjacent to what its question asked. This is the anchor — the short may draw on
+    the whole material, but it has to be ABOUT its own section.
+    """
+    section = _flatten(section_text)
+    answers = [b for b in script.beats if b.speaker == "student"]
+    anchored = [b for b in answers
+                if b.source_quote and _flatten(b.source_quote) in section]
+
+    if not anchored:
+        return GraderResult("on_topic", False,
+            "no answer beat quotes the section this short is filed under — the "
+            "answer has drifted onto neighbouring material. At least one beat must "
+            "come from the section itself, or the question is the wrong question "
+            "for this section.")
+    return GraderResult("on_topic", True,
+                        f"{len(anchored)} of {len(answers)} beats quote its own section")
+
+
+# -------------------------------------------------------------------- svg defects
+#
+# A model drawing SVG cannot see its own output, and the failures that follow from
+# that are always the same three, all of them visible from the markup alone:
+#
+#   1. Overflowing text. SVG has no line wrapping, so a 27-character label in a
+#      200px box simply spills across the drawing. Character count against the
+#      font size catches it without rendering anything.
+#   2. Rotated labels. A transform on a <text> reliably comes out overlapping and
+#      unreadable at phone size.
+#   3. Coordinates outside the viewBox, which are silently clipped.
+#
+# Cheap enough to run on every frame, and specific enough to hand back as retry
+# feedback — which is what render_diagrams does with it.
+
+_TEXT_EL = re.compile(r"<text\b([^>]*)>(.*?)</text>", re.S | re.I)
+_RECT_EL = re.compile(r"<rect\b([^>]*)/?>", re.I)
+_FONT_SIZE = re.compile(r'font-size\s*=\s*"?(\d+(?:\.\d+)?)', re.I)
+_ANCHOR = re.compile(r'text-anchor\s*=\s*"?(\w+)', re.I)
+_XY = re.compile(r'\b(x|y)\s*=\s*"?(-?\d+(?:\.\d+)?)', re.I)
+
+VIEWBOX = 1080
+CHAR_WIDTH_RATIO = 0.55        # rough advance width of Inter at a given font-size
+
+# What actually makes a label unreadable is its WIDTH IN PIXELS, not its character
+# count. A raw character cap flags a 39-character caption set at 34px — 729px on a
+# 1080 canvas, perfectly legible — while missing a 20-character heading at 80px
+# that runs off both edges. Measure the width and the same rule covers both.
+MAX_TEXT_WIDTH = VIEWBOX - 80
+
+
+def _attr(attrs: str, name: str) -> float | None:
+    m = re.search(rf'\b{name}\s*=\s*"?(-?\d+(?:\.\d+)?)', attrs, re.I)
+    return float(m.group(1)) if m else None
+
+
+def _text_box(attrs: str, label: str) -> tuple[float, float, float, float] | None:
+    """Estimated bounding box of a <text>, as (x0, y0, x1, y1)."""
+    x, y = _attr(attrs, "x"), _attr(attrs, "y")
+    if x is None or y is None:
+        return None
+    size = float(m.group(1)) if (m := _FONT_SIZE.search(attrs)) else 40.0
+    width = len(label) * size * CHAR_WIDTH_RATIO
+    anchor = (m.group(1).lower() if (m := _ANCHOR.search(attrs)) else "start")
+    x0 = x - width / 2 if anchor == "middle" else x - width if anchor == "end" else x
+    # y is the baseline, not the top.
+    return x0, y - size * 0.8, x0 + width, y + size * 0.2
+
+
+#: Shapes above which a frame is too busy for a phone, four seconds, once, with
+#: someone talking over it. The SVG brief asks for 3-6; this is the point at which
+#: a redraw is worth spending, not the target — a frame at 7 is fine, one at 13 is
+#: a wall of boxes. Only the redraw loop uses it, so it costs one extra attempt and
+#: never fails a frame outright.
+MAX_SHAPES = 8
+
+_SHAPE_EL = re.compile(r"<(rect|circle|ellipse|polygon|polyline|path|line)\b", re.I)
+
+
+def svg_problems(svg: str, max_width: float = MAX_TEXT_WIDTH,
+                 collisions: bool = False, max_shapes: int | None = None) -> list[str]:
+    """
+    Everything wrong with one generated frame, as instructions to fix it.
+
+    `collisions` adds label-over-box detection. It is off by default because it
+    estimates text widths from character counts and so has false positives, and
+    check_svg_quality gates a paid judge call — a frame failed by a guess is worse
+    than a frame with one tight label. The redraw loop in visuals.py turns it on,
+    where a false positive costs one extra attempt and nothing else.
+    """
+    problems: list[str] = []
+    texts = []
+
+    if max_shapes is not None:
+        drawn = len(_SHAPE_EL.findall(svg or ""))
+        if drawn > max_shapes:
+            problems.append(
+                f"this frame draws {drawn} shapes — too busy for a phone screen at "
+                f"4 seconds. Cut it to {max_shapes} or fewer: keep the objects the "
+                f"narration actually names, drop the decoration, the extra "
+                f"containers and any second mechanism shown for context")
+
+    for attrs, body in _TEXT_EL.findall(svg or ""):
+        label = re.sub(r"<[^>]+>", "", body)
+        label = re.sub(r"\s+", " ", label).strip()
+        if not label:
+            continue
+
+        if re.search(r"\b(transform|rotate)\s*=", attrs, re.I):
+            problems.append(f'"{label[:30]}" is rotated — draw all text horizontally')
+
+        size = float(m.group(1)) if (m := _FONT_SIZE.search(attrs)) else 40.0
+        width = len(label) * size * CHAR_WIDTH_RATIO
+        if width > max_width:
+            problems.append(
+                f'"{label[:40]}" is {len(label)} chars at font-size {size:.0f}, about '
+                f'{width:.0f}px wide — wider than the {max_width:.0f}px canvas allows. '
+                f'Split it into separate <text> lines, or shorten it')
+
+        for axis, value in _XY.findall(attrs):
+            v = float(value)
+            if v < 0 or v > VIEWBOX:
+                problems.append(f'"{label[:30]}" has {axis}={value}, outside the '
+                                f'0-{VIEWBOX} viewBox — it will be clipped')
+                break
+
+        if collisions and (box := _text_box(attrs, label)):
+            texts.append((label, box))
+
+    if collisions:
+        problems += _collisions(svg, texts)
+
+    # Deduplicate but keep the order they were found in.
+    return list(dict.fromkeys(problems))
+
+
+def _collisions(svg: str, texts: list) -> list[str]:
+    """
+    Labels that sit on top of a box they do not belong to.
+
+    This is the defect left over once the text fits and nothing is rotated: an
+    arrow label dropped into a gap too narrow for it, printing across the box next
+    door. Invisible in the markup, obvious on screen, and the model cannot see it.
+    """
+    boxes = []
+    for attrs in _RECT_EL.findall(svg or ""):
+        x, y = _attr(attrs, "x"), _attr(attrs, "y")
+        w, h = _attr(attrs, "width"), _attr(attrs, "height")
+        if None in (x, y, w, h):
+            continue
+        if w * h > 0.6 * VIEWBOX * VIEWBOX:
+            continue            # a panel or background, not a node
+        boxes.append((x, y, x + w, y + h))
+
+    out = []
+    for label, (tx0, ty0, tx1, ty1) in texts:
+        cx, cy = (tx0 + tx1) / 2, (ty0 + ty1) / 2
+        for bx0, by0, bx1, by1 in boxes:
+            overlaps = tx0 < bx1 and tx1 > bx0 and ty0 < by1 and ty1 > by0
+            inside = bx0 <= cx <= bx1 and by0 <= cy <= by1
+            if overlaps and not inside:
+                out.append(
+                    f'the label "{label[:28]}" is printed across the box at '
+                    f'({bx0:.0f},{by0:.0f}) it does not belong to — move it into the '
+                    f'clear, or widen the gap it sits in')
+                break
+
+    # Two labels on the same spot. Same defect, different pair: it happens where a
+    # caption and an arrow label both aim for the gap under the diagram, and it is
+    # just as unreadable as a label over a box.
+    for i, (label_a, a) in enumerate(texts):
+        for label_b, b in texts[i + 1:]:
+            if a[0] < b[2] and a[2] > b[0] and a[1] < b[3] and a[3] > b[1]:
+                out.append(
+                    f'the labels "{label_a[:24]}" and "{label_b[:24]}" are printed on '
+                    f'top of each other — move one of them, or drop it')
+    return out
+
+
+#: A frame may introduce this share of label vocabulary that is in neither the
+#: narration nor the source. Not zero: a diagram legitimately carries structural
+#: words nobody says out loud ("start", "yes", "step 1", axis names), and a frame
+#: is allowed a little labelling of its own.
+MAX_FOREIGN_LABEL_SHARE = 0.4
+
+#: Words a diagram may always use, whether or not anyone says them. Structural
+#: scaffolding, not content.
+_DIAGRAM_SCAFFOLD = {
+    "yes", "no", "start", "end", "step", "then", "before", "after", "input",
+    "output", "true", "false", "bit", "bits", "byte", "bytes", "key", "value",
+    "one", "two", "three", "four", "five", "zero", "total", "each", "per",
+}
+
+#: XML entity names, which survive tag-stripping as bare words and are not content.
+_ENTITY_NAMES = {"gt", "lt", "amp", "quot", "apos", "nbsp"}
+
+#: A label token that carries no topical meaning: a number, a hex literal, or a
+#: short identifier built from a letter-stem plus an index — b0, f12, bit3, h2, x.
+#:
+#: These dominate a good technical diagram. The SVG brief explicitly asks for them
+#: ("anchor abstract things to something countable: number the rows, mark the
+#: positions, draw the actual bits"), so counting them as vocabulary the narration
+#: failed to introduce marks the best frames as the worst. Measured before this
+#: filter existed: 21 of 26 real units "failed", almost entirely on 0, 1, b0, f0.
+_IDENTIFIER = re.compile(r"""^(?:
+      \d+                 # 1, 1011, 4096
+    | 0x[0-9a-f]+         # 0x0a
+    | [a-z]+\d+           # b0, f12, bit3, h2, frame5, page0
+    | \d+[a-z]{1,3}       # 4kb, 2mb, 32bit — a quantity, not a subject
+    | [a-z]               # a single letter used as a variable
+)$""", re.X)
+
+
+def _is_topical(word: str) -> bool:
+    """Does this label token say anything about the subject matter?"""
+    return not (_IDENTIFIER.match(word) or word in _ENTITY_NAMES)
+
+
+def check_diagram_matches_narration(unit: ShortUnit) -> GraderResult:
+    """
+    Every diagram's labels should come from what is being said, or from the source.
+
+    The complaint this exists for: diagrams that are technically well-drawn but are
+    about something adjacent to the narration — the voice explains one thing and the
+    picture labels another. The drawing model is given the narration AND the whole
+    source section, and the section is much longer, so a frame can drift onto a
+    neighbouring idea and still look plausible on its own.
+
+    Deliberately vocabulary-based rather than semantic. It cannot tell a subtly
+    wrong diagram from a right one; it catches the frame that is about different
+    NOUNS than the beat it plays under, which is the failure that actually shows up.
+    A semantic check is the judge's job and costs a model call.
+    """
+    # The WHOLE script's vocabulary, not just the beat this frame plays under.
+    #
+    # The visuals are deliberately one composition that builds, so frame 1 draws
+    # objects beat 4 will name and every frame carries the shared scaffolding. Scoped
+    # per-beat this flagged "frame" and "fault" as foreign to a page-fault short,
+    # because that frame belongs to the interviewer's question and the words arrive
+    # two beats later. What is being caught is a diagram about a DIFFERENT SUBJECT,
+    # and the subject is the short, not the beat.
+    allowed = set(_stems(
+        " ".join(b.line for b in unit.beats)
+        + " " + " ".join(b.on_screen for b in unit.beats)
+        + " " + " ".join(b.source_quote or "" for b in unit.beats)
+        + " " + unit.question
+    )) | {_stem(w) for w in _DIAGRAM_SCAFFOLD}
+    # The visual SPEC is deliberately NOT in here. It comes from the same model
+    # chain as the drawing, so a frame that faithfully renders a spec which itself
+    # wandered off the narration would score perfectly — which is the exact defect
+    # this grader exists to find. Measure the picture against what is SAID.
+
+    offenders: list[str] = []
+    checked = 0
+
+    for ref, visual in (unit.visuals or {}).items():
+        if not visual.svg:
+            continue
+
+        labels = " ".join(
+            re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", body)).strip()
+            for _attrs, body in _TEXT_EL.findall(visual.svg))
+        drawn = {stem: word for stem, word in _stems(labels).items()
+                 if _is_topical(word)}
+        if not drawn:
+            continue          # a frame of pure numbers and bit labels is fine
+
+        checked += 1
+        foreign = [word for stem, word in drawn.items() if not _grounded(stem, allowed)]
+        share = len(foreign) / len(drawn)
+        if share > MAX_FOREIGN_LABEL_SHARE:
+            offenders.append(f"{ref}: {share:.0%} of label words are in neither the "
+                             f"narration nor the source ({', '.join(sorted(foreign)[:6])})")
+
+    if not checked:
+        return GraderResult("diagram_matches_narration", True, "no rendered diagrams")
+    if offenders:
+        return GraderResult("diagram_matches_narration", False,
+                            "; ".join(offenders[:3]))
+    return GraderResult("diagram_matches_narration", True,
+                        f"{checked} diagram(s) labelled from the narration and source")
+
+
+def check_svg_quality(unit: ShortUnit) -> GraderResult:
+    """Frames whose markup shows text that cannot render legibly."""
+    bad: dict[str, list[str]] = {}
+    for ref, visual in unit.visuals.items():
+        if visual.type == "diagram" and visual.svg:
+            found = svg_problems(visual.svg)
+            if found:
+                bad[ref] = found
+
+    if bad:
+        first = "; ".join(f"{ref}: {probs[0]}" for ref, probs in list(bad.items())[:3])
+        return GraderResult("svg_quality", False,
+                            f"{len(bad)} frame(s) with unreadable text — {first}",
+                            {"frames": bad})
+    return GraderResult("svg_quality", True, "all frames render legibly")
+
+
 def check_visuals_resolved(unit: ShortUnit) -> GraderResult:
     refs = {b.visual_ref for b in unit.beats}
     missing = refs - set(unit.visuals)
@@ -295,14 +743,17 @@ def check_technical_beats_use_diagrams(unit: ShortUnit) -> GraderResult:
     return GraderResult("technical_visuals", True, "no technical content sent to an image model")
 
 
-SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape]
-UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams]
+SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_refusal]
+UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
+                  check_svg_quality, check_diagram_matches_narration]
 
 
 def run_script_graders(script: Script, source_text: str | None = None,
                        doc_text: str | None = None) -> list[GraderResult]:
     results = [g(script) for g in SCRIPT_GRADERS]
     if source_text:
+        results.append(check_source_quotes(script, source_text, doc_text=doc_text))
+        results.append(check_answers_its_section(script, source_text))
         results.append(check_grounding(script, source_text, doc_text=doc_text))
     return results
 

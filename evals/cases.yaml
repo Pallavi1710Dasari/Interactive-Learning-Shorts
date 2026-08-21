@@ -108,6 +108,119 @@ cases:
     expect:
       passed: true
 
+  - id: E012
+    name: An answer citing a sentence not in the section is caught
+    why: >
+      The failure grounding cannot see. Beat 2 uses the section's own vocabulary to
+      state something the section never says — an LRU swap priority table — and
+      cites a sentence that does not exist. Word-overlap grounding passes it,
+      because every word in it is a word the material uses elsewhere; a confident,
+      on-topic, wrong answer is the one that actually reaches a learner. E013 is
+      the success half. Change check_source_quotes and both cases together.
+    type: code_grader
+    grader: source_quotes
+    section_id: "3.3"
+    fixture: evals/fixtures/fabricated_quote.json
+    expect:
+      passed: false
+      reason_contains: "not in the material"
+
+  - id: E013
+    name: Answers that quote the section verbatim are accepted
+    why: >
+      The success half of E012. Without it the cheapest way to make source_quotes
+      green is to reject every citation. Also guards the whitespace handling: the
+      quotes in this fixture span a line break in the source, and a matcher that
+      does not collapse whitespace fails all four of them.
+    type: code_grader
+    grader: source_quotes
+    section_id: "3.3"
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
+  - id: E014
+    name: A script that refuses to answer is rejected
+    why: >
+      Shipped to a reviewer on a real HTML document. The doc numbered its FAQ
+      subsections "### 1..4" under top-level sections "## 1..4", so "### 3. What are
+      header and heading elements" collided with "## 3. Paragraph Element" and
+      find_section returned the paragraph one. The writer, obeying the stay-inside-
+      the-source rule, correctly refused — "the section I have only talks about the
+      p element" — and that reached the review page as a finished card.
+
+      Two fixes, and this case guards the second: parse_markdown now makes section
+      ids unique, and a refusal can never again pass the graders. E015 is the
+      success half.
+    type: code_grader
+    grader: no_refusal
+    fixture: evals/fixtures/refusal.json
+    expect:
+      passed: false
+      reason_contains: "refuses to answer"
+
+  - id: E015
+    name: A normal teaching answer is not mistaken for a refusal
+    why: >
+      The success half of E014. The refusal patterns match phrases about the source
+      material, and a grader that fired on ordinary negations ("the process is
+      blocked", "it is not an error") would reject good scripts and be worse than
+      no grader at all.
+    type: code_grader
+    grader: no_refusal
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
+  - id: E016
+    name: One sentence stretched across three beats is rejected
+    why: >
+      What the 30-second length floor was producing. A question whose honest answer
+      is one sentence got inflated to fill the time, and the extra beats restated
+      the same sentence — every claim verbatim-cited, every grader green, and
+      nothing taught after beat 1. The floor is now 18s so a short answer is
+      allowed to be short, and this case stops the padding coming back.
+
+      Whether a citation SUPPORTS its beat is a meaning question and belongs to the
+      judge. How many distinct sentences the answer rests on is countable, and it
+      is the shape padding always has. E013 is the success half.
+    type: code_grader
+    grader: source_quotes
+    section_id: "3.4"
+    fixture: evals/fixtures/one_idea_stretched.json
+    expect:
+      passed: false
+      reason_contains: "distinct sentence"
+
+  - id: E017
+    name: An answer that never quotes its own section is rejected
+    why: >
+      The cost of handing write_script the whole document to stop it refusing: with
+      everything in view an answer can wander onto adjacent material and answer
+      something the question did not ask. This anchors it — the short may draw on
+      the whole material, but it must be ABOUT its own section. Graded against 3.1,
+      which the page-fault fixture never quotes.
+    type: code_grader
+    grader: on_topic
+    section_id: "3.1"
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: false
+      reason_contains: "drifted"
+
+  - id: E018
+    name: An answer grounded in its own section passes the anchor
+    why: >
+      The success half of E017 — same fixture, graded against the section it is
+      actually about. Without this pair the cheapest way to make on_topic green is
+      to reject everything.
+    type: code_grader
+    grader: on_topic
+    section_id: "3.3"
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

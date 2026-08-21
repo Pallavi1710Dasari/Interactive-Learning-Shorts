@@ -26,6 +26,13 @@ PRICES = {
     "claude-haiku-4-5":  (1.0e-6,  5.0e-6),
     "claude-opus-4.8":   (5.0e-6, 25.0e-6),
     "claude-fable-5":   (10.0e-6, 50.0e-6),
+    # Longest key wins the lookup below, so "gpt-5-mini" is not shadowed by "gpt-5".
+    "gpt-5-nano":        (0.05e-6, 0.40e-6),
+    "gpt-5-mini":        (0.25e-6, 2.00e-6),
+    "gpt-5":             (1.25e-6, 10.0e-6),
+    "gemini-3.1-flash-lite": (0.25e-6, 1.50e-6),
+    "gemini-3.5-flash-lite": (0.30e-6, 2.50e-6),
+    "gemini-2.5-flash-lite": (0.10e-6, 0.40e-6),
 }
 
 
@@ -55,10 +62,14 @@ STORE = config.OUTPUT_DIR / "usage.json"
 
 
 def _price(model: str, tin: int, tout: int) -> float:
-    key = next((k for k in PRICES if k in model), None)
-    if key is None:
+    # Longest match, not first: "openai/gpt-5-mini" contains both "gpt-5-mini" and
+    # "gpt-5", and taking whichever happened to be declared first would have priced
+    # the mini model at the full model's rate — a silent 5x overstatement on the
+    # only number anyone reads.
+    matches = [k for k in PRICES if k in model]
+    if not matches:
         return 0.0
-    pin, pout = PRICES[key]
+    pin, pout = PRICES[max(matches, key=len)]
     return tin * pin + tout * pout
 
 

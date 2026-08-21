@@ -18,7 +18,8 @@ export function Reel({
   rate: number;
   onFeedback: (f: Feedback) => void;
 }) {
-  const n = useNarration(unit.beats, unit.seconds, { enabled: voiceOn, rate, active });
+  const n = useNarration(unit.beats, unit.seconds,
+                         { enabled: voiceOn, rate, active, audioUrl: unit.audio_url });
   const beat = unit.beats[n.beat];
   const finished = !n.playing && n.beat === unit.beats.length - 1 && n.progress > 0.5;
   const [liked, setLiked] = useState(false);
@@ -129,8 +130,11 @@ export function Reel({
           {flagged !== null && <em>{flagged}s</em>}
         </button>
         <button onClick={n.replay} title="replay (r)"><span className="glyph">↻</span></button>
-        <div className="railstate">
+        <div className="railstate"
+             title={n.recorded ? "recorded narration"
+                   : n.voiceReady ? "browser voice" : "no voice available"}>
           {voiceOn ? (n.voiceReady ? (n.speaking ? "🔊" : "🔈") : "⚠") : "🔇"}
+          {n.recorded && <em>hd</em>}
         </div>
       </div>
 

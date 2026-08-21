@@ -1,0 +1,10 @@
+{
+  "short_id": "os_s18_padded",
+  "question": "Why is walking the page table on every memory reference a problem?",
+  "beats": [
+    {"speaker":"interviewer","line":"Why is walking the page table on every memory reference a problem?","on_screen":"why the TLB exists","visual_ref":"title"},
+    {"speaker":"student","line":"Walking the page table on every memory reference would double memory traffic, so it is not free.","on_screen":"walking doubles memory traffic","visual_ref":"d_walk","source_quote":"Walking the page table on every memory reference would double memory traffic."},
+    {"speaker":"student","line":"That doubling is the whole cost, because each reference now needs a second trip to memory.","on_screen":"two trips per reference","visual_ref":"d_two","source_quote":"Walking the page table on every memory reference would double memory traffic."},
+    {"speaker":"student","line":"So the traffic doubles, which is exactly the problem hardware has to solve here.","on_screen":"traffic doubles","visual_ref":"d_cost","source_quote":"Walking the page table on every memory reference would double memory traffic."}
+  ]
+}

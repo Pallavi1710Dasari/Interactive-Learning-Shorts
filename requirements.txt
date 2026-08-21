@@ -6,3 +6,14 @@ pyyaml>=6.0
 fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
+
+# Static ffmpeg for joining voice beats, so recording needs no sudo install.
+imageio-ffmpeg>=0.5
+
+# Kokoro-82M, the default voice when no cloud key is set. The ONNX build rather
+# than the `kokoro` package because that one depends on torch; this reuses the
+# onnxruntime it brings anyway, and bundles espeak, so there is nothing to apt
+# install. The ~330MB of model weights are fetched on first use, not by pip.
+# The other local option, piper-tts, stays a manual install — it is rougher, and
+# only worth it if you would rather not keep 330MB of Kokoro on disk.
+kokoro-onnx>=0.4

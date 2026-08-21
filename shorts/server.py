@@ -29,11 +29,16 @@ from .parse import parse_markdown, find_section
 from .skills.select import select_topics_with_notes
 from .skills.script import write_script
 from .skills.visuals import spec_visuals, render_diagrams
-from .skills.audit import audit
-from . import checks, config, feed, usage
+from .skills.audit import judge_script
+from . import checks, config, feed, usage, voice
 
 app = FastAPI(title="Interactive Learning Shorts")
 usage.load()   # cumulative across restarts
+
+# Judge calls are launched from inside a build worker and collected by the same
+# worker, so they need a pool of their own — submitting to the pool you are running
+# on deadlocks once every worker is waiting on a task that is still queued.
+_JUDGE_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="judge")
 
 UPLOADS = config.OUTPUT_DIR / "uploads"
 UPLOADS.mkdir(parents=True, exist_ok=True)
@@ -73,7 +78,7 @@ def _as_qa(script: Script) -> dict:
         "short_id": script.short_id,
         "question": script.question,
         "answers": [{"index": i, "line": b.line, "on_screen": b.on_screen,
-                     "visual_ref": b.visual_ref}
+                     "visual_ref": b.visual_ref, "source_quote": b.source_quote}
                     for i, b in enumerate(script.beats) if b.speaker == "student"],
         "beats": [b.model_dump() for b in script.beats],
         "seconds": script.estimated_seconds,
@@ -169,7 +174,7 @@ def make_script(body: ScriptIn):
     feedback, attempts = None, []
     script = None
     for attempt in range(1, 4):
-        script = write_script(body.topic, section, feedback)
+        script = write_script(body.topic, section, feedback, document=doc_text)
         graders = _graders(script, section, doc_text)
         attempts.append({"attempt": attempt, "graders": graders})
         if all(g["passed"] for g in graders):
@@ -202,22 +207,40 @@ def make_scripts(body: ScriptsIn):
     doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
 
     def one(topic: Topic) -> dict:
+        """
+        One topic -> one drafted script. NEVER raises.
+
+        This ran unguarded, so a single topic whose model call failed propagated
+        out of pool.map and turned the whole request into a 500 — the reviewer lost
+        four good drafts because the fifth had a bad minute, and the page showed
+        "500 Internal Server Error" with nothing to retry. A failure is per-card
+        data now: that card offers Retry, the rest render.
+        """
         try:
             section = find_section(sections, topic.source_section_id)
         except KeyError as e:
             return {"topic": topic.model_dump(), "error": str(e)}
+
         feedback, script, graders = None, None, []
-        for _ in range(3):
-            script = write_script(topic, section, feedback)
-            graders = _graders(script, section, doc_text)
-            if all(g["passed"] for g in graders):
-                break
-            feedback = "\n".join(f"- {g['name']}: {g['reason']}"
-                                 for g in graders if not g["passed"])
+        try:
+            for _ in range(3):
+                script = write_script(topic, section, feedback, document=doc_text)
+                graders = _graders(script, section, doc_text)
+                if all(g["passed"] for g in graders):
+                    break
+                feedback = "\n".join(f"- {g['name']}: {g['reason']}"
+                                     for g in graders if not g["passed"])
+        except Exception as e:
+            return {"topic": topic.model_dump(), "section_id": section.section_id,
+                    "error": f"{type(e).__name__}: {e}"}
+
         return {"topic": topic.model_dump(), "section_id": section.section_id,
                 "qa": _as_qa(script), "graders": graders}
 
-    with ThreadPoolExecutor(max_workers=min(6, len(body.topics) or 1)) as pool:
+    # All topics at once. The cap of 6 serialised anything larger into a second
+    # round, so asking for 10 shorts took twice as long as asking for 5 for no
+    # reason — these are independent network calls, not CPU work.
+    with ThreadPoolExecutor(max_workers=max(1, len(body.topics))) as pool:
         results = list(pool.map(one, body.topics))
 
     return {"results": results, "usage": usage.since(cursor), "total": usage.totals()}
@@ -282,7 +305,8 @@ def regenerate(body: RegenerateIn):
     doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
     script, graders, feedback = None, [], base
     for _ in range(3):
-        script = write_script(body.topic, section, feedback, current=current)
+        script = write_script(body.topic, section, feedback, current=current,
+                              document=doc_text)
         graders = _graders(script, section, doc_text)
         if all(g["passed"] for g in graders):
             break
@@ -302,6 +326,9 @@ class FinalizeIn(BaseModel):
     approved: list[dict]            # [{topic, beats}] straight back from the review UI
     do_svg: bool = True
     do_judge: bool = True
+    # Recorded neural narration, when a provider is configured. Off costs nothing
+    # and the browser voice narrates instead; see shorts/voice.py.
+    do_voice: bool = True
 
 
 @app.post("/api/finalize")
@@ -325,6 +352,24 @@ def finalize(body: FinalizeIn):
             return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}
 
         try:
+            # The judge reads the script, not the pictures, so it does not have to
+            # wait for them. Started first and collected last, it costs no wall
+            # clock at all — it finishes while the diagrams are still drawing.
+            #
+            # The code graders still gate it, exactly as audit() did: they are free
+            # and instant, and there is no sense paying Opus to grade something a
+            # substring test already rejected.
+            judging = None
+            if body.do_judge and checks.all_passed(
+                    checks.run_script_graders(script, section.text)):
+                judging = _JUDGE_POOL.submit(judge_script, script, section.text)
+
+            # Same trick as the judge: the voice depends only on the words, so it
+            # records while the diagrams draw rather than after them.
+            recording = None
+            if body.do_voice and voice.configured()[0]:
+                recording = _JUDGE_POOL.submit(voice.synthesize, script)
+
             visuals = spec_visuals(script)
             if body.do_svg:
                 visuals = render_diagrams(visuals, script, section)
@@ -339,10 +384,24 @@ def finalize(body: FinalizeIn):
                 visuals=visuals,
                 status="approved",      # a human already approved it in step 2
             )
-            if body.do_judge:
-                _, report = audit(script, section.text, unit)
-                if report:
-                    unit.eval = report
+            if judging is not None:
+                try:
+                    unit.eval = judging.result()
+                except Exception as e:
+                    # A short without a score is still a short. Losing the reel
+                    # because the grader had a bad minute is the wrong trade.
+                    print(f"    ! judge {script.short_id}: {type(e).__name__}: {e}")
+
+            if recording is not None:
+                try:
+                    unit.audio = recording.result()
+                except Exception as e:
+                    # Includes tts.AccountBlocked, which voice.synthesize re-raises
+                    # so batch CLIs can stop early. A build must not: the short is
+                    # already paid for, and the browser voice narrates it.
+                    print(f"    ! voice {script.short_id}: {e} "
+                          f"— shipping without a recorded track")
+
             (config.OUTPUT_DIR / f"{unit.short_id}.json").write_text(
                 unit.model_dump_json(indent=2))
             return unit.short_id, None
@@ -352,7 +411,7 @@ def finalize(body: FinalizeIn):
             return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}
 
     # Shorts are independent, so build them side by side rather than end to end.
-    with ThreadPoolExecutor(max_workers=min(4, len(body.approved))) as pool:
+    with ThreadPoolExecutor(max_workers=max(1, len(body.approved))) as pool:
         for short_id, failure in pool.map(build_one, body.approved):
             if short_id:
                 built.append(short_id)
@@ -385,10 +444,43 @@ def shorts():
     return {"shorts": feed.collect()}
 
 
+@app.get("/api/audio/{short_id}")
+def audio(short_id: str):
+    """
+    The recorded narration for one short, if it has any.
+
+    Same id validation as _doc_path: short_id lands in a filesystem path, so
+    anything that is not a plain id is refused rather than resolved.
+    """
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", short_id):
+        raise HTTPException(400, "bad short_id")
+    track = voice.existing(short_id)
+    if not track:
+        raise HTTPException(404, "no recorded narration for this short")
+    return FileResponse(track, media_type="audio/mpeg")
+
+
+@app.get("/api/voice")
+def voice_status():
+    """Whether recorded narration is available, and what is missing when it is not."""
+    ok, why = voice.configured()
+    return {"configured": ok, "reason": why}
+
+
+# Voice comparison samples, written by `python -m shorts.voicesample`. Mounted only
+# if they exist so a fresh checkout does not fail to start, and read-only — choosing
+# a voice is a listening exercise, not something the app should be able to change.
+_SAMPLES = config.OUTPUT_DIR / "voice-samples"
+if _SAMPLES.exists():
+    app.mount("/voice-samples",
+              StaticFiles(directory=_SAMPLES, html=True), name="voice-samples")
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "stub": config.STUB, "model": config.MODEL_GENERATOR,
-            "judge": config.MODEL_JUDGE, "units": len(feed.collect()),
+            "judge": config.MODEL_JUDGE, "diagram": config.MODEL_DIAGRAM,
+            "units": len(feed.collect()),
             "total": usage.totals()}
 
 

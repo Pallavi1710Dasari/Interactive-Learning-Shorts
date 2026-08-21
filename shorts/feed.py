@@ -28,18 +28,28 @@ def _timeline(unit: ShortUnit) -> tuple[list[dict], float]:
     """
     Give every beat a start and end.
 
-    With real audio the word timings are exact. Without, fall back to word count
-    at the project's words-per-minute constant. Browser speech overrides both at
-    playback time — it advances on the utterance ending — so these are the
-    fallback and the progress-bar estimate, not the source of truth.
+    Three sources, best first:
+
+      1. The synthesiser's own per-beat spans. Exact, and the only one that stays
+         correct when the spoken text is repunctuated for delivery.
+      2. Word timings, cut by the written word count. Kept for tracks recorded
+         before spans existed. It assumes the spoken text has exactly as many
+         whitespace tokens as the written line, which conversational formatting
+         breaks — hence (1).
+      3. Word count at the project's words-per-minute constant, when there is no
+         audio at all. The browser voice then overrides it at playback time by
+         advancing on each utterance ending.
     """
     spans, cursor = [], 0.0
+    beat_spans = unit.audio.beat_spans if unit.audio else []
     timings = unit.audio.word_timings if unit.audio else []
     consumed = 0
 
-    for beat in unit.beats:
+    for i, beat in enumerate(unit.beats):
         n = len(beat.line.split())
-        if timings:
+        if i < len(beat_spans):
+            start, end = beat_spans[i].start, beat_spans[i].end
+        elif timings:
             slice_ = timings[consumed:consumed + n]
             consumed += n
             start = slice_[0].start if slice_ else cursor
@@ -91,6 +101,11 @@ def collect() -> list[dict]:
             "section": unit.source_section_id,
             "status": unit.status,
             "seconds": total,
+            # Present only when a recorded neural track exists on disk. The player
+            # prefers it over browser speech; absent, it narrates in the browser.
+            "audio_url": (f"/api/audio/{unit.short_id}"
+                          if (config.OUTPUT_DIR / unit.short_id / "audio.mp3").exists()
+                          else None),
             "judge": ({"faithfulness": unit.eval.faithfulness,
                        "clarity": unit.eval.clarity,
                        "pace": unit.eval.pace,

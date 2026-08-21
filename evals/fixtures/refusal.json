@@ -1,0 +1,10 @@
+{
+  "short_id": "html_head_vs_heading_refusal",
+  "question": "Are the head element and h1 heading tags basically the same thing?",
+  "beats": [
+    {"speaker":"interviewer","line":"Are the head element and h1 heading tags basically the same thing?","on_screen":"head vs h1","visual_ref":"title"},
+    {"speaker":"student","line":"Actually the section I have only talks about the p element, which defines a paragraph.","on_screen":"the p element defines a paragraph","visual_ref":"d_p","source_quote":"The HTML `p` element defines a paragraph."},
+    {"speaker":"student","line":"Its example is just plain text, like the trip planning line, placed inside a p tag.","on_screen":"plan your trip example","visual_ref":"d_example","source_quote":"<p>Plan your trip wherever you want to go</p>"},
+    {"speaker":"student","line":"So I can't really answer about head or h1 from what I've got here.","on_screen":"not covered in source","visual_ref":"d_none","source_quote":"The HTML `p` element defines a paragraph."}
+  ]
+}

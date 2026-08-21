@@ -100,7 +100,7 @@ Nine files matter. Read them in this order, it takes 20 minutes and saves you a 
 | `shorts/schema.py` | **Read this first.** The data contract. Every step consumes one of these models and produces another. |
 | `shorts/parse.py` | Markdown → `Section` objects with line numbers |
 | `shorts/checks.py` | The code graders. Free, instant, deterministic. |
-| `shorts/llm.py` | The only file that calls the API |
+| `shorts/llm.py` | The only file that calls the API. **Read the docstring** — it explains why adaptive thinking is off by default. |
 | `shorts/skills/select.py` | Skill 1 — pick the topics |
 | `shorts/skills/script.py` | Skill 2 — write the dialogue. **Highest-leverage prompt in the project.** |
 | `shorts/skills/visuals.py` | Skills 3 & 4 — spec visuals, generate SVG |
@@ -136,6 +136,18 @@ The `why` field is not documentation — it's the most important field. Six mont
 ### B.2 The three kinds of case
 
 **Code grader cases** — deterministic. Free, run in milliseconds, run them constantly. These cover anything countable: word budgets, overlay length, beat counts, schema shape, missing references. **About 70% of your eval set should be this kind**, because 70% of LLM failures are countable.
+
+The two most valuable ones here are countable in a way that is not obvious:
+
+- `source_quotes` — every answer beat carries the sentence of the section it
+  restates, and the grader checks that sentence really occurs there. It turns "is
+  this grounded?" from a judgement call into a substring test. This is what catches
+  the failure `grounding` cannot see: a confident, on-topic, wrong answer built out
+  of the material's own vocabulary. E012/E013 are the pair that guard it.
+- `svg_quality` — a diagram model cannot see what it drew, so it cannot notice a
+  label that overflows its box, a rotated caption, or two labels printed on top of
+  each other. All three are visible in the markup, so they are checked for free and
+  handed back as a redraw instruction.
 
 **LLM judge cases** — need meaning. "Is this faithful to the source?" can't be counted. Costs an API call per case, so run these before merging, not on every save.
 
@@ -173,8 +185,8 @@ python -m evals.run_evals
 Free and offline — code graders only:
 
 ```
- PASS E001   A rambling script is rejected for length      too long: 98.4s (246 words). Need <= 60s
- PASS E002   A thin script is rejected for being too short too short: 6.4s (16 words). Need >= 30s
+ PASS E001   A rambling script is rejected for length      too long: 98.4s (246 words). Need <= 45s
+ PASS E002   A thin script is rejected for being too short too short: 6.4s (16 words). Need >= 18s
  PASS E003   A well-sized script passes the timing gate    38.0s (95 words)
  PASS E004   Overlay text longer than 8 words is rejected  2 overlay(s) over 8 words
  PASS E005   A single-paragraph answer is rejected         only 1 student beat(s)
@@ -232,6 +244,29 @@ python -m shorts.parse content/session_18_paging.md
 
 Now run it on **your real reading material.** Your OS-course docs use section IDs already, which is why the parser keys on them. If your headings are formatted differently, this is the one file you'll need to adjust — the regex is at the top of `parse.py`.
 
+**Section ids are guaranteed unique, and that matters more than it sounds.** Every
+later step names a section by id, so two sections sharing one means a topic can be
+handed the wrong source text — and a topic handed the wrong source text produces a
+short that refuses to answer or invents. A real HTML doc did exactly this:
+
+```
+## 1. Basic Structure   ## 2. Heading Element   ## 3. Paragraph Element
+### 1. What is HTML?    ### 2. How do you...    ### 3. What are header and headings?
+```
+
+The FAQ subsections restart their numbering, so `### 3` collided with `## 3`. Skill 1
+correctly picked the head-vs-headings question and cited section 3; the writer was
+handed the paragraph-element section and, obeying the stay-inside-the-source rule,
+correctly refused to answer. So: a numbered subsection under a numbered section is
+qualified by its parent (`4` + `3` → `4.3`), and anything still colliding gets an
+occurrence suffix (`3` → `3-2`). Expect to see ids like `3-2` on documents with an
+FAQ; that is the parser keeping them apart, not a bug.
+
+Two guards sit behind it, because a mis-citation is always possible: `write_script`
+is given the **whole** document alongside its section, so an answer that lives in a
+summary elsewhere is still findable; and `check_no_refusal` rejects any script that
+talks about its source instead of teaching (E014/E015).
+
 ### C.2 Skill 1 — topic selection (first paid call, ~1 cent)
 
 ```bash
@@ -243,7 +278,7 @@ for t in select_topics(parse_markdown('content/session_18_paging.md')).topics:
 "
 ```
 
-**Do not move on until the topic list is good.** Everything downstream inherits these choices. If a topic is too big for 45 seconds, the fix is in `select.py`'s SYSTEM prompt, not further down the pipeline.
+**Do not move on until the topic list is good.** Everything downstream inherits these choices. If a topic is too big for 25 seconds, the fix is in `select.py`'s SYSTEM prompt, not further down the pipeline.
 
 ### C.3 Skill 2 — the dialogue script
 
@@ -257,13 +292,13 @@ You'll see the retry loop working:
 
 ```
 === os_s18_page_fault — What happens on a page fault?
-    [FAIL] timing — too long: 71.2s (178 words). Need <= 60s (~150 words).
+    [FAIL] timing — too long: 71.2s (178 words). Need <= 45s (~112 words).
     retry 1/3
-    [PASS] timing — 44.0s (110 words)
+    [PASS] timing — 25.6s (64 words)
     [PASS] overlays — all 5 overlays within limit
     [PASS] dialogue_shape — 4 student beats
     [PASS] grounding — 68% content-word overlap with source
-    script ok: 44.0s, 110 words
+    script ok: 25.6s, 64 words
 ```
 
 That failed-then-passed sequence is the agentic part of the system. Note what it cost: one extra text call, because the timing check ran before voice and rendering.
@@ -397,6 +432,200 @@ cd render && npx remotion studio                       # live preview
 7. Measure real audio duration, fix `WORDS_PER_MINUTE`
 8. One ugly MP4 end to end
 9. Then, and only then, make it look good
+
+## Length: short on purpose
+
+The window is **18–45 seconds**, target ~26s (about 65 words), in `schema.py`. It
+was 30–60, and the floor was actively making shorts worse: a question whose honest
+answer is three sentences had to be inflated to 75 words to clear it, and the extra
+beat was always the weakest — a restatement, or a claim propped up by a citation
+that did not really support it. E016 freezes one of those padded scripts.
+
+Two graders keep the pressure off:
+
+- `source_quotes` also requires **distinct** evidence per beat (one repeat allowed,
+  for a closing takeaway). Three beats resting on one sentence is padding, and that
+  is countable even though "does this quote support this claim" is not.
+- `on_topic` requires at least one beat to quote the section the short is filed
+  under. `write_script` gets the whole document so it can answer instead of refuse,
+  and this is what stops it wandering onto adjacent material (E017/E018).
+
+If a topic genuinely cannot be answered in 45 seconds it is too big for one short,
+and the fix belongs in `select.py`, not in the length window.
+
+## Which model runs where
+
+Four roles, set in `.env`, and they should not all be the same model:
+
+| role | env var | what it does |
+|---|---|---|
+| generator | `MODEL_GENERATOR` | topic selection and script writing |
+| diagram | `MODEL_DIAGRAM` | the SVG calls — 4-5 per short, the biggest line on the bill |
+| judge | `MODEL_JUDGE` | scores faithfulness; must be a DIFFERENT family from the generator |
+| cheap | `MODEL_CHEAP` | throwaway calls |
+
+**The judge belongs to another family.** A model scoring its own family's writing
+marks it generously, and catching fabrication is the entire reason that call exists.
+
+**The diagram model should be one that can turn reasoning off.** By the time the
+SVG call runs, the visual spec has already decided what the frame contains — the
+call is formatting, not deliberation. On one identical frame:
+
+```
+openai/gpt-5-mini              3915 output tokens   7 shapes   0 defects   37s
+google/gemini-3.1-flash-lite    868 output tokens   6 shapes   0 defects    3s
+```
+
+Same quality by every check available, for a fifth of the tokens and a twelfth of
+the wall clock, because the gpt-5 family cannot be told to stop reasoning and
+spends ~3300 tokens laying out boxes.
+
+## Two knobs that decide speed and cost
+
+**Adaptive thinking, and why it is not portable.** `shorts/llm.py` sends
+`thinking: disabled` on every call except the judge. Measured on the real script
+prompt: **30.5s and 2734 output tokens with thinking on, 8.9s and 544 without**,
+with the graders scoring the output no differently. Thinking earns its keep when
+the model has to reason to an answer; filling a fixed JSON shape from a source
+section is not that. It was also a bug — thinking tokens come out of `max_tokens`,
+so a long deliberation on a 2000-token budget spent the whole allowance before the
+text block started and the response came back empty, which surfaced as a 500 on
+`/api/scripts`.
+
+"Thinking off" is an Anthropic spelling and the families answer it differently, so
+never hand-write `thinking={...}` at a call site — ask `llm._reasoning(model, think)`:
+
+| family | disabling reasoning |
+|---|---|
+| `anthropic/*` | works, and is the big win above |
+| `openai/gpt-5*` | **400 error** — "Reasoning is mandatory and cannot be disabled". Asks for the smallest budget instead |
+| `google/*` | works, and matters: 38 output tokens against 194 on the same one-line answer |
+
+Turn it back on for a call by passing `think=True` to `ask_json`.
+
+**What runs concurrently.** `/api/finalize` starts the judge and the voice before
+drawing the diagrams and collects them afterwards, because neither depends on the
+pictures. Their latency is absorbed rather than added, which is why a short with 5
+diagrams plus an Opus judge finalises in about 30s instead of 60.
+
+## The voice
+
+**A recorded track is the narrator**, rendered once at build time and cached in
+`output/<short_id>/`, so watching is instant and a re-watch costs nothing.
+
+Four backends, in `shorts/providers.py`. `TTS_PROVIDER=auto` takes the best one
+whose credentials actually work, so adding a key upgrades the voice and nothing else
+changes:
+
+| provider | needs | notes |
+|---|---|---|
+| `elevenlabs` | API key | Best sounding. Paid beyond a small free tier. |
+| `kokoro` | nothing | Kokoro-82M on onnxruntime. Local, offline, free, no quota, and close enough to the cloud tiers to be the sensible default. One-off ~330MB model download. |
+| `google` | API key | Very close, ~1M free chars/month, plain API key — no service-account JSON. |
+| `piper` | nothing | The floor. Also local and free, a clear step below Kokoro, but much smaller — worth keeping for CI and for anyone who does not want 330MB on disk. |
+
+With everything blank you get Kokoro, which needs no signup at all.
+
+Kokoro is deliberately the ONNX build rather than the official `kokoro` package: that
+one depends on torch, several gigabytes for an eighty-two-million-parameter model.
+`kokoro-onnx` reuses onnxruntime and bundles espeak inside the wheel, so there is
+nothing to `apt install`. Voice ids encode accent and gender in the prefix —
+`a`=American, `b`=British, `f`=female, `m`=male, `h`=Hindi — and `--check` lists all 54.
+
+**Kokoro voices can be blended**, which is how this project gets an accent the pack
+has no voice for. A Kokoro voice is not a model, it is a `(510, 1, 256)` style tensor
+conditioning a shared one, so a weighted average of two is a coherent third voice:
+
+```bash
+KOKORO_VOICE_STUDENT=af_bella+hf_beta            # equal parts
+KOKORO_VOICE_STUDENT=af_bella:0.6+hf_beta:0.4    # weighted
+```
+
+Kokoro ships no Indian English. The Hindi voices reading English smear the stops —
+a muddy "t" — and the American ones read as American; 60/40 between them lands close
+to Indian English with clean articulation, and the ratio is a continuous dial rather
+than a choice between two ends. Blending is interpolation, not a trained accent, so
+it degrades near an even split on voices this far apart; render a ladder and pick by
+ear with `python -m shorts.voicesample --only kokoro`. For properly-trained Indian
+English, Google's `en-IN` voices are in the candidate list and need only a key.
+
+Phonemisation is separate from voice, via `KOKORO_LANG`. espeak has no `en-IN`, so
+`en-gb` is the only other English phonology available and is worth an A/B when
+consonants sound wrong.
+
+```bash
+python -m shorts.voice --check          # every provider, and whether it can really speak
+python -m shorts.voice --all            # backfill every unit
+python -m shorts.voice <id> --force     # re-record one after tuning
+python -m shorts.voice --all --provider google
+```
+
+### Choosing a voice
+
+```bash
+python -m shorts.voicesample            # same short, every candidate voice
+python -m shorts.voicesample --only google --force
+```
+
+Renders the same real short in each candidate — Neural2, Studio, Chirp 3: HD, Piper,
+ElevenLabs — and writes a page at `/voice-samples/` that plays them back to back with
+the words underneath. Choosing a voice is a listening decision and the only honest way
+to make it is the same sentences in each candidate; a voice that sounds fine reading a
+marketing line can fall apart on "the MMU raises a page fault trap". It writes nothing
+into a unit and changes nothing about what the pipeline uses — set `TTS_PROVIDER` and
+the voice ids in `.env` once you have picked.
+
+Google's tiers do not take the same parameters, and getting it wrong is a hard 400
+rather than a warning: **Chirp 3: HD rejects `pitch`** outright, being a different
+synthesis stack from Neural2/WaveNet/Studio. So the pitch separation between the two
+speakers is applied where it exists and omitted where it does not, and an unexpected
+rejection of any tuning field retries flat rather than losing the audio.
+
+`--check` **synthesises a dozen characters per provider** rather than just looking at
+credentials. That distinction is not academic: a valid ElevenLabs key on a free
+account behind a shared office IP lists voices, reports a subscription, and returns
+401 `detected_unusual_activity` for every synthesis. It reported "configured: True"
+right up until the first real beat failed. Under `auto`, a provider that refuses is
+remembered and the next one takes over.
+
+Three things do the work of making it sound like a person rather than a reader:
+
+- **Clause-based phrasing.** `shorts/speech.py` splits each beat at clause
+  boundaries and repunctuates it — a comma is a breath, an ellipsis is the beat of
+  thought before a "so..." or a "but...". ElevenLabs infers prosody from
+  punctuation, so where those fall *is* the phrasing. It also speaks notation out,
+  because `2^3` read literally is "two caret three". This is the same splitting the
+  browser version used, repurposed: there each clause became its own utterance,
+  because the Web Speech API gives you no other handle on phrasing.
+- **Low stability.** The counter-intuitive knob: high stability makes the model
+  hedge toward a flat, even read. `VOICE_STABILITY` defaults to 0.40 so pitch and
+  pace move inside a sentence, which is what conversation does.
+- **Per-speaker delivery.** The interviewer is asking, so slightly quicker and more
+  expressive; the student is explaining, so steadier. Same settings for both is what
+  made the old browser version sound like one person reading both halves.
+
+Voice ids are **optional** for every provider — ElevenLabs picks two contrasting
+voices from your library on first use and prints them; the others have sensible
+defaults. A mistyped id is a 404 on every beat, and it was the most common way this
+failed.
+
+`window.speechSynthesis` is still in `web/src/speech.ts` but is now only the
+**fallback**, for a unit with no recorded track. No provider working at all
+downgrades to it rather than losing a short you have already paid for and approved.
+
+**Beat timings are measured, not requested.** The first version asked ElevenLabs for
+character-level alignments, which tied the pipeline to one vendor's optional response
+field — Google returns nothing of the kind and Piper has no concept of it. Each beat
+is synthesised separately, so its duration is just the length of its own audio, which
+every provider gives you free. Those measured spans live in `Audio.beat_spans` and
+are what the player cuts on; `word_timings` is now an even spread within each beat and
+is explicitly labelled an approximation, so don't build anything load-bearing on it.
+
+Joining the beats needs ffmpeg; `imageio-ffmpeg` is in `requirements.txt` and ships a
+static binary inside the venv, so no `sudo` install is required. Every chunk is
+normalised to 44.1kHz mono before joining, because Piper returns 22kHz WAV and the
+cloud providers 44.1kHz MP3 — concatenating those unnormalised gives you a file whose
+later beats play at the wrong speed.
 
 ## Three things that will bite you
 

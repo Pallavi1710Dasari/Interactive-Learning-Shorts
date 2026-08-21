@@ -19,11 +19,20 @@ you. These are deliberately dumb. Do not tune them; tune the real prompts.
 import re
 
 from .schema import MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND
+from .checks import MAX_ANSWER_WORDS, MIN_ANSWERS, MIN_QUOTE_WORDS
 
-MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)      # 75
-MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)      # 150
-TARGET_WORDS = 110
+MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)      # 45
+MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)      # 112
+# Derived, not a literal: the length window has moved once already, and a hardcoded
+# target silently drifts outside it when it moves again.
+TARGET_WORDS = (MIN_WORDS + MAX_WORDS) // 2
 MAX_OVERLAY = 8
+
+# Read off the graders rather than restated, so tightening a grader cannot leave
+# the stub quietly generating output that grader now rejects — which is exactly
+# how the free end-to-end run stops being a smoke test.
+BEATS = MIN_ANSWERS + 1                              # 4
+MAX_BEAT_WORDS = MAX_ANSWER_WORDS - 2                # stay clear of the cap
 
 
 def fake(model_cls, system: str, user: str):
@@ -79,36 +88,59 @@ def _script(user: str) -> dict:
     """
     short_id = _find(r"^SHORT_ID:\s*(.+)$", user, re.M) or "stub_short"
     topic = _find(r"^TOPIC:\s*(.+)$", user, re.M) or "How does this work?"
-    body = _find(r"SOURCE SECTION.*?\n---\n(.*?)\n---", user, re.S) or topic
+
+    # Both labels, because this regex reaches into the real prompt and so it breaks
+    # every time that prompt is reworded. When it broke, `body` silently fell back to
+    # the topic string, the stub cited a sentence that exists nowhere in the doc, and
+    # the free offline run started failing source_quotes — which is the stub earning
+    # its keep, but only because the run is checked. Keep both spellings.
+    body = (_find(r"THE SECTION THIS SHORT IS FILED UNDER.*?\n---\n(.*?)\n---", user, re.S)
+            or _find(r"SOURCE SECTION.*?\n---\n(.*?)\n---", user, re.S)
+            or topic)
 
     sentences = [s for s in re.split(r"(?<=\.)\s+", " ".join(body.split())) if s.strip()]
     if not sentences:
         sentences = [topic]
 
-    budget = TARGET_WORDS - len(topic.split())
-    picked, words, i = [], 0, 0
-    while words < budget and len(picked) < 12:
-        s = sentences[i % len(sentences)]
-        picked.append(s)
-        words += len(s.split())
-        i += 1
+    # How many beats the section can actually support. check_source_quotes wants a
+    # distinct citation per beat (bar one repeat), so a two-sentence section gets
+    # three beats, not four — cycling two sentences across four beats is precisely
+    # the padding that grader exists to reject, and the stub must not generate what
+    # the graders reject.
+    spans = _spans(sentences)
+    n_beats = max(MIN_ANSWERS, min(BEATS, len(spans) + 1))
 
-    # Deal the sentences into at most 4 student beats. check_dialogue_shape wants
-    # between 2 and 6, so a single-sentence section gets split down the middle.
-    if len(picked) < 2:
-        half = max(1, len(picked[0].split()) // 2)
-        w = picked[0].split()
-        chunks = [[" ".join(w[:half])], [" ".join(w[half:])]]
-    else:
-        per = -(-len(picked) // 4)
-        chunks = [picked[j:j + per] for j in range(0, len(picked), per)][:4]
+    # Fill each beat up to a per-beat word target, cycling the section's sentences
+    # when it is short. Built per-beat rather than by dealing a flat list into
+    # chunks, because check_dialogue_shape caps a single beat at MAX_ANSWER_WORDS
+    # and dealing sentences out blindly produced 44-word beats.
+    budget = max(1, TARGET_WORDS - len(topic.split()))
+    per_beat = min(MAX_BEAT_WORDS, max(8, budget // n_beats))
 
     beats = [{"speaker": "interviewer", "line": topic,
               "on_screen": _overlay(topic), "visual_ref": "v_question"}]
-    for n, chunk in enumerate(chunks, start=1):
-        line = " ".join(chunk)
+    i = 0
+    for n in range(1, n_beats + 1):
+        chosen, words, first = [], 0, None
+        while words < per_beat and len(chosen) < len(sentences) + 2:
+            s = sentences[i % len(sentences)]
+            i += 1
+            if first is None:
+                first = s
+            if chosen and words + len(s.split()) > MAX_BEAT_WORDS:
+                break
+            chosen.append(s)
+            words += len(s.split())
+
+        line = " ".join(" ".join(chosen).split()[:MAX_BEAT_WORDS])
         beats.append({"speaker": "student", "line": line,
-                      "on_screen": _overlay(line), "visual_ref": f"v_step_{n}"})
+                      "on_screen": _overlay(line), "visual_ref": f"v_step_{n}",
+                      # Verbatim by construction: the beat is assembled out of the
+                      # section's own sentences, so citing one of them is a real
+                      # citation and check_source_quotes passes honestly rather
+                      # than by being switched off. Cycled through the distinct
+                      # spans so no two beats lean on the same one.
+                      "source_quote": spans[(n - 1) % len(spans)]})
 
     # Last resort: trim the final beat rather than hand the grader a script we
     # already know is over budget.
@@ -119,6 +151,28 @@ def _script(user: str) -> dict:
         beats[-1]["line"] = " ".join(tail[:keep])
 
     return {"short_id": short_id, "question": topic, "beats": beats}
+
+
+def _spans(sentences: list[str]) -> list[str]:
+    """
+    Distinct verbatim spans of the section, each long enough to cite.
+
+    Sentences under MIN_QUOTE_WORDS are dropped — the grader rejects them as too
+    thin to prove anything. A section that yields fewer than two usable spans has
+    its longest one split in half at a word boundary: both halves are still exact
+    substrings of the material, so both are real citations, and the stub can give
+    two beats separate evidence without inventing any.
+    """
+    spans = [s for s in sentences if len(s.split()) >= MIN_QUOTE_WORDS]
+
+    if len(spans) < 2:
+        longest = max(sentences, key=lambda s: len(s.split()), default="")
+        words = longest.split()
+        if len(words) >= MIN_QUOTE_WORDS * 2:
+            half = len(words) // 2
+            return [" ".join(words[:half]), " ".join(words[half:])]
+
+    return spans or [" ".join(sentences)]
 
 
 def _visuals(user: str) -> dict:

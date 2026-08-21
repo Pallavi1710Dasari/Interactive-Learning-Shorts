@@ -231,6 +231,15 @@ function ReviewCard({
                 <span className="body">
                   {a.line}
                   <span className="os">on screen: {a.on_screen}</span>
+                  {/* The sentence this answer restates, checked against the section
+                      by substring match server-side. Shown so the reviewer can
+                      confirm the answer against the material without leaving the
+                      page — that comparison is the whole job of this step. */}
+                  {a.source_quote && (
+                    <span className="cited" title="verified present in the source section">
+                      “{a.source_quote}”
+                    </span>
+                  )}
                 </span>
               </div>
             ))}

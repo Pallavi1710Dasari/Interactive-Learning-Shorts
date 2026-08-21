@@ -136,6 +136,14 @@ kbd {
   display: inline-block; margin-top: 7px; font-size: 11px; color: var(--muted);
   background: rgba(255, 255, 255, 0.045); padding: 3px 9px; border-radius: 99px;
 }
+/* The source sentence this answer restates. Set as a quotation against the left
+   rule so it reads as evidence the reviewer can scan past, not as more script. */
+.cited {
+  display: block; margin-top: 8px; padding: 5px 0 5px 11px;
+  border-left: 2px solid rgba(29, 158, 117, 0.45);
+  font-size: 11.5px; line-height: 1.45; color: rgba(244, 242, 236, 0.5);
+  font-style: italic;
+}
 .avatarcell { flex: none; }
 
 .graders { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 13px; }
@@ -227,13 +235,31 @@ kbd {
 .avatar.speaking { animation: talk 0.55s ease-in-out infinite alternate; }
 @keyframes talk { from { transform: scale(1); } to { transform: scale(1.07); } }
 
+/* The diagram is the thing a learner is supposed to remember, so it gets the room.
+   At top:15%/bottom:31% a square 1080x1080 viewBox was letterboxed into just over
+   half the frame height and then padded 8% on both sides, which left the actual
+   drawing about a third of the screen — unreadable on a phone, and the reason the
+   diagrams looked like afterthoughts. The SVG prompt now keeps its own 60px margin
+   and reserves the bottom 140px for the characters, so the frame does not need to
+   reserve it a second time. */
 .stage {
-  position: absolute; top: 15%; left: 0; right: 0; bottom: 31%;
-  display: grid; place-items: center; padding: 0 8%; cursor: pointer; z-index: 2;
+  position: absolute; top: 12.5%; left: 0; right: 0; bottom: 25%;
+  display: grid; place-items: center; padding: 0 3.5%; cursor: pointer; z-index: 2;
 }
 .stageinner { width: 100%; height: 100%; display: grid; place-items: center; animation: rise 0.45s ease-out; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
-.svgwrap { width: 100%; height: 100%; display: grid; place-items: center; }
+
+/* One quiet card behind every diagram. The frames of a short are meant to read as
+   one composition that builds, and a shared container is what makes successive
+   frames feel like the same object being added to rather than four separate
+   pictures swapped in and out. */
+.svgwrap {
+  width: 100%; height: 100%; display: grid; place-items: center;
+  padding: 10px; border-radius: 20px;
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 44px rgba(0, 0, 0, 0.42);
+}
 .svgwrap svg { width: 100%; height: 100%; max-height: 100%; filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.45)); }
 .bigtext {
   color: var(--teal-hi); font-size: clamp(25px, 5.4vh, 41px); font-weight: 800;
@@ -277,7 +303,12 @@ kbd {
 .rail .glyph { font-size: 24px; line-height: 1; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); }
 .rail button.on .glyph { color: #ff5b7f; }
 .rail em { font-style: normal; font-size: 9px; color: var(--teal-hi); }
-.railstate { font-size: 15px; opacity: 0.75; }
+.railstate { font-size: 15px; opacity: 0.75; display: grid; place-items: center; }
+/* "hd" marks a recorded neural track rather than the browser synthesiser. */
+.railstate em {
+  font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--accent); opacity: 0.9;
+}
 
 .tap {
   position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;

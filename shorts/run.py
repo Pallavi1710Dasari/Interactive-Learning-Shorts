@@ -60,13 +60,14 @@ def _save_rejected(topic, section, attempt: int, script, results) -> Path:
     return path
 
 
-def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool) -> ShortUnit | None:
+def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
+              document: str | None = None) -> ShortUnit | None:
     print(f"\n=== {topic.id} — {topic.topic[:60]}")
     feedback = None
 
     for attempt in range(1, MAX_SCRIPT_RETRIES + 1):
-        script = write_script(topic, section, feedback)
-        results = checks.run_script_graders(script, section.text)
+        script = write_script(topic, section, feedback, document=document)
+        results = checks.run_script_graders(script, section.text, doc_text=document)
         for r in results:
             print(f"    {r}")
 
@@ -99,9 +100,18 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool) -> Sh
     )
 
     if do_tts:
-        from .tts import synthesize
-        unit.audio = synthesize(script)
-        print(f"    audio: {unit.audio.duration_seconds}s real duration")
+        # Through voice.synthesize, not tts.synthesize: a missing or expired key
+        # used to raise here and take down the whole run, losing every short built
+        # before it. A voice is an enhancement, so its absence downgrades to the
+        # browser voice instead of failing.
+        from . import voice
+        ok, why = voice.configured()
+        if not ok:
+            print(f"    no recorded voice ({why}) — the player will narrate in-browser")
+        else:
+            unit.audio = voice.synthesize(script)
+            if unit.audio:
+                print(f"    audio: {unit.audio.duration_seconds}s real duration")
 
     grader_results, report = audit(script, section.text, unit)
     for r in grader_results:
@@ -132,6 +142,7 @@ def main():
 
     sections = parse_markdown(args.doc)
     session_id = Path(args.doc).stem
+    doc_text = Path(args.doc).read_text(encoding="utf-8")
     print(f"parsed {len(sections)} sections: {[s.section_id for s in sections]}")
 
     topics_path = config.OUTPUT_DIR / "topics.json"
@@ -164,7 +175,8 @@ def main():
         except KeyError as e:
             print(f"  skipping {topic.id}: {e}")
             continue
-        unit = build_one(topic, section, session_id, not args.no_tts, not args.no_svg)
+        unit = build_one(topic, section, session_id, not args.no_tts, not args.no_svg,
+                         document=doc_text)
         if unit:
             units.append(unit)
 

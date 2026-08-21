@@ -1,100 +1,188 @@
 """
-Text to speech with word-level timestamps.
+Assembling a short's narration, whoever speaks it.
 
-Word timings are NOT optional. They are how the video knows when to swap the
-on-screen text. Verify your provider's current endpoint in their docs before
-trusting this module — TTS APIs change often.
+    beat text -> conversational phrasing -> provider -> normalised wav
+              -> measured duration -> beat span -> joined mp3
 
-This uses ElevenLabs' with-timestamps endpoint. Swap the implementation freely;
-keep the synthesize() signature so nothing downstream changes.
+Providers live in providers.py; this file owns everything that is the same
+regardless of who makes the audio.
+
+TWO DESIGN NOTES WORTH READING
+
+Beat timings are MEASURED, not requested. The first version asked ElevenLabs for
+character-level alignments and folded them into word timings, which tied the whole
+pipeline to one vendor's optional response field — Google returns nothing of the
+kind, and Piper has no concept of it. Since each beat is synthesised separately, its
+duration is simply the length of its own audio file, which every provider gives you
+for free. Word timings are still kept when a provider offers them, but nothing
+depends on them any more.
+
+Every chunk is normalised to 44.1kHz mono WAV before joining. Providers return
+different formats and sample rates — Piper 22kHz WAV, the cloud two 44.1kHz MP3 —
+and concatenating those without normalising produces a file whose later beats play
+at the wrong speed.
 """
-import base64, json
+import json, subprocess, tempfile, wave
 from pathlib import Path
-import requests
 
-from .schema import Script, Audio, WordTiming
-from . import config
+from .schema import Script, Audio, WordTiming, BeatSpan
+from . import config, providers, speech
 
-API = "https://api.elevenlabs.io/v1/text-to-speech/{voice}/with-timestamps"
+# Re-exported so callers can keep catching tts.AccountBlocked.
+AccountBlocked = providers.AccountBlocked
 
-
-def _synth_one(text: str, voice_id: str) -> tuple[bytes, list[dict]]:
-    r = requests.post(
-        API.format(voice=voice_id),
-        headers={"xi-api-key": config.ELEVENLABS_API_KEY, "Content-Type": "application/json"},
-        json={"text": text, "model_id": "eleven_turbo_v2_5"},
-        timeout=120,
-    )
-    r.raise_for_status()
-    data = r.json()
-    audio = base64.b64decode(data["audio_base64"])
-    return audio, data.get("alignment", {})
+SAMPLE_RATE = 44100
 
 
-def _chars_to_words(text: str, alignment: dict, offset: float) -> tuple[list[WordTiming], float]:
-    """ElevenLabs returns per-character timings. Collapse them into words."""
-    chars = alignment.get("characters", [])
-    starts = alignment.get("character_start_times_seconds", [])
-    ends = alignment.get("character_end_times_seconds", [])
-    words, cur, cur_start = [], "", None
-
-    for ch, s, e in zip(chars, starts, ends):
-        if ch.isspace():
-            if cur:
-                words.append(WordTiming(word=cur, start=cur_start + offset, end=e + offset))
-                cur, cur_start = "", None
-        else:
-            if not cur:
-                cur_start = s
-            cur += ch
-    if cur:
-        words.append(WordTiming(word=cur, start=cur_start + offset, end=ends[-1] + offset))
-
-    total = (ends[-1] if ends else 0.0)
-    return words, total
-
-
-def synthesize(script: Script, out_dir: Path | None = None, gap: float = 0.35) -> Audio:
+def ffmpeg_exe() -> str | None:
     """
-    Render every beat with the right voice, concatenate, return one Audio with
-    timings that are absolute across the whole short.
+    Path to an ffmpeg binary, or None.
+
+    A system ffmpeg is preferred, but requiring one means requiring sudo on a fresh
+    box just to hear a voice. imageio-ffmpeg ships a static build inside the venv and
+    is in requirements.txt, so the normal install already has one.
     """
+    import shutil
+    if found := shutil.which("ffmpeg"):
+        return found
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe
+        return get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
+def _run(args: list[str]) -> None:
+    result = subprocess.run(args, capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed: {result.stderr.decode()[-400:]}")
+
+
+def _to_wav(raw: bytes, suffix: str, dest: Path, exe: str) -> float:
+    """Write provider audio out as normalised WAV, and return its duration."""
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+        f.write(raw)
+        src = f.name
+    _run([exe, "-y", "-i", src, "-ar", str(SAMPLE_RATE), "-ac", "1", str(dest)])
+    Path(src).unlink(missing_ok=True)
+    with wave.open(str(dest)) as w:
+        return w.getnframes() / float(w.getframerate())
+
+
+def synthesize(script: Script, out_dir: Path | None = None,
+               gap: float | None = None,
+               provider: providers.Provider | None = None) -> Audio:
+    """
+    Render every beat with the right voice, join them, and report exact beat spans.
+    """
+    provider = provider or providers.get()
+    ok, why = provider.available()
+    if not ok:
+        raise RuntimeError(f"{provider.name}: {why}")
+
+    exe = ffmpeg_exe()
+    if not exe:
+        raise RuntimeError("no ffmpeg available to join the beats — "
+                           "pip install imageio-ffmpeg, or install ffmpeg")
+
     out_dir = out_dir or config.OUTPUT_DIR / script.short_id
     out_dir.mkdir(parents=True, exist_ok=True)
+    gap = config.VOICE_BEAT_GAP if gap is None else gap
 
-    voices = {"interviewer": config.VOICE_INTERVIEWER, "student": config.VOICE_STUDENT}
-    parts, all_words, cursor = [], [], 0.0
+    voices = provider.resolve()
+    missing = [k for k, v in voices.items() if not v]
+    if missing:
+        raise RuntimeError(f"{provider.name}: no voice configured for "
+                           f"{', '.join(missing)}")
+
+    parts, spans, all_words, cursor = [], [], [], 0.0
 
     for i, beat in enumerate(script.beats):
-        audio_bytes, alignment = _synth_one(beat.line, voices[beat.speaker])
-        chunk = out_dir / f"beat_{i:02d}.mp3"
-        chunk.write_bytes(audio_bytes)
-        words, dur = _chars_to_words(beat.line, alignment, cursor)
-        all_words += words
+        spoken = speech.conversational(beat.line)
+        raw = provider.synth(spoken, voices[beat.speaker], beat.speaker)
+
+        chunk = out_dir / f"beat_{i:02d}.wav"
+        duration = _to_wav(raw, provider.suffix, chunk, exe)
+
+        spans.append(BeatSpan(start=round(cursor, 3), end=round(cursor + duration, 3)))
+        all_words += _even_words(spoken, cursor, duration)
         parts.append(str(chunk))
-        cursor += dur + gap
+        cursor += duration + gap
 
     combined = out_dir / "audio.mp3"
-    _concat(parts, combined, gap)
+    _join(parts, combined, gap, exe)
+
+    (out_dir / "spans.json").write_text(
+        json.dumps([s.model_dump() for s in spans], indent=2))
     (out_dir / "timings.json").write_text(
         json.dumps([w.model_dump() for w in all_words], indent=2))
 
-    return Audio(file=str(combined), duration_seconds=round(cursor, 2), word_timings=all_words)
+    # The trailing gap is silence after the last word; the track ends with the words.
+    duration = round(max(cursor - gap, 0.0), 2)
+    return Audio(file=str(combined), duration_seconds=duration,
+                 word_timings=all_words, beat_spans=spans)
 
 
-def _concat(parts: list[str], out: Path, gap: float):
-    """Concatenate with silence between beats. Requires ffmpeg on PATH."""
-    import subprocess, tempfile
-    silence = out.parent / "_gap.mp3"
-    subprocess.run(["ffmpeg","-y","-f","lavfi","-i",
-                    f"anullsrc=r=44100:cl=mono","-t",str(gap),str(silence)],
-                   check=True, capture_output=True)
-    seq = []
+def _even_words(text: str, offset: float, duration: float) -> list[WordTiming]:
+    """
+    Word timings spread evenly across a beat.
+
+    An approximation, and labelled as one. Beat changes — the thing the video
+    actually needs — come from the measured beat spans and are exact; these exist so
+    a future word-level effect has something to work with, and so the field is
+    populated the same way whoever spoke. Do not build anything load-bearing on them
+    without checking whether the provider can give real ones.
+    """
+    words = text.split()
+    if not words or duration <= 0:
+        return []
+    step = duration / len(words)
+    return [WordTiming(word=w, start=round(offset + i * step, 3),
+                       end=round(offset + (i + 1) * step, 3))
+            for i, w in enumerate(words)]
+
+
+def _join(parts: list[str], out: Path, gap: float, exe: str) -> None:
+    """Concatenate the beat wavs with silence between them, encode one mp3."""
+    silence = out.parent / "_gap.wav"
+    _run([exe, "-y", "-f", "lavfi", "-i",
+          f"anullsrc=r={SAMPLE_RATE}:cl=mono", "-t", str(gap), str(silence)])
+
+    seq: list[str] = []
     for p in parts:
         seq += [p, str(silence)]
+    seq = seq[:-1]                      # no trailing silence
+
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
-        for p in seq[:-1]:
+        for p in seq:
             f.write(f"file '{p}'\n")
         listfile = f.name
-    subprocess.run(["ffmpeg","-y","-f","concat","-safe","0","-i",listfile,
-                    "-c","copy",str(out)], check=True, capture_output=True)
+
+    _run([exe, "-y", "-f", "concat", "-safe", "0", "-i", listfile,
+          "-ar", str(SAMPLE_RATE), "-ac", "1", "-b:a", "128k", str(out)])
+    Path(listfile).unlink(missing_ok=True)
+    silence.unlink(missing_ok=True)
+
+
+def probe(provider: providers.Provider | None = None) -> tuple[bool, str]:
+    """
+    Can this provider actually synthesise? Costs about a dozen characters.
+
+    Credentials that parse, list voices, and report a subscription still do not prove
+    audio can be produced — ElevenLabs reported "configured" right up until the first
+    real beat failed. The only way to know is to synthesise something.
+    """
+    provider = provider or providers.get()
+    ok, why = provider.available()
+    if not ok:
+        return False, why
+    try:
+        voices = provider.resolve()
+        raw = provider.synth("Hello there.", voices["student"], "student")
+    except AccountBlocked as e:
+        return False, str(e)
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+    if not raw:
+        return False, "the provider returned no audio"
+    return True, f"synthesis works ({len(raw)} bytes via {provider.name})"

@@ -24,6 +24,9 @@ GRADERS = {
     "overlays":       lambda s, src: checks.check_overlays(s),
     "dialogue_shape": lambda s, src: checks.check_dialogue_shape(s),
     "grounding":      lambda s, src: checks.check_grounding(s, src),
+    "source_quotes":  lambda s, src: checks.check_source_quotes(s, src),
+    "no_refusal":     lambda s, src: checks.check_no_refusal(s),
+    "on_topic":       lambda s, src: checks.check_answers_its_section(s, src),
 }
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"

@@ -138,6 +138,7 @@ function Reels({ shorts }: { shorts: Unit[] }) {
   }
 
   const picked = pickVoices(voices);
+  const recorded = shorts.filter((s) => s.audio_url).length;
 
   return (
     <div className="reelswrap">
@@ -152,10 +153,17 @@ function Reels({ shorts }: { shorts: Unit[] }) {
           <span className="hintline">{rate.toFixed(1)}×</span>
         </label>
         <span className="spacer" />
+        {/* Name the narrator that is actually going to speak. Advertising the
+            browser's voices while a recorded track plays was simply wrong, and it
+            hid the thing worth knowing: which shorts still lack a recording. */}
         <span className="hintline">
-          {voices.length === 0
-            ? "no system voices — playing silently"
-            : `${picked.interviewer?.name ?? "?"} / ${picked.student?.name ?? "?"}`}
+          {recorded === shorts.length
+            ? "recorded narration"
+            : recorded > 0
+              ? `recorded narration · ${shorts.length - recorded} still on browser voice`
+              : voices.length === 0
+                ? "no system voices — playing silently"
+                : `browser voice: ${picked.interviewer?.name ?? "?"} / ${picked.student?.name ?? "?"}`}
         </span>
         <span className="hintline">{active + 1}/{shorts.length} · {feedback.length} signals</span>
       </div>

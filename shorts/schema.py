@@ -23,8 +23,11 @@ WORDS_PER_SECOND = WORDS_PER_MINUTE / 60.0
 #
 # 18s is about 45 words, which is three real sentences. If a topic cannot be
 # answered in that, it is too big for one short and belongs to the select step.
-MIN_SECONDS = 18
-MAX_SECONDS = 45
+#: Cut again, from 18-45. At 45 seconds a short is five points long, and five
+#: points is what made these unmemorable — see checks.MAX_ANSWERS. A question and a
+#: two-or-three-part answer is 35-60 words, which is 14 to 24 seconds.
+MIN_SECONDS = 12
+MAX_SECONDS = 28
 MAX_OVERLAY_WORDS = 8
 
 
@@ -62,6 +65,22 @@ class Topic(BaseModel):
     # Optional because topics.json files written before this field existed must
     # still load. Newly selected topics without one are dropped by select.py.
     answer_quote: Optional[str] = None
+
+    # How much this question matters, 1-5, against the rubric in select.py.
+    #
+    # This exists because selection was returning correct, answerable, forgettable
+    # questions — the definition of one CSS property, a yes/no about whether HTML
+    # styles a page — alongside the ones a learner is actually asked. Everything
+    # about those topics validated, so nothing downstream could tell them apart
+    # from the good ones. Scoring them makes "the most important questions in this
+    # material" something select.py can sort by and cut, instead of a hope.
+    #
+    # Optional for the same reason answer_quote is: older topics.json must load.
+    importance: Optional[int] = Field(default=None, ge=1, le=5)
+
+    # The one concept this question is about, as a short noun phrase. Used to keep
+    # three shorts asking the same thing three ways out of one deck.
+    concept: Optional[str] = None
 
 
 class TopicList(BaseModel):
@@ -125,6 +144,78 @@ class Script(BaseModel):
         return v
 
 
+#: How a cell, box or row is being treated by the narration right now.
+#:
+#: The narration decides emphasis, not the drawing, so a frame names ROLES and the
+#: renderer owns the colours. That is what keeps the palette consistent across every
+#: short and stops "amber" being spent on three things at once.
+Role = Literal["plain", "hero", "lost", "quiet"]
+
+
+class Cell(BaseModel):
+    """One box in a bar, column, split or flow."""
+    label: str = ""
+    role: Role = "plain"
+
+
+class TableRow(BaseModel):
+    cells: list[str] = Field(default_factory=list)
+    role: Role = "plain"
+
+
+class Frame(BaseModel):
+    """
+    One diagram, described as STRUCTURE rather than as coordinates.
+
+    WHY THIS EXISTS
+    The model used to emit raw SVG, and the labels overlapped — persistently, on
+    every model tried, however the brief was worded. That is not a prompting
+    problem: drawing an SVG by hand means doing layout arithmetic in your head
+    (does this 27-character label fit inside this 200px box, is there clear space
+    between these two <text> elements) with no way to see the result. Three redraw
+    attempts guided by checks.svg_problems reduced it and never fixed it, and
+    _draw_one kept the frame either way, so broken frames shipped.
+
+    So the model no longer places anything. It chooses a template and supplies the
+    words; skills/layout.py computes every coordinate, fits every label to the box
+    it belongs to, and reserves a band for anything that cannot fit inside. Labels
+    cannot overlap because nothing is ever placed where something else already is.
+
+    The templates are deliberately few. Each one is a shape these shorts actually
+    need, and a frame that cannot be said in one of them is a frame that was trying
+    to say too much for four seconds of phone screen.
+    """
+    template: Literal["bar", "mapping", "split", "flow", "table", "stat", "takeaway"]
+    title: str = ""
+    #: The one supporting line under the diagram. Its own reserved band.
+    note: Optional[str] = None
+
+    #: bar — a row of equal cells, e.g. memory frames.
+    cells: list[Cell] = Field(default_factory=list)
+    #: bar / mapping — a quiet caption naming the whole row or column.
+    cells_title: Optional[str] = None
+
+    #: mapping — two columns with arrows between them, e.g. pages to frames.
+    left: list[Cell] = Field(default_factory=list)
+    right: list[Cell] = Field(default_factory=list)
+    left_title: Optional[str] = None
+    right_title: Optional[str] = None
+
+    #: split — one wide bar cut into named parts, e.g. an address.
+    parts: list[Cell] = Field(default_factory=list)
+
+    #: flow — steps top to bottom with arrows, e.g. a page fault path.
+    steps: list[Cell] = Field(default_factory=list)
+
+    #: table — a header row and rows, one of them the hero.
+    columns: list[str] = Field(default_factory=list)
+    rows: list[TableRow] = Field(default_factory=list)
+
+    #: stat — one number or term, large.
+    value: Optional[str] = None
+    caption: Optional[str] = None
+
+
 class Visual(BaseModel):
     """Output of Skills 3 and 4."""
     ref: str
@@ -132,6 +223,12 @@ class Visual(BaseModel):
     spec: str                       # what it should show, in words
     svg: Optional[str] = None       # filled in for type == "diagram"
     image_path: Optional[str] = None
+
+    #: The structured frame this diagram was rendered from, when it was rendered
+    #: from one. Optional so units written before templates existed still load, and
+    #: kept on the unit so a frame can be re-rendered after a layout fix without
+    #: spending another LLM call.
+    frame: Optional[Frame] = None
 
 
 class WordTiming(BaseModel):

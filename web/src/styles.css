@@ -466,3 +466,290 @@ kbd {
   color: #06110d; box-shadow: 0 10px 34px hsl(var(--hue) 70% 30% / .6);
 }
 .reel.live { box-shadow: 0 24px 80px hsl(var(--hue) 70% 8% / .8), 0 0 0 1px hsl(var(--hue) 60% 40% / .25); }
+
+/* ============================================================================
+   ANIMATED STAGE — three.js backdrop, built diagrams, flowing narration
+   ==========================================================================*/
+
+/* The WebGL field. Behind the diagram card, in front of the CSS gradient, and
+   never in front of anything with words on it. */
+.threestage {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  opacity: 0.85;
+}
+.threestage canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* Room for the flowing caption. The bubble now carries a whole spoken sentence
+   rather than three words, so the diagram gives up the band it used to sit in —
+   a diagram cropped by a caption is worse than a slightly smaller diagram.
+   The extra top margin is for the beat chip, which straddles the card's edge.
+
+   The bands do not overlap, and that is load-bearing: the caption is a whole
+   spoken sentence and wraps to three lines, so a bubble sized by its content grew
+   upward over the diagram and clipped the takeaway line off the bottom of the
+   card. The stage stops where the caption starts, and the caption is a fixed
+   height whatever the sentence — see .flow below. */
+.stage { top: 11.5%; bottom: 39%; }
+
+/* THE DIAGRAM CARD IS LIGHT, AND THIS IS THE BIGGEST LEGIBILITY FIX HERE.
+   Read the palette SVG_SYSTEM gives the model: #E1F5EE pale mint fills, #1D9E75
+   strokes, #2C2C2A for "text on light fills", #8A8880 for muted labels. That is a
+   palette for a light surface — and the card was almost transparent over a
+   near-black reel, so a model that used #2C2C2A exactly as instructed drew
+   near-black text onto near-black. Whole labels were invisible; the ones that did
+   show sat at a contrast ratio of about 1.2:1.
+   Nothing in the drawing needed to change. The surface did. A light card also
+   makes the diagram read as the content of the frame rather than part of its
+   background, and it is what lets amber actually shout when it is the focus. */
+.reel .stageinner {
+  background: linear-gradient(168deg, #FCFBF7 0%, #EFF4F1 100%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: none;
+}
+/* THE CARD MUST NOT GROW PAST ITS BAND.
+   .stage is a centring grid whose row is sized by its content, and the diagram's
+   height comes from its own viewBox aspect ratio — so a crop taller than it is
+   wide made the SVG taller than the band, grew the row, and pushed the card 54px
+   down under the caption, hiding whatever the frame drew at the bottom. Giving the
+   row a definite minmax(0, 1fr) height makes 100% mean "the band" all the way
+   down, and preserveAspectRatio letterboxes the drawing inside it instead. */
+.reel .stage { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+.reel .stageinner { height: 100%; min-height: 0; overflow: hidden; }
+.reel .svgwrap.animated { height: 100%; min-height: 0; }
+.reel .svgwrap.animated svg { width: 100%; height: 100%; max-height: 100%; }
+
+/* No second panel inside the card: the card IS the diagram's surface. */
+.reel .svgwrap.animated {
+  background: none; border: none; box-shadow: none; padding: 4px;
+}
+.reel .svgwrap.animated svg { filter: none; }
+/* The no-diagram fallback has to live on the light card too. */
+.reel .bigtext { color: #0F6E56; text-shadow: none; }
+
+/* Cropped to its ink by AnimatedSvg.fitViewBox, so it can be scaled right up. */
+.svgwrap.animated svg { width: 100%; height: 100%; }
+
+/* The beat's three-word headline, laid over the top of the diagram card. This is
+   the thing a viewer reads in the first half-second; the caption is for following
+   along, and the diagram is for remembering. */
+.onscreen {
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  z-index: 4; pointer-events: none;
+  padding: 5px 13px; border-radius: 999px;
+  font-size: clamp(11px, 1.9vh, 14px); font-weight: 800;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: #04120d; white-space: nowrap;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 20px hsl(var(--hue) 70% 20% / 0.55);
+  animation: chip 0.4s cubic-bezier(.22,.8,.24,1);
+}
+@keyframes chip {
+  from { opacity: 0; transform: translate(-50%, -8px) scale(0.9); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+/* Sitting on the card's edge, it needs its own edge to read against it. */
+.onscreen { border: 2px solid rgba(6, 12, 14, 0.9); }
+
+/* ---------------------------------------------------------- flowing narration */
+
+.bubble { bottom: 19.5%; align-items: stretch; }
+.bubble p.flow {
+  max-width: 100%; width: 100%;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  font-size: clamp(13.5px, 2.2vh, 17px); font-weight: 600;
+  /* Four lines holds a whole beat for nearly every script the pipeline
+     produces; the band has room for it, and FlowingCaption still
+     scroll-follows the spoken word on the rare longer one. Three lines
+     left a fourth half-visible at the bottom, which reads as broken
+     rather than as scrollable. */
+  --lines: 4; --lh: 1.42; --pad: 11px;
+  line-height: var(--lh); letter-spacing: -0.005em;
+  padding: var(--pad) 15px;
+  /* FIXED height, not a max: exactly three lines, whatever the sentence. A bubble
+     sized by its content changes shape on every beat, which makes the whole frame
+     twitch; and once it is taller than its band it grows over the diagram. Three
+     lines holds most beats whole, and FlowingCaption scroll-follows the spoken
+     word for the ones it does not. */
+  /* Height is border-box, so the padding has to be in the sum or the last line is
+     sliced in half — which is exactly how this first read. */
+  height: calc(var(--lines) * var(--lh) * 1em + var(--pad) * 2);
+  min-height: calc(var(--lines) * var(--lh) * 1em + var(--pad) * 2);
+}
+.bubble p.flow::-webkit-scrollbar { display: none; }
+
+/* Three states, all on screen at once. `next` stays visible so the line does not
+   reflow as it fills — words popping in one at a time moved every word after them
+   and was far more distracting than a dim word sitting there. */
+.flow .word {
+  transition: color 0.16s linear, opacity 0.22s linear, text-shadow 0.2s linear;
+}
+.flow .word.next { color: rgba(244, 242, 236, 0.3); }
+.flow .word.said { color: var(--cream); opacity: 1; }
+.flow .word.now {
+  color: #fff; opacity: 1;
+  text-shadow: 0 0 14px hsl(var(--hue) 85% 62% / 0.75);
+}
+/* The interviewer's line is a question, and reads as one: lighter, quieter. */
+.flow.interviewer .word.said { color: rgba(244, 242, 236, 0.9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .threestage { opacity: 0.5; }
+  .onscreen { animation: none; }
+  .flow .word { transition: none; }
+}
+
+
+/* ============================================================================
+   CALM PASS — two zones, muted colour, nothing competing with the diagram
+   ==========================================================================*/
+
+/* The characters and the question footer are gone from Reel.tsx, so the diagram
+   and the caption get the height back.
+
+   Two bands they must NOT reclaim, both of which they did at first:
+   - The header. The card is near-white and the speaker chip is cream text, so a
+     card that reaches up under the header erases it rather than overlapping it.
+   - The action rail down the right. The caption used to run the full width and the
+     like/confusing/replay glyphs printed straight over the last word of every
+     line. */
+.reel .stage { top: 11%; bottom: 31%; }
+.reel .bubble { bottom: 7%; right: 58px; }
+.reel .scenewrap, .reel .reelfoot, .reel .onscreen { display: none; }
+
+/* COLOUR IS TURNED DOWN, DELIBERATELY.
+   The diagram is the content and its amber focus element has to be the brightest
+   thing in the frame. Every saturated pixel of chrome around it competes for the
+   same attention, and at 72% saturation the frame won. */
+.reel {
+  --accent: hsl(var(--hue) 34% 52%);
+  --accent-2: hsl(calc(var(--hue) + 26) 30% 46%);
+}
+.reel .reelbg {
+  background:
+    radial-gradient(120% 80% at 50% -5%, hsl(var(--hue) 22% 14%) 0%, transparent 60%),
+    linear-gradient(170deg, #0b0f11 0%, #06090a 100%);
+}
+.reel .reelbg::before { display: none; }   /* the rotating conic sweep */
+.reel .reelbg::after { opacity: 0.28; }    /* the dot grid */
+
+/* The 3D field is depth, not decoration. */
+.reel .threestage { opacity: 0.38; }
+
+.reel .reelhead .who {
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(244, 242, 236, 0.82);
+  box-shadow: none; font-weight: 700;
+}
+.reel .segfill { background: rgba(244, 242, 236, 0.7); }
+
+/* The caption is a quiet dark panel for both speakers. A per-speaker coloured
+   bubble made the frame change colour every beat, which read as a new scene
+   starting rather than the same explanation continuing. */
+.reel .bubble.left p, .reel .bubble.right p {
+  background: rgba(9, 13, 15, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+}
+/* One quiet marker for who is talking, instead of a whole coloured panel. */
+.reel .bubble.right p { border-left: 3px solid var(--accent); }
+.reel .bubble.left p { border-left: 3px solid rgba(255, 255, 255, 0.22); }
+
+.reel .flow .word.now {
+  color: #fff;
+  text-shadow: 0 0 10px hsl(var(--hue) 45% 55% / 0.5);
+}
+.reel .flow .word.next { color: rgba(244, 242, 236, 0.34); }
+
+.reel .tap { background: rgba(4, 7, 8, 0.5); backdrop-filter: blur(2px); }
+.reel .tap span { background: rgba(244, 242, 236, 0.95); color: #08130e; }
+
+
+/* ============================================================================
+   BIGGER DIAGRAM, SMALLER CAPTION
+   The diagram is what a viewer is supposed to carry away, so it gets the frame.
+   The caption is a reading aid running under the voice; it does not need to be
+   the same weight as the thing it is describing.
+   ==========================================================================*/
+.reel .stage { top: 10.5%; bottom: 23.5%; }
+.reel .bubble { bottom: 5.5%; }
+.reel .bubble p.flow {
+  font-size: clamp(11.5px, 1.75vh, 14px);
+  --lines: 3; --lh: 1.4; --pad: 9px;
+  font-weight: 550;
+  border-radius: 13px;
+}
+
+/* The mode marker sits with the speaker name, and changes with it. */
+.reel .reelhead .who {
+  display: inline-flex; align-items: center; gap: 6px;
+  letter-spacing: 0.06em; font-size: 10.5px;
+}
+.reel .reelhead .mode { font-size: 13px; line-height: 1; }
+
+/* A flag reads as a control at a smaller weight than a face emoji did. */
+.reel .rail .glyph { font-size: 21px; }
+
+
+/* ============================================================================
+   ALIGNMENT — the caption and the diagram card share one column
+   ==========================================================================*/
+
+/* They were inset differently and it showed: .stage pads 3.5% a side, while the
+   caption was pushed 58px off the right to clear the action rail. So the caption's
+   right edge sat 40-odd pixels inside the card's, and the two panels read as
+   misaligned no matter how they were styled.
+   The rail is what forced that inset, so the rail moves. It becomes a horizontal
+   row along the bottom, which is out of the caption's column entirely and lets both
+   panels use the same 3.5% margins as everything else. */
+.reel .stage { top: 10.5%; bottom: 29%; }
+.reel .bubble { left: 3.5%; right: 3.5%; bottom: 11.5%; }
+
+.reel .rail {
+  flex-direction: row; align-items: center;
+  left: auto; right: 3.5%; bottom: 3.2%;
+  gap: 20px;
+}
+.reel .rail .glyph { font-size: 19px; }
+.reel .rail em { position: absolute; transform: translateY(15px); }
+.reel .railstate { font-size: 14px; }
+
+
+/* ============================================================================
+   RAIL BACK ON THE SIDE, WITH THE SPEAKER IN IT
+   ==========================================================================*/
+
+/* The rail returns to a vertical column on the right. It was moved to the bottom
+   to stop it printing over the caption, but the alignment that fixed can be had
+   another way: give the diagram card and the caption the SAME right margin as each
+   other, cleared of the rail. Both now run from 3.5% to the rail's edge, so they
+   still line up — and the controls are back where a reel puts them. */
+.reel .stage {
+  top: 10.5%; bottom: 26%;
+  padding-left: 3.5%; padding-right: 54px;
+}
+.reel .bubble { left: 3.5%; right: 54px; bottom: 8%; }
+
+.reel .rail {
+  flex-direction: column; align-items: center;
+  left: auto; right: 8px; bottom: 8%;
+  gap: 15px;
+}
+
+/* The speaker, drawn, at icon size. The .avatar.speaking talk keyframes already
+   exist for the full-size version and work unchanged here. */
+.reel .whocell {
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+}
+.reel .whocell .avatar {
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55),
+              0 0 0 1.5px rgba(255, 255, 255, 0.14);
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+.reel .whocell .avatar.speaking {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.55),
+              0 0 0 2px hsl(var(--hue) 45% 55% / 0.75);
+}

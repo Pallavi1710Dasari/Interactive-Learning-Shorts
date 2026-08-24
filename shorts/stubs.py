@@ -176,10 +176,37 @@ def _spans(sentences: list[str]) -> list[str]:
 
 
 def _visuals(user: str) -> dict:
-    """Everything comes back as a text card — V1 ships no diagrams."""
-    listed = _find(r"Assign a visual to each of:\s*(.+)$", user, re.M) or ""
-    refs = re.findall(r"'([^']+)'", listed) or re.findall(r"^\[([a-z0-9_]+)\]", user, re.M)
-    return {"visuals": [
-        {"ref": ref, "type": "text", "spec": f"Large text card for {ref}."}
-        for ref in dict.fromkeys(refs)
-    ]}
+    """
+    A real Frame per ref, so a stub run exercises the actual renderer.
+
+    These used to come back type="text" with no frame at all, which meant the stub
+    path skipped drawing entirely and a layout bug could not show up offline. Now
+    every ref gets a legitimate template — a "stat" card for the beats, "takeaway"
+    for the last — so `SHORTS_STUB=1` renders genuine SVG through
+    skills/layout.render and the smoke test covers it for free.
+    """
+    listed = _find(r"in this order:\s*(.+)$", user, re.M) or ""
+    refs = (re.findall(r"'([^']+)'", listed)
+            or re.findall(r"^\[([a-z0-9_]+)\]", user, re.M))
+    refs = list(dict.fromkeys(refs))
+
+    # Labels are taken from the NARRATION, not invented. check_diagram_matches_
+    # narration compares a frame's label words against the beats and the source, and
+    # it is right to: a label naming something the voice never says is the defect it
+    # exists to catch. A stub that invented "stub frame, rendered locally" failed it
+    # for exactly the correct reason, which is not a useful thing for a smoke test
+    # to fail on.
+    lines = dict(re.findall(r"^\[([a-z0-9_]+)\]\s*\w+:\s*(.+)$", user, re.M))
+
+    out = []
+    for i, ref in enumerate(refs):
+        said = lines.get(ref, ref.replace("_", " "))
+        words = re.sub(r"[^\w\s-]", "", said).split()
+        frame = ({"template": "takeaway", "title": " ".join(words[:2]) or "Remember",
+                  "caption": said}
+                 if i == len(refs) - 1 else
+                 {"template": "stat", "title": " ".join(words[:3]),
+                  "value": str(i + 1), "caption": " ".join(words[:6]),
+                  "note": " ".join(words[:8])})
+        out.append({"ref": ref, "spec": f"Stub frame for {ref}.", "frame": frame})
+    return {"visuals": out}

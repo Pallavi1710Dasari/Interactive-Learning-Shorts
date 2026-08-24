@@ -21,6 +21,22 @@ export default function App() {
     getHealth().then((h) => { setHealth(h); setTotal(h.total); }).catch(() => {});
   }, []);
 
+  // #reels opens the feed straight away, on whatever is already in output/, and
+  // #reels/<short_id> opens it scrolled to one particular short.
+  //
+  // Watching the reels is the part you come back to; making that a link means not
+  // clicking through step 1 to reach it, it gives the player a URL that can be
+  // opened on a phone, and it makes "look at this one" a thing you can send to
+  // somebody rather than a scroll instruction.
+  const [focus, setFocus] = useState<string | null>(null);
+  useEffect(() => {
+    const [route, id] = location.hash.replace(/^#/, "").split("/");
+    if (route !== "reels") return;
+    setFocus(id ? decodeURIComponent(id) : null);
+    getShorts().then((s) => { setShorts(s); setStep("reels"); }).catch(() => {});
+    getUsage().then(setTotal).catch(() => {});
+  }, []);
+
   // Anything that spends money hands back its own cost plus the new running total.
   const onSpend = (d: UsageTotals, t: UsageTotals) => { setDelta(d); setTotal(t); };
 
@@ -62,7 +78,7 @@ export default function App() {
           onDone={(s) => { setShorts(s); setStep("reels"); }}
         />
       )}
-      {step === "reels" && <Reels shorts={shorts} />}
+      {step === "reels" && <Reels shorts={shorts} focus={focus} />}
     </div>
   );
 }
@@ -84,7 +100,7 @@ function Crumb({ n, label, on, done, disabled, onClick }: {
 }
 
 /** Step 3 — reels only. No Q&A panel: reviewing was step 2's job. */
-function Reels({ shorts }: { shorts: Unit[] }) {
+function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
   const [active, setActive] = useState(0);
   const [voiceOn, setVoiceOn] = useState(true);
   const [rate, setRate] = useState(1);
@@ -105,6 +121,17 @@ function Reels({ shorts }: { shorts: Unit[] }) {
     slots.current.forEach((el) => el && obs.observe(el));
     return () => obs.disconnect();
   }, [shorts]);
+
+  // Jump to the short named in the URL. Done after the slots exist and without
+  // smooth scrolling, so it lands as "this is where the page opened" rather than
+  // as the feed visibly travelling past the shorts in between.
+  useEffect(() => {
+    if (!focus || !shorts.length) return;
+    const i = shorts.findIndex((s) => s.short_id === focus);
+    if (i < 0) return;
+    setActive(i);
+    requestAnimationFrame(() => slots.current[i]?.scrollIntoView({ block: "center" }));
+  }, [focus, shorts]);
 
   const onFeedback = useCallback((f: Feedback) => {
     setFeedback((prev) => {

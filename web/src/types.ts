@@ -2,11 +2,16 @@
 // field there, add it here — the app fetches these shapes at runtime, so a
 // mismatch shows up as an empty panel rather than a compile error.
 
+/** One word of the narration, with the moment it is spoken. */
+export type CaptionWord = { w: string; s: number; e: number };
+
 export type Beat = {
   speaker: "interviewer" | "student";
   line: string;
   on_screen: string;
   visual_ref: string;
+  /** Word-by-word timings for the flowing caption. See shorts/feed.py. */
+  words?: CaptionWord[];
   /** The sentence of the source this beat restates; student beats only. */
   source_quote?: string | null;
   /** Inline SVG, already stripped of <script> and on* handlers in Python. */
@@ -16,7 +21,9 @@ export type Beat = {
 };
 
 /** A beat as it comes back inside a reel payload — timings always present. */
-export type ReelBeat = Beat & { svg: string | null; start: number; end: number };
+export type ReelBeat = Beat & {
+  svg: string | null; start: number; end: number; words: CaptionWord[];
+};
 
 export type Topic = {
   id: string;

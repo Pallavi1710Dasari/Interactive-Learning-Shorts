@@ -1,4 +1,6 @@
 """SKILL 1 — short-selection. Doc in, topics out."""
+import re
+
 from ..schema import TopicList, Section
 from ..parse import sections_as_prompt_block
 from ..llm import ask_json
@@ -6,25 +8,68 @@ from ..llm import ask_json
 SYSTEM = """You select which questions from a software-engineering course session deserve a
 30-60 second interview-style video short.
 
-PICK THE QUESTIONS AN INTERVIEWER ACTUALLY ASKS
-These shorts are interview preparation. The test for every topic is: would this
-question be asked in a technical interview on this subject, or is it the kind of
-thing an examiner marks you down for not knowing? Pick the standard, important,
-frequently-asked questions on the material — the ones a learner must be able to
-answer out loud.
+YOUR JOB IS TO RANK, NOT TO COLLECT
+There are always more answerable questions in a document than there are questions
+worth a short. Selecting the answerable ones is easy and it is not the task. The
+task is to find THE MOST IMPORTANT ONES — the handful a learner has to be able to
+answer out loud, in the order that matters.
 
-Prefer, in this order:
-1. The question an interviewer opens with on this topic — the direct one.
-   "What happens on a page fault?" "Why does paging need a page table?"
-2. The comparison or distinction that is routinely asked and routinely confused.
-   "How is internal fragmentation different from external?"
-3. The mechanism or consequence question — why something works, what follows.
-4. The misconception a learner would confidently get wrong.
+So score every topic you return with `importance`, 1 to 5, against this rubric,
+and be strict. Inflating the scores defeats the whole step.
 
-ASK IT DIRECTLY. A short is not a riddle. The question must be phrased the plain
-way an interviewer would say it, and the answer must be the plain, complete answer
-to exactly that question. No trick framing, no "which of the following", no
-question that needs the answer before you can understand what is being asked.
+  5  The central idea of the material. If a learner understood only one thing from
+     this document, this is it. An interviewer asks it directly and often. Missing
+     it means not knowing the topic at all.
+     "What happens on a page fault?"  "Why does paging need a page table?"
+  4  A mechanism, cause, or distinction that is genuinely asked and routinely got
+     wrong. Answering it proves understanding rather than recall.
+     "How is internal fragmentation different from external?"
+     "Why can't the CPU just walk the page table on every access?"
+  3  Real but secondary: a consequence, a trade-off, a supporting detail. Worth
+     knowing, rarely the question anybody opens with.
+  2  A definition of one term or property, looked up in seconds and forgotten just
+     as fast. NOT WORTH A SHORT.
+  1  Incidental: an example's numbers, an aside, a naming convention. Never.
+
+RETURN 4s AND 5s. A 3 only when there is nothing better left in the material, and
+never a 1 or a 2 — drop those instead, even if it means returning fewer topics
+than asked for. Three questions a learner will really be asked beat eight
+forgettable ones, and a deck padded with 2s is exactly the complaint this step
+exists to prevent.
+
+Order the list by importance, highest first.
+
+BANNED: THE YES/NO QUESTION
+The question must NOT be answerable with "yes" or "no". This is the most common
+way a weak topic gets through, because a yes/no question sounds conversational
+and provocative while asking almost nothing:
+
+  BAD   "So does HTML decide how pretty a webpage looks?"
+  BAD   "Isn't the <head> element just another heading tag?"
+  BAD   "If you have 4 bits, can they only represent 4 possible values?"
+  BAD   "Does paging get rid of fragmentation completely?"
+
+Every one of those is really a misconception worth correcting, asked the lazy way.
+Ask the real question underneath it instead — the one whose answer is the
+explanation, not a verdict:
+
+  GOOD  "What does HTML define on a page, and what does CSS define?"
+  GOOD  "What is the <head> element for, and how does it differ from <h1>?"
+  GOOD  "How many values can 4 bits represent, and why?"
+  GOOD  "Which kind of fragmentation does paging remove, and which does it leave?"
+
+So: start the question with What, Why, How, Which, When or Where. Never with
+Is/Are/Do/Does/Can/Will/Would/Should, and never with a conversational lead-in
+("So...", "Wait...", "If I..."). No trick framing, no "which of the following", no
+question that needs the answer before it can be understood.
+
+ONE QUESTION PER CONCEPT
+Give every topic a `concept`: the one idea it is about, as a short noun phrase
+("MSB and LSB positions", "page fault handling"). Two topics may not share a
+concept. Asking the same thing three ways — "which bit is the MSB", "which end is
+the MSB", "in 1010 is the important bit on the left" — produces three shorts a
+learner watches once and cannot tell apart, and it crowds out the concepts that
+got no short at all. Prefer covering five concepts once to covering two five ways.
 
 THE ANSWER MUST BE IN THE READING MATERIAL — THIS IS THE HARD RULE
 The single worst failure of this step is a good-sounding question whose answer is
@@ -57,9 +102,12 @@ Pick the section that CONTAINS the answer, not the one whose title sounds closes
 Return FEWER topics rather than padding with weak ones. Three questions a learner
 will really be asked beat eight forgettable ones.
 
-Output JSON:
+Output JSON, ordered by importance, highest first:
 {"topics":[{"id":"snake_case_id","topic":"the question this short answers",
-"why_it_matters":"one sentence","source_section_id":"exact id from the doc",
+"concept":"the one idea it is about, a short noun phrase",
+"importance":5,
+"why_it_matters":"one sentence",
+"source_section_id":"exact id from the doc",
 "answer_quote":"the sentence from that section that answers it, copied verbatim",
 "difficulty":"easy|medium|hard"}]}
 
@@ -70,22 +118,222 @@ section happens to contain a numbered list. Pick the section that contains the
 concept."""
 
 
+#: How many more candidates to ask for than will be kept.
+#
+#: Asking for exactly `target` gets exactly `target` back — a model asked for five
+#: returns five whether or not the fifth is any good, because returning four feels
+#: like failing the instruction however the prompt is worded. Asking for a few more
+#: and then cutting to the best turns "the five best" into a real comparison, and it
+#: costs a handful of output tokens on one call, not another call.
+OVERSHOOT = 4
+
+#: The schema's upper bound. Asking past it just fails validation.
+MAX_CANDIDATES = 12
+
+
 def select_topics_with_notes(sections: list[Section],
                              target: int = 5) -> tuple[TopicList, list[str]]:
-    """Select topics, and report any section id that had to be corrected."""
+    """
+    Select the most important topics, and report everything that was corrected.
+
+    Three passes over one LLM call: the ids have to resolve, the answers have to be
+    in the material, and what is left is cut to the most important non-duplicate
+    questions. The cutting is deliberately deterministic — a model that has just
+    told you a topic is a 2 out of 5 should not also be the thing deciding whether
+    a 2 ships.
+    """
     allowed = [s.section_id for s in sections]
+    candidates = min(target + OVERSHOOT, MAX_CANDIDATES)
     user = (
-        f"Select the {target} best topic(s) for shorts from this session. "
-        f"Return AT MOST {target}. If only one concept here truly qualifies, "
-        f"return just that one — do not pad the list to reach a count.\n\n"
+        f"Find the most important question(s) in this session and return AT MOST "
+        f"{candidates} of them, ordered by importance, highest first. Only the top "
+        f"{target} will be made into shorts, so this is a ranking task: include a "
+        f"topic only if you would defend it as one of the {target} most important "
+        f"things in this material. If only one concept here truly qualifies, return "
+        f"just that one — do not pad the list to reach a count.\n\n"
         f"ALLOWED SECTION IDS (source_section_id must be exactly one of these):\n"
         f"{', '.join(allowed)}\n\n"
         f"{sections_as_prompt_block(sections)}"
     )
-    topics = ask_json(SYSTEM, user, TopicList, max_tokens=2000, label="select")
+    topics = ask_json(SYSTEM, user, TopicList, max_tokens=3000, label="select")
     topics, id_notes = repair_section_ids(topics, sections)
     topics, quote_notes = drop_unanswerable(topics, sections)
-    return topics, id_notes + quote_notes
+    topics, rank_notes = keep_most_important(topics, target)
+    return topics, id_notes + quote_notes + rank_notes
+
+
+#: Below this, a question is not worth a short. See the rubric in SYSTEM.
+MIN_IMPORTANCE = 3
+
+#: An unscored topic (an older topics.json, or a model that skipped the field) is
+#: treated as ordinary rather than dropped — the field is new and its absence is
+#: not evidence of a weak question.
+ASSUMED_IMPORTANCE = 3
+
+#: A question opening with one of these is answerable "yes" or "no".
+#: Apostrophes are stripped before the lookup, so "isn't" arrives as "isnt".
+_YES_NO_OPENERS = {
+    "is", "isnt", "are", "arent", "was", "wasnt", "were", "werent",
+    "do", "dont", "does", "doesnt", "did", "didnt",
+    "can", "cant", "could", "couldnt", "will", "wont", "would", "wouldnt",
+    "should", "shouldnt", "has", "hasnt", "have", "havent", "had",
+    "am", "must", "shall",
+}
+
+#: A question opening with one of these is asking for an explanation, not a
+#: verdict, and is never flagged however many auxiliaries appear later in it.
+_INTERROGATIVES = {"what", "whats", "why", "how", "which", "when", "where",
+                   "who", "whose", "whom"}
+
+#: Conversational lead-ins to look past before judging the opener. "So does HTML
+#: decide..." is the same defect as "Does HTML decide...".
+_LEAD_INS = {"so", "wait", "but", "and", "ok", "okay", "hmm", "then", "now", "if"}
+
+#: Above this token overlap, two questions are asking the same thing twice.
+_DUPLICATE_OVERLAP = 0.7
+
+#: Words that two unrelated questions share anyway, so they must not be what makes
+#: a pair look like duplicates.
+_STOPWORDS = {
+    "a", "an", "the", "is", "are", "was", "were", "do", "does", "did", "of", "to",
+    "in", "on", "for", "and", "or", "but", "it", "its", "this", "that", "what",
+    "why", "how", "which", "when", "where", "you", "your", "i", "if", "so", "just",
+    "actually", "really", "with", "at", "by", "from", "as", "be", "been", "can",
+    "not", "no", "get", "gets", "make", "makes", "than", "then", "there", "here",
+}
+
+
+def keep_most_important(topics: TopicList, target: int) -> tuple[TopicList, list[str]]:
+    """
+    Cut a candidate list down to the most important, distinct, properly-asked ones.
+
+    Three defects, all of which validated cleanly before this existed and all of
+    which reached the reviewer as finished shorts:
+
+      the forgettable one   "What does the CSS color property specify?" — correct,
+                            answerable, cited, and a two-second lookup. Cut by
+                            importance.
+      the yes/no one        "So does HTML decide how pretty a webpage looks?" — a
+                            real misconception asked the lazy way, which produces a
+                            short whose answer is "no, and here is the actual
+                            thing", wasting the first beat on a verdict.
+      the triplet           three shorts asking which end of a binary number the
+                            MSB is on. Each is fine; together they are one concept
+                            occupying three slots that other concepts needed.
+
+    Nothing is dropped when EVERY candidate fails, for the same reason
+    drop_unanswerable keeps its rejects in that case: leaving the user with "no
+    topics" and no way to see why is worse than letting them judge a weak list.
+    """
+    ranked = sorted(
+        topics.topics,
+        key=lambda t: -(t.importance if t.importance is not None else ASSUMED_IMPORTANCE),
+    )
+
+    kept, notes, seen_concepts, seen_questions = [], [], set(), []
+
+    for topic in ranked:
+        score = topic.importance if topic.importance is not None else ASSUMED_IMPORTANCE
+        question = (topic.topic or "").strip()
+
+        if score < MIN_IMPORTANCE:
+            notes.append(f"{topic.id}: dropped, importance {score}/5 — not worth a short")
+        elif _is_yes_no(question):
+            notes.append(f"{topic.id}: dropped, asks a yes/no question — {question[:60]!r}")
+        elif (concept := _norm_concept(topic.concept)) and concept in seen_concepts:
+            notes.append(f"{topic.id}: dropped, another topic already covers "
+                         f"{topic.concept!r}")
+        elif (twin := _near_duplicate(question, seen_questions)) is not None:
+            notes.append(f"{topic.id}: dropped, asks the same thing as {twin!r}")
+        else:
+            kept.append(topic)
+            if concept:
+                seen_concepts.add(concept)
+            seen_questions.append(question)
+
+    if not kept:
+        print(f"  ! every candidate failed the importance/duplicate checks "
+              f"({len(notes)}) — keeping them all rather than returning nothing")
+        for note in notes:
+            print(f"    ~ {note}")
+        return TopicList(topics=ranked[:target]), notes
+
+    cut = kept[target:]
+    for topic in cut:
+        score = topic.importance if topic.importance is not None else ASSUMED_IMPORTANCE
+        notes.append(f"{topic.id}: not selected, ranked below the top {target} "
+                     f"(importance {score}/5)")
+
+    for note in notes:
+        print(f"  ! {note}")
+    if kept[:target]:
+        print(f"  selected {len(kept[:target])} topic(s), most important first:")
+        for topic in kept[:target]:
+            score = topic.importance if topic.importance is not None else ASSUMED_IMPORTANCE
+            print(f"    {score}/5  {topic.topic}")
+    return TopicList(topics=kept[:target]), notes
+
+
+def _is_yes_no(question: str) -> bool:
+    """
+    Would "yes" answer this?
+
+    Judged on the word that opens the asking clause, and only against closed lists,
+    because the cost of a false positive is a good question silently deleted. A
+    question that opens with an interrogative — What/Why/How/Which — is never
+    flagged, however many auxiliaries appear later in it ("Why does adding one more
+    bit double the values?" is a fine question).
+
+    Two shapes, both of which showed up in real output:
+
+      "Does paging get rid of fragmentation?"        the auxiliary opens it
+      "If you have 4 bits, can they only hold 4?"    a condition opens it and the
+                                                     auxiliary opens the clause
+                                                     after the comma
+
+    The second rule only applies when nothing interrogative opens the sentence, so
+    "How is this stored, and does the TLB help?" is left alone.
+    """
+    def words(text: str) -> list[str]:
+        return [w.replace("'", "") for w in re.findall(r"[\w']+", text.lower())]
+
+    head = words(question)
+    while head and head[0] in _LEAD_INS:
+        head.pop(0)
+    if not head:
+        return False
+    if head[0] in _YES_NO_OPENERS:
+        return True
+    if head[0] in _INTERROGATIVES:
+        return False
+
+    _, _, rest = question.partition(",")
+    tail = words(rest)
+    return bool(tail) and tail[0] in _YES_NO_OPENERS
+
+
+def _norm_concept(concept: str | None) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", (concept or "").lower()))
+
+
+def _near_duplicate(question: str, against: list[str]) -> str | None:
+    """The first earlier question asking substantially the same thing, if any."""
+    mine = _content_words(question)
+    if len(mine) < 3:
+        return None                 # too short to judge; let it through
+    for other in against:
+        theirs = _content_words(other)
+        if not theirs:
+            continue
+        overlap = len(mine & theirs) / min(len(mine), len(theirs))
+        if overlap >= _DUPLICATE_OVERLAP:
+            return other
+    return None
+
+
+def _content_words(question: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", question.lower())
+            if w not in _STOPWORDS and len(w) > 1}
 
 
 def select_topics(sections: list[Section], target: int = 5) -> TopicList:

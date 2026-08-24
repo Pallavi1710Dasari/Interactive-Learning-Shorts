@@ -54,19 +54,36 @@ def check_overlays(script: Script) -> GraderResult:
     return GraderResult("overlays", True, f"all {len(script.beats)} overlays within limit")
 
 
-MIN_ANSWERS = 3
-MAX_ANSWERS = 5
-MAX_ANSWER_WORDS = 32
+#: The answer is 2 or 3 parts, not 3 to 5.
+#:
+#: Five points is not a thing anybody remembers off a phone screen. Reviewers kept
+#: asking the same question about these shorts — "which of these five was the
+#: answer?" — and the honest reply was that three of them were context. A short
+#: that lands ONE idea and one consequence is recallable a week later; a short that
+#: lands five lands none of them, and takes twice as long doing it.
+#:
+#: Two is now allowed, and often right: a question whose answer is a mechanism plus
+#: its consequence needs exactly two beats, and the third was always the weakest —
+#: a restatement, or a claim propped up by a quote that did not quite support it.
+MIN_ANSWERS = 2
+MAX_ANSWERS = 3
+
+#: And each part is shorter: 32 words is two sentences read fast, which is a wall
+#: of text against a single diagram.
+MAX_ANSWER_WORDS = 24
 
 
 def check_dialogue_shape(script: Script) -> GraderResult:
     """
-    One question, then the answer in 3 to 5 short parts.
+    One question, then the answer in 2 or 3 short parts.
 
     A single continuous answer was tried and rejected in review: it read as a wall
     of text, left one diagram on screen for ~40 seconds, and gave the model enough
     rope to drift off the source. Splitting the answer gives each idea its own
     visual and keeps every spoken chunk short.
+
+    The upper bound came DOWN from five, which is the more important half of this
+    grader now — see MAX_ANSWERS. Splitting far enough is easy; stopping is not.
     """
     speakers = [b.speaker for b in script.beats]
     if speakers[0] != "interviewer":
@@ -493,7 +510,26 @@ def _text_box(attrs: str, label: str) -> tuple[float, float, float, float] | Non
 #: a redraw is worth spending, not the target — a frame at 7 is fine, one at 13 is
 #: a wall of boxes. Only the redraw loop uses it, so it costs one extra attempt and
 #: never fails a frame outright.
-MAX_SHAPES = 8
+#: Down from 8. The redraw loop reports "N shapes — too busy" and the model thins
+#: the frame out, so this number is the actual lever on how busy a diagram is. At 8
+#: the frames that came back were still schematics of five or six equal parts; the
+#: complaint they generate is "too complex to understand", and the fix is upstream
+#: of any label tweak.
+MAX_SHAPES = 6
+
+#: How far past its own box a label must reach before it counts as spilling.
+#:
+#: A RATIO, not a pixel margin, and that matters. The first version demanded 12px
+#: of clear space per side, which fired on "Single" at an estimated 158px inside a
+#: 180px box — a 22px margin, perfectly fine on screen. Text widths here are
+#: ESTIMATED from character counts (see CHAR_WIDTH_RATIO) and carry maybe 10% of
+#: error, so any threshold tighter than that error bar reports noise. And noise is
+#: expensive: every false positive burns one of the three redraw attempts that a
+#: genuinely broken frame needed.
+#:
+#: At 1.05 the check fires on real spills — a 131px label in an 80px box — and stays
+#: quiet on the merely snug ones.
+LABEL_SPILL_RATIO = 1.05
 
 _SHAPE_EL = re.compile(r"<(rect|circle|ellipse|polygon|polyline|path|line)\b", re.I)
 
@@ -584,6 +620,20 @@ def _collisions(svg: str, texts: list) -> list[str]:
                     f'the label "{label[:28]}" is printed across the box at '
                     f'({bx0:.0f},{by0:.0f}) it does not belong to — move it into the '
                     f'clear, or widen the gap it sits in')
+                break
+
+            # A label centred in its OWN box but wider than it. This is the defect
+            # the "not inside" test above cannot see, and it is the one that keeps
+            # shipping: "Free" centred in a 90px box renders 30px past both its
+            # edges and collides with whatever is next to it. The frame reads as
+            # sloppy for a reason the model has no way to notice, since the markup
+            # is perfectly well-formed.
+            if inside and (tx1 - tx0) > (bx1 - bx0) * LABEL_SPILL_RATIO:
+                out.append(
+                    f'the label "{label[:28]}" is about {tx1 - tx0:.0f}px wide but its '
+                    f'box is only {bx1 - bx0:.0f}px — it spills out over both edges. '
+                    f'Widen the box to at least {(tx1 - tx0) * 1.2:.0f}px, shorten the '
+                    f'label, or split it across two <text> lines')
                 break
 
     # Two labels on the same spot. Same defect, different pair: it happens where a

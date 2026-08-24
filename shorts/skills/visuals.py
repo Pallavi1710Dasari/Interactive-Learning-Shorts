@@ -1,18 +1,41 @@
-"""SKILLS 3 & 4 — visual-spec, then diagram-render.
+"""SKILLS 3 & 4 — choose the composition, then render it.
 
 Non-negotiable: technical content becomes code-generated SVG, never an image
 model. Image models produce confident nonsense for page tables and flow diagrams.
+
+AND NOT MODEL-PLACED SVG EITHER, WHICH IS THE CHANGE HERE
+This used to ask a model for raw <svg> and then police it: checks.svg_problems read
+the markup for overflowing and colliding labels, and _draw_one redrew up to three
+times carrying that list. It never converged. Rendered and inspected, the finished
+frames still carried around twenty label problems per pair of shorts on every model
+tried — "External frag" printed on top of "No single block", column captions across
+the tables they labelled — and because a missing diagram is worse than a flawed one,
+_draw_one kept the frame regardless. So broken frames shipped by design.
+
+The cause was not the wording of the brief. Placing SVG by hand means doing layout
+arithmetic with no way to see the result, and no model can check its own work there.
+
+So the model no longer places anything. It picks one of seven templates and supplies
+the words; skills/layout.py computes every coordinate and fits every label to the
+box that holds it. Overlap is not graded any more because it cannot be constructed.
+That also makes drawing FREE — rendering is local, so the diagram calls that were
+82% of the bill are gone.
 """
-from concurrent.futures import ThreadPoolExecutor
 
 from pydantic import BaseModel
-from ..schema import Script, Visual, Section
+from ..schema import Script, Visual, Section, Frame
 from ..llm import ask_json
-from .. import config, usage
+from . import layout
+
+
+class FramedVisual(BaseModel):
+    ref: str
+    spec: str
+    frame: Frame
 
 
 class VisualPlan(BaseModel):
-    visuals: list[Visual]
+    visuals: list[FramedVisual]
 
 
 SPEC_SYSTEM = """You design the visuals for one short video, as a SINGLE COMPOSITION THAT BUILDS.
@@ -63,150 +86,128 @@ ONE IDEA PER FRAME. A frame illustrates the ONE thing its beat says. If you find
 yourself specifying a second mechanism to give context, delete it — the previous
 frame already established the context, because this is one composition that builds.
 
+NAME THE FOCUS, AND NAME WHAT CARRIES OVER
+Because the composition builds, every spec after the first has two parts the
+drawing step depends on, and both must be explicit:
+
+  CARRIED OVER — the objects already on screen from the previous beat, which must
+                 be drawn in the same place, unchanged and quiet.
+  FOCUS        — the ONE object this beat is about. Exactly one. It is the thing
+                 that gets the accent colour, it is drawn LARGER than everything
+                 else in the frame, and it is the only thing the viewer is asked to
+                 look at while this line is spoken.
+
+A composition of equal parts has no focus. If your base composition is four
+same-sized boxes in a row, it is wrong however neatly it is drawn — the viewer is
+given nothing to look at first. Build the composition around one dominant shape and
+let the beats move the emphasis around inside it.
+
+Write them in those words. "Carried over: the three-row table and the MMU box.
+Focus: row 2." A spec that does not say which single object is the focus produces
+a frame where everything is emphasised, which communicates nothing.
+
 Then write `spec`: concrete enough that someone could draw it without seeing the
 script. Name every label exactly as it should appear. Two or three sentences.
 
-KEEP THE LABELS SHORT. Whatever you name is drawn as-is on a phone screen, and SVG
-does not wrap text, so a long label overflows its box. Every label you specify must
-be 3 words or fewer and under 18 characters: "MMU checks PTE", not "MMU checks Page
-Table Entry"; "Backing store", not "Backing Store (disk)". Specify at most 5 boxes
-in any single row.
+CHOOSE A TEMPLATE, DO NOT DRAW
+You do not place anything on the canvas. You choose the SHAPE of each frame and
+supply its words; the renderer computes every coordinate and fits every label to
+its box. There are seven shapes. Pick the one the sentence actually needs.
 
-Output JSON: {"visuals":[{"ref":"...","type":"diagram|image|text","spec":"..."}]}"""
+  "bar"      One row of equal cells. For anything countable laid out in a line:
+             physical memory, frames, slots, a timeline.
+             -> cells: up to 10, each {label, role}. cells_title names the row
+                ("Physical memory").
+  "mapping"  Two columns with arrows between them, ROW BY ROW. For a
+             correspondence between two sets of things: these pages live in those
+             frames, this key finds that entry.
+             -> left, right: up to 4 each. left_title, right_title.
+             GIVE THE TWO COLUMNS THE SAME NUMBER OF BOXES. A mapping is a
+             row-for-row claim, and an arrow is only drawn where both sides have a
+             box — so two boxes facing four renders as two arrows and two
+             unexplained boxes, which reads as a diagram with pieces missing.
+  "split"    ONE wide bar cut into named parts. For one thing divided into fields:
+             an address into page number and offset.
+             -> parts: up to 3.
+  "flow"     Steps top to bottom with arrows. For a sequence of events:
+             what happens on a page fault.
+             -> steps: up to 4.
+  "table"    A header row and rows, one of them highlighted. For lookups and
+             comparisons: a page table, internal versus external.
+             -> columns: up to 3, rows: up to 4, each {cells, role}.
+  "stat"     One number or term, very large, with a caption. For a frame whose
+             whole content is a figure: "4 GB".
+             -> value, caption.
+  "takeaway" The last frame. One sentence, set large, nothing else.
+             -> caption: the sentence to remember.
 
-SVG_SYSTEM = """You draw ONE frame of a technical diagram as an SVG for a VERTICAL phone video.
+PICK THE TEMPLATE FROM THE RELATIONSHIP, NOT FROM THE SUBJECT
+Ask what the sentence CLAIMS, and the template follows:
 
-You are drawing one beat of a short. The other beats' specs are given so that your
-frame belongs to the same composition as theirs: the same objects in the SAME
-PLACE, at the same size, in the same style. Only the emphasis and the added parts
-change between beats. A viewer must feel the diagram growing, not being swapped.
+  one thing divides into named fields    -> "split"
+  two sets correspond, row for row       -> "mapping"
+  a sequence of events in order          -> "flow"
+  countable slots in a line              -> "bar"
+  a lookup, or two things compared       -> "table"
+  a single figure is the whole point     -> "stat"
 
-CANVAS
-- viewBox="0 0 1080 1080". Nothing outside those bounds, nothing clipped.
-- Transparent background. Do not draw a background rect.
-- Usable area is x 60..1020 and y 60..940. USE IT ALL — fill the height, do not
-  crowd everything into the top half and leave the bottom empty.
-- Below y=940 draw nothing: the characters and the caption sit there.
-- Three bands, so successive frames line up:
-    y   60..190   title
-    y  200..820   the diagram itself, vertically centred in this band
-    y  830..940   one supporting label or the takeaway line
+The commonest wrong choice is "mapping" for something that is really a "split". A
+logical address is NOT a mapping from "logical address" to "page number": it is one
+address CUT INTO a page number and an offset, which is "split" with two parts. Drawn
+as a mapping it becomes three left boxes pointing at two right boxes, which claims
+a correspondence that does not exist and contradicts the very sentence being spoken.
+Whenever a column would contain both a whole and its own parts, you wanted "split".
 
-TEXT DOES NOT WRAP IN SVG — THIS IS THE MOST COMMON WAY THESE COME OUT BROKEN
-There is no automatic line breaking. A <text> longer than its box does not wrap,
-it overflows and is unreadable. So you must do the arithmetic yourself:
+ROLES ARE HOW YOU POINT, AND THERE IS EXACTLY ONE HERO
+Every cell, box and row takes a role, and the role decides its colour:
+  "hero"   the ONE thing this beat is about. Exactly one per frame, never two.
+           This is the element the viewer's eye is sent to.
+  "plain"  present and relevant, but not what is being said right now.
+  "lost"   something wasted, rejected, invalid or unusable. Used sparingly.
+  "quiet"  context the viewer should not read yet.
+Moving the hero between beats, on the same template, is how the explanation is
+carried. That is the "one composition that builds" rule, made concrete: keep the
+SAME template and the SAME cells across the beats of a short, and change which one
+is the hero.
 
-- At font-size F, one character is about 0.55 x F wide. A label of N characters
-  needs about N x 0.55 x F pixels.
-    "MMU checks Page Table Entry" is 27 chars at F=40 -> 27 x 22 = 594px wide.
-    A 200px box CANNOT hold it. Either the box is 594px wide, or the label is
-    split across lines, or the label is shortened.
-- To put two lines in a box, emit TWO separate <text> elements 1.15 x F apart.
-  A single <text> with a newline in it renders as one long line.
-- Keep every line to 18 characters or fewer, and every box label to 3 words or
-  fewer. Shorten aggressively: "MMU checks PTE", "Backing store", "Free frame".
-- Centre with text-anchor="middle" at the box's centre x, and set y to the box's
-  centre y plus about 0.35 x F so it sits on the optical centre.
-- Check the widest label in your drawing against its box before you finish. A
-  label that overflows its box is a broken diagram, not a cosmetic issue.
-- NEVER put a transform or a rotate on a <text>. Rotated labels come out
-  overlapping and illegible on a phone.
+KEEP THE LABELS SHORT — 14 CHARACTERS OR FEWER
+The renderer will shrink a long label, wrap it to two lines, and finally truncate
+it with an ellipsis rather than let it overflow. Nothing breaks, but a truncated
+label is still a worse label. "MMU checks PTE", not "MMU checks Page Table Entry".
+"Backing store", not "Backing Store (disk)".
 
-LAYOUT — the part that separates a designed diagram from a generated one
-- Work on a grid. Align edges and centres; equal gaps between sibling shapes.
-  Two boxes that are nearly aligned look like a mistake; exactly aligned looks
-  deliberate.
-- Pick coordinates that work for the BUSIEST frame in the composition and reuse
-  them in every frame. A shared object must sit at IDENTICAL x/y in every frame
-  it appears in — that is what makes the diagram look like it is being added to
-  rather than redrawn. Do not rescale or reflow it between frames.
-- At most 4 boxes in a row across 960px, which is 200px each with 50px gaps. If the
-  labels do not fit in that, use fewer boxes or stack them in two rows.
+`note` is the one supporting line under the diagram, in its own reserved band. One
+short sentence, or leave it out.
 
-ARROWS AND THEIR LABELS
-- A 50px gap between two boxes has room for an arrow and NOTHING ELSE. A label
-  dropped in there prints straight across the box next door, which is the single
-  most common way one of these comes out looking broken.
-- So a labelled arrow needs its label ABOVE or BELOW the arrow line, clear of every
-  box: at least 40px above the arrow, or 40px below it, in empty canvas.
-- If there is no clear space for the label, leave the arrow unlabelled. The
-  narration is saying it anyway; an unlabelled arrow reads fine, a label printed
-  over a box does not.
-- Keep arrows straight and horizontal or vertical wherever possible. Curved arrows
-  looping back across the drawing cross the boxes and each other; if a step returns
-  to the start, route it well below the row, in the clear.
-- One clear reading order, top to bottom. The eye should land on the title, then
-  the focus element, then the detail — never wander.
-- Group related things: align them in a row or column, or enclose them in one
-  rounded container with a quiet stroke, so the structure reads before the labels.
+`title` is the frame's heading. Three or four words.
 
-SIMPLE BEATS COMPLETE — THE MOST COMMON FAILURE IS TOO MUCH, NOT TOO LITTLE
-- 3 to 6 shapes. Not 9. This is watched on a phone, for four seconds, once, while
-  someone is talking over it. A frame that needs studying has already failed.
-- Draw ONLY what this beat's narration is about. Every extra object is a thing the
-  viewer must rule out before finding the one that matters.
-- Use the narration's own nouns as labels. A label naming something the voice never
-  says sends the viewer hunting for what they missed.
-- If the beat's idea is genuinely one number or one comparison, then one number or
-  two boxes IS the frame. Do not decorate it up to a diagram.
-- Empty space is not waste; it is what makes the remaining marks legible.
+`spec` is one sentence of prose saying what the frame shows, for the graders and
+for a human reading the unit later. It is not drawn.
 
-TYPE
-- font-family="Inter, Helvetica, sans-serif".
-- A real hierarchy, not one size everywhere:
-    title                             56-64px, font-weight="700"
-    the one number that matters        72-96px, font-weight="700"
-    box and node labels               36-44px
-    secondary and axis labels         32-36px, fill="#8A8880"
-  Never below 32px. Use text-anchor to centre properly.
+Output JSON:
+{"visuals":[{"ref":"...","spec":"one sentence","frame":{
+  "template":"bar|mapping|split|flow|table|stat|takeaway",
+  "title":"...", "note":"...",
+  "cells":[{"label":"...","role":"plain|hero|lost|quiet"}], "cells_title":"...",
+  "left":[...], "right":[...], "left_title":"...", "right_title":"...",
+  "parts":[...], "steps":[...],
+  "columns":["..."], "rows":[{"cells":["..."],"role":"..."}],
+  "value":"...", "caption":"..."}}]}
 
-COLOUR — this palette and nothing else
-    #E1F5EE  fill for boxes and panels
-    #1D9E75  primary stroke, arrows, headings
-    #0F6E56  deeper green for a second grouping
-    #F2B14B  AMBER — the one element the narration is about RIGHT NOW. Exactly one
-             shape per frame, never more. This is what the eye finds first, and
-             moving it between beats is how the viewer follows the explanation.
-    #E8735A  coral — only for a thing being rejected, lost, wasted, or wrong
-    #2C2C2A  text on light fills
-    #8A8880  muted labels and secondary text
-- Everything not being talked about stays quiet: pale fill, thin stroke, muted
-  label. A frame where everything is emphasised communicates nothing.
-
-MAKE IT MEMORABLE — this is the brief, not a nicety
-This diagram has to be recallable weeks later, from a syllabus of many shorts.
-- Give it ONE strong shape a viewer could sketch from memory: a split bar, a
-  ladder of rows, a fork, a loop, a before/after pair. Decide what that shape is
-  and commit the whole layout to it.
-- Show the mechanism, not a restatement of the words. If the idea is "the value
-  doubles each step", the doubling must be visible in the drawing — steps growing,
-  a bar twice as long — not written in a caption.
-- Anchor abstract things to something countable: number the rows, mark the
-  positions, draw the actual bits. Concrete beats abstract for recall.
-- If this frame is the TAKEAWAY CARD, drop the working detail: the essential shape,
-  large, with the one sentence to remember beneath it. Set that sentence at 52-64px
-  and BREAK IT INTO LINES YOURSELF — one <text> per line, at most 24 characters
-  each, text-anchor="middle" at x="540", lines 1.2 x font-size apart. A single long
-  <text> runs off both edges of the canvas, which is the most visible way one of
-  these can fail.
-
-ACCURACY BEATS DECORATION. Every label, number, and state must match the narration
-and the source. If the narration says the valid bit is clear, draw it clear. If the
-source's example is 1011, draw 1011 and not 1010. A wrong diagram is worse than no
-diagram, and a diagram that contradicts the voice is the worst of all.
-
-TECHNICAL
-- No <style> blocks, no CSS classes, no external refs, no <image>, no scripts, no
-  animation. Inline presentation attributes only.
-- Use <rect rx="..."> for rounded boxes, <path> for arrows with a visible head.
-
-Output the raw <svg>...</svg> only. No fences, no explanation."""
+Include only the fields the chosen template uses. The last ref is the takeaway."""
 
 
 def spec_visuals(script: Script) -> dict[str, Visual]:
-    # In beat order, not sorted: the specs describe a composition that builds, so
-    # the model has to see the sequence it is designing for. Sorting the refs
-    # alphabetically handed it the beats shuffled.
+    """
+    One call for the whole short: a template and its words for every visual_ref.
+
+    In beat order, not sorted: the specs describe a composition that builds, so the
+    model has to see the sequence it is designing for. Sorting the refs
+    alphabetically handed it the beats shuffled.
+
+    This is now the ONLY paid step in the visual pipeline. Drawing used to be one
+    call per frame on top of this — four or five per short, and 82% of the bill.
+    """
     refs, seen = [], set()
     for b in script.beats:
         if b.visual_ref not in seen:
@@ -215,107 +216,30 @@ def spec_visuals(script: Script) -> dict[str, Visual]:
 
     beats = "\n".join(f"[{b.visual_ref}] {b.speaker}: {b.line}" for b in script.beats)
     user = (f"QUESTION: {script.question}\n\nBEATS, in order:\n{beats}\n\n"
-            f"Design the composition and assign one visual to each of these refs, "
+            f"Design the composition and assign one frame to each of these refs, "
             f"in this order: {refs}\nThe last one, {refs[-1]}, is the takeaway card.")
-    plan = ask_json(SPEC_SYSTEM, user, VisualPlan, max_tokens=3000, label="visual_spec")
-    return {v.ref: v for v in plan.visuals}
+    plan = ask_json(SPEC_SYSTEM, user, VisualPlan, max_tokens=4000, label="visual_spec")
+
+    return {v.ref: Visual(ref=v.ref, type="diagram", spec=v.spec, frame=v.frame)
+            for v in plan.visuals}
 
 
-def render_diagrams(visuals: dict[str, Visual], script: Script, section: Section) -> dict[str, Visual]:
+def render_diagrams(visuals: dict[str, Visual], script: Script,
+                    section: Section) -> dict[str, Visual]:
     """
-    Fill in .svg for every diagram-type visual. One LLM call per diagram.
+    Fill in .svg for every frame. No LLM calls, no network, no failure mode.
 
-    Drawn concurrently: a short has 4-5 diagrams and each call takes several
-    seconds, so doing them in sequence made building a single short the slowest
-    thing in the product. The calls are independent, so wall-clock time drops to
-    roughly one diagram instead of the sum of all of them.
+    `script` and `section` are no longer read — a Frame already carries everything
+    the drawing needs. They stay in the signature because run.py and server.py both
+    call this, and because a future renderer that wants to check a label against the
+    source would want them back.
+
+    There is no retry loop here any more, and nothing to retry: layout.render is
+    deterministic and cannot produce an overlapping label. What used to be four
+    concurrent model calls per short, a three-attempt redraw loop, a truncation
+    path, and a "keep it anyway" fallback is now one function call per frame.
     """
-    if config.STUB:
-        return visuals                      # stub visuals are all type="text"
-
-    todo = [(ref, v) for ref, v in visuals.items() if v.type == "diagram"]
-    if not todo:
-        return visuals
-
-    # Every frame is given the whole arc, so it can place its shapes where the
-    # neighbouring frames place theirs. Without it each call invented its own
-    # layout and the "one composition that builds" became four unrelated pictures.
-    arc = "\n".join(f"  {i+1}. [{ref}] {visuals[ref].spec}"
-                    for i, (ref, _) in enumerate(todo))
-
-    with ThreadPoolExecutor(max_workers=len(todo)) as pool:
-        list(pool.map(lambda rv: _draw_one(rv[0], rv[1], script, section, arc, len(todo)), todo))
+    for visual in visuals.values():
+        if visual.frame is not None:
+            visual.svg = layout.render(visual.frame)
     return visuals
-
-
-def _draw_one(ref: str, v: Visual, script: Script, section: Section,
-              arc: str, total: int) -> None:
-    """
-    Draw one diagram, in place. Never raises — a missing SVG is a grader's job.
-
-    Drawn up to twice. The model cannot see what it drew, so the overflowing label
-    and the rotated caption are mistakes it has no way to notice; checks.svg_problems
-    reads them straight off the markup for free, and a second attempt carrying that
-    list fixes them far more often than not. This is the same failed-then-passed
-    loop the scripts get, applied to the pictures.
-    """
-    from ..llm import client, _reasoning as reasoning
-    from .. import checks
-
-    narration = " ".join(b.line for b in script.beats if b.visual_ref == ref)
-    quotes = " ".join(b.source_quote or "" for b in script.beats
-                      if b.visual_ref == ref and b.source_quote)
-    base = (
-        f"THE FULL COMPOSITION, frame by frame — yours must match the others:\n{arc}\n\n"
-        f"YOU ARE DRAWING FRAME [{ref}] of {total}.\n"
-        f"ITS SPEC: {v.spec}\n\n"
-        f"NARRATION PLAYING OVER IT: {narration}\n\n"
-        + (f"THE SOURCE SENTENCE THIS FRAME MUST AGREE WITH: {quotes}\n\n" if quotes else "")
-        + f"SOURCE OF TRUTH [{section.section_id}]:\n{section.text}"
-    )
-
-    prompt = base
-    for attempt in (1, 2):
-        try:
-            resp = client().messages.create(
-                model=config.MODEL_DIAGRAM,
-                max_tokens=8000,
-                system=SVG_SYSTEM,
-                messages=[{"role": "user", "content": prompt}],
-                **reasoning(config.MODEL_DIAGRAM, False),
-            )
-            usage.record("diagram", config.MODEL_DIAGRAM, resp)
-            svg = "".join(b.text for b in resp.content if b.type == "text").strip()
-
-            # Both tags, not just the opening one. A diagram truncated at max_tokens
-            # has "<svg" and no "</svg>", and rindex() then raises mid-pipeline —
-            # killing the run for every remaining topic. Leaving .svg as None instead
-            # lets check_visuals_resolved report it as a normal grader failure.
-            if "<svg" not in svg or "</svg>" not in svg:
-                reason = "truncated" if resp.stop_reason == "max_tokens" else "no <svg> in output"
-                print(f"    ! diagram {ref}: {reason} — leaving it unrendered")
-                return
-
-            candidate = svg[svg.index("<svg"):svg.rindex("</svg>") + 6]
-            problems = checks.svg_problems(candidate, collisions=True,
-                                           max_shapes=checks.MAX_SHAPES)
-
-            # Keep the frame either way: a diagram with one wide label still beats
-            # no diagram. The retry is an attempt to improve it, not a gate.
-            if not problems or attempt == 2:
-                v.svg = candidate
-                if problems:
-                    print(f"    ~ diagram {ref}: still {len(problems)} text issue(s) "
-                          f"after a redraw — keeping it")
-                return
-
-            v.svg = candidate
-            print(f"    ~ diagram {ref}: {problems[0][:80]} — redrawing")
-            prompt = (base + "\n\nYOUR PREVIOUS ATTEMPT HAD UNREADABLE TEXT:\n"
-                      + "\n".join(f"- {p}" for p in problems[:6])
-                      + "\n\nRedraw the whole frame with those fixed. Same layout, same "
-                        "coordinates for shared objects — shorten the labels or split "
-                        "them across separate <text> lines.")
-        except Exception as e:
-            print(f"    ! diagram {ref}: {type(e).__name__}: {e} — leaving it unrendered")
-            return

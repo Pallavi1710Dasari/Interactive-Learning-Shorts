@@ -8,30 +8,71 @@ from ..llm import ask_json
 
 MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 45
 MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
-TARGET_WORDS = 65
+TARGET_WORDS = 56
 
 SYSTEM = f"""You write SHORT interview-style video scripts that teach ONE concept.
 
 FORMAT
 Beat 1: the interviewer asks ONE question.
-Beats 2-4: the student answers in 3 SHORT parts (4 maximum).
+Beats 2-3: the student answers in 2 SHORT parts. THREE IS THE MAXIMUM.
 Every beat after the first is the student. No follow-up question.
+
+THE LAST BEAT MUST ANSWER THE QUESTION. THIS IS NOT NEGOTIABLE.
+Read the question again, then read your last beat. If the last beat is the last step
+of a mechanism rather than the answer, the short ends before it has said anything
+and the viewer is left waiting for a sentence that never comes.
+
+This is the defect that keeps happening, so here it is exactly:
+
+  QUESTION  "Why does an OS use paging instead of contiguous allocation?"
+  BAD       "Paging removes contiguity: memory is split into frames and pages."
+            "Any page can go in any free frame, so the OS can fill gaps."
+            ^ Both true, both from the material, and the question is never
+              answered. It asked WHY paging is used. Describing how paging works
+              is not a reason to use it. The short just stops.
+  GOOD      "Contiguous allocation needs one unbroken block, so free memory ends
+             up as unusable gaps."
+            "Paging splits memory into fixed-size frames, and any page can go in
+             any free frame."
+            "So those scattered gaps become usable and external fragmentation
+             disappears — that is why paging wins."
+            ^ Three beats: the problem, the mechanism, THE ANSWER.
+
+So match the shape of the answer to the shape of the question:
+- "Why..." / "Why not..."  -> the last beat is the CONSEQUENCE. Usually 3 beats:
+                              the problem, the mechanism, the payoff.
+- "How..." / "What happens..." -> the last beat is the RESULT of the process, the
+                              state you end up in. 2 or 3 beats.
+- "What is..." / "Which..."  -> the last beat is the DISTINCTION that matters. 2
+                              beats is usually enough.
+
+TWO OR THREE PARTS. NOT FOUR, NOT FIVE.
+Five-point answers are what these shorts are being fixed from. Nobody watching a
+phone remembers point four, and by the time you have written it you have buried the
+one sentence that mattered under context nobody asked for. If a beat is a
+restatement, a recap, or a "so in summary", DELETE IT.
+
+But do not cut the beat that answers the question in order to hit two. A complete
+three-beat answer beats a tidy two-beat non-answer every time.
 
 BE BRIEF. THIS IS THE HARDEST PART AND THE MOST IMPORTANT.
 Total spoken words across ALL beats: {MIN_WORDS} minimum, {MAX_WORDS} maximum,
 {TARGET_WORDS} is the target — about 26 seconds. Speech runs 150 words per minute,
 so this IS the video length.
 
-Aim at the target, not the maximum. Three tight sentences that a learner
+Aim at the target, not the maximum. Two or three tight sentences that a learner
 understands the first time beat six that cover more ground. If you find yourself
-adding a fourth beat to fill time, stop — you are done.
+adding a beat to fill time, stop — you are done. But see THE LAST BEAT below: being
+under the target is not a virtue if the question is left unanswered.
 
 What brevity does NOT mean: dropping the part that makes it make sense. A short
 answer still has to be understandable on its own, to someone who has not read the
 material. Cut words, never cut the explanation.
 
 THE QUESTION (beat 1)
-- 8 to 18 words. Ask the thing a learner actually wonders, not a textbook prompt.
+- 8 to 16 words, and shorter is better: it is the first thing heard and the thing a
+  viewer decides on. Ask the thing a learner actually wonders, not a textbook
+  prompt.
 - Best when it targets a misconception, so the answer corrects a wrong prediction.
 - THE QUESTION AND THE ANSWER MUST MATCH. Write the answer first if it helps, then
   make the question the exact thing that answer answers. A question that promises
@@ -40,13 +81,16 @@ THE QUESTION (beat 1)
   If the material only supports a narrower question, ask the narrower question.
 
 EACH ANSWER BEAT
-- ONE idea only. 15 to 24 spoken words. NEVER more than 32 — a longer beat is
+- ONE idea only. 12 to 20 spoken words. NEVER more than 24 — a longer beat is
   rejected outright, because the diagram on screen has to change with the idea.
 - Each beat needs its OWN supporting sentence from the material. If you cannot find
   a distinct sentence behind a beat, that beat should not exist — delete it and let
   the answer be shorter.
 - Reads as speech, not prose. No "furthermore", no "it should be noted".
-- Builds on the beat before it. The last beat lands the takeaway.
+- Builds on the beat before it. The last beat lands the takeaway, and the takeaway
+  is the sentence you would want quoted back to you a week later. Make it the
+  strongest sentence in the script, not a summary of the other two — and make it
+  the ANSWER, see above.
 - Together the beats must flow as one continuous explanation, not three
   disconnected facts — someone reads the whole thing aloud in one take.
 

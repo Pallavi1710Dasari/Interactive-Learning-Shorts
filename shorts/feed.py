@@ -59,6 +59,7 @@ def _timeline(unit: ShortUnit) -> tuple[list[dict], float]:
             end = cursor + max(MIN_BEAT_SECONDS, n / WORDS_PER_SECOND)
         cursor = end
         visual = unit.visuals.get(beat.visual_ref)
+
         spans.append({
             "speaker": beat.speaker,
             "line": beat.line,
@@ -67,8 +68,61 @@ def _timeline(unit: ShortUnit) -> tuple[list[dict], float]:
             "svg": _clean_svg(visual.svg) if visual and visual.svg else None,
             "start": round(start, 2),
             "end": round(end, 2),
+            # Word-by-word timings for the flowing caption. Always present, even
+            # with no recorded audio: estimated timings still let the caption
+            # reveal itself rather than land as a wall of text.
+            "words": _caption_words(beat.line, start, end),
         })
     return spans, round(cursor, 2)
+
+
+def _caption_words(line: str, start: float, end: float) -> list[dict]:
+    """
+    Give every word of the line its own start and end, so the caption can flow
+    word by word under the voice instead of appearing as a finished block.
+
+    Distributed across the beat's own span, weighted by length. "the" and
+    "fragmentation" do not take the same time to say, so an even split makes the
+    highlight visibly lag on long words and race on short ones; weighting by
+    characters, with a pause added after sentence-ending punctuation, tracks real
+    speech closely enough that the eye reads it as synchronised.
+
+    WHY NOT unit.audio.word_timings, WHICH EXIST
+    Because they are this same estimate, made worse. Read tts._even_words: no
+    provider in providers.py returns real alignments, so those timings are an EVEN
+    split — and of the *spoken* text, which speech.conversational has repunctuated,
+    so there is often not even one per written word. Lining an even split of a
+    different string up against the words on screen is strictly worse than
+    weighting the written words across the same measured span. If a provider that
+    reports true word alignments is ever added, this is the function that should
+    prefer them.
+
+    The span itself is exact whenever there is a recorded track — it comes from the
+    measured beat audio — so the words are spread across a real duration even
+    though their individual boundaries are estimated.
+    """
+    words = line.split()
+    if not words:
+        return []
+
+    span = max(end - start, 0.001)
+    weights = []
+    for word in words:
+        weight = max(len(re.sub(r"[^\w]", "", word)), 1)
+        if word.endswith((".", "!", "?")):
+            weight += 4          # a full stop is a real pause, not a fast word
+        elif word.endswith((",", ";", ":", "—")):
+            weight += 2
+        weights.append(float(weight))
+
+    total = sum(weights)
+    out, cursor = [], start
+    for word, weight in zip(words, weights):
+        length = span * weight / total
+        out.append({"w": word, "s": round(cursor, 3),
+                    "e": round(cursor + length, 3)})
+        cursor += length
+    return out
 
 
 def _clean_svg(svg: str) -> str:

@@ -145,7 +145,14 @@ def main():
     doc_text = Path(args.doc).read_text(encoding="utf-8")
     print(f"parsed {len(sections)} sections: {[s.section_id for s in sections]}")
 
-    topics_path = config.OUTPUT_DIR / "topics.json"
+    # A stub run writes somewhere else, and that is not cosmetic. topics.json is
+    # the human-approved list — the one file here that represents a decision rather
+    # than an output — and `SHORTS_STUB=1` selection produces placeholders like
+    # "How does why paging exists work?". One stub run to exercise the renderer
+    # silently replaced a real approved list with those, and every later
+    # `--topics-file output/topics.json` build faithfully made shorts out of them.
+    # Nothing warned, because reading the file worked perfectly.
+    topics_path = config.OUTPUT_DIR / ("topics.stub.json" if config.STUB else "topics.json")
 
     if args.topics_file:
         topic_list = TopicList(**json.loads(Path(args.topics_file).read_text()))

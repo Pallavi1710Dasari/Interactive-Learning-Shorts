@@ -35,24 +35,114 @@ ANTHROPIC_BASE_URL  = os.getenv("ANTHROPIC_BASE_URL", "").strip()
 # is handled, not worked around, but it does mean a gpt-5 generator has an output
 # token floor the Anthropic models do not.
 MODEL_GENERATOR = os.getenv("MODEL_GENERATOR", "claude-sonnet-5")
-MODEL_JUDGE     = os.getenv("MODEL_JUDGE", "claude-opus-5")
-MODEL_CHEAP     = os.getenv("MODEL_CHEAP", "claude-haiku-4-5")
 
-# Drawing the SVGs is its own model, because it is a different kind of work and it
-# dominates the bill: four or five calls per short against one for the script.
+# THE JUDGE MUST NOT BE WEAKER THAN THE GENERATOR, and this is the one setting
+# people get wrong. Grading a claim against a source is the hardest reasoning in
+# this pipeline — harder than writing the script, because it means holding the
+# document and the claim side by side and deciding whether one really establishes
+# the other. It is also the only step whose failure is invisible: a weak judge does
+# not produce bad output, it produces APPROVAL, and approval reads exactly like
+# quality.
 #
-# It is also the step that needs reasoning least. The visual spec has already
-# decided what the frame contains; this call turns a written spec into coordinates,
-# which is formatting, not deliberation — the same argument llm.py makes for
-# switching thinking off generally. Measured on one identical frame:
+# Measured on this project with MODEL_JUDGE set to a flash-lite tier: 7 judged
+# units, 6 of them a straight 5/5/5, and zero problems reported across all of them
+# — while the free code graders in checks.py were failing most of the same units on
+# real defects. It had never once disagreed with anything. See judge_health() below;
+# it warns rather than overrides, because the model choice is yours.
+MODEL_JUDGE     = os.getenv("MODEL_JUDGE", "claude-opus-5")
+
+# The model that DESIGNS the visuals — skills/visuals.spec_visuals.
 #
-#     openai/gpt-5-mini              3915 output tokens   7 shapes   0 problems   37s
-#     google/gemini-3.1-flash-lite    868 output tokens   6 shapes   0 problems    3s
+# THIS WAS DEAD CONFIG AND THE ADVICE ON IT WAS BACKWARDS. It used to name the model
+# that drew raw SVG, one call per frame, and the note here recommended the cheapest
+# fast model on the grounds that "turning a written spec into coordinates is
+# formatting, not deliberation". Both halves stopped being true when templates
+# landed: drawing is now local and free (skills/layout.py), so the call it referred
+# to does not exist, and for a while nothing read this constant at all — only
+# /api/health did, which meant the health endpoint advertised a "diagram" model that
+# was never invoked.
 #
-# Same quality by every check available, 4.5x fewer tokens and 12x faster, because
-# gpt-5 cannot have reasoning turned off and spends ~3300 tokens deliberating over
-# a box layout. Defaults to the generator so this is opt-in, not a surprise.
+# What is left is the opposite kind of work. One call per short now has to choose a
+# template from eleven, copy code out of the material verbatim, map each selector to
+# the value the document gives IT, keep every label off the narration, and make each
+# frame differ from the last. That is deliberation, and it is where the accuracy
+# complaints land when it is underpowered — a cheap model here produces frames that
+# are confidently wrong rather than frames that are ugly.
+#
+# So: same tier as the generator or better. Defaults to the generator.
 MODEL_DIAGRAM   = os.getenv("MODEL_DIAGRAM", "").strip() or MODEL_GENERATOR
+
+#: Model names that mark a light/fast tier. Used only to warn about MODEL_JUDGE.
+_LIGHT_TIER = ("lite", "nano", "mini", "flash", "haiku", "small", "-8b", "3b", "1b")
+
+
+def model_warnings() -> list[str]:
+    """Every model setting that is likely to be doing quiet damage.
+
+    Deliberately advisory. There is no way to rank arbitrary gateway model strings,
+    and overriding somebody's explicit choice would be worse than saying nothing.
+    What IS detectable is a small number of configurations whose failure mode is
+    silence rather than an error.
+    """
+    out = [w for w in (_judge_warning(), _diagram_warning()) if w]
+    return out
+
+
+def judge_health() -> str | None:
+    """Back-compat alias for the judge warning alone."""
+    return _judge_warning()
+
+
+def _diagram_warning() -> str | None:
+    """MODEL_DIAGRAM on a light tier, now that it means something again.
+
+    Worth its own warning because of how the setting changed under people's feet.
+    It used to name the model that turned a finished spec into SVG coordinates, and
+    for that job the cheapest fast model genuinely was the right answer — the note
+    above this used to recommend exactly that, with timings. Then templates made
+    drawing local, nothing read the constant at all, and it sat in .env as a stale
+    value that did nothing.
+
+    Wiring it to spec_visuals gives it teeth again, pointed at completely different
+    work: designing every frame of the short. A value chosen for the old meaning is
+    now silently downgrading the hardest call in the pipeline, and the symptom is
+    frames that are confidently wrong — which reads as a prompt problem, not a
+    config one.
+    """
+    diagram, gen = MODEL_DIAGRAM.lower(), MODEL_GENERATOR.lower()
+    if diagram == gen:
+        return None
+    if any(tag in diagram for tag in _LIGHT_TIER) and diagram != gen:
+        return (f"MODEL_DIAGRAM ({MODEL_DIAGRAM}) is a light/fast tier. It no longer "
+                f"means 'draw this spec as coordinates' — since templates landed it "
+                f"DESIGNS every frame: picking a template, copying code out of the "
+                f"material verbatim, and matching each value to the selector the "
+                f"document gives it. Underpowered there produces accurate-looking "
+                f"frames that are wrong. Unset it to follow MODEL_GENERATOR "
+                f"({MODEL_GENERATOR}), or raise it.")
+    return None
+
+
+def _judge_warning() -> str | None:
+    judge, gen = MODEL_JUDGE.lower(), MODEL_GENERATOR.lower()
+    # ABSOLUTE, not relative to the generator. The first version of this only warned
+    # when the judge was lighter than the generator, which stayed silent on the exact
+    # configuration that prompted writing it — a flash-lite judge behind a gpt-5-mini
+    # generator, where both are light tiers so neither is "lighter". But the judge is
+    # not competing with the generator, it is doing a harder job than the generator:
+    # writing a grounded script is easier than deciding whether someone else's script
+    # is grounded. A light model is not up to the second task at any generator size.
+    if any(tag in judge for tag in _LIGHT_TIER):
+        return (f"MODEL_JUDGE ({MODEL_JUDGE}) is a light/fast tier. Grading a claim "
+                f"against its source is the hardest step here, and a judge that "
+                f"cannot do it does not fail loudly — it approves everything, and "
+                f"5/5/5 from it means nothing. Point MODEL_JUDGE at a frontier "
+                f"model; it is one call per short.")
+    if judge == gen:
+        return (f"MODEL_JUDGE and MODEL_GENERATOR are both {MODEL_GENERATOR} — a model "
+                f"grading its own output scores itself generously. Use a different "
+                f"family for the judge.")
+    return None
 
 # ------------------------------------------------------------------ neural voice
 #

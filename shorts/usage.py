@@ -60,6 +60,21 @@ _lock = threading.Lock()
 _calls: list[Call] = []
 STORE = config.OUTPUT_DIR / "usage.json"
 
+#: Has the on-disk ledger been read into _calls yet this process?
+#:
+#: THE LEDGER USED TO RESET DEPENDING ON WHICH COMMAND YOU RAN, which makes the one
+#: number anyone checks — what this project has cost — quietly wrong. load() was
+#: called in exactly one place, server.py at import. Every other entry point
+#: (shorts.run, shorts.redraw, shorts.voice, any one-off script) started with an
+#: empty _calls, and the first model call appended to that empty list and then
+#: _save_locked() wrote it over usage.json. One CLI build therefore replaced the
+#: whole history with its own handful of calls, silently, and the web UI went on
+#: showing the pre-CLI total from memory until it was restarted.
+#:
+#: So loading is no longer something a caller has to remember. record() reads the
+#: ledger before its first append, which no entry point can forget to do.
+_loaded = False
+
 
 def _price(model: str, tin: int, tout: int) -> float:
     # Longest match, not first: "openai/gpt-5-mini" contains both "gpt-5-mini" and
@@ -93,6 +108,7 @@ def record(label: str, model: str, resp) -> Call | None:
 
         call = Call(label, model, tin, tout, round(cost, 6), estimated)
         with _lock:
+            _load_locked()
             _calls.append(call)
             _save_locked()
         return call
@@ -142,20 +158,36 @@ def _save_locked() -> None:
         pass
 
 
-def load() -> None:
-    """Carry totals across restarts so the figure on screen is cumulative."""
+def _load_locked() -> None:
+    """Read the ledger once per process. Caller holds _lock."""
+    global _loaded
+    if _loaded:
+        return
+    _loaded = True                     # set first: a failed read must not retry per call
     if not STORE.exists():
         return
     try:
         data = json.loads(STORE.read_text())
-        with _lock:
-            _calls.clear()
-            _calls.extend(Call(**c) for c in data.get("calls", []))
+        _calls.clear()
+        _calls.extend(Call(**c) for c in data.get("calls", []))
     except Exception:
         pass
 
 
-def reset() -> None:
+def load() -> None:
+    """Carry totals across restarts so the figure on screen is cumulative.
+
+    Kept for server.py, which wants the totals available before the first call is
+    made so /api/usage is correct on a fresh boot. record() now loads lazily too, so
+    every other entry point is covered without calling this.
+    """
     with _lock:
+        _load_locked()
+
+
+def reset() -> None:
+    global _loaded
+    with _lock:
+        _loaded = True                 # an explicit reset must not be re-hydrated
         _calls.clear()
         _save_locked()

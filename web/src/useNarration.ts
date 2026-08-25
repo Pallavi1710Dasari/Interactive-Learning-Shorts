@@ -39,6 +39,19 @@ export type Narration = {
   voiceReady: boolean;
   /** True when a recorded neural track is what you are hearing. */
   recorded: boolean;
+  /**
+   * The short has played to its end, as opposed to being paused part way.
+   *
+   * The reel used to infer this — `!playing && beat === last && progress > 0.5` —
+   * and the inference is wrong at exactly the moment it matters. `progress` for a
+   * recorded track is elapsed/total measured from `timeupdate`, which fires every
+   * ~250ms and is NOT guaranteed to fire again between the last tick and `ended`.
+   * So a short that finished normally sat at 96% with its final caption word still
+   * unrevealed and its progress bar visibly short of the end — the "it stops half
+   * way, it does not feel finished" report. Whether playback ended is something the
+   * narrator knows for certain; it should not be guessed at from a sampled clock.
+   */
+  completed: boolean;
   play: () => void;
   pause: () => void;
   toggle: () => void;
@@ -106,6 +119,7 @@ export function useNarration(
   const [speaking, setSpeaking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [time, setTime] = useState(0);
+  const [completed, setCompleted] = useState(false);
 
   const beatRef = useRef(0);
   /** performance.now() at the moment the current beat became current. */
@@ -147,16 +161,28 @@ export function useNarration(
       const at = beats.findIndex((b) => a.currentTime >= b.start && a.currentTime < b.end);
       if (at !== -1 && at !== beatRef.current) setBeat(at);
     };
-    const onEnd = () => { setPlaying(false); setSpeaking(false); };
+    const onEnd = () => {
+      setPlaying(false);
+      setSpeaking(false);
+      // Land ON the end, not wherever the last timeupdate happened to sample. This
+      // is what fills the progress bar and reveals the final word of the last
+      // caption, so the short reads as finished rather than interrupted.
+      const end = beats.length ? beats[beats.length - 1].end : totalSeconds;
+      setElapsed(end);
+      setTime(end);
+      setBeat(Math.max(0, beats.length - 1));
+      setCompleted(true);
+    };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("ended", onEnd);
+    setCompleted(false);
     return () => {
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("ended", onEnd);
       a.pause();
       audioRef.current = null;
     };
-  }, [recorded, audioUrl, active, beats]);
+  }, [recorded, audioUrl, active, beats, totalSeconds]);
 
   useEffect(() => {
     const a = audioRef.current;
@@ -213,6 +239,10 @@ export function useNarration(
         if (item.index === last.index && item.part === last.part) {
           setSpeaking(false);
           setPlaying(false);
+          const end = beats.length ? beats[beats.length - 1].end : totalSeconds;
+          setElapsed(end);
+          setTime(end);
+          setCompleted(true);
         }
       };
       utter.onerror = () => {
@@ -241,8 +271,12 @@ export function useNarration(
     const ms = Math.max(800, ((current.end - current.start) * 1000) / rate);
     const id = window.setTimeout(() => {
       const next = beatRef.current + 1;
-      if (next < beats.length) setBeat(next);
-      else setPlaying(false);
+      if (next < beats.length) { setBeat(next); return; }
+      setPlaying(false);
+      const end = beats.length ? beats[beats.length - 1].end : totalSeconds;
+      setElapsed(end);
+      setTime(end);
+      setCompleted(true);
     }, ms);
     return () => window.clearTimeout(id);
   }, [playing, beat, voiceReady, active, beats, rate]);
@@ -287,6 +321,7 @@ export function useNarration(
       setBeat(0);
       setElapsed(0);
       setTime(0);
+      setCompleted(false);
     }
   }, [active, stopVoice]);
 
@@ -294,6 +329,7 @@ export function useNarration(
 
   const play = useCallback(() => {
     claimFloor(stopVoice);    // silences whatever else was narrating
+    setCompleted(false);
     setPlaying(true);
   }, [stopVoice]);
 
@@ -315,6 +351,7 @@ export function useNarration(
     setElapsed(0);
     setTime(0);
     beatEnteredAt.current = performance.now();
+    setCompleted(false);
     setPlaying(false);
     requestAnimationFrame(() => { cancelled.current = false; setPlaying(true); });
   }, [stopVoice]);
@@ -326,6 +363,7 @@ export function useNarration(
     setBeat(i);
     setElapsed(beats[i].start);
     setTime(beats[i].start);
+    setCompleted(false);
     beatEnteredAt.current = performance.now();
 
     if (audioRef.current) {
@@ -349,6 +387,9 @@ export function useNarration(
                  : canSpeak ? Math.max(byClock * 0.6, byBeat * 0.85)
                  : byClock;
 
-  return { beat, playing, speaking, progress: Math.min(1, progress), time,
-           voiceReady, recorded, play, pause, toggle, replay, goToBeat };
+  return { beat, playing, speaking,
+           // A completed short reads 100%, whatever the sampled clock last saw.
+           progress: completed ? 1 : Math.min(1, progress), time,
+           voiceReady, recorded, completed,
+           play, pause, toggle, replay, goToBeat };
 }

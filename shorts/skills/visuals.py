@@ -15,16 +15,35 @@ _draw_one kept the frame regardless. So broken frames shipped by design.
 The cause was not the wording of the brief. Placing SVG by hand means doing layout
 arithmetic with no way to see the result, and no model can check its own work there.
 
-So the model no longer places anything. It picks one of seven templates and supplies
+So the model no longer places anything. It picks one of eight templates and supplies
 the words; skills/layout.py computes every coordinate and fits every label to the
 box that holds it. Overlap is not graded any more because it cannot be constructed.
 That also makes drawing FREE — rendering is local, so the diagram calls that were
 82% of the bill are gone.
+
+AND THE FRAMES ARE PICTURES NOW, WHICH IS THE SECOND CHANGE
+Templates fixed the overlap and left a different defect: the frames were legible and
+they were text. Three things caused it and all three are fixed here.
+
+  The `note` field. It asked for "one supporting line under the diagram" and got the
+  sentence being spoken, on 6 of 11 frames measured — under a player that already
+  captions that same line word by word. layout.render no longer draws it.
+
+  The `takeaway` template, which was a sentence set large and which the brief made
+  the last frame of EVERY short. It is not offered any more; the last frame is the
+  finished composition with the hero on the answer.
+
+  And the real cause: this step could not see the reading material. Given only the
+  dialogue, the dialogue is the only thing there is to draw, so `bar` became a row
+  of boxes holding the three beats of the conversation. spec_visuals now gets the
+  section, plus two templates that can show what a document actually contains —
+  "code" for the snippet it teaches from, "compare" for two named alternatives.
 """
 
 from pydantic import BaseModel
 from ..schema import Script, Visual, Section, Frame
 from ..llm import ask_json
+from .. import config
 from . import layout
 
 
@@ -41,28 +60,82 @@ class VisualPlan(BaseModel):
 SPEC_SYSTEM = """You design the visuals for one short video, as a SINGLE COMPOSITION THAT BUILDS.
 
 THE RULE THAT MATTERS MOST
-The beats of a short are one continuous explanation, so the visuals are one
-continuous diagram — not four unrelated pictures. Decide ONE base composition for
-the whole short, then for each beat say what is ADDED or HIGHLIGHTED on it.
+The beats of a short are one continuous explanation, so the visuals belong to one
+continuous idea — not four unrelated pictures. Decide what the short is a picture
+OF, then give each beat a frame that shows the part of it that beat is about.
 
-A viewer who watched four different diagrams remembers none of them. A viewer who
-watched one diagram assemble itself remembers the assembled thing, and that is the
-whole point: the picture is the thing they carry out of the video.
+A viewer who watched four unrelated diagrams remembers none of them. A viewer who
+watched one thing develop remembers the thing.
 
-So each spec must (a) restate the base composition, and (b) name what changes for
-this beat. Beat 3's spec is not "a table" — it is "the same three-row table from
-beat 2, with row 2 now highlighted and an arrow entering it from the left".
+BUT "DEVELOP" MEANS SOMETHING CHANGES. RECOLOURING ONE CELL IS NOT A NEW FRAME.
+This is the defect to avoid, and it is the one that gets complained about:
 
-THE LAST BEAT IS A TAKEAWAY CARD
-The final visual is not another step of the diagram. It is the one thing to
-remember, composed to be recalled weeks later: the completed composition reduced
-to its essential shape, with the single sentence of the takeaway set large. Say so
-explicitly in its spec.
+  BAD   Beat 1: the same 7-line snippet, line 3 amber.
+        Beat 2: the same 7-line snippet, line 2 amber.
+        Beat 3: the same 7-line snippet, line 3 amber again.
+        ^ A real short this pipeline produced. Watching it, nothing happens: it is
+          one slide for the whole video with a highlight sliding around on it.
+          The viewer has read everything on screen within two seconds and then
+          stares at an unchanging picture for the remaining twelve.
+
+  GOOD  Beat 1: an "icons" frame — a file, a browser, a screen.
+        Beat 2: a "preview" frame — the same words set in two different typefaces.
+        Beat 3: a "code" frame — the rule that produced the difference.
+        ^ Three pictures, one subject, and each beat shows something the last one
+          could not.
+
+So every frame after the first must ADD, REMOVE or REPLACE something a viewer would
+notice with the sound off. Moving the accent is allowed as PART of a change; it is
+never the whole change. Two consecutive frames that differ ONLY in which element is
+the hero are rejected — give those two beats the SAME visual_ref instead, which
+holds one picture still and is honest about doing so, or find the second picture.
+
+AND DO NOT OPEN ON THE ANSWER'S CODE. Beat 1 is the interviewer's question, and its
+frame should show the SUBJECT — the thing being asked about, drawn — not the listing
+that answers it. A short that starts on the same code panel it ends on has shown the
+viewer the answer before the question finished, and then has nothing left to reveal.
+Lead with an "icons" or "preview" frame and let the code arrive when it is earned.
+
+CHANGING TEMPLATE BETWEEN BEATS IS ENCOURAGED, not a failure of continuity. The
+continuity comes from the subject, not from the shape: showing the effect and then
+the code that causes it is one explanation told in two pictures, and it is far
+stronger than either picture held on screen twice.
+
+THE LAST BEAT IS THE COMPOSITION FINISHED, NOT A SENTENCE ON A CARD
+The final visual is the SAME composition with the hero moved onto the thing that
+answers the question — the assembled diagram, complete, pointing at its own
+conclusion. It is the frame that has to survive in someone's memory for a week, and
+what survives is the shape, not a paraphrase of the audio.
+
+It used to be a card with the last spoken line set large. Do not do that. Every
+short ended on a slide of its own voiceover, which is the single most common
+complaint these shorts get: "the visuals are just text, and the text is just the
+narration". A sentence is already being spoken and already being captioned under the
+frame. Printing it a third time inside the picture is not a visual.
+
+NEVER PUT A SENTENCE IN A FRAME. THIS IS THE RULE THAT IS BROKEN MOST OFTEN.
+Every label you write is a NOUN or a VALUE — a thing on the screen that could be
+pointed at. Never a clause, never a claim, never a line of the dialogue.
+
+  BAD   cells: ["font-family?", "Import font CSS", "Which typeface"]
+        ^ This is a real frame this pipeline produced. The three cells are the
+          three beats of the conversation, laid out as boxes. It is the script in a
+          row of rectangles: no memory is drawn, no code, no structure, nothing a
+          learner could not have got from the audio. A viewer reads it once in half
+          a second and then watches nothing for twelve seconds.
+  GOOD  a "code" frame showing the material's own rule, `.main-heading { ... }`,
+        with `font-family: "Roboto";` as the hero line.
+
+If your cells, steps or rows could be read aloud as the answer, you have drawn the
+transcript. Throw it away and draw the SUBJECT instead.
+
+There is NO caption band and NO note field. Do not ask for one.
 
 TYPE, for each distinct visual_ref:
-  "diagram" — anything structural or technical: tables, memory layouts, address
-              splits, state transitions, request flows, before/after states, and
-              every takeaway card. ALWAYS use this for technical content.
+  "diagram" — anything structural or technical: code and markup, tables, memory
+              layouts, address splits, state transitions, request flows,
+              before/after states. ALWAYS use this for technical content, which in
+              practice means every frame of every one of these shorts.
   "image"   — decorative background only. Never carries information. Its spec must
               not name any technical noun (memory, address, page, frame, table,
               cache, bit, queue, stack, tree, flow, architecture, register). If you
@@ -81,6 +154,50 @@ So every label you specify must use the NARRATION'S OWN WORDS. If the beats say
 "most significant bit", the label is "Most significant", not "Highest". If a noun
 is not in the beats, it does not go on the screen. Introducing a new object the
 voice never mentions makes the viewer stop listening and start reading.
+
+EVERY FRAME IS A CLAIM ABOUT THE MATERIAL, AND IT IS CHECKED
+A frame is not decoration; it asserts something, and a viewer believes a picture
+faster than a sentence. So accuracy here matters more than in the narration, not
+less — a wrong diagram is not noticed as wrong, it is simply learned.
+
+Three rules, and all three are verified by code after you answer:
+  * A "code" frame's lines must OCCUR IN THE MATERIAL, character for character
+    modulo whitespace. Copy them; do not reconstruct them from memory. A plausible
+    CSS rule is indistinguishable from the real one to everybody except the
+    document, which is why this is checked rather than trusted.
+  * A "preview" sample must RENDER what its caption claims — see that template.
+  * Every label must come from the narration, the material's code, or its values.
+
+If you cannot support a claim, make a smaller claim. A frame showing one rule
+correctly beats a frame showing three where one is invented.
+
+DRAW WHAT THE READING MATERIAL SHOWS YOU
+You are given the section of the reading material this short came from, and that is
+not background — it is where the picture comes from. The dialogue is a compression
+of it into speech; the material still has the things speech had to drop, and those
+things are exactly what a diagram is for:
+
+  a style, or anything VISUAL     -> a "preview" frame showing the real effect
+  named things and what links them-> an "icons" frame of drawn pictograms
+  a code block or markup snippet  -> a "code" frame, the lines COPIED VERBATIM
+  a table of values               -> a "table" frame with the real values in it
+  a number, size or range         -> a "stat" frame
+  two named alternatives          -> a "compare" frame
+  a structure, layout or sequence -> "split", "bar", "flow", "mapping"
+
+Take the first row that fits before the later ones. A document about how text looks
+is best drawn by showing the text; its code block is the SECOND-best picture of it,
+because code still has to be read to be understood and an effect does not.
+
+A frame built from the material's own artifact is grounded by construction and
+cannot drift, which is why it is always the better frame. Copy the material's
+identifiers, values, selectors and numbers CHARACTER FOR CHARACTER — do not
+paraphrase `font-family` into "font property", and do not substitute a value you
+find neater for the one the document uses.
+
+WHAT YOU MAY NOT TAKE FROM THE MATERIAL is its prose. You are looking for the
+things it DRAWS and LISTS, not the sentences it writes. A noun from a paragraph
+nobody in this short mentions is drift; a line from its code block is evidence.
 
 ONE IDEA PER FRAME. A frame illustrates the ONE thing its beat says. If you find
 yourself specifying a second mechanism to give context, delete it — the previous
@@ -112,7 +229,7 @@ script. Name every label exactly as it should appear. Two or three sentences.
 CHOOSE A TEMPLATE, DO NOT DRAW
 You do not place anything on the canvas. You choose the SHAPE of each frame and
 supply its words; the renderer computes every coordinate and fits every label to
-its box. There are seven shapes. Pick the one the sentence actually needs.
+its box. There are eight shapes. Pick the one the sentence actually needs.
 
   "bar"      One row of equal cells. For anything countable laid out in a line:
              physical memory, frames, slots, a timeline.
@@ -137,9 +254,132 @@ its box. There are seven shapes. Pick the one the sentence actually needs.
              -> columns: up to 3, rows: up to 4, each {cells, role}.
   "stat"     One number or term, very large, with a caption. For a frame whose
              whole content is a figure: "4 GB".
-             -> value, caption.
-  "takeaway" The last frame. One sentence, set large, nothing else.
-             -> caption: the sentence to remember.
+             -> value, caption. The caption names the figure ("addressable bytes"),
+                it is NOT a sentence about it.
+  "code"     A code or markup snippet on a dark editor panel, one line lit. For any
+             material that teaches through code — CSS rules, HTML markup, a
+             command, a config. IF THE SECTION CONTAINS A CODE BLOCK RELEVANT TO
+             THE QUESTION, THIS IS ALMOST ALWAYS THE RIGHT TEMPLATE, and it is the
+             one that was missing while these shorts were coming out as walls of
+             text.
+             -> code_lines: up to 7, each {label, role}. `label` is ONE LINE of
+                code, copied from the material verbatim, KEEPING ITS LEADING
+                SPACES — indentation is drawn, so `  font-family: "Roboto";` nests
+                inside its selector the way it does in the document. Mark the ONE
+                line this beat is about role="hero"; every other line stays
+                "plain" or "quiet". code_caption is the file it lives in
+                ("style.css", "index.html"), or leave it out.
+                Moving the hero DOWN THE SAME SNIPPET across beats is the strongest
+                build this renderer can draw: the code holds still and the light
+                walks through it.
+                KEEP THE SNIPPET TO WHAT IS BEING TAUGHT. Copy the lines that carry
+                the point and leave out boilerplate — a 500-character
+                `@import url("https://fonts.googleapis.com/css2?family=...")` is
+                setup, not the lesson. Elide a long line as
+                `@import url("...");` rather than pasting it whole. Four focused
+                lines beat seven with the subject buried among them.
+  "icons"    DRAWN PICTOGRAMS in a row, named underneath, with arrows between
+             them. The most literally pictorial shape here, and the right answer
+             whenever the beat is about THINGS and what passes between them: a
+             browser reading a file, a CPU reaching memory, a page being painted.
+             -> glyphs: 2 to 4, each {icon, label, role}. `icon` MUST be one of:
+                browser, file, page, screen, chip, memory, disk, brush, code,
+                text, table, check, cross, warning, box
+                Anything else draws a plain box, so pick from the list.
+                `label` names it in 1-2 words. arrows: false for a set rather than
+                a sequence.
+             A box with the word "Browser" in it is the word "browser" with a
+             border round it. A drawn browser window is a picture. Prefer the
+             picture.
+  "preview"  SAMPLE TEXT RENDERED IN THE STYLE BEING TAUGHT — the effect itself,
+             not a description of it. For every typography and text property:
+             font-family, font-size, font-style, font-weight, text-decoration.
+             -> samples: up to 3, each {text, label, role} plus any of
+                font, scale (1-5), weight (100-900), italic, decoration
+                ("underline" | "line-through" | "overline"), color, background.
+                color / background are CSS values — a keyword ("blue", "grey",
+                "lightblue") or a hex ("#3366ff"). Use the material's own value.
+                `text` is the words to render — use the material's own example
+                ("Tourism", "Plan your trip"). `label` names what it shows
+                ("Lobster", "36px", "bold").
+                `font` must be a family that actually renders: serif, sans-serif,
+                monospace, cursive, fantasy, or one of Bree Serif, Caveat, Lobster,
+                Monoton, Open Sans, Playfair Display, Roboto, Source Sans 3,
+                Work Sans. Naming anything else shows the viewer a typeface that is
+                not the one the caption claims, so do not.
+                `scale` is RELATIVE, not pixels. For "36px versus 28px" use scale 5
+                and scale 4 — the renderer fits them to the canvas, and real pixel
+                values both come out the same size on a 1080 square, which erases
+                the very difference being demonstrated.
+             THE LABEL IS A CLAIM AND THE SAMPLE MUST BACK IT UP. Whatever the
+             caption says, the fields have to actually produce. This is the way it
+             goes wrong: asked to show `color: blue` against `color: grey` the frame
+             came back with two samples captioned "blue" and "grey" and NO color set
+             on either, so both drew in the default near-black. The captions were
+             right, the material was right, and the picture told the viewer that
+             blue and grey look the same. Watched back it read as "it says the main
+             heading is blue but the paragraph is blue too".
+             So: a sample captioned "blue" sets color "blue". One captioned "bold"
+             sets weight 700. One captioned "36px" gets the larger `scale`. If the
+             effect has no field on this template, DO NOT use "preview" for it —
+             use "code" and show the rule instead. A caption the drawing cannot
+             honour is worse than a plainer frame, because it is confidently wrong.
+
+             READ THE VALUE OFF THE RULE THAT SETS IT, PER SELECTOR. The material
+             gives each selector its own value:
+
+                 .main-heading { color: blue; }
+                 .paragraph    { color: grey; }
+
+             so the sample showing the heading sets color "blue" and the sample
+             showing the paragraph sets color "grey". Do not colour one and leave the
+             other to default — an unset colour is not neutral, it draws in the
+             near-black page ink, so a frame about colour that sets only one is
+             telling the viewer the other element is black. Every sample in the
+             frame gets the value the material gives ITS selector.
+
+             And do not caption a sample with its own words. `text` is "Main heading"
+             and the caption is "blue" — the words are already on screen at four
+             times the size; the caption is there to name what is being demonstrated.
+
+             SET ONLY THE FIELDS THIS BEAT IS ABOUT. Leave the rest out.
+             Every field you fill in is a claim about the material, and a field the
+             section never mentions is an invented one. On a frame about `color`,
+             adding font "Roboto" and weight 700 asserts a typeface and a weight
+             that the colour section does not give — the frame is then mostly
+             fabricated even though the colour it was built for is right. Omitted
+             fields render in a neutral default, which claims nothing.
+             `scale` is the exception: something has to decide the size, so use it
+             for relative emphasis and do not read it as a claim about font-size
+             unless font-size IS the subject.
+
+             THE SAMPLES MUST LOOK OBVIOUSLY DIFFERENT FROM EACH OTHER, or the
+             frame shows nothing. This is the way this template fails: asked to
+             demonstrate font-family it returns "Main heading" in `sans-serif`
+             above "Main heading" in `Roboto` — which ARE the same shape, because
+             Roboto IS the default sans on most screens. The viewer sees one word
+             twice and is told to notice a difference that is not there.
+             So pick faces from DIFFERENT categories. `Lobster` or `Caveat`
+             (script) against `Roboto` (sans); `Playfair Display` (serif) against
+             `monospace`. If you cannot tell the two apart when you imagine them,
+             the frame is wrong however correct the labels are.
+             Same for the other properties: weight 200 against 700, not 400
+             against 500. scale 5 against scale 2, not 4 against 3.
+             And never repeat one sample's own `text` as its `label` — the label
+             names the STYLE ("Lobster", "36px", "bold"), not the words.
+
+             THIS IS THE RIGHT TEMPLATE FOR ANY QUESTION ABOUT HOW SOMETHING LOOKS.
+             "What does font-family specify?" is answered by two words in two
+             typefaces, side by side, in a way no sentence and no code listing can.
+  "compare"  Two cards side by side, each holding its own small stack. For two
+             named alternatives, a before and after, a right way and a wrong way.
+             -> panels: EXACTLY 2, each {title, role, items} where items is up to
+                4 {label, role}. The panel's own role colours its border, so put
+                role="lost" on the approach that wastes something and role="hero"
+                on the one being recommended. Item roles work inside that.
+             Use this and NOT "table" for a comparison. A table is a lookup, so its
+             two columns claim a row-for-row correspondence — and two alternatives
+             are not a correspondence, they are a choice.
 
 PICK THE TEMPLATE FROM THE RELATIONSHIP, NOT FROM THE SUBJECT
 Ask what the sentence CLAIMS, and the template follows:
@@ -148,8 +388,16 @@ Ask what the sentence CLAIMS, and the template follows:
   two sets correspond, row for row       -> "mapping"
   a sequence of events in order          -> "flow"
   countable slots in a line              -> "bar"
-  a lookup, or two things compared       -> "table"
+  a lookup: this key gives that value    -> "table"
+  two alternatives weighed against each  -> "compare"
+  how something LOOKS, or a style        -> "preview"
+  things, and what passes between them   -> "icons"
+  the material teaches it with code      -> "code"
   a single figure is the whole point     -> "stat"
+
+Work down that list in order of how CONCRETE the frame ends up. A "code" frame of
+the document's own rule beats a "flow" of your paraphrase of it every time, because
+one is the thing itself and the other is a description of the thing.
 
 The commonest wrong choice is "mapping" for something that is really a "split". A
 logical address is NOT a mapping from "logical address" to "page number": it is one
@@ -176,28 +424,39 @@ it with an ellipsis rather than let it overflow. Nothing breaks, but a truncated
 label is still a worse label. "MMU checks PTE", not "MMU checks Page Table Entry".
 "Backing store", not "Backing Store (disk)".
 
-`note` is the one supporting line under the diagram, in its own reserved band. One
-short sentence, or leave it out.
+A label over about four words is a sentence wearing a box, and it is the tell that
+a frame has become a slide. The one exception is `code_lines`, whose labels are
+lines of real code and are as long as the document made them.
 
-`title` is the frame's heading. Three or four words.
+`title` is the frame's heading. Three or four words. A NAME for what is on screen
+("Physical memory", "The font-family rule") — not a statement about it, and not the
+beat's sentence shortened.
 
 `spec` is one sentence of prose saying what the frame shows, for the graders and
 for a human reading the unit later. It is not drawn.
 
 Output JSON:
 {"visuals":[{"ref":"...","spec":"one sentence","frame":{
-  "template":"bar|mapping|split|flow|table|stat|takeaway",
-  "title":"...", "note":"...",
+  "template":"bar|mapping|split|flow|table|stat|code|compare|preview|icons",
+  "title":"...",
   "cells":[{"label":"...","role":"plain|hero|lost|quiet"}], "cells_title":"...",
   "left":[...], "right":[...], "left_title":"...", "right_title":"...",
   "parts":[...], "steps":[...],
   "columns":["..."], "rows":[{"cells":["..."],"role":"..."}],
-  "value":"...", "caption":"..."}}]}
+  "value":"...", "caption":"...",
+  "code_lines":[{"label":"  font-family: \"Roboto\";","role":"hero"}],
+  "code_caption":"style.css",
+  "panels":[{"title":"...","role":"...","items":[{"label":"...","role":"..."}]}],
+  "glyphs":[{"icon":"browser","label":"Browser","role":"hero"}], "arrows":true,
+  "samples":[{"text":"Tourism","label":"Lobster","font":"Lobster","scale":3,
+              "weight":700,"italic":false,"decoration":null,"color":"blue",
+              "background":null,"role":"hero"}]}}]}
 
-Include only the fields the chosen template uses. The last ref is the takeaway."""
+Include only the fields the chosen template uses. There is no "takeaway" template
+and no "note" field — the last ref is the finished composition, see above."""
 
 
-def spec_visuals(script: Script) -> dict[str, Visual]:
+def spec_visuals(script: Script, section: Section | None = None) -> dict[str, Visual]:
     """
     One call for the whole short: a template and its words for every visual_ref.
 
@@ -207,6 +466,27 @@ def spec_visuals(script: Script) -> dict[str, Visual]:
 
     This is now the ONLY paid step in the visual pipeline. Drawing used to be one
     call per frame on top of this — four or five per short, and 82% of the bill.
+
+    `section` IS WHY THE FRAMES STOPPED BEING TEXT, so it is worth being explicit
+    about. This step used to receive the dialogue and nothing else, and a step that
+    can only see sentences can only draw sentences: the frames that came back were
+    the beats laid out as boxes — cells reading "font-family?", "Import font CSS",
+    "Which typeface", which is the script in a row of rectangles. There was nothing
+    else in the prompt to draw.
+
+    The material is where the pictures actually are. The section behind that CSS
+    short contains
+
+        .main-heading {
+          font-family: "Roboto";
+        }
+
+    and a "code" frame of those three lines with the middle one lit is a real
+    diagram of the answer, grounded character for character in the document, that no
+    amount of rewording the brief could have produced without the document present.
+
+    Optional, so callers that genuinely have no section (and the eval harness) still
+    work — they just get the weaker, dialogue-only framing they had before.
     """
     refs, seen = [], set()
     for b in script.beats:
@@ -215,10 +495,32 @@ def spec_visuals(script: Script) -> dict[str, Visual]:
             refs.append(b.visual_ref)
 
     beats = "\n".join(f"[{b.visual_ref}] {b.speaker}: {b.line}" for b in script.beats)
-    user = (f"QUESTION: {script.question}\n\nBEATS, in order:\n{beats}\n\n"
-            f"Design the composition and assign one frame to each of these refs, "
-            f"in this order: {refs}\nThe last one, {refs[-1]}, is the takeaway card.")
-    plan = ask_json(SPEC_SYSTEM, user, VisualPlan, max_tokens=4000, label="visual_spec")
+    user = f"QUESTION: {script.question}\n\nBEATS, in order:\n{beats}\n"
+
+    if section is not None:
+        # After the beats, not before: the composition is designed for the dialogue,
+        # and the material is the source of what the dialogue's nouns look like. Put
+        # first, the model plans a diagram of the section and then tries to hang the
+        # beats off it, which is how a frame drifts onto a neighbouring idea.
+        user += f"""
+THE READING MATERIAL THIS SHORT CAME FROM — section [{section.section_id}] {section.title}
+Draw from the things this document SHOWS: its code blocks, its tables, its values
+and its numbers, copied exactly. Not from its prose.
+---
+{section.text}
+---
+"""
+
+    user += (f"\nDesign ONE composition and assign a frame to each of these refs, in "
+             f"this order: {refs}\nThe last one, {refs[-1]}, is that composition "
+             f"finished, with the hero on the thing that answers the question — it is "
+             f"NOT a card with a sentence on it.")
+    # MODEL_DIAGRAM, which until now nothing read — /api/health advertised it and no
+    # call site used it, so setting it did nothing at all. This is the call it should
+    # always have named: the one paid step that decides what every frame of the short
+    # contains. Defaults to the generator.
+    plan = ask_json(SPEC_SYSTEM, user, VisualPlan, model=config.MODEL_DIAGRAM,
+                    max_tokens=4000, label="visual_spec")
 
     return {v.ref: Visual(ref=v.ref, type="diagram", spec=v.spec, frame=v.frame)
             for v in plan.visuals}

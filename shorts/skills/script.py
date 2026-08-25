@@ -43,8 +43,57 @@ So match the shape of the answer to the shape of the question:
                               the problem, the mechanism, the payoff.
 - "How..." / "What happens..." -> the last beat is the RESULT of the process, the
                               state you end up in. 2 or 3 beats.
-- "What is..." / "Which..."  -> the last beat is the DISTINCTION that matters. 2
-                              beats is usually enough.
+- "What is..." / "What does..." / "Which..." -> the FIRST answer beat is the
+                              definition, and the last is the DISTINCTION or the
+                              worked example that makes it concrete. 2 beats is
+                              usually enough. Do not save the definition for the
+                              end: a "what" question is answered by its first
+                              sentence or the viewer is left guessing through it.
+
+EVERY BEAT IS ON THE QUESTION'S OWN SUBJECT. A PREREQUISITE IS NOT AN ANSWER.
+A beat can be true, cited to a real sentence, and still not be part of the answer.
+The material is full of sentences that are ABOUT the topic without ANSWERING
+anything about it: prerequisites, syntax rules, spelling warnings, "you must
+remember to", lists of common mistakes. They cite beautifully. They are not answers,
+and putting one in front of the real answer is how a short becomes hard to follow —
+the viewer is told a rule for using a thing before being told what the thing is.
+
+This is the defect, from a script this pipeline actually produced:
+
+  QUESTION  "What exactly does the CSS font-family property specify?"
+  BAD       "You must import the font stylesheet before using font-family."
+            "It specifies which typeface the browser should use for an element."
+            ^ Beat 2 is a footnote from a caveat list. It is correctly cited and it
+              answers a question nobody asked, so the viewer spends the first half
+              of the short waiting for the topic to arrive. And it makes the SECOND
+              beat carry the whole answer alone, with no room left to make it
+              concrete.
+  GOOD      "It sets which typeface the browser uses to render that element's text."
+            "So `.main-heading {{ font-family: "Roboto"; }}` renders that heading in
+             Roboto."
+            ^ Beat 2 answers. Beat 3 makes it something you can picture.
+
+So: THE FIRST STUDENT BEAT ANSWERS THE QUESTION DIRECTLY, in the question's own
+terms. Later beats deepen it — the mechanism, the example, the consequence. Never
+open on setup, context, or a caveat. If a caveat is genuinely the most important
+thing in the section, then it is the topic, and the interviewer should be asking
+about it instead.
+
+BE CONCRETE: USE THE MATERIAL'S OWN EXAMPLE, BY NAME
+An answer made only of general statements is the kind a learner nods along to and
+cannot use an hour later. The reading material almost always contains the concrete
+thing — a code snippet, a selector, a property value, a number, a worked case — and
+naming it is what turns an abstract answer into one that lands.
+
+- At least one beat should name the material's actual example: the real selector,
+  the real value, the real figure. `font-family: "Roboto"`, not "a font name". 1011,
+  not "a binary number". 36px, not "a size".
+- Copy it EXACTLY as the document writes it. Do not invent a tidier example, and do
+  not generalise the document's example into a placeholder.
+- This is also what the diagram is drawn from. The visual step gets the same
+  section, and if the answer names the document's own code the picture can show that
+  code with the line under discussion lit — instead of falling back to putting your
+  sentences in boxes, which is what it does when the beats give it nothing concrete.
 
 TWO OR THREE PARTS. NOT FOUR, NOT FIVE.
 Five-point answers are what these shorts are being fixed from. Nobody watching a
@@ -112,6 +161,12 @@ a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTER.
 - Quote a sentence that STATES something. A heading, a title, or a list label is
   not evidence — "What are header and heading elements in HTML?" is a question the
   material asks, not a fact it establishes. Cite the sentence that answers it.
+- A code block counts, and for a beat naming the material's example it is the right
+  citation: quote the line of code. `font-family: "Roboto";` is the document
+  establishing exactly what that beat claims.
+- Having a valid quote does not make a beat worth keeping. Prerequisite and caveat
+  sentences cite perfectly and answer nothing — see EVERY BEAT IS ON THE QUESTION'S
+  OWN SUBJECT above. Check the beat belongs before you check it is cited.
 - The quote must actually SUPPORT the beat, not merely share words with it. Sharing
   a phrase is not support: a beat claiming a file extension causes rendering is not
   supported by a sentence about telling the browser how to display elements, even

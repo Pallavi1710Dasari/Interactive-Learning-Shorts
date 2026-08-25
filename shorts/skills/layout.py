@@ -27,7 +27,9 @@ The renderers also emit the animation tags the player drives (data-enter for
 arrival order, data-role="focus" on the hero, data-role="flow" on arrows), which
 the model used to have to remember to add. See web/src/AnimatedSvg.tsx.
 """
-from ..schema import Frame, Cell, TableRow
+import re
+
+from ..schema import Frame, Cell, TableRow, Panel, Sample, Glyph
 
 VIEW = 1080
 MARGIN = 60
@@ -46,6 +48,13 @@ NOTE_TOP, NOTE_BOTTOM = 850, 950
 #: believes are fine.
 CHAR_W = 0.55
 
+#: Advance width of a monospace face, which is the whole point of one: every glyph
+#: is this wide, so a code block can be laid out at ONE size for every line and the
+#: indentation lines up. Wider than Inter, so a snippet needs measuring separately.
+CHAR_W_MONO = 0.60
+
+MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+
 # The palette. checks and SVG_SYSTEM describe it; here it is the only thing that
 # assigns it, which is why a short cannot end up with three amber elements.
 FILL = "#E1F5EE"
@@ -55,13 +64,24 @@ AMBER = "#F2B14B"
 CORAL = "#E8735A"
 INK = "#2C2C2A"
 MUTED = "#8A8880"
+PAPER = "#F4F5F3"
 
 #: fill, stroke, ink for each role.
 ROLE_COLOURS: dict[str, tuple[str, str, str]] = {
     "plain": (FILL, STROKE, INK),
     "hero":  (AMBER, DEEP, INK),
     "lost":  ("#FBE3DE", CORAL, INK),
-    "quiet": ("#F4F5F3", MUTED, MUTED),
+    "quiet": (PAPER, MUTED, MUTED),
+}
+
+#: Ink for text drawn ON the dark code panel. The role colours above are ink for
+#: text inside a LIGHT box, so reusing them there would print near-black on
+#: near-black. Same roles, inverted ground.
+CODE_INK: dict[str, str] = {
+    "plain": FILL,
+    "hero":  AMBER,
+    "lost":  CORAL,
+    "quiet": MUTED,
 }
 
 #: Hard caps. Past these a frame is not a diagram, it is a spreadsheet — and the
@@ -71,6 +91,9 @@ MAX_COLUMN = 4
 MAX_PARTS = 3
 MAX_STEPS = 4
 MAX_ROWS = 4
+MAX_CODE_LINES = 7
+MAX_PANELS = 2
+MAX_PANEL_ITEMS = 4
 
 
 # --------------------------------------------------------------------- text
@@ -480,9 +503,632 @@ def _takeaway(frame: Frame, enter: int) -> tuple[str, int]:
     return out, enter + 2
 
 
+# ------------------------------------------------------------------ pictograms
+#
+# DRAWN THINGS, which is the point. Every other template on this list communicates
+# with a rounded rectangle holding a word, and a viewer told "the visuals are just
+# text" is not wrong about that: a box saying "Browser" is the word "browser" with a
+# border. A drawn browser window is a picture, read at a glance and in any language.
+#
+# Deliberately built from primitives — rect, circle, line, a short path — rather
+# than lifted from an icon set. They have to sit in the project's palette, take a
+# role colour, scale to whatever box the layout gives them, and stay legible at
+# phone size; a 24px-grid icon path does none of that when blown up to 200px. These
+# are simple on purpose: at this size and this duration, recognisable beats detailed.
+#
+# Each takes a UNIT BOX and returns markup filling it. The layout owns position and
+# size; a pictogram only knows how to draw itself inside the square it is handed.
+
+
+def _pict_browser(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A window with a title bar and three dots. Anything to do with a browser."""
+    bar = s * 0.22
+    return (f'<rect x="{x}" y="{y}" width="{s}" height="{s * 0.82}" rx="{s * 0.07}" '
+            f'fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+            f'<line x1="{x}" y1="{y + bar}" x2="{x + s}" y2="{y + bar}" '
+            f'stroke="{ink}" stroke-width="{s * 0.045}"/>'
+            + "".join(f'<circle cx="{x + s * (0.14 + i * 0.13):.1f}" '
+                      f'cy="{y + bar / 2:.1f}" r="{s * 0.035}" fill="{ink}"/>'
+                      for i in range(3))
+            + f'<rect x="{x + s * 0.12}" y="{y + bar + s * 0.14}" width="{s * 0.5}" '
+              f'height="{s * 0.09}" rx="{s * 0.03}" fill="{accent}"/>'
+              f'<rect x="{x + s * 0.12}" y="{y + bar + s * 0.32}" width="{s * 0.72}" '
+              f'height="{s * 0.06}" rx="{s * 0.02}" fill="{ink}" opacity="0.4"/>')
+
+
+def _pict_file(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A page with a folded corner. A file, a document, a stylesheet."""
+    w, h, fold = s * 0.74, s * 0.92, s * 0.24
+    left = x + (s - w) / 2
+    return (f'<path d="M{left} {y + h} L{left} {y} L{left + w - fold} {y} '
+            f'L{left + w} {y + fold} L{left + w} {y + h} Z" fill="none" '
+            f'stroke="{ink}" stroke-width="{s * 0.055}" stroke-linejoin="round"/>'
+            f'<path d="M{left + w - fold} {y} L{left + w - fold} {y + fold} '
+            f'L{left + w} {y + fold}" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.045}" stroke-linejoin="round"/>'
+            + "".join(f'<line x1="{left + w * 0.16:.1f}" '
+                      f'y1="{y + h * (0.52 + i * 0.15):.1f}" '
+                      f'x2="{left + w * 0.84:.1f}" '
+                      f'y2="{y + h * (0.52 + i * 0.15):.1f}" stroke="{accent if i == 0 else ink}" '
+                      f'stroke-width="{s * 0.045}" opacity="{1 if i == 0 else 0.45}"/>'
+                      for i in range(3)))
+
+
+def _pict_page(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A rendered page: a heading bar and body lines. Structure, content, layout."""
+    w, h = s * 0.82, s * 0.92
+    left = x + (s - w) / 2
+    out = (f'<rect x="{left}" y="{y}" width="{w}" height="{h}" rx="{s * 0.05}" '
+           f'fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+           f'<rect x="{left + w * 0.1}" y="{y + h * 0.12}" width="{w * 0.55}" '
+           f'height="{h * 0.13}" rx="{s * 0.025}" fill="{accent}"/>')
+    for i in range(3):
+        out += (f'<line x1="{left + w * 0.1:.1f}" y1="{y + h * (0.42 + i * 0.16):.1f}" '
+                f'x2="{left + w * (0.9 if i < 2 else 0.62):.1f}" '
+                f'y2="{y + h * (0.42 + i * 0.16):.1f}" stroke="{ink}" '
+                f'stroke-width="{s * 0.04}" opacity="0.45"/>')
+    return out
+
+
+def _pict_screen(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A monitor on a stand. What the user actually sees."""
+    h = s * 0.66
+    return (f'<rect x="{x}" y="{y}" width="{s}" height="{h}" rx="{s * 0.06}" '
+            f'fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+            f'<rect x="{x + s * 0.16}" y="{y + h * 0.24}" width="{s * 0.44}" '
+            f'height="{h * 0.16}" rx="{s * 0.02}" fill="{accent}"/>'
+            f'<line x1="{x + s * 0.5}" y1="{y + h}" x2="{x + s * 0.5}" '
+            f'y2="{y + s * 0.86}" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+            f'<line x1="{x + s * 0.28}" y1="{y + s * 0.88}" x2="{x + s * 0.72}" '
+            f'y2="{y + s * 0.88}" stroke="{ink}" stroke-width="{s * 0.055}" '
+            f'stroke-linecap="round"/>')
+
+
+def _pict_chip(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A chip with pins. A CPU, an MMU, anything that computes."""
+    b, w = s * 0.2, s * 0.62
+    out = (f'<rect x="{x + b}" y="{y + b}" width="{w}" height="{w}" rx="{s * 0.06}" '
+           f'fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+           f'<rect x="{x + b + w * 0.26}" y="{y + b + w * 0.26}" width="{w * 0.48}" '
+           f'height="{w * 0.48}" rx="{s * 0.03}" fill="{accent}"/>')
+    for i in range(3):
+        at = b + w * (0.24 + i * 0.26)
+        out += (f'<line x1="{x + at:.1f}" y1="{y + b:.1f}" x2="{x + at:.1f}" '
+                f'y2="{y:.1f}" stroke="{ink}" stroke-width="{s * 0.045}"/>'
+                f'<line x1="{x + at:.1f}" y1="{y + b + w:.1f}" x2="{x + at:.1f}" '
+                f'y2="{y + b + w + b:.1f}" stroke="{ink}" stroke-width="{s * 0.045}"/>'
+                f'<line x1="{x + b:.1f}" y1="{y + at:.1f}" x2="{x:.1f}" '
+                f'y2="{y + at:.1f}" stroke="{ink}" stroke-width="{s * 0.045}"/>'
+                f'<line x1="{x + b + w:.1f}" y1="{y + at:.1f}" '
+                f'x2="{x + b + w + b:.1f}" y2="{y + at:.1f}" stroke="{ink}" '
+                f'stroke-width="{s * 0.045}"/>')
+    return out
+
+
+def _pict_memory(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A stack of equal bars. RAM, frames, slots."""
+    out = ""
+    for i in range(4):
+        h = s * 0.17
+        out += (f'<rect x="{x}" y="{y + i * s * 0.24:.1f}" width="{s}" height="{h}" '
+                f'rx="{s * 0.03}" fill="{accent if i == 1 else "none"}" stroke="{ink}" '
+                f'stroke-width="{s * 0.05}"/>')
+    return out
+
+
+def _pict_disk(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A cylinder. Disk, backing store, swap."""
+    w, ry = s * 0.86, s * 0.15
+    left, top = x + (s - w) / 2, y + s * 0.1
+    bot = y + s * 0.74
+    return (f'<ellipse cx="{left + w / 2}" cy="{top}" rx="{w / 2}" ry="{ry}" '
+            f'fill="{accent}" stroke="{ink}" stroke-width="{s * 0.05}"/>'
+            f'<path d="M{left} {top} L{left} {bot}" stroke="{ink}" '
+            f'stroke-width="{s * 0.05}" fill="none"/>'
+            f'<path d="M{left + w} {top} L{left + w} {bot}" stroke="{ink}" '
+            f'stroke-width="{s * 0.05}" fill="none"/>'
+            f'<ellipse cx="{left + w / 2}" cy="{bot}" rx="{w / 2}" ry="{ry}" '
+            f'fill="none" stroke="{ink}" stroke-width="{s * 0.05}"/>')
+
+
+def _pict_brush(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A brush. Styling, appearance, CSS as opposed to structure."""
+    return (f'<rect x="{x + s * 0.34}" y="{y + s * 0.04}" width="{s * 0.32}" '
+            f'height="{s * 0.34}" rx="{s * 0.05}" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.055}"/>'
+            f'<rect x="{x + s * 0.28}" y="{y + s * 0.38}" width="{s * 0.44}" '
+            f'height="{s * 0.14}" rx="{s * 0.04}" fill="{accent}" stroke="{ink}" '
+            f'stroke-width="{s * 0.05}"/>'
+            f'<path d="M{x + s * 0.42} {y + s * 0.52} L{x + s * 0.42} {y + s * 0.76} '
+            f'Q{x + s * 0.5} {y + s * 0.94} {x + s * 0.58} {y + s * 0.76} '
+            f'L{x + s * 0.58} {y + s * 0.52}" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.055}" stroke-linejoin="round"/>')
+
+
+def _pict_code(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """Angle brackets. Markup, a tag, source."""
+    return (f'<rect x="{x}" y="{y + s * 0.06}" width="{s}" height="{s * 0.78}" '
+            f'rx="{s * 0.07}" fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+            f'<path d="M{x + s * 0.34} {y + s * 0.3} L{x + s * 0.2} {y + s * 0.45} '
+            f'L{x + s * 0.34} {y + s * 0.6}" fill="none" stroke="{accent}" '
+            f'stroke-width="{s * 0.06}" stroke-linejoin="round" stroke-linecap="round"/>'
+            f'<path d="M{x + s * 0.66} {y + s * 0.3} L{x + s * 0.8} {y + s * 0.45} '
+            f'L{x + s * 0.66} {y + s * 0.6}" fill="none" stroke="{accent}" '
+            f'stroke-width="{s * 0.06}" stroke-linejoin="round" stroke-linecap="round"/>')
+
+
+def _pict_text(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A capital A. Type, a font, text itself."""
+    return (f'<path d="M{x + s * 0.16} {y + s * 0.84} L{x + s * 0.5} {y + s * 0.06} '
+            f'L{x + s * 0.84} {y + s * 0.84}" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.09}" stroke-linejoin="round" stroke-linecap="round"/>'
+            f'<line x1="{x + s * 0.32}" y1="{y + s * 0.58}" x2="{x + s * 0.68}" '
+            f'y2="{y + s * 0.58}" stroke="{accent}" stroke-width="{s * 0.09}" '
+            f'stroke-linecap="round"/>')
+
+
+def _pict_table(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A grid. A table, a lookup, a page table."""
+    out = (f'<rect x="{x}" y="{y + s * 0.06}" width="{s}" height="{s * 0.78}" '
+           f'rx="{s * 0.05}" fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+           f'<rect x="{x}" y="{y + s * 0.06}" width="{s}" height="{s * 0.2}" '
+           f'fill="{accent}" opacity="0.9"/>')
+    for i in (1, 2):
+        out += (f'<line x1="{x}" y1="{y + s * (0.06 + i * 0.26):.1f}" x2="{x + s}" '
+                f'y2="{y + s * (0.06 + i * 0.26):.1f}" stroke="{ink}" '
+                f'stroke-width="{s * 0.045}"/>')
+    out += (f'<line x1="{x + s * 0.5}" y1="{y + s * 0.06}" x2="{x + s * 0.5}" '
+            f'y2="{y + s * 0.84}" stroke="{ink}" stroke-width="{s * 0.045}"/>')
+    return out
+
+
+def _pict_check(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A tick in a circle. Right, valid, allowed."""
+    return (f'<circle cx="{x + s * 0.5}" cy="{y + s * 0.45}" r="{s * 0.39}" '
+            f'fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+            f'<path d="M{x + s * 0.3} {y + s * 0.46} L{x + s * 0.44} {y + s * 0.6} '
+            f'L{x + s * 0.71} {y + s * 0.3}" fill="none" stroke="{accent}" '
+            f'stroke-width="{s * 0.085}" stroke-linejoin="round" stroke-linecap="round"/>')
+
+
+def _pict_cross(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A cross in a circle. Wrong, invalid, rejected."""
+    return (f'<circle cx="{x + s * 0.5}" cy="{y + s * 0.45}" r="{s * 0.39}" '
+            f'fill="none" stroke="{ink}" stroke-width="{s * 0.055}"/>'
+            f'<line x1="{x + s * 0.33}" y1="{y + s * 0.28}" x2="{x + s * 0.67}" '
+            f'y2="{y + s * 0.62}" stroke="{accent}" stroke-width="{s * 0.085}" '
+            f'stroke-linecap="round"/>'
+            f'<line x1="{x + s * 0.67}" y1="{y + s * 0.28}" x2="{x + s * 0.33}" '
+            f'y2="{y + s * 0.62}" stroke="{accent}" stroke-width="{s * 0.085}" '
+            f'stroke-linecap="round"/>')
+
+
+def _pict_warning(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A triangle with a bang. A caveat, a mistake, a gotcha."""
+    return (f'<path d="M{x + s * 0.5} {y + s * 0.06} L{x + s * 0.95} {y + s * 0.82} '
+            f'L{x + s * 0.05} {y + s * 0.82} Z" fill="{accent}" stroke="{ink}" '
+            f'stroke-width="{s * 0.055}" stroke-linejoin="round"/>'
+            f'<line x1="{x + s * 0.5}" y1="{y + s * 0.34}" x2="{x + s * 0.5}" '
+            f'y2="{y + s * 0.58}" stroke="{ink}" stroke-width="{s * 0.07}" '
+            f'stroke-linecap="round"/>'
+            f'<circle cx="{x + s * 0.5}" cy="{y + s * 0.7}" r="{s * 0.045}" fill="{ink}"/>')
+
+
+def _pict_box(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """The fallback, for an icon name the renderer does not know."""
+    return (f'<rect x="{x + s * 0.08}" y="{y + s * 0.14}" width="{s * 0.84}" '
+            f'height="{s * 0.62}" rx="{s * 0.07}" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.055}"/>'
+            f'<circle cx="{x + s * 0.5}" cy="{y + s * 0.45}" r="{s * 0.1}" fill="{accent}"/>')
+
+
+#: Every pictogram an `icons` frame may name. Keep this list and the one in
+#: SPEC_SYSTEM in step: a name the model invents renders as _pict_box, which is
+#: honest but says nothing.
+PICTOGRAMS = {
+    "browser": _pict_browser, "file": _pict_file, "page": _pict_page,
+    "screen": _pict_screen, "chip": _pict_chip, "memory": _pict_memory,
+    "disk": _pict_disk, "brush": _pict_brush, "code": _pict_code,
+    "text": _pict_text, "table": _pict_table, "check": _pict_check,
+    "cross": _pict_cross, "warning": _pict_warning, "box": _pict_box,
+}
+
+
+def _icons(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    A row of drawn pictograms with names under them, optionally with arrows.
+
+    The most literally "a picture" of any template here, and the answer to the
+    complaint that every frame was a rectangle holding a word. "Browser reads the
+    HTML file and paints the page" is three drawn objects and two arrows; the same
+    sentence in three boxes is the sentence, re-set in a smaller font.
+    """
+    glyphs = (frame.glyphs or [])[:4]
+    if not glyphs:
+        glyphs = [Glyph(icon="box", label=frame.title)]
+    n = len(glyphs)
+
+    gap = 40 if n > 1 else 0
+    cell = (USABLE - (n - 1) * gap) / n
+    size = min(cell * 0.78, 230.0)
+    label_h = 90
+    mid = (BODY_TOP + BODY_BOTTOM) / 2 - label_h / 2
+    top = mid - size / 2
+
+    out = ""
+    centres: list[float] = []
+    for i, glyph in enumerate(glyphs):
+        cx = MARGIN + i * (cell + gap) + cell / 2
+        centres.append(cx)
+        _, stroke, ink = ROLE_COLOURS[glyph.role]
+        # The role picks the pictogram's own two colours, so emphasis works the same
+        # way here as in every other template: the hero is the amber one.
+        line, accent = (DEEP, AMBER) if glyph.role == "hero" else \
+                       (CORAL, CORAL) if glyph.role == "lost" else \
+                       (MUTED, MUTED) if glyph.role == "quiet" else (STROKE, FILL)
+        draw = PICTOGRAMS.get(glyph.icon, _pict_box)
+        body = draw(cx - size / 2, top, size, line, accent)
+        if glyph.label:
+            lines, fs = fit(glyph.label, cell, 40, 24, max_lines=2)
+            body += text_block(lines, cx, top + size + label_h * 0.45, fs,
+                               ink if glyph.role != "plain" else INK, 700)
+        out += group(body, enter, "focus" if glyph.role == "hero" else None)
+        enter += 1
+
+    if frame.arrows and n > 1:
+        shafts = "".join(
+            arrow(centres[i] + size / 2 + 14, top + size / 2,
+                  centres[i + 1] - size / 2 - 8, top + size / 2, role="")
+            for i in range(n - 1))
+        out += group(shafts, enter, "flow")
+        enter += 1
+    return out, enter
+
+
+#: Font-family values a `preview` frame can HONESTLY render.
+#:
+#: The generic families are always available. The named ones are loaded by
+#: web/index.html and nothing else — so a sample naming a face outside this set
+#: renders in the fallback, and the frame then shows one typeface while its own
+#: caption names another. That is worse than not drawing it: the viewer is being
+#: pointed at a difference which is not on the screen.
+#:
+#: SPEC_SYSTEM offers exactly this list. Keep the three in step — this set, the
+#: <link> in web/index.html, and the list in the brief.
+WEB_SAFE_FONTS = {
+    "serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui",
+    "Bree Serif", "Caveat", "Lobster", "Monoton", "Open Sans",
+    "Playfair Display", "Roboto", "Source Sans 3", "Work Sans",
+}
+
+#: The families every browser resolves without loading anything.
+_GENERIC_FAMILIES = {"serif", "sans-serif", "monospace", "cursive", "fantasy",
+                     "system-ui"}
+
+#: Where an unavailable face falls back to, so the drawing stays honest-ish rather
+#: than defaulting everything to the UI sans. A script face asked for and not found
+#: at least still arrives as a script face.
+_FONT_FALLBACK = {
+    "lobster": "cursive", "caveat": "cursive", "monoton": "fantasy",
+    "bree serif": "serif", "playfair display": "serif",
+}
+
+
+def _font_stack(name: str | None) -> str | None:
+    """A usable font-family value for `name`, or None to leave the frame's default."""
+    if not name:
+        return None
+    clean = name.strip().strip('"\'')
+    # A generic family IS the stack — appending a fallback to "monospace" would
+    # produce "monospace, sans-serif", and a browser that cannot find a monospace
+    # face is not a browser this runs in.
+    if clean.lower() in _GENERIC_FAMILIES:
+        return clean.lower()
+    if clean in WEB_SAFE_FONTS:
+        generic = _FONT_FALLBACK.get(clean.lower(), "sans-serif")
+        return f"{clean}, {generic}"
+    # Not loaded. Land on the nearest generic rather than the UI sans, so a frame
+    # comparing a script face with a plain one still shows two different shapes.
+    return _FONT_FALLBACK.get(clean.lower(), "sans-serif")
+
+
+#: CSS colour keywords a sample may name. Not the full 148: this is the set that
+#: turns up in teaching material, and anything outside it — plus any hex value — is
+#: handled by _colour() below.
+CSS_COLOURS = {
+    "black", "white", "red", "green", "blue", "yellow", "orange", "purple",
+    "pink", "brown", "grey", "gray", "silver", "gold", "navy", "teal", "olive",
+    "maroon", "lime", "aqua", "cyan", "magenta", "fuchsia", "violet", "indigo",
+    "beige", "ivory", "khaki", "salmon", "coral", "crimson", "tomato",
+    "lightblue", "lightgreen", "lightgrey", "lightgray", "lightyellow",
+    "lightpink", "darkblue", "darkgreen", "darkgrey", "darkgray", "darkred",
+    "skyblue", "steelblue", "seagreen", "forestgreen", "goldenrod", "chocolate",
+    "transparent",
+}
+
+_HEX = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
+_RGB = re.compile(r"^rgba?\([\d\s.,%/]+\)$")
+
+
+def _colour(value: str | None) -> str | None:
+    """A CSS colour safe to put straight into an SVG attribute, or None.
+
+    Whitelisted rather than passed through, because this string is written into
+    markup by a model and the markup is injected into the page. A colour is also the
+    one place a typo is invisible: `blu` silently renders as the default ink, so a
+    frame claiming "blue" would show black and look deliberate. Returning None lets
+    the caller keep the palette ink instead, and checks.check_samples_differ then
+    catches the frame whose samples no longer differ.
+    """
+    if not value:
+        return None
+    clean = str(value).strip().lower()
+    if clean in CSS_COLOURS or _HEX.match(clean) or _RGB.match(clean):
+        return clean
+    return None
+
+
+def _preview(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    Sample text rendered IN the style being taught. The effect, not a description.
+
+    For a typography lesson this is the only honest picture. A box reading
+    "font-family sets the typeface" is a sentence about type; the word "Tourism" set
+    in Lobster above the same word in Roboto IS the difference, and it needs no
+    label to be understood.
+
+    `scale` is relative, 1-5, and the renderer converts it — which is what makes a
+    font-size comparison truthful. Handed pixel values the model picks numbers that
+    look right in the document (36px, 28px) and are both a quarter of the height of
+    a 1080 canvas, so the difference it is demonstrating disappears. Relative sizes
+    get normalised so the biggest sample fills its band and the ratios survive.
+    """
+    samples = (frame.samples or [])[:3]
+    if not samples:
+        samples = [Sample(text=frame.value or frame.title or "", label=frame.caption or "")]
+    n = len(samples)
+
+    gap = 26
+    area = BODY_BOTTOM - BODY_TOP
+    band = (area - (n - 1) * gap) / n
+    # A third of the band for the caption. At 0.28 the label sat close enough to the
+    # sample to read as part of it, which matters here more than elsewhere: the
+    # sample is set in a decorative face and the caption is not, so they must be
+    # visibly separate things or the frame looks like one broken line of type.
+    label_h = min(52.0, band * 0.33)
+    top = BODY_TOP
+
+    scales = [s.scale or 3 for s in samples]
+    biggest = max(scales) or 3
+
+    out = ""
+    for i, sample in enumerate(samples):
+        y = top + i * (band + gap)
+        fill, stroke, ink = ROLE_COLOURS[sample.role]
+        colour = _colour(sample.color)
+        ground = _colour(sample.background)
+
+        # WHEN A COLOUR IS THE SUBJECT, THE CARD GETS OUT OF THE WAY. A hero band is
+        # normally amber, and amber behind the word "blue" set in blue distorts the
+        # very thing the frame exists to show — the viewer cannot judge a colour
+        # against a strong tint. So a sample carrying its own colour sits on paper
+        # and states its role through the border alone.
+        card_fill = ground or (PAPER if colour else fill)
+        card = (f'<rect x="{MARGIN}" y="{y:.0f}" width="{USABLE}" height="{band:.0f}" '
+                f'rx="16" fill="{card_fill}" stroke="{stroke}" stroke-width="'
+                f'{6 if sample.role in ("hero", "lost") else 3}"/>')
+
+        # The size that fits this band, then cut by the sample's share of the
+        # largest scale so a "36px vs 28px" frame really shows two sizes.
+        room = band - label_h - 18
+        text = sample.text or "Sample"
+        lines, fs = fit(text, USABLE - 80, int(room * 0.72), 22, max_lines=1)
+        fs = max(20, int(fs * (scales[i] / biggest)))
+
+        style = f'font-size="{fs}" fill="{colour or ink}"'
+        stack = _font_stack(sample.font)
+        style += f' font-family="{esc(stack)}"' if stack else ""
+        style += f' font-weight="{sample.weight}"' if sample.weight else ' font-weight="600"'
+        style += ' font-style="italic"' if sample.italic else ""
+        style += f' text-decoration="{sample.decoration}"' if sample.decoration else ""
+        body = (f'<text x="{VIEW / 2:.0f}" y="{y + (band - label_h) / 2 + fs * 0.35:.0f}" '
+                f'text-anchor="middle" {style}>{esc(lines[0] if lines else text)}</text>')
+
+        if sample.label:
+            capt, cs = fit(sample.label, USABLE - 80, int(label_h * 0.72), 20, max_lines=1)
+            body += text_block(capt, VIEW / 2, y + band - label_h * 0.42, cs, MUTED, 600)
+
+        out += group(card + body, enter, "focus" if sample.role == "hero" else None)
+        enter += 1
+    return out, enter
+
+
+def _code(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    The material's own snippet, on a dark panel, with one line lit.
+
+    A code block is the one thing on this list that is already a picture of itself.
+    The document being taught says
+
+        .main-heading {
+          font-family: "Roboto";
+        }
+
+    and no arrangement of boxes-with-words in it gets closer to that than showing
+    it. So the words here are not labels the model composed — they are lines COPIED
+    out of the reading material, and moving the hero down them from beat to beat is
+    the same "one composition that builds" the other templates get from moving the
+    accent around a shape.
+
+    ONE FONT SIZE FOR EVERY LINE, and that is not a detail. A monospace block whose
+    lines are each fitted to their own width has ragged indentation, and ragged
+    indentation stops reading as code and starts reading as a list — which is the
+    thing this template exists to avoid. So the size is computed from the LONGEST
+    line and every line uses it; a line still too wide at the floor is truncated.
+    """
+    lines = [c for c in (frame.code_lines or []) if str(c.label).strip()][:MAX_CODE_LINES]
+    if not lines:
+        lines = [Cell(label=frame.value or frame.caption or frame.title or "")]
+
+    pad = 32
+    chrome_h = 58                      # the title bar: dots, and the file name
+    inner = USABLE - 2 * pad
+
+    text = [str(c.label).expandtabs(2).rstrip() for c in lines]
+    widths = sorted(len(t) for t in text)
+
+    # ONE OUTLIER MUST NOT SHRINK THE WHOLE BLOCK, which is what sizing from the
+    # widest line did. Real documents contain lines like
+    #
+    #   @import url("https://fonts.googleapis.com/css2?family=Bree+Serif&family=...
+    #
+    # — 520 characters of font-loading boilerplate in the CSS section this project
+    # is fed. Sized to fit that whole, every line lands at the 18px floor and a
+    # frame whose subject is `font-family: "Roboto";` is unreadable on a phone
+    # because of a line nobody is being asked to read.
+    #
+    # So the size is set by what MATTERS: the hero line, which must be legible in
+    # full, and the median line, which stands in for the body of the snippet.
+    # Anything wider than that is truncated with an ellipsis by draw() below — and
+    # an elided import is exactly what a person would have put on the slide.
+    hero_w = max((len(text[i]) for i, c in enumerate(lines) if c.role == "hero"),
+                 default=0)
+    sizing_w = max(1, hero_w, widths[len(widths) // 2])
+
+    # Constrained by width AND by height, then rounded to an even size so the
+    # baseline arithmetic stays on whole pixels.
+    avail_h = BODY_BOTTOM - BODY_TOP - chrome_h - 2 * pad
+    by_width = inner / (sizing_w * CHAR_W_MONO)
+    by_height = (avail_h / len(lines)) / 1.62
+    size = max(18, int(min(44.0, by_width, by_height)) // 2 * 2)
+    char_w = size * CHAR_W_MONO
+    limit = max(8, int(inner / char_w))
+    line_h = size * 1.62
+
+    height = chrome_h + 2 * pad + len(lines) * line_h
+    top = (BODY_TOP + BODY_BOTTOM) / 2 - height / 2
+    text_top = top + chrome_h + pad
+
+    chrome = (f'<rect x="{MARGIN}" y="{top:.0f}" width="{USABLE}" height="{height:.0f}" '
+              f'rx="22" fill="{INK}" stroke="{DEEP}" stroke-width="5"/>')
+    chrome += (f'<line x1="{MARGIN}" y1="{top + chrome_h:.0f}" '
+               f'x2="{MARGIN + USABLE}" y2="{top + chrome_h:.0f}" '
+               f'stroke="{MUTED}" stroke-width="2" opacity="0.45"/>')
+    # Three dots. Decoration, and it earns its pixels: it is what makes the panel
+    # read as a screen showing code before a single word of it has been read.
+    chrome += "".join(
+        f'<circle cx="{MARGIN + pad + i * 28:.0f}" cy="{top + chrome_h / 2:.0f}" '
+        f'r="7" fill="{MUTED}"/>' for i in range(3))
+    if frame.code_caption:
+        # Where a file name belongs, which is the other half of "this is code".
+        cap, cap_size = fit(frame.code_caption, USABLE - 2 * pad - 120, 30, 20, max_lines=1)
+        if cap:
+            chrome += (f'<text x="{MARGIN + pad + 3 * 28 + 22:.0f}" '
+                       f'y="{top + chrome_h / 2 + cap_size * 0.35:.0f}" '
+                       f'font-size="{cap_size}" fill="{MUTED}" font-weight="600" '
+                       f'font-family="{MONO}" text-anchor="start">{esc(cap[0])}</text>')
+
+    def draw(i: int, raw: str, role: str) -> str:
+        indent = len(raw) - len(raw.lstrip(" "))
+        body = raw.strip()
+        if len(body) + indent > limit:
+            body = body[: max(1, limit - indent - 1)] + "\u2026"
+        y = text_top + i * line_h + line_h / 2 + size * 0.35
+        x = MARGIN + pad + indent * char_w
+        weight = 700 if role == "hero" else 500
+        return (f'<text x="{x:.0f}" y="{y:.0f}" font-size="{size}" '
+                f'fill="{CODE_INK[role]}" font-weight="{weight}" '
+                f'font-family="{MONO}" text-anchor="start" '
+                f'xml:space="preserve">{esc(body)}</text>')
+
+    hero = next((i for i, c in enumerate(lines) if c.role == "hero"), None)
+
+    base = chrome + "".join(draw(i, text[i], lines[i].role)
+                            for i in range(len(lines)) if i != hero)
+    out = group(base, enter)
+    enter += 1
+
+    if hero is not None:
+        y = text_top + hero * line_h
+        lit = (f'<rect x="{MARGIN + 10}" y="{y:.0f}" width="{USABLE - 20}" '
+               f'height="{line_h:.0f}" rx="8" fill="{AMBER}" fill-opacity="0.16"/>'
+               f'<rect x="{MARGIN + 10}" y="{y:.0f}" width="7" '
+               f'height="{line_h:.0f}" rx="3" fill="{AMBER}"/>')
+        out += group(lit + draw(hero, text[hero], "hero"), enter, "focus")
+        enter += 1
+    return out, enter
+
+
+def _compare(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    Two worlds side by side, each a bounded card with its own small stack inside.
+
+    This shape was previously forced through `table`, which is wrong in a way that
+    contradicts the sentence being spoken: a table is a LOOKUP, so two columns of it
+    claim a row-for-row correspondence, and "contiguous allocation versus paging" is
+    not a correspondence — it is two alternatives, only one of which is in force at
+    a time. Bounding each side in its own card says that; a shared grid says the
+    opposite.
+
+    The card's own role colours its BORDER, and its items keep their own roles
+    inside it, so "this whole approach is the wasteful one" (role="lost" on the
+    panel) and "this one box within it is wasted" (role="lost" on an item) are
+    different statements that look different.
+    """
+    panels = (frame.panels or [])[:MAX_PANELS]
+    if not panels:
+        panels = [Panel(title=frame.title or "", items=frame.cells)]
+    n = len(panels)
+    gutter = 40 if n > 1 else 0
+    card_w = (USABLE - (n - 1) * gutter) / n
+    top, height = BODY_TOP, BODY_BOTTOM - BODY_TOP
+    title_h, ipad = 78, 20
+
+    out = ""
+    for j, panel in enumerate(panels):
+        x = MARGIN + j * (card_w + gutter)
+        _, stroke, _ = ROLE_COLOURS[panel.role]
+        # A hero or lost card is stated by its border, so it needs to be heavy
+        # enough to read at phone size against a plain one.
+        weight = 9 if panel.role in ("hero", "lost") else 4
+        card = (f'<rect x="{x:.0f}" y="{top}" width="{card_w:.0f}" height="{height}" '
+                f'rx="20" fill="{PAPER}" stroke="{stroke}" stroke-width="{weight}"/>')
+        titled, size = fit(panel.title, card_w - 2 * ipad, 42, 26, max_lines=2)
+        card += text_block(titled, x + card_w / 2, top + title_h / 2 + 4, size, stroke, 700)
+        card += (f'<line x1="{x + ipad:.0f}" y1="{top + title_h:.0f}" '
+                 f'x2="{x + card_w - ipad:.0f}" y2="{top + title_h:.0f}" '
+                 f'stroke="{stroke}" stroke-width="3" opacity="0.45"/>')
+        out += group(card, enter, "focus" if panel.role == "hero" else None)
+        enter += 1
+
+        items = panel.items[:MAX_PANEL_ITEMS]
+        if not items:
+            continue
+        gap = 18
+        area = height - title_h - 2 * ipad
+        item_h = min(120, (area - (len(items) - 1) * gap) / len(items))
+        total = len(items) * item_h + (len(items) - 1) * gap
+        iy = top + title_h + ipad + (area - total) / 2
+        iw = card_w - 2 * ipad
+        for item in items:
+            out += group(box(x + ipad, iy, iw, item_h, item.role, rx=12)
+                         + label_in_box(item.label, x + ipad, iy, iw, item_h,
+                                        item.role, hi=38, lo=20),
+                         enter, "focus" if item.role == "hero" else None)
+            enter += 1
+            iy += item_h + gap
+    return out, enter
+
+
 _TEMPLATES = {
     "bar": _bar, "mapping": _mapping, "split": _split, "flow": _flow,
-    "table": _table, "stat": _stat, "takeaway": _takeaway,
+    "table": _table, "stat": _stat, "code": _code, "compare": _compare,
+    "preview": _preview, "icons": _icons,
+    # LEGACY. Not offered to the model any more — a frame whose whole content is a
+    # sentence is the "visuals are just text" complaint in its purest form, and it
+    # was landing on EVERY short because the brief made it the last beat's job.
+    # Kept only so the units already in output/ still re-render.
+    "takeaway": _takeaway,
 }
 
 
@@ -505,13 +1151,19 @@ def render(frame: Frame) -> str:
         parts.append(title)
         enter += 1
 
-    # A takeaway carries its sentence in the body, so a note under it would be a
-    # second sentence competing with the one thing to remember.
     body, enter = _TEMPLATES[frame.template](frame, enter)
     parts.append(body)
 
-    if frame.template != "takeaway":
-        parts.append(band_text(frame.note, NOTE_TOP, NOTE_BOTTOM, 42, 32, INK, 600, enter))
+    # frame.note IS DELIBERATELY NOT DRAWN, and the band it used to own is left
+    # empty. The field asked for "the one supporting line under the diagram" and
+    # what came back was the sentence being spoken: "Student: Contiguous allocation
+    # forces one unbroken block per process." under a picture of exactly that,
+    # inside a player that already flows the same line word by word beneath the
+    # frame. So every short showed its narration twice and its subject once, which
+    # is what "the visuals are just text" meant.
+    #
+    # A frame earns its place by drawing the thing. If an idea needs a sentence to
+    # land, the sentence is the voice's job — it is already being said.
 
     parts.append("</svg>")
     return "".join(p for p in parts if p)

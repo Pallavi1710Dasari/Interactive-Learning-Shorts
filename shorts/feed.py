@@ -127,8 +127,15 @@ def _caption_words(line: str, start: float, end: float) -> list[dict]:
 
 def _clean_svg(svg: str) -> str:
     """
-    The SVG is model-generated and gets injected into the DOM. SVG_SYSTEM forbids
-    scripts, but a prompt is not an enforcement mechanism.
+    The SVG is model-generated and gets injected into the DOM. Nothing upstream is
+    an enforcement mechanism, so this is.
+
+    KNOWN COSMETIC EDGE, deliberately not fixed: the handler strip runs over the
+    whole string, so a "code" frame drawing HTML markup that itself contains
+    `onclick="..."` loses that fragment from the DISPLAYED code as well. No document
+    in this project has an inline handler, and the alternative — teaching the regex
+    to tell a real attribute from escaped text inside <text> — trades a security
+    boundary for the prettiness of a rare frame. Wrong way round.
     """
     svg = re.sub(r"<script.*?</script>", "", svg, flags=re.S | re.I)
     return re.sub(r"\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", svg, flags=re.I)

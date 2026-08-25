@@ -80,8 +80,13 @@ export const regenerate = (
   });
 
 export const finalize = (doc_id: string, approved: { topic: Topic; qa: QA }[]) =>
-  post<{ built: string[]; failed: { topic_id: string; error: string }[]; shorts: Unit[];
-         usage: UsageTotals; total: UsageTotals }>(
+  post<{ built: string[]; failed: { topic_id: string; error: string }[];
+         /** Unit graders that failed on a short that was built anyway, by short_id.
+          *  These judge the PICTURES, and they run after the money is spent — so a
+          *  frame that came back as a slide of its own narration is reported here
+          *  rather than throwing the short away. Regenerate the ones worth it. */
+         warnings: Record<string, string[]>;
+         shorts: Unit[]; usage: UsageTotals; total: UsageTotals }>(
     "/api/finalize", { doc_id, approved },
   );
 

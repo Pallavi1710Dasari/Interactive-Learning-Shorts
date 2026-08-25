@@ -40,7 +40,10 @@ export function Reel({
   const n = useNarration(unit.beats, unit.seconds,
                          { enabled: voiceOn, rate, active, audioUrl: unit.audio_url });
   const beat = unit.beats[n.beat];
-  const finished = !n.playing && n.beat === unit.beats.length - 1 && n.progress > 0.5;
+  // Asked, not inferred. The old test was `!playing && beat === last &&
+  // progress > 0.5`, which called a short finished on the strength of a sampled
+  // clock — see Narration.completed for why that read as an unfinished video.
+  const finished = n.completed;
   const [liked, setLiked] = useState(false);
 
   // Every frame of this short, so AnimatedSvg can crop them all to one shared box

@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef } from "react";
  * still frame and, optionally, TAGS it (see SVG_SYSTEM in shorts/skills/visuals.py):
  *
  *   data-enter="1"        the order things should arrive in; same number = together
- *   data-role="focus"     the one element this beat is about  -> keeps breathing
+ *   data-role="focus"     the one element this beat is about  -> one arrival beat
  *   data-role="flow"      an arrow that should show movement  -> marching dashes
  *   data-role="base"      carried over from the previous beat -> already there
  *
@@ -40,11 +40,25 @@ import { useEffect, useMemo, useRef } from "react";
  * roughly reading speed and lets the eye finish one before the next appears.
  *
  * The build stops short of the beat's end (BUILD_FRACTION) so the completed frame
- * is on screen, whole and still, while the sentence finishes.
+ * is on screen, whole and still, while the sentence finishes — and ENTER_TAIL_MS is
+ * held back from the budget so that "whole" includes the last arrival's own
+ * animation, not just the moment it was told to start.
  */
-const BUILD_FRACTION = 0.66;
+const BUILD_FRACTION = 0.72;
 const MIN_STEP_MS = 420;
-const MAX_STEP_MS = 1100;
+
+/**
+ * The longest any single arrival animation runs — `enter`'s stroke-draw case, plus
+ * `breathe`'s one-shot emphasis, whichever is worse.
+ *
+ * Reserved out of the build budget so the LAST element's own animation finishes
+ * inside the beat that explains it. Without the reserve the final arrival started
+ * at the end of the budget and was still moving when the beat ended, so the closing
+ * frame of a short was replaced — or, on the last beat, frozen by playback
+ * stopping — while it was still assembling. Watched back, the short "ends half
+ * way".
+ */
+const ENTER_TAIL_MS = 1120;
 
 /** Fallback when the beat's duration is unknown. */
 const DEFAULT_BEAT_MS = 4500;
@@ -92,11 +106,32 @@ export function AnimatedSvg({ svg, beatKey, composition, beatMs }: {
       return () => running.forEach((a) => a.cancel());
     }
 
-    const steps = arrivalOrder(root);
-    const budget = (beatMs && beatMs > 400 ? beatMs : DEFAULT_BEAT_MS) * BUILD_FRACTION;
-    const gap = steps.length > 1
-      ? Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, budget / (steps.length - 1)))
-      : 0;
+    // PACING, AND BOTH WAYS IT USED TO BE WRONG.
+    //
+    // This was one line: gap = clamp(budget / (steps - 1), MIN_STEP_MS, MAX_STEP_MS),
+    // and each clamp caused a different complaint.
+    //
+    // Clamping UP overran the beat. Five arrivals in a 1.5s beat gives 247ms each,
+    // raised to the 420ms floor, so the build ran 1680ms inside a 1500ms beat and
+    // the frame was still assembling when the beat ended — on the last beat, when
+    // playback stops, it simply froze part-drawn. That is the short that "feels
+    // like it is cut in half".
+    //
+    // Clamping DOWN made the picture lead the narration. Two arrivals in a 7s beat
+    // wants 4.6s of spread; capped at 1100ms the whole diagram was finished 1.1s
+    // in — 16% of the way through the sentence that explains it. The viewer sees the
+    // answer, then waits for the voice to catch up, which is "the visuals come
+    // before the context".
+    //
+    // So neither clamp survives. The gap is whatever spreads the arrivals across
+    // the budget, and when that would be faster than a viewer can follow the fix is
+    // FEWER STEPS, not a longer build: merge arrivals until they fit. The build then
+    // always occupies the same share of its beat, whatever the frame contains.
+    const beatLength = beatMs && beatMs > 400 ? beatMs : DEFAULT_BEAT_MS;
+    const budget = Math.max(0, beatLength * BUILD_FRACTION - ENTER_TAIL_MS);
+    const followable = Math.max(1, Math.floor(budget / MIN_STEP_MS) + 1);
+    const steps = arrivalOrder(root, Math.min(MAX_STEPS, followable));
+    const gap = steps.length > 1 ? budget / (steps.length - 1) : 0;
 
     steps.forEach((group, step) => {
       const delay = step * gap;
@@ -130,7 +165,7 @@ export function AnimatedSvg({ svg, beatKey, composition, beatMs }: {
  * document order, which is the order the model drew them and therefore already
  * roughly the order it was thinking in.
  */
-function arrivalOrder(root: SVGSVGElement): SVGElement[][] {
+function arrivalOrder(root: SVGSVGElement, cap: number = MAX_STEPS): SVGElement[][] {
   const tagged = Array.from(root.querySelectorAll<SVGElement>("[data-enter]"));
   if (tagged.length) {
     const byStep = new Map<number, SVGElement[]>();
@@ -148,7 +183,7 @@ function arrivalOrder(root: SVGSVGElement): SVGElement[][] {
     );
     let ordered = [...byStep.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
     if (untagged.length) ordered = [untagged, ...ordered];
-    return merge(ordered, MAX_STEPS);
+    return merge(ordered, cap);
   }
 
   // Untagged: one element per step, but never more steps than a viewer can follow —
@@ -156,7 +191,7 @@ function arrivalOrder(root: SVGSVGElement): SVGElement[][] {
   const kids = Array.from(root.children).filter(
     (c): c is SVGElement => c instanceof SVGElement && c.tagName.toLowerCase() !== "defs",
   );
-  const maxSteps = MAX_STEPS;
+  const maxSteps = cap;
   if (kids.length <= maxSteps) return kids.map((k) => [k]);
   const per = Math.ceil(kids.length / maxSteps);
   const out: SVGElement[][] = [];
@@ -253,16 +288,45 @@ function march(el: SVGElement, delay: number): Animation[] {
   )];
 }
 
-/** The focus element keeps a slow pulse, so the eye returns to it mid-beat. */
+/**
+ * The focus element lands with ONE emphasis and then holds perfectly still.
+ *
+ * IT USED TO PULSE FOREVER, AND IT READ AS SHAKING. The animation was an infinite
+ * scale(1.035) with transform-box: fill-box, which is tolerable on a big rectangle
+ * and is not tolerable on text: glyph rasterisation snaps to the pixel grid, so a
+ * 3.5% scale applied to a line of type does not look like breathing, it looks like
+ * the letters are vibrating. On a code line — the whole point of the "code"
+ * template — it was the first thing anyone noticed about the frame, and they
+ * noticed it for twelve straight seconds because it never stopped.
+ *
+ * Two things were wrong and both are fixed by making it one-shot. Infinite motion
+ * under a voice that is explaining something competes with the explanation: the eye
+ * cannot settle on a thing that will not sit still, which is the opposite of what
+ * "send the eye here" is supposed to do. An arrival is enough. It says "this one"
+ * at the moment the sentence reaches it, and then it gets out of the way.
+ *
+ * Scale is also dropped for anything containing text, which is most focus elements
+ * — a shape and its own label are always in one group (see layout.group). Those get
+ * the emphasis as opacity alone, which no rasteriser can turn into a wobble.
+ */
 function breathe(el: SVGElement, delay: number): Animation[] {
   if (el.hasAttribute("transform")) return [];
+
+  const holdsText = el.tagName.toLowerCase() === "text" || !!el.querySelector("text");
+  if (holdsText) {
+    return [el.animate(
+      [{ opacity: 0.55 }, { opacity: 1 }],
+      { duration: 520, delay: delay + 200, easing: "ease-out", fill: "backwards" },
+    )];
+  }
+
   el.style.transformBox = "fill-box";
   el.style.transformOrigin = "center";
   return [el.animate(
-    [{ transform: "scale(1)", opacity: 1 },
-     { transform: "scale(1.035)", opacity: 0.94 },
-     { transform: "scale(1)", opacity: 1 }],
-    { duration: 2000, delay: delay + 460, iterations: Infinity, easing: "ease-in-out" },
+    [{ transform: "scale(1)" },
+     { transform: "scale(1.045)" },
+     { transform: "scale(1)" }],
+    { duration: 900, delay: delay + 200, iterations: 1, easing: "ease-in-out" },
   )];
 }
 

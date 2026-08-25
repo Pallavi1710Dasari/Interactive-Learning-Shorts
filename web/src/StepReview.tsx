@@ -28,6 +28,9 @@ export function StepReview({
   const [building, setBuilding] = useState(false);
   const [drafting, setDrafting] = useState(true);
   const [buildError, setBuildError] = useState<string | null>(null);
+  // Shorts that BUILT but failed a diagram grader. Separate from buildError: the
+  // reel exists and is watchable, its picture is just weaker than it should be.
+  const [buildWarnings, setBuildWarnings] = useState<string[]>([]);
 
   const patch = (i: number, next: Partial<ReviewItem>) =>
     setItems((prev) => prev.map((it, k) => (k === i ? { ...it, ...next } : it)));
@@ -107,6 +110,9 @@ export function StepReview({
       if (r.failed.length) {
         setBuildError(r.failed.map((f) => `${f.topic_id}: ${f.error}`).join("; "));
       }
+      setBuildWarnings(
+        Object.entries(r.warnings ?? {}).map(([id, ws]) => `${id} — ${ws.join("; ")}`),
+      );
       onDone(r.shorts);
     } catch (e) {
       setBuildError((e as Error).message);
@@ -164,6 +170,12 @@ export function StepReview({
         </button>
       </div>
       {buildError && <div className="error">{buildError}</div>}
+      {buildWarnings.length > 0 && (
+        <div className="warn">
+          <b>Built, but the diagrams need work</b>
+          {buildWarnings.map((w, i) => <span key={i}>{w}</span>)}
+        </div>
+      )}
     </div>
   );
 }

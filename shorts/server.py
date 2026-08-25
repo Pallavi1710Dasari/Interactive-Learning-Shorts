@@ -35,6 +35,9 @@ from . import checks, config, feed, usage, voice
 app = FastAPI(title="Interactive Learning Shorts")
 usage.load()   # cumulative across restarts
 
+for _warning in config.model_warnings():
+    print(f"!! {_warning}")
+
 # Judge calls are launched from inside a build worker and collected by the same
 # worker, so they need a pool of their own — submitting to the pool you are running
 # on deadlocks once every worker is waiting on a task that is still queued.
@@ -341,36 +344,24 @@ def finalize(body: FinalizeIn):
     sections = _sections(body.doc_id)
     built, failed = [], []
 
-    def build_one(item: dict) -> tuple[str | None, dict | None]:
-        """One approved Q&A -> one unit on disk. Returns (short_id, failure)."""
+    def build_one(item: dict) -> tuple[str | None, dict | None, list[str]]:
+        """One approved Q&A -> one unit on disk. Returns (short_id, failure, warnings)."""
         try:
             topic = Topic(**item["topic"])
             section = find_section(sections, topic.source_section_id)
             script = Script(short_id=topic.id, question=item["qa"]["question"],
                             beats=item["qa"]["beats"])
         except Exception as e:
-            return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}
+            return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}, []
 
         try:
-            # The judge reads the script, not the pictures, so it does not have to
-            # wait for them. Started first and collected last, it costs no wall
-            # clock at all — it finishes while the diagrams are still drawing.
-            #
-            # The code graders still gate it, exactly as audit() did: they are free
-            # and instant, and there is no sense paying Opus to grade something a
-            # substring test already rejected.
-            judging = None
-            if body.do_judge and checks.all_passed(
-                    checks.run_script_graders(script, section.text)):
-                judging = _JUDGE_POOL.submit(judge_script, script, section.text)
-
-            # Same trick as the judge: the voice depends only on the words, so it
-            # records while the diagrams draw rather than after them.
+            # The voice depends only on the words, so it records while the visuals
+            # are being designed rather than after them.
             recording = None
             if body.do_voice and voice.configured()[0]:
                 recording = _JUDGE_POOL.submit(voice.synthesize, script)
 
-            visuals = spec_visuals(script)
+            visuals = spec_visuals(script, section)
             if body.do_svg:
                 visuals = render_diagrams(visuals, script, section)
 
@@ -384,6 +375,25 @@ def finalize(body: FinalizeIn):
                 visuals=visuals,
                 status="approved",      # a human already approved it in step 2
             )
+
+            # THE JUDGE GOES AFTER THE VISUALS NOW, and that is a deliberate trade of
+            # a few seconds of wall clock for a check that actually happens.
+            #
+            # It used to be submitted first, on the reasoning that "the judge reads
+            # the script, not the pictures, so it does not have to wait for them" —
+            # which was true of the code and false of the brief. JUDGE_SYSTEM has
+            # always asked for `diagram_correct`, so the judge was being asked about
+            # frames that had not been designed yet, and answered True every single
+            # time because the schema default is True. The overlap was free because
+            # the work was not being done.
+            #
+            # The voice still records in parallel, so most of the latency is still
+            # absorbed; only the judge waits, and only for the one visual call.
+            judging = None
+            if body.do_judge and checks.all_passed(
+                    checks.run_script_graders(script, section.text)):
+                judging = _JUDGE_POOL.submit(judge_script, script, section.text, unit)
+
             if judging is not None:
                 try:
                     unit.eval = judging.result()
@@ -402,19 +412,40 @@ def finalize(body: FinalizeIn):
                     print(f"    ! voice {script.short_id}: {e} "
                           f"— shipping without a recorded track")
 
+            # THE UNIT GRADERS RUN HERE TOO, and it took a while to notice they did
+            # not. Everything that judges the PICTURES — check_frames_are_visual,
+            # check_svg_quality, check_diagram_matches_narration — lived only in
+            # run.py's audit(), so a diagram defect was caught on the CLI path and
+            # sailed straight through the web one. This is the path people actually
+            # upload material through, which made it the path with no cover at all.
+            #
+            # They REPORT, they do not reject. By the time this line runs the script
+            # was approved by a human and every model call is already paid for, so
+            # throwing the short away would cost money and lose work to fix nothing.
+            # The reviewer gets told what is wrong with it and can regenerate the
+            # ones worth regenerating.
+            warnings = [f"{r.name}: {r.reason}"
+                        for r in checks.run_unit_graders(unit, section.text)
+                        if not r.passed]
+            for warning in warnings:
+                print(f"    ! {unit.short_id}: {warning}")
+
             (config.OUTPUT_DIR / f"{unit.short_id}.json").write_text(
                 unit.model_dump_json(indent=2))
-            return unit.short_id, None
+            return unit.short_id, None, warnings
         except Exception as e:
             # One bad short must not lose the others in the batch — they have
             # already been paid for by the time anything can go wrong here.
-            return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}
+            return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}, []
 
     # Shorts are independent, so build them side by side rather than end to end.
+    warned: dict[str, list[str]] = {}
     with ThreadPoolExecutor(max_workers=max(1, len(body.approved))) as pool:
-        for short_id, failure in pool.map(build_one, body.approved):
+        for short_id, failure, warnings in pool.map(build_one, body.approved):
             if short_id:
                 built.append(short_id)
+                if warnings:
+                    warned[short_id] = warnings
             elif failure:
                 failed.append(failure)
 
@@ -422,7 +453,7 @@ def finalize(body: FinalizeIn):
     # approving one short and then being shown seven, which is not what the
     # reviewer asked for.
     fresh = [s for s in feed.collect() if s["short_id"] in set(built)]
-    return {"built": built, "failed": failed, "shorts": fresh,
+    return {"built": built, "failed": failed, "warnings": warned, "shorts": fresh,
             "usage": usage.since(cursor), "total": usage.totals()}
 
 
@@ -480,6 +511,10 @@ if _SAMPLES.exists():
 def health():
     return {"ok": True, "stub": config.STUB, "model": config.MODEL_GENERATOR,
             "judge": config.MODEL_JUDGE, "diagram": config.MODEL_DIAGRAM,
+            # Surfaced, not buried in a log nobody reads. A misconfigured judge is
+            # invisible by construction — it approves everything — so the one place
+            # it can be noticed is next to the model name it applies to.
+            "model_warnings": config.model_warnings(),
             "units": len(feed.collect()),
             "total": usage.totals()}
 

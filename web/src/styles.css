@@ -107,6 +107,17 @@ kbd {
 }
 .error.sm { margin-top: 8px; padding: 7px 11px; font-size: 11.5px; }
 
+/* A short that BUILT but failed a diagram grader. Amber, not red: the reel plays,
+   its picture is just weaker than it should be, and the fix is a regenerate rather
+   than anything being broken. */
+.warn {
+  margin-top: 13px; padding: 10px 13px; border-radius: 10px; font-size: 12.5px;
+  display: flex; flex-direction: column; gap: 4px;
+  background: rgba(242, 177, 75, 0.1); color: #e3bd80;
+  border: 1px solid rgba(242, 177, 75, 0.24);
+}
+.warn b { font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; }
+
 /* --------------------------------------------------------------- review cards */
 .card {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);

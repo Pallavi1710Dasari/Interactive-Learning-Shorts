@@ -84,7 +84,7 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
 
     print(f"    script ok: {script.estimated_seconds}s, {script.word_count} words")
 
-    visuals = spec_visuals(script)
+    visuals = spec_visuals(script, section)
     if do_svg:
         visuals = render_diagrams(visuals, script, section)
     print(f"    visuals: {[(v.ref, v.type) for v in visuals.values()]}")
@@ -139,6 +139,11 @@ def main():
     ap.add_argument("--topics-file",
                     help="skip selection and read an already-approved topics.json")
     args = ap.parse_args()
+
+    # A misconfigured judge cannot be noticed from its output — it approves
+    # everything — so it has to be said out loud before the run starts.
+    for warning in config.model_warnings():
+        print(f"!! {warning}\n")
 
     sections = parse_markdown(args.doc)
     session_id = Path(args.doc).stem

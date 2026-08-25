@@ -687,7 +687,38 @@ def _is_topical(word: str) -> bool:
     return not (_IDENTIFIER.match(word) or word in _ENTITY_NAMES)
 
 
-def check_diagram_matches_narration(unit: ShortUnit) -> GraderResult:
+#: Fenced code blocks and inline `code` spans in the reading material.
+_CODE_BLOCK = re.compile(r"```.*?```|~~~.*?~~~", re.S)
+_CODE_SPAN = re.compile(r"`([^`\n]+)`")
+
+
+def literal_vocabulary(source_text: str) -> set[str]:
+    """
+    Stems of every word the material shows inside CODE, as opposed to prose.
+
+    This is the narrow door through which a frame may use a word nobody in the short
+    says out loud, and it is narrow on purpose. `code` frames copy the document's own
+    snippet verbatim — `.main-heading { font-family: "Roboto"; }` — which is the most
+    strongly grounded a label can possibly be: it is not a claim about the material,
+    it IS the material. But the narration will not have said "main-heading" or
+    "Roboto", so measured against speech alone the best frame in the pipeline scores
+    as the most drifted one.
+
+    Only code counts. The material's PROSE stays foreign, because a noun lifted from
+    a paragraph nobody mentions is exactly the drift check_diagram_matches_narration
+    exists to catch — and letting the whole section in would retire the grader.
+    """
+    if not source_text:
+        return set()
+    fenced = " ".join(_CODE_BLOCK.findall(source_text))
+    inline = " ".join(_CODE_SPAN.findall(source_text))
+    # Split on anything that is not a word character, so CSS and markup fall apart
+    # into the identifiers a label would be built from: font-family -> font, family.
+    return set(_stems(re.sub(r"[^\w]+", " ", f"{fenced} {inline}")))
+
+
+def check_diagram_matches_narration(unit: ShortUnit,
+                                    source_text: str | None = None) -> GraderResult:
     """
     Every diagram's labels should come from what is being said, or from the source.
 
@@ -715,7 +746,7 @@ def check_diagram_matches_narration(unit: ShortUnit) -> GraderResult:
         + " " + " ".join(b.on_screen for b in unit.beats)
         + " " + " ".join(b.source_quote or "" for b in unit.beats)
         + " " + unit.question
-    )) | {_stem(w) for w in _DIAGRAM_SCAFFOLD}
+    )) | {_stem(w) for w in _DIAGRAM_SCAFFOLD} | literal_vocabulary(source_text or "")
     # The visual SPEC is deliberately NOT in here. It comes from the same model
     # chain as the drawing, so a frame that faithfully renders a spec which itself
     # wandered off the narration would score perfectly — which is the exact defect
@@ -781,6 +812,389 @@ def check_visuals_resolved(unit: ShortUnit) -> GraderResult:
     return GraderResult("visuals_resolved", True, f"{len(refs)} visuals resolved")
 
 
+#: Templates whose entire content is words. "stat" is one figure and a caption
+#: naming it, which is legitimately a picture of a number; "takeaway" is a sentence
+#: set large, which is not a picture of anything.
+_TEXT_ONLY_TEMPLATES = {"takeaway"}
+
+#: A label this long stopped being a label. Diagram labels are nouns and values —
+#: "Page 2", "Backing store", 'font-family: "Roboto";' — and a box holding more
+#: words than this is holding a clause, which means the frame is a slide.
+#: `code_lines` are exempt: they are lines of real code, as long as the document
+#: wrote them.
+MAX_LABEL_WORDS = 5
+
+#: ONLY TOKENS WITH LETTERS IN THEM COUNT TOWARD THAT LIMIT.
+#:
+#: The first version split on whitespace and counted everything, which failed a
+#: perfectly good label: a frame about integer ranges was drawing
+#: "...-3, -2, -1, 0, 1, 2, 3,..." and got reported as "label is a sentence". It is
+#: the opposite of a sentence — it is the most concrete thing on the frame, and the
+#: kind of label the SVG brief explicitly asks for ("anchor abstract things to
+#: something countable"). A number sequence is long because enumerating is the
+#: point, not because prose crept in.
+_HAS_LETTER = re.compile(r"[A-Za-z]")
+
+
+def _prose_words(label: str) -> list[str]:
+    return [w for w in str(label).split() if _HAS_LETTER.search(w)]
+
+#: How much of a beat's spoken line a frame may reproduce before the frame is just
+#: that line in a box. Measured as the share of the line's content words that turn
+#: up in the frame's labels.
+MAX_NARRATION_ECHO = 0.6
+
+
+def _frame_labels(frame) -> list[str]:
+    """Every word a frame puts on screen, EXCEPT its code lines and its title."""
+    out: list[str] = []
+    for cell in list(frame.cells) + list(frame.left) + list(frame.right) \
+            + list(frame.parts) + list(frame.steps):
+        out.append(cell.label)
+    for row in frame.rows:
+        out.extend(row.cells)
+    for panel in frame.panels:
+        out.append(panel.title)
+        out.extend(item.label for item in panel.items)
+    out.extend(filter(None, [frame.cells_title, frame.left_title, frame.right_title,
+                             frame.value, frame.caption, frame.note]))
+    return [str(x) for x in out if str(x).strip()]
+
+
+def check_frames_are_visual(unit: ShortUnit) -> GraderResult:
+    """
+    A frame has to be a PICTURE of the idea, not the sentence about it in a box.
+
+    THE COMPLAINT THIS EXISTS FOR, in the words it arrived in: "most of the visuals
+    are just text not the visuals and the text is also just as the voice
+    background." Measured on the units in output/ at the time, that was three
+    separate defects and every short had at least two of them:
+
+      1. Every short ended on a "takeaway" frame — one spoken sentence set large.
+      2. 6 of 11 frames carried a `note` line, and what was in it was the narration:
+         "Student: Contiguous allocation forces one unbroken block per process."
+      3. `bar` frames whose cells WERE the beats: ["font-family?", "Import font
+         CSS", "Which typeface"] — the dialogue laid out as rectangles.
+
+    None of the three could fail a check. svg_problems only asks whether text is
+    legible, and a slide of the voiceover is perfectly legible. Nothing measured
+    whether a frame drew anything. So this does, from the Frame rather than the
+    markup, because the Frame is where the defect is decided.
+
+    Three separate failures, all of them structural and none of them a judgement
+    call — which is what keeps this free and keeps it out of the judge's way.
+    """
+    text_cards: list[str] = []
+    sentences: list[str] = []
+    echoes: list[str] = []
+
+    # Every beat's spoken line, to compare a frame's labels against. A frame plays
+    # under one beat, but the composition is shared across all of them, so a label
+    # echoing ANY beat of this short is the same defect.
+    spoken = {ref: [] for ref in unit.visuals}
+    for beat in unit.beats:
+        if beat.visual_ref in spoken:
+            spoken[beat.visual_ref].append(beat.line)
+
+    for ref, visual in (unit.visuals or {}).items():
+        frame = visual.frame
+        if frame is None:
+            continue
+
+        if frame.template in _TEXT_ONLY_TEMPLATES:
+            text_cards.append(f"{ref} is a {frame.template!r} card — a sentence, not a diagram")
+            continue
+
+        labels = _frame_labels(frame)
+        long = [lab for lab in labels if len(_prose_words(lab)) > MAX_LABEL_WORDS]
+        if long:
+            sentences.append(f"{ref}: label is a sentence — {long[0][:60]!r}")
+
+        # Does the frame reproduce what is being said? Content words only, so
+        # "the", "a", "of" cannot carry a frame over the threshold on their own.
+        drawn = set(_stems(" ".join(labels)))
+        for line in spoken.get(ref, []):
+            said = set(_stems(line))
+            if len(said) < 4:
+                continue
+            share = len(said & drawn) / len(said)
+            if share > MAX_NARRATION_ECHO:
+                echoes.append(f"{ref}: {share:.0%} of the spoken line is printed in the "
+                              f"frame — draw the subject, not the sentence")
+                break
+
+    # A TABLE WHOSE ROWS REPEAT ITS OWN HEADERS IS NOT A LOOKUP.
+    #
+    # Found by the judge, not by anything here: "rows repeat the column headers as
+    # cell values ('Page number', 'Frame number', 'Valid bit' in every row), so it
+    # draws no actual lookup". Structurally it is a well-formed table and every
+    # label is on-vocabulary, so nothing failed it. What is on screen is a header
+    # row printed four times — the shape of a page table with none of its content,
+    # which teaches nothing about the thing it is a picture of.
+    empty_tables: list[str] = []
+    for ref, visual in (unit.visuals or {}).items():
+        frame = visual.frame
+        if frame is None or frame.template != "table" or not frame.rows:
+            continue
+        heads = [h.strip().lower() for h in frame.columns]
+        if not heads:
+            continue
+        echoing = sum(1 for row in frame.rows
+                      if [c.strip().lower() for c in row.cells][:len(heads)] == heads)
+        if echoing == len(frame.rows):
+            empty_tables.append(f"{ref}: every row repeats the column headers "
+                                f"({', '.join(frame.columns[:3])}) — the table shows "
+                                f"no values, so it draws no lookup")
+
+    problems = text_cards + sentences + echoes + empty_tables
+    if problems:
+        return GraderResult("frames_are_visual", False, "; ".join(problems[:3]),
+                            {"problems": problems})
+    return GraderResult("frames_are_visual", True,
+                        "no frame is a slide of its own narration")
+
+
+def _frame_fingerprint(frame) -> tuple:
+    """Everything a frame draws EXCEPT which element is emphasised.
+
+    Two frames with the same fingerprint are the same picture; if their roles also
+    match they are the same frame twice, and if only the roles differ they are one
+    slide with the accent moved.
+    """
+    return (
+        frame.template,
+        tuple(_frame_labels(frame)),
+        tuple(str(c.label) for c in frame.code_lines),
+        tuple(g.icon for g in frame.glyphs),
+        tuple((s.text, s.label, s.font, s.scale, s.weight, s.italic, s.decoration)
+              for s in frame.samples),
+    )
+
+
+def check_frames_develop(unit: ShortUnit) -> GraderResult:
+    """
+    Across a short, the picture has to actually CHANGE, not just move its highlight.
+
+    THE COMPLAINT THIS EXISTS FOR: "for all the slides its just getting the same
+    slide visual and it just highlighting the text". Exactly right, and it was the
+    documented design — SPEC_SYSTEM asked for one composition with the accent moving
+    between beats, on the reasoning that a viewer remembers one assembled diagram
+    better than four unrelated ones.
+
+    That reasoning holds for a diagram that ASSEMBLES. It does not hold for one that
+    merely recolours. A seven-line code panel with line 3 lit, then line 2, then
+    line 3 again is a single still image on screen for the whole video: everything
+    readable is read in the first two seconds and then nothing happens for twelve.
+    The build was supposed to pace the explanation and instead it removed the reason
+    to keep watching.
+
+    So EVERY transition must change what is on screen, not just what is amber. The
+    first cut of this grader only failed a short where ALL transitions were
+    roles-only, on the theory that spending one beat of three on a moved accent is
+    fine. Measured against real output that was too loose: the shape that came back
+    was "same code panel, accent moved, then one real picture at the end", which
+    still opens on a static slide for the first two thirds of the video — the exact
+    thing being complained about, now scoring a pass.
+
+    A beat with nothing new to show does not need a frame of its own. Two beats can
+    share one visual_ref, which holds the picture still and is honest about it; what
+    is not allowed is two frames pretending to be different pictures.
+
+    This reports, it does not gate — no retry loop hangs off it, so tightening it
+    costs nothing but a warning that tells the truth.
+    """
+    # In BEAT order, deduplicated: consecutive beats deliberately sharing one
+    # visual_ref are one frame held across two lines, which is a pacing choice
+    # rather than a repeated picture.
+    refs: list[str] = []
+    for beat in unit.beats:
+        if not refs or refs[-1] != beat.visual_ref:
+            refs.append(beat.visual_ref)
+
+    frames = [unit.visuals[r].frame for r in refs
+              if r in unit.visuals and unit.visuals[r].frame is not None]
+    if len(frames) < 2:
+        return GraderResult("frames_develop", True, "single frame, nothing to compare")
+
+    identical, roles_only, total = [], 0, 0
+    for a, b in zip(frames, frames[1:]):
+        total += 1
+        if _frame_fingerprint(a) != _frame_fingerprint(b):
+            continue
+        roles_only += 1
+        if _frame_labels(a) == _frame_labels(b) and _roles(a) == _roles(b):
+            identical.append(b.template)
+
+    if identical:
+        return GraderResult("frames_develop", False,
+                            f"{len(identical)} consecutive frame(s) are byte-identical "
+                            f"({', '.join(identical[:3])}) — the same picture twice")
+    if roles_only:
+        return GraderResult("frames_develop", False,
+                            f"{roles_only} of {total} frame transition(s) only move the "
+                            f"accent on the same picture — the viewer sees one static "
+                            f"slide with a highlight sliding over it")
+    return GraderResult("frames_develop", True,
+                        f"all {total} transition(s) change the picture")
+
+
+def _roles(frame) -> tuple:
+    """Which element is emphasised, across every template that has elements."""
+    return (
+        tuple(c.role for c in frame.cells + frame.left + frame.right
+              + frame.parts + frame.steps + frame.code_lines),
+        tuple(r.role for r in frame.rows),
+        tuple((p.role, tuple(i.role for i in p.items)) for p in frame.panels),
+        tuple(g.role for g in frame.glyphs),
+        tuple(s.role for s in frame.samples),
+    )
+
+
+#: What a `preview` sample actually RENDERS. Its label is a claim about the effect;
+#: this is the effect. If two samples have the same tuple they look identical, and
+#: any label that says otherwise is a caption the picture does not support.
+def _sample_render(sample) -> tuple:
+    from .skills.layout import _colour, _font_stack
+    return (_font_stack(sample.font), sample.scale, sample.weight, sample.italic,
+            sample.decoration, _colour(sample.color), _colour(sample.background))
+
+
+def check_samples_differ(unit: ShortUnit) -> GraderResult:
+    """
+    A `preview` frame that claims two things look different must SHOW them different.
+
+    THE COMPLAINT THIS EXISTS FOR: a CSS colour short whose frame put "Main heading"
+    over the caption "blue" and "Paragraph" over the caption "grey", and rendered
+    both in the same near-black ink. The reading material really does say
+    `.main-heading { color: blue; }` and `.paragraph { color: grey; }`, the labels
+    were right, and the picture still told the viewer that blue and grey are the same
+    colour. Watched back, the note taken was "it says main heading is blue but the
+    paragraph is blue" — which is exactly what was on screen.
+
+    The cause was a missing field: Sample had nowhere to put a colour, so the model
+    put it in the label and the renderer had nothing to draw. That field now exists,
+    and this grader is the part that keeps the class of bug from coming back for the
+    NEXT property nobody thought of. It does not know what any style means. It only
+    asks whether two samples that are captioned differently actually render
+    differently — which is checkable, free, and catches every future version of
+    "the template cannot express what it is being asked to show".
+
+    Also catches the plain mislabel: a sample captioned with a colour word that
+    renders in a different colour.
+    """
+    problems: list[str] = []
+
+    for ref, visual in (unit.visuals or {}).items():
+        frame = visual.frame
+        if frame is None or not frame.samples:
+            continue
+
+        seen: dict[tuple, str] = {}
+        for sample in frame.samples:
+            render = _sample_render(sample)
+            label = (sample.label or "").strip()
+            twin = seen.get(render)
+            if twin is not None and twin.lower() != label.lower():
+                problems.append(
+                    f"{ref}: samples captioned {twin!r} and {label!r} render "
+                    f"identically — the frame claims a difference it does not show")
+            seen.setdefault(render, label)
+
+            # A caption that names a colour has to be the colour that is drawn.
+            named = _colour_word(label)
+            if named and _sample_render(sample)[5] not in (named, None):
+                problems.append(f"{ref}: sample captioned {label!r} is drawn in "
+                                f"{sample.color!r}")
+            elif named and sample.color is None:
+                problems.append(f"{ref}: sample captioned {label!r} sets no color, so "
+                                f"it renders in the default ink")
+
+            # A caption that repeats the sample's own words says nothing. The label
+            # names the STYLE; the text is already on screen, larger.
+            if label and label.strip().lower() == (sample.text or "").strip().lower():
+                problems.append(f"{ref}: sample caption {label!r} just repeats the "
+                                f"sample's own text — caption the style instead")
+
+        # COLOUR IS ALL OR NOTHING WITHIN A FRAME, and this is the rule that caught
+        # the real regression. Told that a caption naming a colour must draw that
+        # colour, the model's next answer removed the colour from the CAPTIONS
+        # instead of adding it to the drawing: two samples labelled "Main heading"
+        # and "Paragraph", one blue, one left to default. The material gives a colour
+        # for BOTH selectors, so the uncoloured one renders near-black and the frame
+        # still tells the viewer that `.paragraph` is black.
+        #
+        # An unset colour is not neutral — it is a colour, the palette ink, and in a
+        # frame that is about colour it reads as a deliberate one. So if any sample
+        # states its colour, all of them must.
+        coloured = [s for s in frame.samples if _sample_render(s)[5]]
+        if coloured and len(coloured) != len(frame.samples):
+            bare = [s.label or s.text for s in frame.samples if not _sample_render(s)[5]]
+            problems.append(
+                f"{ref}: {len(coloured)} of {len(frame.samples)} samples set a color, so "
+                f"{bare[:2]} render in the default ink and read as black — give every "
+                f"sample in a colour frame its own color")
+
+    if problems:
+        return GraderResult("samples_differ", False, "; ".join(problems[:3]),
+                            {"problems": problems})
+    return GraderResult("samples_differ", True, "preview samples render as captioned")
+
+
+def _colour_word(label: str) -> str | None:
+    """The CSS colour a caption names, if it names exactly one and nothing else."""
+    from .skills.layout import CSS_COLOURS
+    words = [w for w in re.split(r"[^a-zA-Z#0-9]+", label or "") if w]
+    hits = [w.lower() for w in words if w.lower() in CSS_COLOURS]
+    # "blue" and "color: blue" both count; "blue vs grey" names two and is a
+    # heading for the frame rather than a claim about this one sample.
+    return hits[0] if len(hits) == 1 else None
+
+
+def check_code_frames_quote_source(unit: ShortUnit,
+                                   source_text: str | None = None) -> GraderResult:
+    """
+    Every line of a `code` frame has to occur in the reading material.
+
+    The `code` template was introduced on the argument that it is "grounded by
+    construction" — the lines are copied out of the document, so they cannot drift.
+    That was an argument about intent, and nothing enforced it. A model asked for the
+    document's snippet will happily supply a plausible one, and a plausible CSS rule
+    is indistinguishable from a real one to everybody except the document.
+
+    So it is checked, the same way check_source_quotes checks a beat's citation: by
+    substring, after flattening whitespace. Free, and not arguable.
+
+    Structural lines are exempt — a bare `}` or `{` is punctuation, not a claim — and
+    so is any line the renderer would have elided, since a line the model shortened
+    to `@import url("...");` is honest about being shortened.
+    """
+    if not source_text:
+        return GraderResult("code_quotes_source", True, "no source to check against")
+
+    flat_source = _flatten(source_text)
+    offenders: list[str] = []
+    checked = 0
+
+    for ref, visual in (unit.visuals or {}).items():
+        frame = visual.frame
+        if frame is None or frame.template != "code":
+            continue
+        for line in frame.code_lines:
+            text = str(line.label).strip()
+            # Punctuation-only lines, and lines the model elided on purpose.
+            if len(text) < 4 or not re.search(r"[A-Za-z0-9]", text) or "..." in text or "…" in text:
+                continue
+            checked += 1
+            if _flatten(text) not in flat_source:
+                offenders.append(f"{ref}: {text[:60]!r} is not in the material")
+
+    if offenders:
+        return GraderResult("code_quotes_source", False, "; ".join(offenders[:3]),
+                            {"problems": offenders})
+    return GraderResult("code_quotes_source", True,
+                        f"{checked} code line(s) quoted from the material")
+
+
 def check_technical_beats_use_diagrams(unit: ShortUnit) -> GraderResult:
     """Non-negotiable #4: technical content must not be rendered by an image model."""
     offenders = [v.ref for v in unit.visuals.values() if v.type == "image"
@@ -794,8 +1208,28 @@ def check_technical_beats_use_diagrams(unit: ShortUnit) -> GraderResult:
 
 
 SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_refusal]
+
+#: Unit graders that need only the unit.
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
-                  check_svg_quality, check_diagram_matches_narration]
+                  check_svg_quality, check_frames_are_visual, check_frames_develop,
+                  check_samples_differ, check_code_frames_quote_source,
+                  check_diagram_matches_narration]
+
+#: Unit graders that read the reading material as well as the unit.
+_NEEDS_SOURCE = {check_diagram_matches_narration, check_code_frames_quote_source}
+
+
+def run_unit_graders(unit: ShortUnit, source_text: str | None = None) -> list[GraderResult]:
+    """
+    Every unit grader, with the source handed to the ones that can use it.
+
+    check_diagram_matches_narration takes the material so that a `code` frame
+    copying the document's own snippet is not scored as drift — see
+    literal_vocabulary. Everything else ignores the extra argument, and callers
+    without a section (the eval harness) can leave it out.
+    """
+    return [g(unit, source_text) if g in _NEEDS_SOURCE else g(unit)
+            for g in UNIT_GRADERS]
 
 
 def run_script_graders(script: Script, source_text: str | None = None,

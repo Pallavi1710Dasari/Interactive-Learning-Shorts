@@ -163,6 +163,70 @@ class TableRow(BaseModel):
     role: Role = "plain"
 
 
+class Sample(BaseModel):
+    """One line of sample text, DRAWN WITH the style being taught.
+
+    The picture for a typography lesson is the type. A frame that says
+    "font-family sets the typeface" in a box is a sentence; a frame showing the word
+    "Tourism" set in Lobster next to the same word in Roboto is the thing itself,
+    and the difference is visible before a single label is read.
+
+    Only styles a browser can actually render are here — no invented ones — because
+    this is drawn as real SVG text and the viewer is looking at the genuine effect.
+    """
+    text: str = ""
+    #: What this sample demonstrates, e.g. 'Roboto' or '36px'. Small, under it.
+    label: str = ""
+    #: A font-family value. Generic families (serif, sans-serif, monospace, cursive)
+    #: always render; named ones need loading — see web/index.html.
+    font: Optional[str] = None
+    #: Relative size, 1-5. NOT pixels: the renderer owns the canvas and scales these
+    #: so the largest fits, which is what makes a size comparison honest at any
+    #: number of samples.
+    scale: Optional[int] = Field(default=None, ge=1, le=5)
+    weight: Optional[int] = Field(default=None, ge=100, le=900)
+    italic: bool = False
+    decoration: Optional[Literal["underline", "line-through", "overline"]] = None
+
+    #: The text colour, as a CSS keyword or hex — the material's own value.
+    #:
+    #: THIS FIELD WAS MISSING AND THE FRAME LIED WITHOUT IT. Asked to illustrate
+    #: `color: blue` / `color: grey`, the model produced two samples labelled "blue"
+    #: and "grey" and, with nowhere to put the colour, both rendered in the default
+    #: ink — a picture claiming a difference it did not show. A `preview` frame
+    #: exists to display an effect, so every effect it is asked to display needs
+    #: somewhere to live; see checks.check_samples_differ, which now fails a frame
+    #: whose samples claim to differ and render identically.
+    color: Optional[str] = None
+
+    #: The background colour behind this sample, same format. For background-color.
+    background: Optional[str] = None
+
+    role: Role = "plain"
+
+
+class Glyph(BaseModel):
+    """One pictogram in an `icons` frame: a drawn thing, with a name under it."""
+    #: Which pictogram. See layout.PICTOGRAMS for the list; an unknown name falls
+    #: back to a plain box rather than failing the build.
+    icon: str = "box"
+    label: str = ""
+    role: Role = "plain"
+
+
+class Panel(BaseModel):
+    """One side of a `compare` frame: a titled card with a small stack inside.
+
+    Two worlds side by side is a shape these shorts need constantly — contiguous
+    versus paged, internal versus external, normal versus italic — and it was being
+    forced through `table`, which draws a lookup grid and claims a
+    row-for-row correspondence that a comparison does not have.
+    """
+    title: str = ""
+    items: list[Cell] = Field(default_factory=list)
+    role: Role = "plain"
+
+
 class Frame(BaseModel):
     """
     One diagram, described as STRUCTURE rather than as coordinates.
@@ -185,9 +249,18 @@ class Frame(BaseModel):
     need, and a frame that cannot be said in one of them is a frame that was trying
     to say too much for four seconds of phone screen.
     """
-    template: Literal["bar", "mapping", "split", "flow", "table", "stat", "takeaway"]
+    #: "takeaway" is LEGACY and must not be chosen for new frames — see the
+    #: renderer and SPEC_SYSTEM. It stays in the union only so the units already in
+    #: output/ still load and can be re-rendered.
+    template: Literal["bar", "mapping", "split", "flow", "table", "stat",
+                      "code", "compare", "preview", "icons", "takeaway"]
     title: str = ""
-    #: The one supporting line under the diagram. Its own reserved band.
+    #: LEGACY, and no longer drawn. This was "the one supporting line under the
+    #: diagram", and what the model actually put in it was the sentence being
+    #: spoken — so every frame carried a caption of its own narration, under a
+    #: player that already flows that same line word by word. Two copies of the
+    #: voice and no picture is the "visuals are just text" complaint in one field.
+    #: Kept so old units load; layout.render ignores it.
     note: Optional[str] = None
 
     #: bar — a row of equal cells, e.g. memory frames.
@@ -214,6 +287,31 @@ class Frame(BaseModel):
     #: stat — one number or term, large.
     value: Optional[str] = None
     caption: Optional[str] = None
+
+    #: code — the material's OWN snippet, one line per Cell, verbatim including its
+    #: leading indentation, with the line under discussion as the hero.
+    #:
+    #: This is the template that was missing, and its absence is most of why the
+    #: frames came out as text. Roughly every web-development document in this
+    #: project teaches through a code block — `.main-heading { font-family:
+    #: "Roboto"; }` — and there was no shape that could show one. With nothing
+    #: pictorial to choose, the model laid the narration out as boxes instead, which
+    #: is a slide of the voiceover rather than a diagram of the idea.
+    code_lines: list[Cell] = Field(default_factory=list)
+    #: code — the file or selector the snippet lives in, e.g. "style.css".
+    code_caption: Optional[str] = None
+
+    #: compare — two titled cards side by side, each holding its own small stack.
+    panels: list[Panel] = Field(default_factory=list)
+
+    #: preview — sample text rendered IN the style being taught, so the viewer sees
+    #: the effect rather than reading a description of it.
+    samples: list[Sample] = Field(default_factory=list)
+
+    #: icons — drawn pictograms with names under them. Pictures, not boxes of words.
+    glyphs: list[Glyph] = Field(default_factory=list)
+    #: icons — draw arrows between the pictograms, for a sequence rather than a set.
+    arrows: bool = True
 
 
 class Visual(BaseModel):

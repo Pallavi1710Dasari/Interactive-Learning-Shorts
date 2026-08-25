@@ -47,8 +47,11 @@ pace
   2 Wildly uneven.
   1 Effectively a monologue.
 
-diagram_correct: true only if every on_screen label matches what is being said at
-that moment and nothing contradicts the source. If there are no diagrams, true.
+diagram_correct: judge the FRAMES section below, when it is present. False if any
+frame contradicts the source, shows a value the material gives to a different
+selector, labels something the narration never mentions, or repeats the spoken
+sentence instead of drawing its subject. If no frames are given, true — but say so
+in `problems` rather than implying you checked them.
 
 In `problems`, list each specific defect as an actionable instruction, e.g.
 "beat 3 states pages are 4KB; the source never gives a page size". Empty if clean.
@@ -57,12 +60,43 @@ Output JSON: {"faithfulness":n,"clarity":n,"pace":n,"diagram_correct":bool,
 "question_answered":bool,"problems":["..."]}"""
 
 
-def judge_script(script: Script, source_text: str) -> EvalReport:
+def judge_script(script: Script, source_text: str,
+                 unit: ShortUnit | None = None) -> EvalReport:
+    """
+    Grade one script, and its frames when they exist.
+
+    `unit` IS WHY diagram_correct MEANT NOTHING. JUDGE_SYSTEM has always asked for
+    it — "true only if every on_screen label matches what is being said" — and the
+    judge was handed the dialogue and the source and no frames whatsoever. Asked a
+    question it had no information to answer, with a schema default of True, it
+    answered True every time, on every short, including the ones whose frames were a
+    sentence of narration in a box. A field that cannot be false is not a check;
+    it is a decoration that makes the report look more thorough than it is.
+
+    So the frames go in when the caller has them. Cheap — a Frame is small
+    structured JSON, far smaller than the section it is graded against — and it also
+    lets the judge catch the class of error the code graders cannot: a frame that is
+    well-formed, on-vocabulary, and about the wrong thing.
+    """
     beats = "\n".join(
         f"{i}. [{b.speaker}] {b.line}\n   on_screen: {b.on_screen}"
         + (f"\n   cites: {b.source_quote!r}" if b.source_quote else "")
         for i, b in enumerate(script.beats)
     )
+    frames = ""
+    if unit is not None and unit.visuals:
+        import json
+        drawn = {}
+        for beat in script.beats:
+            visual = unit.visuals.get(beat.visual_ref)
+            if visual is not None and visual.frame is not None:
+                drawn[beat.visual_ref] = visual.frame.model_dump(exclude_defaults=True)
+        if drawn:
+            frames = ("\n\nTHE FRAMES, one per visual_ref, in beat order. These are what "
+                      "the viewer SEES while each line is spoken — judge diagram_correct "
+                      "against them, and say in `problems` which frame is wrong and how.\n"
+                      + json.dumps(drawn, indent=1))
+
     user = f"""SOURCE SECTION (the only permitted source of truth)
 ---
 {source_text}
@@ -72,7 +106,7 @@ SCRIPT
 Question: {script.question}
 Estimated length: {script.estimated_seconds}s ({script.word_count} words)
 
-{beats}
+{beats}{frames}
 
 Grade it."""
     # The one call in the pipeline that keeps adaptive thinking on. Everything else
@@ -88,9 +122,11 @@ def audit(script: Script, source_text: str, unit: ShortUnit | None = None):
     """Full audit: code graders, then the judge only if the cheap checks passed."""
     results = checks.run_script_graders(script, source_text)
     if unit:
-        results += [g(unit) for g in checks.UNIT_GRADERS]
+        # run_unit_graders rather than a loop over UNIT_GRADERS: the diagram check
+        # needs the material to recognise a code frame's verbatim labels as grounded.
+        results += checks.run_unit_graders(unit, source_text)
 
     if not checks.all_passed(results):
         return results, None                      # don't pay for a judge on known-bad output
 
-    return results, judge_script(script, source_text)
+    return results, judge_script(script, source_text, unit)

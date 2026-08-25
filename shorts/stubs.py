@@ -181,9 +181,17 @@ def _visuals(user: str) -> dict:
 
     These used to come back type="text" with no frame at all, which meant the stub
     path skipped drawing entirely and a layout bug could not show up offline. Now
-    every ref gets a legitimate template — a "stat" card for the beats, "takeaway"
-    for the last — so `SHORTS_STUB=1` renders genuine SVG through
-    skills/layout.render and the smoke test covers it for free.
+    every ref gets a legitimate template so `SHORTS_STUB=1` renders genuine SVG
+    through skills/layout.render and the smoke test covers it for free.
+
+    ONE "bar" COMPOSITION WITH THE HERO WALKING ALONG IT, not a card per beat. The
+    stub used to emit a "stat" per beat and a "takeaway" at the end, carrying the
+    spoken line as its caption and its note — which is precisely the shape
+    check_frames_are_visual now fails, so an offline run failed its own smoke test
+    on the stub rather than on anything real. It is also the shape the real brief
+    now forbids, and a stub that models the banned output teaches the smoke test
+    nothing. This models the wanted one: one composition, short noun labels, and the
+    accent moving between beats.
     """
     listed = _find(r"in this order:\s*(.+)$", user, re.M) or ""
     refs = (re.findall(r"'([^']+)'", listed)
@@ -198,15 +206,35 @@ def _visuals(user: str) -> dict:
     # to fail on.
     lines = dict(re.findall(r"^\[([a-z0-9_]+)\]\s*\w+:\s*(.+)$", user, re.M))
 
+    # One cell per beat, labelled with the LONGEST word of that beat — a noun, not a
+    # clause, and short enough that check_frames_are_visual sees a label rather than
+    # a sentence and cannot read the frame as an echo of the line.
+    def noun(ref: str) -> str:
+        words = re.sub(r"[^\w\s-]", " ", lines.get(ref, ref.replace("_", " "))).split()
+        return max(words, key=len)[:14] if words else "step"
+
+    cells = [noun(ref) for ref in refs]
+
     out = []
     for i, ref in enumerate(refs):
-        said = lines.get(ref, ref.replace("_", " "))
-        words = re.sub(r"[^\w\s-]", "", said).split()
-        frame = ({"template": "takeaway", "title": " ".join(words[:2]) or "Remember",
-                  "caption": said}
-                 if i == len(refs) - 1 else
-                 {"template": "stat", "title": " ".join(words[:3]),
-                  "value": str(i + 1), "caption": " ".join(words[:6]),
-                  "note": " ".join(words[:8])})
-        out.append({"ref": ref, "spec": f"Stub frame for {ref}.", "frame": frame})
+        # THE BAR GROWS, one cell per beat, rather than holding all of them and
+        # moving the accent. check_frames_develop fails a short whose every
+        # transition is roles-only, and it is right to: that is one static slide
+        # with a highlight sliding over it. The stub has to model the shape the
+        # brief asks for, or an offline run fails on the stub instead of on the
+        # thing being tested.
+        #
+        # No cells_title, and no word of its own anywhere on the frame.
+        # check_diagram_matches_narration compares every drawn word against the
+        # narration and the source, so a caption reading "Stub composition" made
+        # every offline HTTP run report two shorts with 50% foreign labels — a stub
+        # crying wolf, which trains you to ignore the one that means it.
+        frame = {
+            "template": "bar",
+            "title": cells[i] or "Stub",
+            "cells": [{"label": label, "role": "hero" if j == i else "plain"}
+                      for j, label in enumerate(cells[: i + 1])],
+        }
+        out.append({"ref": ref, "spec": f"Stub frame {i + 1}: hero on {cells[i]!r}.",
+                    "frame": frame})
     return {"visuals": out}

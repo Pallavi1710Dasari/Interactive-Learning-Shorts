@@ -19,8 +19,9 @@ import json, re, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+import anthropic
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -28,7 +29,7 @@ from .schema import Script, Topic, Section, ShortUnit
 from .parse import parse_markdown, find_section
 from .skills.select import select_topics_with_notes
 from .skills.script import write_script
-from .skills.visuals import spec_visuals, render_diagrams
+from .skills.visuals import design_visuals, render_diagrams
 from .skills.audit import judge_script
 from . import checks, config, feed, usage, voice
 
@@ -42,6 +43,55 @@ for _warning in config.model_warnings():
 # worker, so they need a pool of their own — submitting to the pool you are running
 # on deadlocks once every worker is waiting on a task that is still queued.
 _JUDGE_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="judge")
+
+# ------------------------------------------------- provider errors, said out loud
+#
+# EVERY MODEL ERROR USED TO BE A BARE 500. The reviewer's report was "500 Internal
+# Server Error while loading reading material", and the cause was not in this
+# project at all — the gateway had answered
+#
+#     403 permission_error: Key limit exceeded (total limit).
+#
+# /api/material catches ValueError, because a bad topic selection is a known
+# outcome, and nothing caught the API exceptions. So a spending cap, an expired key,
+# a rate limit and a provider outage all reached the browser as the same blank 500,
+# with the real message visible only in the terminal running uvicorn. Nobody using
+# the web flow would ever see it.
+#
+# None of these are bugs in the pipeline and all of them are actionable by the
+# person hitting them, which is exactly what an error message is for.
+
+#: Provider failures worth telling the user apart, and what to say about each.
+_PROVIDER_ERRORS: tuple[tuple[type, int, str], ...] = (
+    (anthropic.RateLimitError, 429,
+     "the model provider is rate-limiting this key — wait a moment and retry"),
+    (anthropic.AuthenticationError, 502,
+     "the model provider rejected the API key. Check ANTHROPIC_API_KEY in .env"),
+    (anthropic.PermissionDeniedError, 502,
+     "the model provider refused the request — usually a spending limit on the key, "
+     "or a model this key may not use. The provider's own message is below"),
+    (anthropic.APIConnectionError, 504,
+     "could not reach the model provider — check the network and ANTHROPIC_BASE_URL"),
+    (anthropic.APIStatusError, 502,
+     "the model provider returned an error"),
+)
+
+
+def _provider_detail(exc: Exception) -> tuple[int, str]:
+    for kind, status, hint in _PROVIDER_ERRORS:
+        if isinstance(exc, kind):
+            return status, f"{hint}: {exc}"
+    return 502, f"model provider error: {exc}"
+
+
+@app.exception_handler(anthropic.APIError)
+async def _provider_error(request: Request, exc: anthropic.APIError):
+    """Turn a provider failure into something the browser can show a human."""
+    status, detail = _provider_detail(exc)
+    print(f"!! {request.url.path}: {type(exc).__name__}: {exc}")
+    return JSONResponse({"detail": detail, "provider_error": type(exc).__name__},
+                        status_code=status)
+
 
 UPLOADS = config.OUTPUT_DIR / "uploads"
 UPLOADS.mkdir(parents=True, exist_ok=True)
@@ -334,6 +384,84 @@ class FinalizeIn(BaseModel):
     do_voice: bool = True
 
 
+def _rejudge_after_fix(unit: ShortUnit, script: Script, topic: Topic,
+                       section: Section, body: "FinalizeIn") -> ShortUnit | None:
+    """
+    One repair attempt on a short the judge failed, then quarantine. Returns the
+    unit to keep, or None to keep the caller's.
+
+    THE COST, because it is not free: one script call, one visual call, one judge
+    call — and only for a short that actually failed, which on the fifteen units
+    measured was four of them. A short that passes costs exactly what it did before.
+
+    WHAT IT REPAIRS AND WHAT IT DOES NOT. It rewrites the SCRIPT, because that is
+    where a faithfulness failure lives — a frame drawing an invented value is a
+    faithful drawing of an invented beat, and redesigning the picture around a wrong
+    sentence produces a better-looking wrong short. The visuals are then redesigned
+    to match the new words, which they must be: the old frames were built for beats
+    that no longer exist.
+
+    The repaired short is kept only if it actually scores better. A rewrite that
+    fixes the cited problem and breaks something else is not an improvement, and the
+    original at least had a human's approval behind its wording.
+
+    Either way the verdict decides the STATUS, and that is the part that matters:
+    a short still under the bar is stored "needs_review" and feed.collect keeps it
+    out of the reel. It is not deleted — it is paid for, it is on disk, and the
+    reviewer can read the judge's problems and fix it by hand.
+    """
+    before = unit.eval
+    problems = "\n".join(f"  - {p}" for p in (before.problems or [])) if before else ""
+    print(f"    judge failed {unit.short_id} "
+          f"(f={before.faithfulness} c={before.clarity} p={before.pace}) — one repair attempt")
+
+    repaired = None
+    try:
+        feedback = (
+            "The reviewer's grader rejected your previous script. Fix exactly these, "
+            "and change nothing else:\n" + (problems or "  - the answer is not "
+            "supported by its own section") +
+            "\n\nEvery beat must rest on a sentence copied from THIS SHORT'S SECTION. "
+            "If a beat cannot be supported from the section, delete it or narrow the "
+            "question until it can be.")
+        # The REAL topic, not a reconstructed one — Topic requires difficulty and an
+        # answer sentence, and a hand-built stand-in fails validation inside the
+        # try, which would make the repair silently never happen.
+        fixed = write_script(topic=topic, section=section,
+                             feedback=feedback, current=script)
+        # The code graders come first and are free. A rewrite that breaks a hard
+        # rule is not worth a judge call.
+        if not checks.all_passed(checks.run_script_graders(fixed, section.text)):
+            print(f"    ! repair of {unit.short_id} failed the code graders — keeping the original")
+        else:
+            visuals, _ = design_visuals(fixed, section, draw=body.do_svg)
+            repaired = unit.model_copy(update={
+                "question": fixed.question, "beats": fixed.beats,
+                "estimated_seconds": fixed.estimated_seconds, "visuals": visuals})
+            repaired.eval = judge_script(fixed, section.text, repaired)
+            print(f"    repaired {unit.short_id}: f={repaired.eval.faithfulness} "
+                  f"c={repaired.eval.clarity} p={repaired.eval.pace}")
+    except Exception as e:
+        # A failed repair must not lose a short that is already built and paid for.
+        print(f"    ! repair of {unit.short_id}: {type(e).__name__}: {e}")
+
+    keep = unit
+    if repaired is not None and repaired.eval is not None and before is not None:
+        better = (repaired.eval.passed and not before.passed) or (
+            repaired.eval.faithfulness > before.faithfulness)
+        if better:
+            keep = repaired
+        else:
+            print(f"    repair of {unit.short_id} was not an improvement — keeping the original")
+
+    if keep.eval is not None and not keep.eval.passed:
+        keep.status = "needs_review"
+        print(f"    ! {keep.short_id} QUARANTINED (f={keep.eval.faithfulness} "
+              f"c={keep.eval.clarity} p={keep.eval.pace}) — held out of the reel, "
+              f"see its judge problems")
+    return keep
+
+
 @app.post("/api/finalize")
 def finalize(body: FinalizeIn):
     """Turn approved Q&A into units on disk, then hand back the reel payload."""
@@ -361,9 +489,11 @@ def finalize(body: FinalizeIn):
             if body.do_voice and voice.configured()[0]:
                 recording = _JUDGE_POOL.submit(voice.synthesize, script)
 
-            visuals = spec_visuals(script, section)
-            if body.do_svg:
-                visuals = render_diagrams(visuals, script, section)
+            # design_visuals, not spec_visuals: it grades what comes back and asks
+            # again for a short whose frames repeat, print the narration, or draw a
+            # capital A where a server was meant. One call for a short that passes.
+            visuals, design_problems = design_visuals(script, section,
+                                                      draw=body.do_svg)
 
             unit = ShortUnit(
                 short_id=script.short_id,
@@ -401,6 +531,27 @@ def finalize(body: FinalizeIn):
                     # A short without a score is still a short. Losing the reel
                     # because the grader had a bad minute is the wrong trade.
                     print(f"    ! judge {script.short_id}: {type(e).__name__}: {e}")
+
+            # THE JUDGE NOW DECIDES SOMETHING, which it did not before.
+            #
+            # Everything above this line used to end at "write it to disk". The
+            # comment below still explains why the CODE graders only warn — the
+            # script was human-approved and the money is spent — and that reasoning
+            # is right for a structural nit and wrong for the judge, because the
+            # judge is the only check that reads a claim against its source and says
+            # "this is not in the section". Four of fifteen shipped shorts scored
+            # faithfulness 2 of 5, each for teaching a fact its own section does not
+            # contain, and each was written out as "audited" and shown to students
+            # beside a 5.
+            #
+            # So: one retry with the judge's own problems as the feedback, then
+            # quarantine. The retry is worth its cost because the judge's problems
+            # are specific and actionable ("beat 3 introduces 'GET /index.html',
+            # which does not appear in the source section") — this is the same
+            # feedback channel the human reviewer uses in step 2, and write_script
+            # already knows how to act on it.
+            if unit.eval is not None and not unit.eval.passed:
+                unit = _rejudge_after_fix(unit, script, topic, section, body) or unit
 
             if recording is not None:
                 try:
@@ -505,6 +656,31 @@ _SAMPLES = config.OUTPUT_DIR / "voice-samples"
 if _SAMPLES.exists():
     app.mount("/voice-samples",
               StaticFiles(directory=_SAMPLES, html=True), name="voice-samples")
+
+
+@app.get("/api/video/{short_id}")
+def video(short_id: str):
+    """
+    Render (or serve the cached) MP4 for one short, as a file download.
+
+    Synchronous on purpose. A render is a few Chrome screenshots and one ffmpeg
+    pass — seconds, no API calls, no cost — so a job queue with polling would be
+    more moving parts than the work justifies. The result is cached beside the unit
+    and only rebuilt when the unit JSON is newer, so a second click is instant.
+    """
+    from . import video as videomod
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", short_id):
+        raise HTTPException(400, "bad short_id")
+    try:
+        mp4 = videomod.render(short_id)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        # A render failure is worth naming: the causes are a missing Chromium, a
+        # missing ffmpeg, or a unit with no frames, and each needs a different fix.
+        raise HTTPException(500, f"could not render {short_id}: {e}")
+    return FileResponse(mp4, media_type="video/mp4",
+                        filename=f"{short_id}.mp4")
 
 
 @app.get("/api/health")

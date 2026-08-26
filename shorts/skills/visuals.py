@@ -90,6 +90,27 @@ never the whole change. Two consecutive frames that differ ONLY in which element
 the hero are rejected — give those two beats the SAME visual_ref instead, which
 holds one picture still and is honest about doing so, or find the second picture.
 
+A COSMETIC LABEL EDIT IS NOT A CHANGE. This is the loophole, and a real short went
+through it:
+        Beat 1: icons — Users, Applications, Operating System, Hardware
+        Beat 3: icons — Users, Applications, Operating System, Hardware (CPU, I/O, RAM)
+        ^ The same four pictograms, same order, same one lit. Adding a parenthetical
+          changes the text and changes NOTHING a viewer sees. Labels are compared by
+          meaning, not by characters, so this is rejected.
+
+AND NEVER RETURN TO A FRAME YOU HAVE ALREADY SHOWN. Not just the previous frame —
+ANY earlier frame. The short above was A, B, A: every adjacent pair differed and the
+composition still ended exactly where it started, which is the complaint these
+shorts get most ("showing same visuals again and again which feel bore"). A
+composition that builds does not revisit. If a later beat genuinely needs an earlier
+picture back, give it that beat's visual_ref and hold the picture honestly.
+
+DO NOT OPEN ON A CARD THAT RESTATES THE QUESTION. Beat 1's frame is not a title
+slide and not a "what is being asked" placeholder — those are the frames that get
+skipped past. Beat 1 draws THE SUBJECT, as an object: the two things about to be
+related, the device, the file, the structure. If the honest answer is "the subject
+is an abstract idea", draw what it acts on or sits between.
+
 AND DO NOT OPEN ON THE ANSWER'S CODE. Beat 1 is the interviewer's question, and its
 frame should show the SUBJECT — the thing being asked about, drawn — not the listing
 that answers it. A short that starts on the same code panel it ends on has shown the
@@ -252,10 +273,19 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
   "table"    A header row and rows, one of them highlighted. For lookups and
              comparisons: a page table, internal versus external.
              -> columns: up to 3, rows: up to 4, each {cells, role}.
-  "stat"     One number or term, very large, with a caption. For a frame whose
-             whole content is a figure: "4 GB".
+  "stat"     ONE NUMBER, very large, with a caption naming it. For a frame whose
+             whole content is a figure: "4 GB", "1011", "36px", "65".
              -> value, caption. The caption names the figure ("addressable bytes"),
                 it is NOT a sentence about it.
+             THE VALUE MUST CONTAIN A DIGIT. A grader rejects one that does not, and
+             here is why, from a reel this pipeline built:
+                 title "What is being asked", value "Computing system",
+                 caption "Computing system"
+             The same two words printed twice, as the OPENING frame of the short. A
+             viewer's first two seconds went on reading one noun three times. A bare
+             term set large is the takeaway card this brief already removed, wearing
+             a different template name. If your beat has no figure in it, this is
+             not your template — draw the thing.
   "code"     A code or markup snippet on a dark editor panel, one line lit. For any
              material that teaches through code — CSS rules, HTML markup, a
              command, a config. IF THE SECTION CONTAINS A CODE BLOCK RELEVANT TO
@@ -283,14 +313,38 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
              whenever the beat is about THINGS and what passes between them: a
              browser reading a file, a CPU reaching memory, a page being painted.
              -> glyphs: 2 to 4, each {icon, label, role}. `icon` MUST be one of:
-                browser, file, page, screen, chip, memory, disk, brush, code,
-                text, table, check, cross, warning, box
+__ICON_LIST__
                 Anything else draws a plain box, so pick from the list.
                 `label` names it in 1-2 words. arrows: false for a set rather than
                 a sequence.
              A box with the word "Browser" in it is the word "browser" with a
              border round it. A drawn browser window is a picture. Prefer the
              picture.
+
+             THE ICON MUST BE A PICTURE OF THE LABEL. This is the rule that was
+             broken most often, and it produced the single worst frame this pipeline
+             has shipped: a glyph labelled "HTTP" drawn as `text`, which renders as
+             A CAPITAL LETTER A. The viewer is told, in a picture, that HTTP is a
+             letter of the alphabet. The same short drew its server as `disk`, a
+             storage cylinder; another labelled "Authentication" with the capital A
+             and "Printer" with an empty box.
+
+             None of those was a wrong choice from a good list — the list had no
+             server, no network, no lock. It does now. So:
+
+               "text" draws a CAPITAL A and means TYPOGRAPHY. Use it only when the
+                      subject really is type: a font, a typeface, text styling. It
+                      is not a general-purpose glyph for an abstract noun, and a
+                      grader fails it on any other label.
+               "box"  is not available. It was the "renderer does not know this
+                      name" fallback and using it deliberately is drawing nothing.
+
+             If nothing on the list is a picture of your label, THE LABEL IS NOT A
+             THING and this is the wrong template. A protocol, a guarantee, a
+             property, a concept — these have no pictogram because they are not
+             objects. Draw what they act ON instead (`server` and `browser` with an
+             arrow between them, not a glyph named "HTTP"), or use "flow", "code" or
+             "compare", which are built for claims rather than for things.
   "preview"  SAMPLE TEXT RENDERED IN THE STYLE BEING TAUGHT — the effect itself,
              not a description of it. For every typography and text property:
              font-family, font-size, font-style, font-weight, text-decoration.
@@ -456,7 +510,18 @@ Include only the fields the chosen template uses. There is no "takeaway" templat
 and no "note" field — the last ref is the finished composition, see above."""
 
 
-def spec_visuals(script: Script, section: Section | None = None) -> dict[str, Visual]:
+#: The icon names the brief offers, wrapped to fit it, taken from the renderer
+#: itself. SPEC_SYSTEM cannot be an f-string — it is mostly JSON braces — so this is
+#: a substitution rather than an interpolation.
+_ICON_LINES = "\n".join(
+    "                " + ", ".join(layout.OFFERED_ICONS[i:i + 7])
+    for i in range(0, len(layout.OFFERED_ICONS), 7))
+SPEC_SYSTEM = SPEC_SYSTEM.replace("__ICON_LIST__", _ICON_LINES)
+
+
+def spec_visuals(script: Script, section: Section | None = None,
+                 feedback: str | None = None,
+                 model_override: str | None = None) -> dict[str, Visual]:
     """
     One call for the whole short: a template and its words for every visual_ref.
 
@@ -514,16 +579,175 @@ and its numbers, copied exactly. Not from its prose.
     user += (f"\nDesign ONE composition and assign a frame to each of these refs, in "
              f"this order: {refs}\nThe last one, {refs[-1]}, is that composition "
              f"finished, with the hero on the thing that answers the question — it is "
-             f"NOT a card with a sentence on it.")
+             f"NOT a card with a sentence on it."
+             f"\n\nRETURN EXACTLY {len(refs)} VISUALS, whose `ref` values are these "
+             f"strings character for character: {refs}\nDo not invent a ref, do not "
+             f"merge two refs into one, do not drop one. A renamed ref makes the whole "
+             f"answer unusable — the beats are keyed to these strings.")
+
+    # LAST, so it is the final thing read before answering. The script step has had a
+    # retry loop since the beginning and this step had none — one call, whatever came
+    # back, shipped. That asymmetry is why 11 of 15 shipped shorts failed a visual
+    # grader that already existed and already said the right thing.
+    if feedback:
+        user += f"""
+
+YOUR PREVIOUS DESIGN WAS REJECTED. These are the exact defects a code grader found
+in it — they are structural, not opinions, and the same grader runs again on your
+next answer:
+
+{feedback}
+
+Do not repeat them. If a beat has no second picture in it, give it the SAME
+visual_ref as the beat before rather than redrawing one frame with the accent
+moved — one honest still is better than two frames pretending to differ."""
     # MODEL_DIAGRAM, which until now nothing read — /api/health advertised it and no
     # call site used it, so setting it did nothing at all. This is the call it should
     # always have named: the one paid step that decides what every frame of the short
     # contains. Defaults to the generator.
-    plan = ask_json(SPEC_SYSTEM, user, VisualPlan, model=config.MODEL_DIAGRAM,
+    plan = ask_json(SPEC_SYSTEM, user, VisualPlan,
+                    model=model_override or config.MODEL_DIAGRAM,
                     max_tokens=4000, label="visual_spec")
 
     return {v.ref: Visual(ref=v.ref, type="diagram", spec=v.spec, frame=v.frame)
             for v in plan.visuals}
+
+
+#: How many times the visual step may be asked again before its best answer ships.
+#: The script step has used 3 since the beginning; this matches it.
+MAX_DESIGN_ATTEMPTS = 3
+
+#: The graders a redesign can actually act on. All structural, all free, all about
+#: the DESIGN rather than the drawing — a failure here means asking the model again
+#: is worth a call. Deliberately not the whole of UNIT_GRADERS: check_svg_quality
+#: fails on a line of the material's own code being too long to fit, which a
+#: redesign cannot shorten without inventing code, and check_diagram_matches_narration
+#: is a vocabulary heuristic that a correct frame can trip.
+def _design_graders(section: Section | None = None):
+    """Imported late: checks imports schema, and schema is what defines a Frame.
+
+    check_code_frames_quote_source IS IN THIS LIST, and leaving it out was a real
+    hole. It needs the section, which is why it was skipped when this list was first
+    written — and the consequence showed up immediately after the design model
+    changed: a frame came back captioning
+
+        GET /index.html HTTP/1.1
+        Host: example.com
+
+    as the material's own snippet, on a document that contains neither line. The
+    retry loop never saw it, because the only graders it gated on were the ones that
+    need no source. A fabricated code line is the most harmful thing this pipeline
+    can put on screen — a learner cannot tell it from the real thing, and it is
+    presented as the document's own text — so it belongs in the gate, not in a
+    warning printed after the short is written.
+    """
+    from .. import checks
+    graders = [checks.check_frames_develop, checks.check_frames_are_visual,
+               checks.check_icons_are_pictures, checks.check_samples_differ]
+    if section is not None:
+        graders.append(lambda u: checks.check_code_frames_quote_source(u, section.text))
+    return graders
+
+
+def design_visuals(script: Script, section: Section | None = None, *,
+                   draw: bool = True,
+                   previous: dict[str, Visual] | None = None,
+                   attempts: int = MAX_DESIGN_ATTEMPTS) -> tuple[dict[str, Visual], list[str]]:
+    """
+    Design the frames, grade them, and ask again for the ones that failed.
+
+    Returns (visuals, remaining problems). The problems list is empty on success and
+    is what the caller should warn about when every attempt has been spent.
+
+    WHY THIS EXISTS. Every defect it catches was already detectable, by graders that
+    already lived in checks.py and already printed the right sentence — and every
+    one of them shipped anyway, because nothing was wired to act on them.
+    check_frames_develop says so in its own docstring: "This reports, it does not
+    gate — no retry loop hangs off it." Measured on the fifteen shorts in output/,
+    11 failed at least one of these four. Three shorts were four frames of the SAME
+    four icons with only the amber highlight moving between them, which is exactly
+    the complaint the grader was written for.
+
+    So the gap was never detection. It was that the script step had a retry loop and
+    the visual step did not: one call, whatever came back, straight to disk.
+
+    The loop is cheap by construction. Drawing is local and free, so an attempt
+    costs one model call and only happens for a short that actually failed — the
+    common case is one call, unchanged from before. The best attempt is kept rather
+    than the last: a second try that fixes two defects and introduces one is still
+    the better frame set, and returning the final attempt regardless would sometimes
+    ship a worse design than the one it replaced.
+    """
+    from ..schema import ShortUnit
+
+    # Every ref the beats actually name. A returned design MUST cover all of them or
+    # ShortUnit will not validate — see the ref-drift note below.
+    needed = {b.visual_ref for b in script.beats}
+
+    best: dict[str, Visual] | None = None
+    best_problems: list[str] | None = None
+    feedback: str | None = None
+
+    for attempt in range(1, max(1, attempts) + 1):
+        # ONE BAD ATTEMPT MUST NOT LOSE THE GOOD ONES.
+        #
+        # It did, and this is the bug that cost a whole redesign sweep. On a retry
+        # the model sometimes RENAMES the refs — asked again for
+        # "what_is_a_computing_system_q, definition, hardware_and_software" it came
+        # back with a single "system_icons" — and the probe below then failed
+        # ShortUnit's every_ref_resolved validator. That ValidationError escaped
+        # design_visuals entirely, so the caller's `except Exception` logged it and
+        # moved on, discarding two perfectly usable earlier attempts. Five of nine
+        # units in one sweep were silently left un-redesigned this way.
+        try:
+            visuals = spec_visuals(script, section, feedback=feedback)
+            if draw:
+                visuals = render_diagrams(visuals, script, section)
+
+            # REF DRIFT, repaired rather than punished. A design that renamed a ref
+            # is still a usable design for the refs it did produce; fill the gaps
+            # from the previous frames when the caller has them.
+            missing = needed - set(visuals)
+            if missing:
+                for ref in missing:
+                    if previous and ref in previous:
+                        visuals[ref] = previous[ref]
+                if needed - set(visuals):
+                    raise ValueError(
+                        f"design dropped refs {sorted(needed - set(visuals))} and there "
+                        f"is no previous frame to fall back on")
+
+            probe = ShortUnit(short_id=script.short_id, session_id="probe",
+                              source_section_id=section.section_id if section else "",
+                              question=script.question,
+                              estimated_seconds=script.estimated_seconds,
+                              beats=script.beats, visuals=visuals)
+            problems = [f"{r.name}: {r.reason}"
+                        for r in (g(probe) for g in _design_graders(section)) if not r.passed]
+        except Exception as e:
+            print(f"    attempt {attempt}/{attempts} for {script.short_id} unusable: "
+                  f"{type(e).__name__}: {str(e)[:120]}")
+            feedback = ((feedback or "") +
+                        f"\n  - your previous answer was unusable ({type(e).__name__}). "
+                        f"Return a frame for EVERY ref you were given, using those exact "
+                        f"ref strings and no others.")
+            continue
+
+        if best_problems is None or len(problems) < len(best_problems):
+            best, best_problems = visuals, problems
+        if not problems:
+            return visuals, []
+
+        if attempt < attempts:
+            print(f"    redesign {attempt}/{attempts} for {script.short_id}: "
+                  + "; ".join(p[:110] for p in problems[:2]))
+        feedback = "\n".join(f"  - {p}" for p in problems)
+
+    # Every attempt unusable: hand back what the caller already had rather than an
+    # empty dict, which would fail validation at the call site for a different reason.
+    if best is None:
+        return dict(previous or {}), ["design produced no usable frame set"]
+    return best, best_problems or []
 
 
 def render_diagrams(visuals: dict[str, Visual], script: Script,

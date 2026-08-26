@@ -7,18 +7,57 @@ Stages, in cost order — cheap checks always before paid steps:
   parse -> select -> [ script -> timing -> overlays -> grounding -> visuals ->
   svg -> tts -> assemble -> audit ] -> human gate -> render
 """
-import argparse, json, sys
+import argparse, io, json, sys, threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .schema import ShortUnit, TopicList
 from .parse import parse_markdown, find_section
 from .skills.select import select_topics
 from .skills.script import write_script
-from .skills.visuals import spec_visuals, render_diagrams
+from .skills.visuals import design_visuals, render_diagrams
 from .skills.audit import audit
 from . import checks, config
 
 MAX_SCRIPT_RETRIES = 3
+
+class _StdoutRouter(io.TextIOBase):
+    """
+    A sys.stdout stand-in that sends each thread's writes to that thread's buffer.
+
+    build_one narrates with print(), and five of them running at once need five
+    separate transcripts. contextlib.redirect_stdout looks like the tool for that
+    and is not: it swaps the single global sys.stdout, so concurrent workers
+    overwrite one another's redirect and lines land in whichever buffer was
+    installed last. The result is a per-short log that is confidently wrong about
+    which short it describes.
+
+    Routing is thread-local, so a worker can only ever write to its own buffer, and
+    anything printed from a thread that has not claimed one (or after it releases)
+    falls through to the real stdout rather than vanishing.
+    """
+
+    def __init__(self, fallback):
+        self._fallback = fallback
+        self._local = threading.local()
+
+    def route(self, buf) -> None:
+        self._local.buf = buf
+
+    def write(self, text: str) -> int:
+        buf = getattr(self._local, "buf", None)
+        return (self._fallback if buf is None else buf).write(text)
+
+    def flush(self) -> None:
+        self._fallback.flush()
+
+
+#: How many shorts to build at once. Each one is a handful of sequential model calls
+#: with long waits in between, so the work is latency-bound rather than CPU-bound and
+#: a small pool is plenty. Capped rather than unbounded because every worker is
+#: hitting the same gateway, and five concurrent requests is well inside a rate limit
+#: where fifty is not.
+MAX_BUILD_WORKERS = 5
 
 
 def _save_rejected(topic, section, attempt: int, script, results) -> Path:
@@ -84,10 +123,12 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
 
     print(f"    script ok: {script.estimated_seconds}s, {script.word_count} words")
 
-    visuals = spec_visuals(script, section)
-    if do_svg:
-        visuals = render_diagrams(visuals, script, section)
+    # Designed, graded and redesigned — the same shape as the script loop above.
+    # A short whose frames all pass costs exactly one call, as before.
+    visuals, design_problems = design_visuals(script, section, draw=do_svg)
     print(f"    visuals: {[(v.ref, v.type) for v in visuals.values()]}")
+    for problem in design_problems:
+        print(f"    ! visuals still failing after redesign — {problem[:140]}")
 
     unit = ShortUnit(
         short_id=script.short_id,
@@ -179,16 +220,57 @@ def main():
         return
 
     topics = topic_list.topics[: args.limit] if args.limit else topic_list.topics
-    units = []
 
-    for topic in topics:
+    # SHORTS ARE BUILT SIDE BY SIDE, not one after another.
+    #
+    # This loop was sequential and the web path was not, so `run.py --topics 5` took
+    # five times as long as finalizing the same five shorts through the browser —
+    # about ten minutes against two. Nothing about a short depends on another one:
+    # each is a script call, a design call and a judge call against its own section.
+    # The only reason it was serial is that it was written before the web flow.
+    #
+    # Output is captured per topic and printed as a block when that topic finishes,
+    # because build_one narrates every grader and five narrations interleaved line by
+    # line is unreadable.
+    workers = min(MAX_BUILD_WORKERS, max(1, len(topics)))
+    print(f"building {len(topics)} short(s), {workers} at a time")
+
+    # contextlib.redirect_stdout CANNOT BE USED HERE, and using it was a real bug.
+    # It rebinds sys.stdout process-wide, so five workers entering it concurrently
+    # each replace the others' target: the printed blocks came out interleaved into
+    # the wrong buffers. The run above reported a block headed "page_fault_handling"
+    # that contained the TLB short's visuals and the fragmentation short's judge
+    # notes — every line real, every line filed under the wrong short. Logs that
+    # lie are worse than logs that interleave, because they read as correct.
+    router = _StdoutRouter(sys.stdout)
+
+    def build(topic):
+        buf = io.StringIO()
+        router.route(buf)                    # per-thread, so workers cannot collide
         try:
             section = find_section(sections, topic.source_section_id)
+            unit = build_one(topic, section, session_id, not args.no_tts,
+                             not args.no_svg, document=doc_text)
         except KeyError as e:
-            print(f"  skipping {topic.id}: {e}")
-            continue
-        unit = build_one(topic, section, session_id, not args.no_tts, not args.no_svg,
-                         document=doc_text)
+            return topic, None, f"  skipping {topic.id}: {e}\n"
+        except Exception as e:
+            # One short must not take down the other four; they are paid for.
+            return topic, None, buf.getvalue() + f"  ! {topic.id}: {type(e).__name__}: {e}\n"
+        finally:
+            router.route(None)
+        return topic, unit, buf.getvalue()
+
+    units = []
+    real_stdout = sys.stdout
+    sys.stdout = router
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(build, topics))
+    finally:
+        sys.stdout = real_stdout
+    for topic, unit, log in results:
+        # No header printed here: build_one already opens with its own "=== <id> — ".
+        print(log, end="")
         if unit:
             units.append(unit)
 

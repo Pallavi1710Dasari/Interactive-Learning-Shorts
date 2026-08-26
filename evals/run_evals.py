@@ -13,7 +13,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from shorts.schema import Script
+from shorts.schema import Script, ShortUnit
 from shorts.parse import parse_markdown, find_section
 from shorts import checks
 
@@ -27,6 +27,20 @@ GRADERS = {
     "source_quotes":  lambda s, src: checks.check_source_quotes(s, src),
     "no_refusal":     lambda s, src: checks.check_no_refusal(s),
     "on_topic":       lambda s, src: checks.check_answers_its_section(s, src),
+}
+
+#: Graders that read a whole ShortUnit — the FRAMES — rather than the script.
+#:
+#: These had no eval coverage at all, and that is not a coincidence: the harness
+#: could only load a Script, so every grader that judges a picture was unrunnable
+#: here. They were also the graders wired to nothing, and 11 of 15 shipped shorts
+#: failed one. A grader with no case behind it drifts back to advisory.
+UNIT_GRADERS = {
+    "frames_develop":     checks.check_frames_develop,
+    "frames_are_visual":  checks.check_frames_are_visual,
+    "icons_are_pictures": checks.check_icons_are_pictures,
+    "samples_differ":     checks.check_samples_differ,
+    "svg_quality":        checks.check_svg_quality,
 }
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
@@ -46,6 +60,22 @@ def run_code_case(case: dict, sections) -> tuple[bool, str]:
     script = load_script(case["fixture"])
     grader = GRADERS[case["grader"]]
     result = grader(script, source_for(case, sections))
+    exp = case["expect"]
+
+    if result.passed != exp["passed"]:
+        return False, f"expected passed={exp['passed']}, got {result.passed} ({result.reason})"
+
+    needle = exp.get("reason_contains")
+    if needle and needle.lower() not in result.reason.lower():
+        return False, f"reason missing {needle!r}; got: {result.reason}"
+
+    return True, result.reason
+
+
+def run_unit_case(case: dict, sections) -> tuple[bool, str]:
+    """A frame-level case. The fixture is a whole ShortUnit, not a Script."""
+    unit = ShortUnit(**json.loads((ROOT / case["fixture"]).read_text()))
+    result = UNIT_GRADERS[case["grader"]](unit)
     exp = case["expect"]
 
     if result.passed != exp["passed"]:
@@ -117,6 +147,8 @@ def main():
         try:
             if kind == "code_grader":
                 ok, detail = run_code_case(case, sections)
+            elif kind == "unit_grader":
+                ok, detail = run_unit_case(case, sections)
             elif kind == "llm_judge":
                 ok, detail = run_judge_case(case, sections)
             else:

@@ -87,7 +87,8 @@ def _design_problems(unit: ShortUnit) -> list[str]:
     """
     section = _section_for(unit)
     results = [checks.check_frames_are_visual(unit), checks.check_frames_develop(unit),
-               checks.check_samples_differ(unit), checks.check_svg_quality(unit)]
+               checks.check_samples_differ(unit), checks.check_svg_quality(unit),
+               checks.check_icons_are_pictures(unit)]
     if section is not None:
         results.append(checks.check_code_frames_quote_source(unit, section.text))
     return [f"{r.name}: {r.reason}" for r in results if not r.passed]
@@ -132,20 +133,18 @@ def redesign(path: Path, write: bool) -> tuple[int, list[str]]:
     must keep working offline, and a module-level import of the visual skill would
     make the free path depend on the paid one.
     """
-    from .skills.visuals import spec_visuals, render_diagrams
+    from .skills.visuals import design_visuals
     from .schema import Script
 
     unit = ShortUnit(**json.loads(path.read_text()))
     section = _section_for(unit)
     script = Script(short_id=unit.short_id, question=unit.question, beats=unit.beats)
 
-    visuals = spec_visuals(script, section)
-    if section is not None:
-        visuals = render_diagrams(visuals, script, section)
-    else:
-        for visual in visuals.values():
-            if visual.frame is not None:
-                visual.svg = render(visual.frame)
+    # design_visuals grades its own answer and asks again, so a redesign that comes
+    # back with the same repeated-frame defect is caught here rather than written to
+    # disk and rediscovered by the next sweep. It draws unconditionally: rendering is
+    # local and free, and the graders need the frames, not the markup.
+    visuals, _ = design_visuals(script, section, previous=unit.visuals)
 
     # Every beat must still resolve, or the unit will not validate. If the model
     # renamed a ref, keep the old frame for it rather than losing the short.
@@ -307,8 +306,23 @@ def _redesign_all(paths: list[Path], every: bool = False, judge: bool = False) -
 
     calls = len(todo) * (2 if judge else 1)
     print(f"\nredesigning {len(todo)} unit(s) — {calls} paid call(s) total:")
-    fixed = still_bad = 0
+    fixed = still_bad = reverted = 0
     for path in todo:
+        # THE OLD VERDICT AND THE OLD FILE, BOTH KEPT, so a redesign that the judge
+        # likes LESS can be undone.
+        #
+        # This is not hypothetical. In one sweep three units came back clean on every
+        # code grader and were rejected by the judge for their NEW frames — one had
+        # been passing before with diagram_correct=True. redesign() writes
+        # unconditionally, so all three left the reel, and the sweep reported them as
+        # progress. Code graders measure whether a frame is structurally a picture;
+        # only the judge reads it against the source. When they disagree about a
+        # replacement, the version a human already had is the safer one to keep.
+        was = path.read_text()
+        try:
+            before = ShortUnit(**json.loads(was)).eval
+        except Exception:
+            before = None
         try:
             count, problems = redesign(path, write=True)
         except Exception as e:
@@ -326,13 +340,27 @@ def _redesign_all(paths: list[Path], every: bool = False, judge: bool = False) -
         if judge:
             try:
                 print(f"       judge: {_judge_one(path)}")
+                after = ShortUnit(**json.loads(path.read_text())).eval
+                if (before is not None and after is not None
+                        and before.passed and not after.passed):
+                    path.write_text(was)
+                    reverted += 1
+                    if problems:
+                        still_bad -= 1
+                    else:
+                        fixed -= 1
+                    print(f"       REVERTED — the judge passed the old frames "
+                          f"(f={before.faithfulness} diag={before.diagram_correct}) and "
+                          f"rejects the new ones (f={after.faithfulness} "
+                          f"diag={after.diagram_correct}); keeping what was there")
             except Exception as e:
                 # A judge that has a bad minute must not lose the redesigned frames,
                 # which are already written and already paid for.
                 print(f"       judge failed: {type(e).__name__}: {e}")
 
     out = feed.build_json()
-    print(f"\n{fixed} clean, {still_bad} still failing a code grader; rebuilt {out}")
+    print(f"\n{fixed} clean, {still_bad} still failing a code grader, "
+          f"{reverted} reverted as worse; rebuilt {out}")
     if still_bad:
         print("A unit that fails twice usually has a script the pictures cannot "
               "follow — one beat with nothing concrete in it. Rewrite the script "

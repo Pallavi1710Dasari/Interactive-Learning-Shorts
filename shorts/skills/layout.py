@@ -57,9 +57,24 @@ MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
 
 # The palette. checks and SVG_SYSTEM describe it; here it is the only thing that
 # assigns it, which is why a short cannot end up with three amber elements.
-FILL = "#E1F5EE"
-STROKE = "#1D9E75"
-DEEP = "#0F6E56"
+#
+# BLUE, not green, since the reviewer asked for it. Only these three values carried
+# the hue — every pictogram, box, arrow and border takes its colour from FILL /
+# STROKE / DEEP through ROLE_COLOURS, so recolouring the theme is these three lines
+# and a free `python -m shorts.redraw` over what is already on disk.
+#
+# The three keep their old lightness relationship on purpose: a near-white tint for
+# "present", a mid tone for every line and border, a dark tone for the hero's own
+# border and for pictogram strokes. Swapping in blues of different weights would
+# have quietly changed which element the eye lands on first.
+#
+# AMBER is deliberately unchanged. It is the hero accent, and its whole job is to be
+# the one thing on the frame that is not the theme colour — amber on blue separates
+# more cleanly than amber on green did, so the emphasis reads better than before
+# rather than worse.
+FILL = "#E4EEFA"     # was #E1F5EE — the light tint behind a "plain" element
+STROKE = "#2A78C2"   # was #1D9E75 — every line, border and arrow
+DEEP = "#12497B"     # was #0F6E56 — hero borders and pictogram strokes
 AMBER = "#F2B14B"
 CORAL = "#E8735A"
 INK = "#2C2C2A"
@@ -714,6 +729,231 @@ def _pict_warning(x: float, y: float, s: float, ink: str, accent: str) -> str:
             f'<circle cx="{x + s * 0.5}" cy="{y + s * 0.7}" r="{s * 0.045}" fill="{ink}"/>')
 
 
+def _pict_server(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A rack of stacked units with status lights. A server, a host, a backend.
+
+    The gap this fills: there was no server pictogram, so a short about HTTP drew
+    its server as `disk` (a cylinder, which is storage, not a host) and its HTTP as
+    `text` (a capital A, which is typography). Both are wrong about what they name.
+    """
+    out = ""
+    for i in range(3):
+        top = y + s * 0.06 + i * s * 0.29
+        out += (f'<rect x="{x + s * 0.05:.1f}" y="{top:.1f}" width="{s * 0.9:.1f}" '
+                f'height="{s * 0.21:.1f}" rx="{s * 0.045:.1f}" fill="none" '
+                f'stroke="{ink}" stroke-width="{s * 0.05:.1f}"/>'
+                f'<circle cx="{x + s * 0.18:.1f}" cy="{top + s * 0.105:.1f}" '
+                f'r="{s * 0.038:.1f}" fill="{accent if i == 0 else ink}" '
+                f'opacity="{1 if i == 0 else 0.4}"/>'
+                f'<line x1="{x + s * 0.34:.1f}" y1="{top + s * 0.105:.1f}" '
+                f'x2="{x + s * 0.8:.1f}" y2="{top + s * 0.105:.1f}" stroke="{ink}" '
+                f'stroke-width="{s * 0.04:.1f}" opacity="0.35"/>')
+    return out
+
+
+def _pict_network(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """Nodes joined by links. A network, connected devices, the thing itself.
+
+    A "computer network" short drew four separate device icons and never drew the
+    interconnection, which IS the concept — the judge said so in as many words.
+    """
+    hub = (x + s * 0.5, y + s * 0.47)
+    nodes = [(x + s * 0.11, y + s * 0.14), (x + s * 0.89, y + s * 0.14),
+             (x + s * 0.5, y + s * 0.87)]
+    out = "".join(
+        f'<line x1="{hub[0]:.1f}" y1="{hub[1]:.1f}" x2="{nx:.1f}" y2="{ny:.1f}" '
+        f'stroke="{ink}" stroke-width="{s * 0.045:.1f}" opacity="0.55"/>'
+        for nx, ny in nodes)
+    out += "".join(
+        f'<circle cx="{nx:.1f}" cy="{ny:.1f}" r="{s * 0.13:.1f}" fill="none" '
+        f'stroke="{ink}" stroke-width="{s * 0.05:.1f}"/>' for nx, ny in nodes)
+    out += (f'<circle cx="{hub[0]:.1f}" cy="{hub[1]:.1f}" r="{s * 0.16:.1f}" '
+            f'fill="{accent}" stroke="{ink}" stroke-width="{s * 0.05:.1f}"/>')
+    return out
+
+
+def _pict_cloud(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A cloud. The internet, a remote service, somewhere else."""
+    return (f'<path d="M{x + s * 0.22:.1f} {y + s * 0.76:.1f} '
+            f'C{x + s * 0.02:.1f} {y + s * 0.76:.1f} {x + s * 0.02:.1f} '
+            f'{y + s * 0.46:.1f} {x + s * 0.24:.1f} {y + s * 0.44:.1f} '
+            f'C{x + s * 0.26:.1f} {y + s * 0.14:.1f} {x + s * 0.66:.1f} '
+            f'{y + s * 0.12:.1f} {x + s * 0.70:.1f} {y + s * 0.42:.1f} '
+            f'C{x + s * 0.94:.1f} {y + s * 0.40:.1f} {x + s * 0.98:.1f} '
+            f'{y + s * 0.76:.1f} {x + s * 0.78:.1f} {y + s * 0.76:.1f} Z" '
+            f'fill="{accent}" stroke="{ink}" stroke-width="{s * 0.055:.1f}" '
+            f'stroke-linejoin="round"/>')
+
+
+def _pict_globe(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A globe with meridians. The web, the internet, worldwide."""
+    cx, cy, r = x + s * 0.5, y + s * 0.46, s * 0.4
+    return (f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="none" '
+            f'stroke="{ink}" stroke-width="{s * 0.055:.1f}"/>'
+            f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{r * 0.42:.1f}" ry="{r:.1f}" '
+            f'fill="none" stroke="{accent}" stroke-width="{s * 0.05:.1f}"/>'
+            f'<line x1="{cx - r:.1f}" y1="{cy:.1f}" x2="{cx + r:.1f}" y2="{cy:.1f}" '
+            f'stroke="{accent}" stroke-width="{s * 0.05:.1f}"/>'
+            f'<line x1="{cx - r * 0.78:.1f}" y1="{cy - r * 0.5:.1f}" '
+            f'x2="{cx + r * 0.78:.1f}" y2="{cy - r * 0.5:.1f}" stroke="{ink}" '
+            f'stroke-width="{s * 0.04:.1f}" opacity="0.45"/>'
+            f'<line x1="{cx - r * 0.78:.1f}" y1="{cy + r * 0.5:.1f}" '
+            f'x2="{cx + r * 0.78:.1f}" y2="{cy + r * 0.5:.1f}" stroke="{ink}" '
+            f'stroke-width="{s * 0.04:.1f}" opacity="0.45"/>')
+
+
+def _pict_lock(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A closed padlock. Encryption, TLS, HTTPS, anything secured."""
+    return (f'<path d="M{x + s * 0.29:.1f} {y + s * 0.44:.1f} '
+            f'L{x + s * 0.29:.1f} {y + s * 0.28:.1f} '
+            f'A{s * 0.21:.1f} {s * 0.21:.1f} 0 0 1 {x + s * 0.71:.1f} '
+            f'{y + s * 0.28:.1f} L{x + s * 0.71:.1f} {y + s * 0.44:.1f}" '
+            f'fill="none" stroke="{ink}" stroke-width="{s * 0.06:.1f}" '
+            f'stroke-linecap="round"/>'
+            f'<rect x="{x + s * 0.15:.1f}" y="{y + s * 0.44:.1f}" '
+            f'width="{s * 0.7:.1f}" height="{s * 0.42:.1f}" rx="{s * 0.06:.1f}" '
+            f'fill="{accent}" stroke="{ink}" stroke-width="{s * 0.055:.1f}"/>'
+            f'<circle cx="{x + s * 0.5:.1f}" cy="{y + s * 0.61:.1f}" '
+            f'r="{s * 0.055:.1f}" fill="{ink}"/>'
+            f'<line x1="{x + s * 0.5:.1f}" y1="{y + s * 0.63:.1f}" '
+            f'x2="{x + s * 0.5:.1f}" y2="{y + s * 0.73:.1f}" stroke="{ink}" '
+            f'stroke-width="{s * 0.05:.1f}" stroke-linecap="round"/>')
+
+
+def _pict_key(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A key. A session key, a credential, a lookup key."""
+    return (f'<circle cx="{x + s * 0.26:.1f}" cy="{y + s * 0.45:.1f}" '
+            f'r="{s * 0.2:.1f}" fill="{accent}" stroke="{ink}" '
+            f'stroke-width="{s * 0.055:.1f}"/>'
+            f'<circle cx="{x + s * 0.26:.1f}" cy="{y + s * 0.45:.1f}" '
+            f'r="{s * 0.07:.1f}" fill="{ink}"/>'
+            f'<line x1="{x + s * 0.46:.1f}" y1="{y + s * 0.45:.1f}" '
+            f'x2="{x + s * 0.92:.1f}" y2="{y + s * 0.45:.1f}" stroke="{ink}" '
+            f'stroke-width="{s * 0.06:.1f}" stroke-linecap="round"/>'
+            f'<line x1="{x + s * 0.72:.1f}" y1="{y + s * 0.45:.1f}" '
+            f'x2="{x + s * 0.72:.1f}" y2="{y + s * 0.64:.1f}" stroke="{ink}" '
+            f'stroke-width="{s * 0.055:.1f}" stroke-linecap="round"/>'
+            f'<line x1="{x + s * 0.88:.1f}" y1="{y + s * 0.45:.1f}" '
+            f'x2="{x + s * 0.88:.1f}" y2="{y + s * 0.6:.1f}" stroke="{ink}" '
+            f'stroke-width="{s * 0.055:.1f}" stroke-linecap="round"/>')
+
+
+def _pict_shield(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A shield with a tick. Integrity, protection, a guarantee."""
+    return (f'<path d="M{x + s * 0.5:.1f} {y + s * 0.05:.1f} '
+            f'L{x + s * 0.9:.1f} {y + s * 0.2:.1f} L{x + s * 0.9:.1f} '
+            f'{y + s * 0.5:.1f} Q{x + s * 0.9:.1f} {y + s * 0.78:.1f} '
+            f'{x + s * 0.5:.1f} {y + s * 0.9:.1f} Q{x + s * 0.1:.1f} '
+            f'{y + s * 0.78:.1f} {x + s * 0.1:.1f} {y + s * 0.5:.1f} '
+            f'L{x + s * 0.1:.1f} {y + s * 0.2:.1f} Z" fill="{accent}" '
+            f'stroke="{ink}" stroke-width="{s * 0.055:.1f}" '
+            f'stroke-linejoin="round"/>'
+            f'<path d="M{x + s * 0.31:.1f} {y + s * 0.47:.1f} '
+            f'L{x + s * 0.45:.1f} {y + s * 0.61:.1f} L{x + s * 0.7:.1f} '
+            f'{y + s * 0.34:.1f}" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.075:.1f}" stroke-linejoin="round" '
+            f'stroke-linecap="round"/>')
+
+
+def _pict_user(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A person. A user, a client, a developer — whoever is at the other end."""
+    return (f'<circle cx="{x + s * 0.5:.1f}" cy="{y + s * 0.26:.1f}" '
+            f'r="{s * 0.19:.1f}" fill="{accent}" stroke="{ink}" '
+            f'stroke-width="{s * 0.055:.1f}"/>'
+            f'<path d="M{x + s * 0.13:.1f} {y + s * 0.87:.1f} '
+            f'Q{x + s * 0.13:.1f} {y + s * 0.53:.1f} {x + s * 0.5:.1f} '
+            f'{y + s * 0.53:.1f} Q{x + s * 0.87:.1f} {y + s * 0.53:.1f} '
+            f'{x + s * 0.87:.1f} {y + s * 0.87:.1f}" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.055:.1f}" stroke-linecap="round"/>')
+
+
+def _pict_printer(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A printer with a sheet coming out. A shared device on a network."""
+    return (f'<rect x="{x + s * 0.24:.1f}" y="{y + s * 0.04:.1f}" '
+            f'width="{s * 0.52:.1f}" height="{s * 0.18:.1f}" fill="none" '
+            f'stroke="{ink}" stroke-width="{s * 0.05:.1f}"/>'
+            f'<rect x="{x + s * 0.06:.1f}" y="{y + s * 0.22:.1f}" '
+            f'width="{s * 0.88:.1f}" height="{s * 0.34:.1f}" rx="{s * 0.06:.1f}" '
+            f'fill="none" stroke="{ink}" stroke-width="{s * 0.055:.1f}"/>'
+            f'<circle cx="{x + s * 0.79:.1f}" cy="{y + s * 0.31:.1f}" '
+            f'r="{s * 0.04:.1f}" fill="{accent}"/>'
+            f'<rect x="{x + s * 0.24:.1f}" y="{y + s * 0.5:.1f}" '
+            f'width="{s * 0.52:.1f}" height="{s * 0.34:.1f}" fill="{accent}" '
+            f'stroke="{ink}" stroke-width="{s * 0.05:.1f}"/>')
+
+
+def _pict_clock(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A clock. Time, order, latency, when something happens."""
+    cx, cy, r = x + s * 0.5, y + s * 0.46, s * 0.4
+    return (f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="none" '
+            f'stroke="{ink}" stroke-width="{s * 0.055:.1f}"/>'
+            f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{cx:.1f}" '
+            f'y2="{cy - r * 0.58:.1f}" stroke="{accent}" '
+            f'stroke-width="{s * 0.06:.1f}" stroke-linecap="round"/>'
+            f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{cx + r * 0.46:.1f}" '
+            f'y2="{cy + r * 0.28:.1f}" stroke="{accent}" '
+            f'stroke-width="{s * 0.06:.1f}" stroke-linecap="round"/>'
+            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{s * 0.045:.1f}" fill="{ink}"/>')
+
+
+def _pict_list(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """Bulleted lines. A set of named things: types, resources, properties."""
+    out = ""
+    for i in range(3):
+        cy = y + s * 0.22 + i * s * 0.26
+        out += (f'<circle cx="{x + s * 0.11:.1f}" cy="{cy:.1f}" '
+                f'r="{s * 0.06:.1f}" fill="{accent if i == 0 else ink}" '
+                f'opacity="{1 if i == 0 else 0.45}"/>'
+                f'<line x1="{x + s * 0.28:.1f}" y1="{cy:.1f}" '
+                f'x2="{x + s * (0.94 if i < 2 else 0.7):.1f}" y2="{cy:.1f}" '
+                f'stroke="{ink}" stroke-width="{s * 0.06:.1f}" '
+                f'stroke-linecap="round" opacity="{1 if i == 0 else 0.5}"/>')
+    return out
+
+
+def _pict_folder(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A folder. A directory, a project, a grouping."""
+    return (f'<path d="M{x + s * 0.05:.1f} {y + s * 0.84:.1f} '
+            f'L{x + s * 0.05:.1f} {y + s * 0.16:.1f} L{x + s * 0.4:.1f} '
+            f'{y + s * 0.16:.1f} L{x + s * 0.5:.1f} {y + s * 0.3:.1f} '
+            f'L{x + s * 0.95:.1f} {y + s * 0.3:.1f} L{x + s * 0.95:.1f} '
+            f'{y + s * 0.84:.1f} Z" fill="none" stroke="{ink}" '
+            f'stroke-width="{s * 0.055:.1f}" stroke-linejoin="round"/>'
+            f'<rect x="{x + s * 0.18:.1f}" y="{y + s * 0.46:.1f}" '
+            f'width="{s * 0.42:.1f}" height="{s * 0.09:.1f}" '
+            f'rx="{s * 0.03:.1f}" fill="{accent}"/>')
+
+
+def _pict_database(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A stacked cylinder. A database — as opposed to `disk`, which is one volume."""
+    w, ry = s * 0.84, s * 0.13
+    left, top, bot = x + (s - w) / 2, y + s * 0.12, y + s * 0.78
+    out = (f'<path d="M{left:.1f} {top:.1f} L{left:.1f} {bot:.1f}" stroke="{ink}" '
+           f'stroke-width="{s * 0.05:.1f}" fill="none"/>'
+           f'<path d="M{left + w:.1f} {top:.1f} L{left + w:.1f} {bot:.1f}" '
+           f'stroke="{ink}" stroke-width="{s * 0.05:.1f}" fill="none"/>')
+    for i, cy in enumerate((bot, top + (bot - top) * 0.5, top)):
+        out += (f'<ellipse cx="{left + w / 2:.1f}" cy="{cy:.1f}" rx="{w / 2:.1f}" '
+                f'ry="{ry:.1f}" fill="{accent if i == 2 else "none"}" stroke="{ink}" '
+                f'stroke-width="{s * 0.05:.1f}"/>')
+    return out
+
+
+def _pict_gear(x: float, y: float, s: float, ink: str, accent: str) -> str:
+    """A gear. A process, a mechanism, configuration — something working."""
+    cx, cy = x + s * 0.5, y + s * 0.46
+    out = "".join(
+        f'<rect x="{cx - s * 0.06:.1f}" y="{cy - s * 0.44:.1f}" '
+        f'width="{s * 0.12:.1f}" height="{s * 0.16:.1f}" rx="{s * 0.02:.1f}" '
+        f'fill="{ink}" transform="rotate({a} {cx:.1f} {cy:.1f})"/>'
+        for a in range(0, 360, 45))
+    out += (f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{s * 0.29:.1f}" fill="none" '
+            f'stroke="{ink}" stroke-width="{s * 0.09:.1f}"/>'
+            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{s * 0.13:.1f}" '
+            f'fill="{accent}"/>')
+    return out
+
+
 def _pict_box(x: float, y: float, s: float, ink: str, accent: str) -> str:
     """The fallback, for an icon name the renderer does not know."""
     return (f'<rect x="{x + s * 0.08}" y="{y + s * 0.14}" width="{s * 0.84}" '
@@ -725,13 +965,48 @@ def _pict_box(x: float, y: float, s: float, ink: str, accent: str) -> str:
 #: Every pictogram an `icons` frame may name. Keep this list and the one in
 #: SPEC_SYSTEM in step: a name the model invents renders as _pict_box, which is
 #: honest but says nothing.
+#:
+#: THE SET GREW BECAUSE IT WAS TOO SMALL TO DESCRIBE THE MATERIAL, and a vocabulary
+#: that cannot name a thing does not decline to draw it — it draws the nearest thing
+#: it has, which is worse than a blank. Measured on fifteen shipped shorts, `text`
+#: (a capital A, meaning typography) was used 11 times and `box` (the do-not-know
+#: fallback) 6 times, for subjects the first fifteen entries simply had no picture
+#: of: a capital A labelled "HTTP", a capital A labelled "Authentication", a
+#: cylinder labelled "Server", an empty box labelled "Printer". Every one of those
+#: reads to a learner as a claim about what the thing IS.
+#:
+#: So the additions are not decoration; each one replaces a documented mis-draw.
+#: server/network/globe/cloud for the networking material, lock/key/shield for TLS
+#: and HTTPS, user for the client half of a request, printer for the shared device
+#: the network section actually names, list for "the four data types", and
+#: clock/gear/folder/database for the sequencing and storage nouns that were
+#: reaching for `box`.
 PICTOGRAMS = {
     "browser": _pict_browser, "file": _pict_file, "page": _pict_page,
     "screen": _pict_screen, "chip": _pict_chip, "memory": _pict_memory,
     "disk": _pict_disk, "brush": _pict_brush, "code": _pict_code,
     "text": _pict_text, "table": _pict_table, "check": _pict_check,
     "cross": _pict_cross, "warning": _pict_warning, "box": _pict_box,
+    "server": _pict_server, "network": _pict_network, "cloud": _pict_cloud,
+    "globe": _pict_globe, "lock": _pict_lock, "key": _pict_key,
+    "shield": _pict_shield, "user": _pict_user, "printer": _pict_printer,
+    "clock": _pict_clock, "list": _pict_list, "folder": _pict_folder,
+    "database": _pict_database, "gear": _pict_gear,
 }
+
+#: What an `icons` frame may ask for, which is NOT the same as what PICTOGRAMS can
+#: draw. `box` stays in the map as the fallback for a name the model invents, but it
+#: is not offered — offering "a plain box" gives the model a legal way to put a word
+#: in a rectangle and call it a picture, which is the complaint this whole template
+#: exists to answer. `text` stays offered because a capital A is the right drawing
+#: for a short about typography; checks.check_icons_are_pictures fails it anywhere
+#: else.
+OFFERED_ICONS = sorted(set(PICTOGRAMS) - {"box"})
+
+#: Icons that only mean what they draw. `text` IS a capital A and `box` IS an empty
+#: rectangle, so each is honest for exactly one subject and a mis-label everywhere
+#: else — see check_icons_are_pictures.
+LITERAL_ICONS = {"text", "box"}
 
 
 def _icons(frame: Frame, enter: int) -> tuple[str, int]:

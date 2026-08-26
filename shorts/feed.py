@@ -141,8 +141,15 @@ def _clean_svg(svg: str) -> str:
     return re.sub(r"\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", svg, flags=re.I)
 
 
-def collect() -> list[dict]:
-    """Every unit in output/, newest section first, in reel-playable form."""
+def collect(include_quarantined: bool = False) -> list[dict]:
+    """
+    Every unit in output/, newest section first, in reel-playable form.
+
+    QUARANTINED UNITS ARE HELD BACK. A short whose judge verdict came in under the
+    bar is stored with status "needs_review" and left out of this list, because this
+    list is what students watch. Pass include_quarantined=True to see them — that is
+    for the reviewer's own listing, not for the reel.
+    """
     units = []
     for path in sorted(config.OUTPUT_DIR.glob("*.json")):
         if path.name in SIDECARS:
@@ -154,6 +161,10 @@ def collect() -> list[dict]:
             # function — which includes the endpoint that has just spent money
             # building shorts and is trying to return them.
             print(f"  skipping {path.name}: not a short unit ({type(e).__name__})")
+            continue
+        # "rejected" is the CLI path's word for the same thing — run.py sets it when
+        # the judge verdict fails — and it was being shown to students too.
+        if unit.status in ("needs_review", "rejected") and not include_quarantined:
             continue
         beats, total = _timeline(unit)
         units.append({

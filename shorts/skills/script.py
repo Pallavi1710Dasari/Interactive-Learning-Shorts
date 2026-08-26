@@ -132,9 +132,10 @@ THE QUESTION (beat 1)
 EACH ANSWER BEAT
 - ONE idea only. 12 to 20 spoken words. NEVER more than 24 — a longer beat is
   rejected outright, because the diagram on screen has to change with the idea.
-- Each beat needs its OWN supporting sentence from the material. If you cannot find
-  a distinct sentence behind a beat, that beat should not exist — delete it and let
-  the answer be shorter.
+- Each beat needs its OWN supporting sentence FROM THIS SHORT'S SECTION. If you
+  cannot find a distinct sentence in the section behind a beat, that beat should not
+  exist — delete it and let the answer be shorter. Two good beats beat three where
+  the third had to be borrowed.
 - Reads as speech, not prose. No "furthermore", no "it should be noted".
 - Builds on the beat before it. The last beat lands the takeaway, and the takeaway
   is the sentence you would want quoted back to you a week later. Make it the
@@ -153,10 +154,11 @@ visual_ref
 - A DIFFERENT ref per beat, unless two consecutive beats really share one visual.
 
 source_quote — REQUIRED on every student beat
-Before you write a beat, find the sentence in the READING MATERIAL that the beat is
-a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTER.
+Before you write a beat, find the sentence IN THIS SHORT'S OWN SECTION that the beat
+is a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTER.
 - Copy, do not retype from memory, and do not tidy it up. It is checked by exact
-  match against the material and a beat whose quote is not found is rejected.
+  match AGAINST THE SECTION — not against the whole document — and a beat whose
+  quote is not found in the section is rejected.
 - At least 4 words. One sentence is ideal; two adjacent sentences are allowed.
 - Quote a sentence that STATES something. A heading, a title, or a list label is
   not evidence — "What are header and heading elements in HTML?" is a question the
@@ -189,15 +191,42 @@ this subject for the length of this task.
 - Never contradict the material, and never "correct" it.
 - Padding with outside knowledge is the worst failure mode in this project.
 
-WHERE TO LOOK, AND NEVER REFUSE
+WHERE TO LOOK — THE SECTION, AND ONLY THE SECTION
 You are given the FULL reading material plus the ONE section this short is filed
-under. Work from that section first — it is where the topic came from.
+under. They are not two sources. They have two different jobs:
 
-If the section does not contain the whole answer, FIND THE ANSWER ELSEWHERE IN THE
-MATERIAL. Reading material is not tidy: a question like "what is the difference
-between X and Y" is often answered in a summary or an FAQ several sections away,
-and the section headings do not always say where an answer lives. Search the whole
-document before concluding anything is missing.
+  THE SECTION is the only place a CLAIM may come from. Every source_quote must be
+  copied out of it, and this is checked by exact match against the section alone.
+  A sentence from two sections away will be found and the script rejected.
+
+  THE FULL MATERIAL is CONTEXT ONLY — it is there so you know what a term means
+  when the section uses one it introduced earlier, and so you can write in the
+  document's vocabulary. You may not take a fact from it. Not an example, not a
+  number, not a definition, not a code line.
+
+This used to say the opposite: "if the section does not contain the whole answer,
+find the answer elsewhere in the material". It reads as reasonable and it is how
+every wrong short this project has shipped got made. Four of fifteen were scored 2
+out of 5 for faithfulness, and the reason was the same every time — a beat citing a
+real sentence from a section the viewer never read:
+
+  BAD   Section: "Computers represent all information using two values, 0 and 1."
+        Beat:    "The character A is encoded as the integer 65, then converted to
+                  binary."
+        ^ True. Cited to a real sentence. From a different section. A student who
+          read the section and watched the reel is now being taught something the
+          page in front of them does not say, and cannot check.
+
+  GOOD  Beat:    "Everything a computer handles is represented with just two
+                  values — zero and one."
+        ^ Smaller, and answerable from the page the viewer actually read.
+
+THE SECTION IS SMALLER THAN YOU WANT IT TO BE. ANSWER ANYWAY.
+When the section will not support the question as asked, you do NOT go looking
+elsewhere and you do NOT refuse. You ANSWER THE NARROWER QUESTION THE SECTION DOES
+SUPPORT, and you rewrite the interviewer's question in beat 1 to be that narrower
+question. A clear, complete, correctly-cited answer to a smaller question is a good
+short. It is the ONLY good short available when the material is thin.
 
 You must NEVER produce any of these:
 - "I can't answer that", "that's not covered here", "the section I have only
@@ -206,10 +235,10 @@ You must NEVER produce any of these:
   have. The viewer is watching a person explain an idea; that person does not
   discuss their reference documents.
 
-If the material genuinely answers a NARROWER version of the question, answer the
+If the SECTION genuinely answers a NARROWER version of the question, answer the
 narrower version well and let the interviewer's question match what you answered.
 A clear answer to a slightly smaller question is a good short. A refusal is not a
-short at all.
+short at all, and a wider answer borrowed from elsewhere is a wrong one.
 
 BE CORRECT, THEN BE SIMPLE
 - Say it the way you would to a friend who missed the class. Short sentences.
@@ -233,12 +262,17 @@ def write_script(topic: Topic, section: Section, feedback: str | None = None,
     """
     Write one script.
 
-    `document` is the whole reading material. Passing it is what stops the model
-    refusing: given only its own section, a topic whose answer lives in a summary or
-    an FAQ elsewhere in the document has no way to be answered, and the model does
-    the honest thing and says so — which reaches the reviewer as a broken card. With
-    the full material in front of it the answer is findable, and check_source_quotes
-    still holds every claim to a sentence that really exists.
+    `document` is the whole reading material, and its job has CHANGED. It is passed
+    as vocabulary and context — so a term the section inherits from an earlier
+    section is understood rather than guessed at — and no longer as a place to find
+    answers in. check_source_quotes now matches against the section alone, so a beat
+    sourced from elsewhere in the document is rejected and retried.
+
+    It used to be the escape hatch for a thin section: given only its own section a
+    model would sometimes refuse, and a refusal reaches the reviewer as a broken
+    card. The escape hatch is now the NARROWER QUESTION instead, which the brief
+    spells out — answer what the section supports and rewrite beat 1 to match. That
+    keeps the short honest and still never refuses.
     """
     user = f"""TOPIC: {topic.topic}
 WHY IT MATTERS: {topic.why_it_matters}
@@ -247,7 +281,10 @@ SHORT_ID: {topic.id}
 
     if document:
         user += f"""
-THE FULL READING MATERIAL — everything you are allowed to know
+THE FULL READING MATERIAL — CONTEXT ONLY, NOT A SOURCE OF CLAIMS
+This is here so you understand the document's vocabulary. You may NOT take a fact,
+an example, a number or a code line from it. Every source_quote is matched against
+the section below and nothing else.
 =============================================================
 {document}
 =============================================================
@@ -259,8 +296,10 @@ THE SECTION THIS SHORT IS FILED UNDER — start here [{section.section_id}] {sec
 {section.text}
 ---
 
-Write the script. Answer the topic from the section above where you can, and from
-elsewhere in the reading material where the section falls short. Do not refuse, and
+Write the script. Every beat must be supported by a sentence from THE SECTION ABOVE,
+copied verbatim into its source_quote. If the section does not support the topic as
+stated, answer the narrower question it does support and make beat 1 ask that
+narrower question. Do not borrow from elsewhere in the document, do not refuse, and
 do not mention the material."""
 
     # A targeted edit ("just fix the question") is impossible if the model cannot

@@ -67,7 +67,14 @@ def client() -> anthropic.Anthropic:
 # thinking={"type":"disabled"} for these with a hard 400:
 #     "Reasoning is mandatory for this endpoint and cannot be disabled."
 # Matched on the model string because the gateway prefixes it ("openai/gpt-5-mini").
-_REASONING_MANDATORY = ("gpt-5", "o1", "o3", "o4")
+# gemini-2.5-pro is on this list and gemini-2.5-flash is NOT, which looks arbitrary
+# and is not: asked to disable reasoning, pro answers with the same hard 400 as the
+# gpt-5 family while flash accepts it. The docstring below used to say "google/*
+# accepts disabling, and it matters" — measured on flash, generalised to the family,
+# and wrong for pro. Every call to gemini-2.5-pro failed with
+# "Reasoning is mandatory for this endpoint and cannot be disabled." until it was
+# added here, which made the model look broken when it was the request that was.
+_REASONING_MANDATORY = ("gpt-5", "o1", "o3", "o4", "gemini-2.5-pro", "gemini-3-pro")
 
 # The floor to ask for when reasoning cannot be switched off. Measured on
 # gpt-5-mini through OpenRouter, same trivial prompt: no thinking field at all
@@ -86,8 +93,9 @@ def _reasoning(model: str, think: bool) -> dict:
                     docstring measures — 3.4x wall clock, 5x tokens.
       openai/gpt-5* REJECTS disabling with a 400. Reasoning is mandatory, so the
                     cheapest legal request is an explicit minimum budget.
-      google/*      accepts disabling, and it matters: 38 output tokens disabled
+      gemini flash  accepts disabling, and it matters: 38 output tokens disabled
                     against 194 with reasoning on, for the same one-line answer.
+      gemini *-pro  REJECTS disabling, exactly like gpt-5. Same 400, same fix.
 
     think=True sends nothing and lets the provider deliberate as it sees fit, which
     is what the judge wants on every family.
@@ -111,12 +119,52 @@ def _extract_json(text: str) -> str:
     return text[start:end + 1]
 
 
+#: Families whose API accepts Anthropic-style prompt caching through this gateway.
+#:
+#: google/ is on this list because it was TESTED, not assumed. cache_control is an
+#: Anthropic field, so the first cut of this restricted it to anthropic/* on the
+#: reasoning that other providers would ignore or reject it — which would have made
+#: "use Gemini for the frames" and "make it faster" mutually exclusive. Measured on
+#: gemini-2.5-pro with the real 7k-token visual brief:
+#:     call 1  7.80s  cache_write=6717
+#:     call 2  2.76s  cache_read=6717      <- 65% faster
+#: The gateway translates it. Anything not listed here still gets a plain string,
+#: because a silently ignored cache is a saving we would only think we had made.
+_CACHEABLE = ("anthropic/", "claude-", "google/")
+
+#: Anthropic will not cache a block below ~1024 tokens, so asking for it on a short
+#: system prompt spends a cache-write for nothing. Both briefs in this project are
+#: far above the line — the visual one is ~7,200 tokens — but select.py and the
+#: judge call with smaller ones.
+MIN_CACHEABLE_CHARS = 4096
+
+
+def _system(system: str, model: str):
+    """
+    The `system` argument, marked cacheable when that is worth doing.
+
+    WHY THIS EXISTS. Nothing cached anything. The visual brief is 28,653 characters
+    — roughly 7,200 tokens of fixed instructions — and it was re-sent, uncached, on
+    every call: three times for a short whose frames needed two retries, on top of
+    the section and the beats. The brief is byte-identical every time, which is
+    exactly the case prompt caching is for, and it was being paid for in full in
+    both latency and tokens on every attempt.
+
+    This is the cheapest speed win available in the project and it costs nothing in
+    quality, because the text sent is unchanged — only its cache marking differs.
+    """
+    if len(system) < MIN_CACHEABLE_CHARS or not any(m in model for m in _CACHEABLE):
+        return system
+    return [{"type": "text", "text": system,
+             "cache_control": {"type": "ephemeral"}}]
+
+
 def call(system: str, user: str, model: str | None = None, max_tokens: int = 4000,
          think: bool = False, label: str = "llm"):
     """One raw message call. Thinking off unless asked for — see module docstring."""
     model = model or config.MODEL_GENERATOR
     resp = client().messages.create(
-        model=model, max_tokens=max_tokens, system=system,
+        model=model, max_tokens=max_tokens, system=_system(system, model),
         messages=[{"role": "user", "content": user}], **_reasoning(model, think),
     )
     usage.record(label, model, resp)
@@ -160,7 +208,8 @@ def ask_json(
 
     for attempt in range(retries + 1):
         resp = client().messages.create(
-            model=model, max_tokens=budget, system=system, messages=messages,
+            model=model, max_tokens=budget, system=_system(system, model),
+            messages=messages,
             **_reasoning(model, think),
         )
         usage.record(label, model, resp)
@@ -179,7 +228,20 @@ def ask_json(
             continue
 
         try:
-            return model_cls(**json.loads(_extract_json(raw)))
+            parsed = json.loads(_extract_json(raw))
+            # A BARE LIST WHERE AN OBJECT WAS ASKED FOR. gemini-2.5-pro returned
+            # `[{...}, {...}]` for VisualPlan instead of `{"visuals": [...]}`, and
+            # `model_cls(**parsed)` then died with "argument after ** must be a
+            # mapping" — a TypeError, not a ValidationError, so the retry-with-your-
+            # own-mistake path below never ran and the whole design was lost.
+            # The wrapper is unambiguous whenever the model has exactly one list
+            # field, which is the shape every plan class here has.
+            if isinstance(parsed, list):
+                fields = [n for n, f in model_cls.model_fields.items()
+                          if getattr(f.annotation, "__origin__", None) is list]
+                if len(fields) == 1:
+                    parsed = {fields[0]: parsed}
+            return model_cls(**parsed)
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
             last_err = e
             if resp.stop_reason == "max_tokens":

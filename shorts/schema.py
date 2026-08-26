@@ -392,7 +392,15 @@ class ShortUnit(BaseModel):
     visuals: dict[str, Visual]
     audio: Optional[Audio] = None
     eval: Optional[EvalReport] = None
-    status: Literal["draft", "audited", "approved", "rendered", "rejected"] = "draft"
+    #: "needs_review" is the quarantine state: the short was built and paid for, and
+    #: the judge scored it below the bar (see EvalReport.passed). It stays on disk
+    #: with its verdict attached so a human can read what was wrong and decide, but
+    #: feed.collect keeps it out of the student-facing reel by default. Before this
+    #: existed a faithfulness-2 short — one teaching a fact its own section does not
+    #: contain — was written as "audited" and appeared in the feed indistinguishable
+    #: from a 5.
+    status: Literal["draft", "audited", "approved", "rendered", "rejected",
+                    "needs_review"] = "draft"
     video_path: Optional[str] = None
 
     @field_validator("visuals")

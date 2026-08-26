@@ -31,9 +31,22 @@ export default function App() {
   const [focus, setFocus] = useState<string | null>(null);
   useEffect(() => {
     const [route, id] = location.hash.replace(/^#/, "").split("/");
-    if (route !== "reels") return;
-    setFocus(id ? decodeURIComponent(id) : null);
-    getShorts().then((s) => { setShorts(s); setStep("reels"); }).catch(() => {});
+    const openingReels = route === "reels";
+    if (openingReels) setFocus(id ? decodeURIComponent(id) : null);
+
+    // THE FEED IS LOADED ON EVERY MOUNT, not only behind #reels. Before this, the
+    // shorts already in output/ were fetched ONLY when the URL carried the hash —
+    // so on a normal page load `shorts` stayed empty, which left the step-3 crumb
+    // `disabled={!shorts.length}` and step 3 itself showing "No reels yet. Paste
+    // material in step 1". Sixteen finished shorts were sitting on disk and the one
+    // tab built to play them could not be opened. The only way in was to know to
+    // type #reels, which is not a thing a user knows.
+    //
+    // It is one cheap GET on a local server, and it is the same call the hash path
+    // already made, so nothing new can fail.
+    getShorts()
+      .then((s) => { setShorts(s); if (openingReels) setStep("reels"); })
+      .catch(() => {});
     getUsage().then(setTotal).catch(() => {});
   }, []);
 
@@ -147,6 +160,7 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
       if (e.key === "j") slots.current[active + 1]?.scrollIntoView({ behavior: "smooth" });
       if (e.key === "k") slots.current[active - 1]?.scrollIntoView({ behavior: "smooth" });
       if (e.key === "m") setVoiceOn((v) => !v);
+      if (e.key === "d") void download();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -167,6 +181,49 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
   const picked = pickVoices(voices);
   const recorded = shorts.filter((s) => s.audio_url).length;
 
+  // DOWNLOAD THE SHORT ON SCREEN, as an MP4.
+  //
+  // The render is synchronous on the server and takes a few seconds the first time
+  // (Chrome screenshots one frame per beat, ffmpeg muxes them with the recorded
+  // audio), then it is cached. So the button has to show that it is working, or a
+  // click looks like it did nothing and gets clicked again.
+  //
+  // A plain <a href download> cannot do that — it fires and forgets, with no hook
+  // for "started" or "failed". Fetching the blob lets the button say "rendering…",
+  // and lets a failure surface as a message instead of a silently broken save.
+  const [saving, setSaving] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const current = shorts[active];
+
+  const download = async () => {
+    if (!current || saving) return;
+    setSaving(current.short_id);
+    setSaveErr(null);
+    try {
+      const res = await fetch(`/api/video/${encodeURIComponent(current.short_id)}`);
+      if (!res.ok) {
+        let msg = `render failed (${res.status})`;
+        try { msg = (await res.json()).detail ?? msg; } catch { /* keep the status */ }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${current.short_id}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoked on a tick, not immediately: Safari cancels the save if the object
+      // URL disappears in the same frame as the click.
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(null);
+    }
+  };
+
   return (
     <div className="reelswrap">
       <div className="reeltop">
@@ -179,7 +236,13 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
                  onChange={(e) => setRate(+e.target.value)} />
           <span className="hintline">{rate.toFixed(1)}×</span>
         </label>
+        <button className="primary sm" onClick={download}
+                disabled={!current || !!saving}
+                title="download this reel as an MP4 (d)">
+          {saving ? "⏳ rendering…" : "⬇ download reel"}
+        </button>
         <span className="spacer" />
+        {saveErr && <span className="error sm">{saveErr}</span>}
         {/* Name the narrator that is actually going to speak. Advertising the
             browser's voices while a recorded track plays was simply wrong, and it
             hid the thing worth knowing: which shorts still lack a recording. */}
@@ -207,7 +270,7 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
       <div className="hint">
         scroll for the next short · <kbd>space</kbd> pause (stops the voice) ·{" "}
         <kbd>←</kbd>/<kbd>→</kbd> beat · <kbd>j</kbd>/<kbd>k</kbd> short ·{" "}
-        <kbd>l</kbd> like · <kbd>m</kbd> mute
+        <kbd>l</kbd> like · <kbd>m</kbd> mute · <kbd>d</kbd> download
       </div>
     </div>
   );

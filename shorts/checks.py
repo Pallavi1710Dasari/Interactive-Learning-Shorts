@@ -371,17 +371,35 @@ def check_source_quotes(script: Script, source_text: str,
     """
     Every answer beat must quote a span that actually occurs in the material.
 
-    Checked against the whole document when it is available, not only the cited
-    section. A question can legitimately need one sentence from a neighbouring
-    section — "what is the difference between X and Y" often does — and rejecting
-    that quote would push the model toward refusing rather than answering. The
-    guarantee that matters is unchanged: the sentence must exist in the material
-    the user supplied. Whether the short stayed on-topic for its section is the
-    judge's question, not this one's.
+    Checked against THE SECTION, not the whole document. This is the change, and it
+    is the one that cost the most to leave un-made.
+
+    It used to accept a quote from anywhere in the material, reasoning that a
+    question like "what is the difference between X and Y" legitimately needs a
+    sentence from a neighbouring section, and that rejecting it would push the model
+    toward refusing rather than answering. That reasoning is sound and the cost of
+    it was not visible from here — it was visible in the judge's verdicts, on four
+    of fifteen shipped shorts, all scoring faithfulness 2 of 5:
+
+      "beat 2 introduces a specific value ('A' = 65) and a claim about character
+       encoding that does not appear anywhere in the source section"
+      "Beat 3 introduces a concrete example ('GET /index.html', 'session key') that
+       does not appear anywhere in the source section"
+      "the cited code block is not part of this section and says nothing about
+       metadata or links"
+
+    Every one of those passed this grader, because the sentence existed SOMEWHERE.
+    A learner watching the reel is being taught a fact the section they just read
+    does not contain, cited to a section they were not shown — which is worse than
+    an uncited claim, because it looks checked.
+
+    `doc_text` is still taken, and still read: a quote found in the document but not
+    in the section gets a DIFFERENT message, one that tells the model it went to the
+    wrong place rather than that it made the sentence up. The retry loop acts on
+    that distinction, and the two failures need opposite fixes.
     """
     haystack = _flatten(source_text)
-    if doc_text:
-        haystack += "  " + _flatten(doc_text)
+    elsewhere = _flatten(doc_text) if doc_text else ""
     answers = [(i, b) for i, b in enumerate(script.beats) if b.speaker == "student"]
     if not answers:
         return GraderResult("source_quotes", False, "no answer beats to check")
@@ -397,15 +415,24 @@ def check_source_quotes(script: Script, source_text: str,
             thin.append(f"beat {i} quote is only {len(flat.split())} words")
             continue
         if flat not in haystack:
-            missing.append(f'beat {i} quotes "{quote[:70]}" which is not in the material')
+            if elsewhere and flat in elsewhere:
+                # Real sentence, wrong section. Say which, because "not in the
+                # material" would send the model looking for a better copy of a
+                # quote that was already copied correctly.
+                missing.append(
+                    f'beat {i} quotes "{quote[:70]}" — that sentence is in the '
+                    f"document but NOT in this short's own section, so the beat is "
+                    f"teaching material the viewer was not shown")
+            else:
+                missing.append(f'beat {i} quotes "{quote[:70]}" which is not in the material')
 
     problems = missing + thin
     if problems:
         return GraderResult("source_quotes", False,
             "; ".join(problems[:4]) +
-            ". Copy the sentence out of the reading material character for character. "
-            "The full quote is compared, so do not add words to it or run two "
-            "separated sentences together.",
+            ". Every beat must rest on a sentence from THIS SHORT'S SECTION, copied "
+            "character for character. The full quote is compared, so do not add "
+            "words to it or run two separated sentences together.",
             {"problems": problems})
 
     # One sentence propping up three beats. Whether a citation actually SUPPORTS its
@@ -433,27 +460,49 @@ def check_source_quotes(script: Script, source_text: str,
 
 def check_answers_its_section(script: Script, section_text: str) -> GraderResult:
     """
-    At least one answer beat must quote the section the topic was filed under.
+    EVERY answer beat must quote the section the topic was filed under.
 
-    write_script is given the whole document so that a topic whose answer lives in a
-    summary elsewhere can still be answered instead of refused. The cost of that is
-    drift: with everything in view, a short can wander off and answer something
-    adjacent to what its question asked. This is the anchor — the short may draw on
-    the whole material, but it has to be ABOUT its own section.
+    It used to be "at least one", which is a much weaker claim than it reads as: a
+    three-beat short with one anchored beat and two from elsewhere passed, and that
+    is precisely the shape the drifting shorts had. One beat holds the short to its
+    topic while the other two teach whatever the model found interesting nearby.
+
+    Measured on the fifteen units in output/, this grader passed all fifteen while
+    the judge scored four of them faithfulness 2 of 5 for exactly this — beats cited
+    to sections the viewer never read. The anchor was doing its job and its job was
+    too small.
+
+    So the rule is now the one a learner would assume was already true: a short about
+    section 3.3 is answered out of section 3.3. Every beat, not one.
+
+    THE COST, STATED PLAINLY, because it is a real trade and not a free win. A topic
+    whose section genuinely cannot support a full answer now fails three attempts and
+    is dropped instead of being padded from a neighbouring section. That is the
+    intended behaviour — these reels teach students, and a short that is wrong is
+    worse than a short that does not exist — but it does mean fewer shorts per
+    document, and the fix for a topic worth keeping is to file it under the section
+    that actually answers it.
     """
     section = _flatten(section_text)
     answers = [b for b in script.beats if b.speaker == "student"]
-    anchored = [b for b in answers
-                if b.source_quote and _flatten(b.source_quote) in section]
+    if not answers:
+        return GraderResult("on_topic", False, "no answer beats to check")
 
-    if not anchored:
+    strays = [i for i, b in enumerate(script.beats)
+              if b.speaker == "student"
+              and not (b.source_quote and _flatten(b.source_quote) in section)]
+
+    if strays:
         return GraderResult("on_topic", False,
-            "no answer beat quotes the section this short is filed under — the "
-            "answer has drifted onto neighbouring material. At least one beat must "
-            "come from the section itself, or the question is the wrong question "
-            "for this section.")
+            f"{len(strays)} of {len(answers)} answer beat(s) — {strays} — are not "
+            f"supported by this short's own section. Every beat must rest on a "
+            f"sentence from the section the short is filed under; a fact from "
+            f"elsewhere in the document is a fact the viewer was never shown. "
+            f"Either answer from this section alone, or answer the narrower "
+            f"question this section does support.",
+            {"strays": strays, "answers": len(answers)})
     return GraderResult("on_topic", True,
-                        f"{len(anchored)} of {len(answers)} beats quote its own section")
+                        f"all {len(answers)} answer beats quote its own section")
 
 
 # -------------------------------------------------------------------- svg defects
@@ -923,6 +972,41 @@ def check_frames_are_visual(unit: ShortUnit) -> GraderResult:
                               f"frame — draw the subject, not the sentence")
                 break
 
+    # A "stat" FRAME WHOSE VALUE IS NOT A VALUE IS A WORD ON A CARD.
+    #
+    # From a reel built on a computing-systems document, and it is the worst frame
+    # this pipeline has produced since the takeaway card was removed:
+    #
+    #     template "stat", title "What is being asked",
+    #     value "Computing system", caption "Computing system"
+    #
+    # The same two words, printed twice, under a title saying a question is being
+    # asked. It is the opening frame of the short, so a viewer's first two seconds
+    # are spent reading one noun three times.
+    #
+    # `stat` exists for "4 GB" — a FIGURE that is the whole content of a beat. Used
+    # for a bare noun it is the takeaway card wearing a different template name, and
+    # the brief's own words for it were "a frame whose whole content is a figure".
+    # So: a stat frame must carry a digit, and its caption must add something its
+    # value and title do not already say.
+    filler_stats: list[str] = []
+    for ref, visual in (unit.visuals or {}).items():
+        frame = visual.frame
+        if frame is None or frame.template != "stat":
+            continue
+        value = str(frame.value or "").strip()
+        caption = str(frame.caption or "").strip()
+        title = str(frame.title or "").strip()
+        if not any(ch.isdigit() for ch in value):
+            filler_stats.append(
+                f"{ref}: a 'stat' frame whose value is {value!r} — not a figure. "
+                f"This template is for a number that IS the beat ('4 GB'); a bare "
+                f"noun set large is a word on a card. Draw the thing instead")
+        elif caption.lower() in (value.lower(), title.lower()) or not caption:
+            filler_stats.append(
+                f"{ref}: 'stat' caption {caption!r} repeats its own value/title — "
+                f"the caption must NAME the figure ('addressable bytes'), not echo it")
+
     # A TABLE WHOSE ROWS REPEAT ITS OWN HEADERS IS NOT A LOOKUP.
     #
     # Found by the judge, not by anything here: "rows repeat the column headers as
@@ -946,12 +1030,81 @@ def check_frames_are_visual(unit: ShortUnit) -> GraderResult:
                                 f"({', '.join(frame.columns[:3])}) — the table shows "
                                 f"no values, so it draws no lookup")
 
-    problems = text_cards + sentences + echoes + empty_tables
+    problems = text_cards + sentences + echoes + filler_stats + empty_tables
     if problems:
         return GraderResult("frames_are_visual", False, "; ".join(problems[:3]),
                             {"problems": problems})
     return GraderResult("frames_are_visual", True,
                         "no frame is a slide of its own narration")
+
+
+#: Words whose presence in a glyph label means the label names TYPOGRAPHY, which is
+#: the one subject the `text` pictogram — a capital A — is an honest drawing of.
+_TYPE_WORDS = {"font", "fonts", "typeface", "typefaces", "text", "type", "family",
+               "serif", "italic", "bold", "weight", "letter", "letters", "character",
+               "characters", "heading", "paragraph", "word", "words", "caption",
+               "label", "style", "styling"}
+
+
+def check_icons_are_pictures(unit: ShortUnit) -> GraderResult:
+    """
+    An `icons` glyph must be a PICTURE OF ITS LABEL, not the nearest shape to hand.
+
+    THE COMPLAINT THIS EXISTS FOR: "if any image not able to display then it simply
+    showing A". There is no failed image. `text` is a real pictogram and it draws a
+    capital A, which is the right picture for a font and a wrong one for everything
+    else — and the model was reaching for it whenever a label named something
+    abstract, because nothing on the list was a picture of that thing.
+
+    Measured across fifteen shipped shorts: `text` used 11 times, `box` 6 times. A
+    capital A labelled "HTTP". A capital A labelled "Authentication". An empty box
+    labelled "Printer". Every one of those is a confident visual claim about what
+    the thing IS, made to a learner who believes a picture faster than a sentence.
+
+    Two failures, both structural:
+
+      `box` at all — it is the renderer's do-not-know fallback, so a frame that asks
+            for it is asking to draw nothing. It is no longer offered in the brief;
+            this catches it being named anyway.
+      `text` on a label that is not about type — the capital A is only true of
+            typography. `font`, `typeface`, `bold`, `heading` keep it; `HTTP`,
+            `Authentication`, `Network` do not.
+
+    Fixing the vocabulary was the other half of this: layout.PICTOGRAMS gained
+    server, network, cloud, globe, lock, key, shield, user, printer, clock, list,
+    folder, database and gear, so the label that used to have no picture now has
+    one. A grader without those additions would only have converted a bad drawing
+    into a rejected short.
+    """
+    from .skills.layout import LITERAL_ICONS
+
+    problems: list[str] = []
+    for ref, visual in (unit.visuals or {}).items():
+        frame = visual.frame
+        if frame is None or not frame.glyphs:
+            continue
+        for glyph in frame.glyphs:
+            if glyph.icon not in LITERAL_ICONS:
+                continue
+            label = str(glyph.label or "").strip()
+            if glyph.icon == "box":
+                problems.append(
+                    f'{ref}: glyph "{label}" uses icon "box", which draws an empty '
+                    f"rectangle — pick a pictogram of the thing, or use a template "
+                    f"built for claims rather than for objects")
+                continue
+            # "text" draws a capital A. Honest for type, a mis-claim for anything else.
+            if not (set(_stems(label)) & {_stem(w) for w in _TYPE_WORDS}):
+                problems.append(
+                    f'{ref}: glyph "{label}" uses icon "text", which draws a CAPITAL '
+                    f'A — that says "{label}" is typography. Use a pictogram of what '
+                    f"it actually is, or draw what it acts on instead")
+
+    if problems:
+        return GraderResult("icons_are_pictures", False, "; ".join(problems[:3]),
+                            {"problems": problems})
+    return GraderResult("icons_are_pictures", True,
+                        "every pictogram draws the thing its label names")
 
 
 def _frame_fingerprint(frame) -> tuple:
@@ -969,6 +1122,52 @@ def _frame_fingerprint(frame) -> tuple:
         tuple((s.text, s.label, s.font, s.scale, s.weight, s.italic, s.decoration)
               for s in frame.samples),
     )
+
+
+def _near_same(a, b) -> bool:
+    """
+    Are these two frames the same picture, allowing for a cosmetic label edit?
+
+    THE HOLE THIS CLOSES. _frame_fingerprint compares labels EXACTLY, so a frame
+    passed as "developed" if a single word changed anywhere in it. Measured on a
+    freshly built operating-system reel, whose beats 1 and 3 were:
+
+        icons: Users, Applications, Operating System, Hardware
+        icons: Users, Applications, Operating System, Hardware (CPU, I/O, RAM)
+
+    Identical drawing, identical roles, identical everything a viewer perceives —
+    four pictograms in the same order with the same one lit. The parenthetical made
+    the fingerprints differ, so the short passed a grader written to catch precisely
+    this, and the reviewer's complaint came back word for word: "if visuals present
+    also its showing same visuals again and again which feel bore".
+
+    So the comparison is now on the STRUCTURE a viewer sees — template, the drawn
+    pictograms, the count of elements, and the label STEMS — rather than on label
+    text. Two frames whose labels differ only by an added qualifier, a pluralisation
+    or a parenthetical are the same picture, because that is what they look like.
+    """
+    if a.template != b.template:
+        return False
+    if tuple(g.icon for g in a.glyphs) != tuple(g.icon for g in b.glyphs):
+        return False
+    la, lb = _frame_labels(a), _frame_labels(b)
+    if len(la) != len(lb):
+        return False
+    # Stem-set overlap per label: "Hardware" vs "Hardware (CPU, I/O, RAM)" shares
+    # its whole first stem set, so it reads as the same box with a note added.
+    for x, y in zip(la, lb):
+        sx, sy = set(_stems(x)), set(_stems(y))
+        if not sx or not sy:
+            if x.strip().lower() != y.strip().lower():
+                return False
+            continue
+        if not (sx <= sy or sy <= sx):
+            return False
+    ca = (tuple(str(c.label) for c in a.code_lines),
+          tuple((s.text, s.font, s.scale, s.weight, s.italic, s.decoration) for s in a.samples))
+    cb = (tuple(str(c.label) for c in b.code_lines),
+          tuple((s.text, s.font, s.scale, s.weight, s.italic, s.decoration) for s in b.samples))
+    return ca == cb
 
 
 def check_frames_develop(unit: ShortUnit) -> GraderResult:
@@ -1019,16 +1218,38 @@ def check_frames_develop(unit: ShortUnit) -> GraderResult:
     identical, roles_only, total = [], 0, 0
     for a, b in zip(frames, frames[1:]):
         total += 1
-        if _frame_fingerprint(a) != _frame_fingerprint(b):
+        # _near_same, not fingerprint equality: a label with a parenthetical added
+        # is the same picture, and comparing label text exactly let that through.
+        if not _near_same(a, b):
             continue
         roles_only += 1
-        if _frame_labels(a) == _frame_labels(b) and _roles(a) == _roles(b):
+        if _roles(a) == _roles(b):
             identical.append(b.template)
+
+    # A FRAME THAT RETURNS TO AN EARLIER ONE HAS NOT DEVELOPED EITHER.
+    #
+    # The consecutive check above misses the shape a freshly built operating-system
+    # reel actually had: frame 1 and frame 3 the same four pictograms, frame 2
+    # different. Every ADJACENT pair changes, so it passed — and the short still
+    # ends where it started, which is the complaint ("showing same visuals again and
+    # again which feel bore"). A composition that builds does not revisit; if beat 3
+    # genuinely wants beat 1's picture back, it should share beat 1's visual_ref and
+    # be honest that the picture is being held.
+    returns: list[str] = []
+    for i in range(len(frames)):
+        for j in range(i + 2, len(frames)):
+            if _near_same(frames[i], frames[j]):
+                returns.append(f"frame {j + 1} is the same picture as frame {i + 1} "
+                               f"({frames[j].template}) — the composition returns to "
+                               f"where it started instead of building")
 
     if identical:
         return GraderResult("frames_develop", False,
                             f"{len(identical)} consecutive frame(s) are byte-identical "
                             f"({', '.join(identical[:3])}) — the same picture twice")
+    if returns:
+        return GraderResult("frames_develop", False, "; ".join(returns[:2]),
+                            {"problems": returns})
     if roles_only:
         return GraderResult("frames_develop", False,
                             f"{roles_only} of {total} frame transition(s) only move the "
@@ -1213,7 +1434,7 @@ SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_r
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_svg_quality, check_frames_are_visual, check_frames_develop,
                   check_samples_differ, check_code_frames_quote_source,
-                  check_diagram_matches_narration]
+                  check_icons_are_pictures, check_diagram_matches_narration]
 
 #: Unit graders that read the reading material as well as the unit.
 _NEEDS_SOURCE = {check_diagram_matches_narration, check_code_frames_quote_source}

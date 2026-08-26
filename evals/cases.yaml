@@ -67,14 +67,23 @@ cases:
       to a single continuous answer and this case was flipped to reject split
       answers. Review rejected that: one long answer read as a wall of text, held
       one diagram on screen for ~40 seconds, and drifted off the source. So the
-      rule is back to a split answer, now 3-5 beats with a 32-word cap per beat.
+      rule is back to a split answer.
+
+      THE FLOOR IS 2, NOT 3, and this expectation was stale against it — the case
+      failed for months asking for the words "at least 3" while check_dialogue_shape
+      said "at least 2". The grader is the one that is right: skills/script.py asks
+      for two or three answer beats and calls three the maximum, and a padded third
+      beat with no object in it is what leaves the design step nothing new to draw.
+      A red eval nobody can act on teaches people to ignore the suite, so it is
+      fixed to the rule that is actually enforced.
+
       E011 is the success half. Change dialogue_shape and both cases together.
     type: code_grader
     grader: dialogue_shape
     fixture: evals/fixtures/single_answer.json
     expect:
       passed: false
-      reason_contains: "at least 3"
+      reason_contains: "at least 2"
 
   - id: E011
     name: A 3-5 beat answer with short beats is accepted
@@ -195,18 +204,19 @@ cases:
   - id: E017
     name: An answer that never quotes its own section is rejected
     why: >
-      The cost of handing write_script the whole document to stop it refusing: with
-      everything in view an answer can wander onto adjacent material and answer
-      something the question did not ask. This anchors it — the short may draw on
-      the whole material, but it must be ABOUT its own section. Graded against 3.1,
-      which the page-fault fixture never quotes.
+      An answer may only be built from the section the short is filed under. It used
+      to be enough for ONE beat to quote that section, which let a three-beat short
+      pass with two beats taught out of neighbouring material — and that is the shape
+      four shipped shorts had when the judge scored them faithfulness 2 of 5, each
+      for teaching a fact its own section does not contain. Now every answer beat has
+      to be anchored. Graded against 3.1, which the page-fault fixture never quotes.
     type: code_grader
     grader: on_topic
     section_id: "3.1"
     fixture: evals/fixtures/good_page_fault.json
     expect:
       passed: false
-      reason_contains: "drifted"
+      reason_contains: "not supported by this short's own section"
 
   - id: E018
     name: An answer grounded in its own section passes the anchor
@@ -218,6 +228,76 @@ cases:
     grader: on_topic
     section_id: "3.3"
     fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
+  # ------------------------------------------------------------- frames (unit)
+  #
+  # These grade a whole ShortUnit rather than a Script, because the defect is in the
+  # PICTURE. The harness could not load a unit until now, which is why the frame
+  # graders had no cases — and a grader with no case behind it is how all four of
+  # them ended up wired to nothing while 11 of 15 shipped shorts failed one.
+
+  - id: E019
+    name: Four frames that only move the highlight are rejected
+    why: >
+      The reviewer's words: "most of the slide is getting the same image". Frozen
+      from what_is_http_and_what_does_it_do as it shipped — three frames of the same
+      three glyphs with only the amber hero moving between them. Nothing is added,
+      removed or replaced, so a viewer reads everything on screen in two seconds and
+      then watches a still image for the rest of the short. check_frames_develop
+      already said exactly this and its own docstring said "This reports, it does
+      not gate"; skills/visuals.design_visuals is what now acts on it. E020 is the
+      success half.
+    type: unit_grader
+    grader: frames_develop
+    fixture: evals/fixtures/repeated_icon_frames.json
+    expect:
+      passed: false
+      reason_contains: "the same picture twice"
+
+  - id: E020
+    name: Frames that change between beats are accepted
+    why: >
+      The success half of E019. Without it the cheapest way to make frames_develop
+      green is to reject every composition, which would take out the legitimate case
+      the whole "one composition that builds" design exists for.
+    type: unit_grader
+    grader: frames_develop
+    fixture: evals/fixtures/developing_frames.json
+    expect:
+      passed: true
+
+  - id: E021
+    name: A glyph labelled HTTP drawn as a capital A is rejected
+    why: >
+      The reviewer's words: "if any image not able to display then it simply showing
+      A". No image failed. `text` is a real pictogram, it draws a capital A, and the
+      model reached for it whenever a label named something abstract — because the
+      icon list had no server, no network, no lock. A capital A captioned "HTTP"
+      tells a learner, in a picture, that HTTP is a letter of the alphabet.
+
+      Two halves to the fix and this case guards the second: layout.PICTOGRAMS gained
+      fourteen entries so the label has a picture, and check_icons_are_pictures fails
+      `text` on anything that is not typography and `box` anywhere at all. E022 is
+      the success half — a capital A IS the right drawing for a short about fonts.
+    type: unit_grader
+    grader: icons_are_pictures
+    fixture: evals/fixtures/repeated_icon_frames.json
+    expect:
+      passed: false
+      reason_contains: "CAPITAL A"
+
+  - id: E022
+    name: Pictograms that draw what they name are accepted
+    why: >
+      The success half of E021. The grader must not fire on `text` used honestly —
+      three shipped shorts label it "Text", which a capital A is a correct picture
+      of — nor on the fourteen new pictograms, which is the whole point of adding
+      them.
+    type: unit_grader
+    grader: icons_are_pictures
+    fixture: evals/fixtures/developing_frames.json
     expect:
       passed: true
 

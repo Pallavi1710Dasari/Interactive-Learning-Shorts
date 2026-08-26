@@ -72,8 +72,20 @@ MODEL_JUDGE     = os.getenv("MODEL_JUDGE", "claude-opus-5")
 # So: same tier as the generator or better. Defaults to the generator.
 MODEL_DIAGRAM   = os.getenv("MODEL_DIAGRAM", "").strip() or MODEL_GENERATOR
 
-#: Model names that mark a light/fast tier. Used only to warn about MODEL_JUDGE.
-_LIGHT_TIER = ("lite", "nano", "mini", "flash", "haiku", "small", "-8b", "3b", "1b")
+#: Tier words that mark a light/fast model. Matched as WHOLE SEGMENTS of the model
+#: id, not as substrings — "gemini" contains "mini", so a plain `in` test called
+#: google/gemini-2.5-pro a light tier and printed a warning telling the user their
+#: strongest available design model was underpowered. Any Gemini would have tripped
+#: it. Segments come from splitting on /, - and . so "gpt-5-mini" -> {gpt,5,mini}
+#: still matches and "gemini-2.5-pro" -> {gemini,2,5,pro} no longer does.
+_LIGHT_TIER = ("lite", "nano", "mini", "flash", "haiku", "small", "8b", "3b", "1b")
+
+
+def _is_light_tier(model: str) -> bool:
+    """Is this model id a light/fast tier, by whole-segment match?"""
+    import re
+    segments = {s for s in re.split(r"[/\-.:]+", model.lower()) if s}
+    return bool(segments & set(_LIGHT_TIER))
 
 
 def model_warnings() -> list[str]:
@@ -112,7 +124,7 @@ def _diagram_warning() -> str | None:
     diagram, gen = MODEL_DIAGRAM.lower(), MODEL_GENERATOR.lower()
     if diagram == gen:
         return None
-    if any(tag in diagram for tag in _LIGHT_TIER) and diagram != gen:
+    if _is_light_tier(diagram) and diagram != gen:
         return (f"MODEL_DIAGRAM ({MODEL_DIAGRAM}) is a light/fast tier. It no longer "
                 f"means 'draw this spec as coordinates' — since templates landed it "
                 f"DESIGNS every frame: picking a template, copying code out of the "
@@ -132,7 +144,7 @@ def _judge_warning() -> str | None:
     # not competing with the generator, it is doing a harder job than the generator:
     # writing a grounded script is easier than deciding whether someone else's script
     # is grounded. A light model is not up to the second task at any generator size.
-    if any(tag in judge for tag in _LIGHT_TIER):
+    if _is_light_tier(judge):
         return (f"MODEL_JUDGE ({MODEL_JUDGE}) is a light/fast tier. Grading a claim "
                 f"against its source is the hardest step here, and a judge that "
                 f"cannot do it does not fail loudly — it approves everything, and "

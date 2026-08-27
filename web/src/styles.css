@@ -204,6 +204,8 @@ kbd {
 .reel.live { transform: scale(1); opacity: 1; }
 
 /* Per-short hue keeps the feed from looking like one long identical page. */
+/* NOTE: this is the BASE. `.reel .reelbg` further down wins on specificity and is
+   where the reel's actual background lives — change it there, not here. */
 .reelbg {
   position: absolute; inset: 0; z-index: -1;
   background:
@@ -213,8 +215,16 @@ kbd {
 }
 .reelbg::after {
   content: ""; position: absolute; inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  background-size: 22px 22px; opacity: 0.5;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1px);
+  background-size: 22px 22px; opacity: 0.6;
+}
+/* A slow drift across the hue wash, so a still frame and a playing reel do not
+   look like the same thing. 40s and 3 degrees — enough that the frame is alive,
+   little enough that it never competes with the diagram building on top of it. */
+.reel.live .reelbg { animation: reeldrift 40s ease-in-out infinite alternate; }
+@keyframes reeldrift {
+  from { filter: hue-rotate(-3deg) saturate(1); transform: scale(1); }
+  to   { filter: hue-rotate(3deg) saturate(1.12); transform: scale(1.04); }
 }
 
 .segments { position: absolute; top: 11px; left: 13px; right: 13px; display: flex; gap: 4px; z-index: 4; }
@@ -257,7 +267,11 @@ kbd {
   position: absolute; top: 12.5%; left: 0; right: 0; bottom: 25%;
   display: grid; place-items: center; padding: 0 3.5%; cursor: pointer; z-index: 2;
 }
-.stageinner { width: 100%; height: 100%; display: grid; place-items: center; animation: rise 0.45s ease-out; }
+/* 0.24s, down from 0.45s. .stageinner is keyed on visual_ref, so this whole
+   fade-and-lift replays on every beat change — while the caption swaps
+   instantly. Half a second of the card fading up after the words have
+   already changed is most of "the visuals come late after the text". */
+.stageinner { width: 100%; height: 100%; display: grid; place-items: center; animation: rise 0.24s ease-out; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
 
 /* One quiet card behind every diagram. The frames of a short are meant to read as
@@ -302,34 +316,91 @@ kbd {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
+/* The action rail, read top to bottom the way a reel's does: whose turn it is,
+   then react, respond, pass on, keep, save the file. */
 .rail {
-  position: absolute; right: 10px; bottom: 5.5%; z-index: 4;
-  display: flex; flex-direction: column; align-items: center; gap: 13px;
+  position: absolute; right: 7px; bottom: 4.5%; z-index: 4;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 7px 3px; border-radius: 22px;
+  background: rgba(6, 12, 10, 0.2);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
-.rail button {
-  background: none; border: none; color: var(--cream); display: grid; place-items: center;
-  gap: 1px; padding: 0; transition: transform 0.14s;
+.rail .whocell { margin-bottom: 4px; }
+
+/* One button shape for every action: a 44px hit target, the icon optically
+   centred in it, and the label under it in the same place every time. The icons
+   are a single 24px SVG grid at one stroke weight (see RailIcons.tsx), so this
+   only has to size and colour them. */
+.railbtn {
+  background: none; border: none; padding: 4px 0 3px; width: 46px;
+  display: grid; place-items: center; gap: 2px; color: var(--cream);
+  border-radius: 13px; cursor: pointer;
+  transition: transform 0.16s cubic-bezier(.3,.9,.3,1.2), background 0.16s, color 0.16s;
 }
-.rail button:hover { transform: scale(1.16); }
-.rail .glyph { font-size: 24px; line-height: 1; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); }
-.rail button.on .glyph { color: #ff5b7f; }
-.rail em { font-style: normal; font-size: 9px; color: var(--teal-hi); }
-.railstate { font-size: 15px; opacity: 0.75; display: grid; place-items: center; }
-/* "hd" marks a recorded neural track rather than the browser synthesiser. */
+.railbtn svg {
+  width: 24px; height: 24px; display: block;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.75));
+}
+.railbtn em {
+  font-style: normal; font-size: 8.5px; font-weight: 600; line-height: 1;
+  letter-spacing: 0.02em; color: rgba(238, 244, 240, 0.72);
+  /* Fixed box: the labels change width ("share" -> "link copied", "mp4" ->
+     "rendering") and a column that resized on every state change jittered. */
+  width: 100%; text-align: center; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.railbtn:hover:not(:disabled) { transform: translateY(-1px) scale(1.08); background: rgba(255,255,255,.08); }
+.railbtn:active:not(:disabled) { transform: scale(0.94); }
+.railbtn:disabled { cursor: default; }
+
+/* Activated states. The icon is the same outline filled in, so the shape does not
+   move — only its weight and colour change, which is what makes the toggle read
+   as one object rather than two pictures. */
+.railbtn.on { color: #ff4d79; }
+.railbtn.on em { color: #ffa6bb; }
+.railbtn.on svg { filter: drop-shadow(0 0 9px rgba(255, 77, 121, 0.55)); }
+.railbtn.on:not(:active) svg { animation: railpop 0.32s cubic-bezier(.3,1.3,.4,1); }
+@keyframes railpop { 0% { transform: scale(1); } 45% { transform: scale(1.28); } 100% { transform: scale(1); } }
+
+.railbtn.busy svg { animation: railspin 0.9s linear infinite; }
+@keyframes railspin { to { transform: rotate(360deg); } }
+
+.railstate {
+  display: grid; place-items: center; gap: 2px; width: 46px;
+  padding: 4px 0 3px; color: rgba(238, 244, 240, 0.66);
+}
+.railstate svg { width: 21px; height: 21px; display: block; }
 .railstate em {
-  font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--accent); opacity: 0.9;
+  font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--accent); opacity: 0.85;
 }
 
+/* PAUSING SHOWS A BUTTON. It does not veil the short.
+   This was `inset: 0` with a 42% black wash and a blur over the whole reel, so
+   pausing to read a diagram — the single most likely reason to pause — dimmed and
+   blurred the diagram you paused to read. The overlay still covers the reel,
+   because the whole surface is the click target for resuming, but it is now
+   invisible: the only thing drawn is the button in the middle of it. */
 .tap {
   position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
-  background: rgba(3, 6, 7, 0.42); border: none; backdrop-filter: blur(1.5px);
+  background: transparent; border: none; cursor: pointer;
 }
 .tap span {
-  width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center;
-  background: rgba(244, 242, 236, 0.93); color: #06110c; font-size: 26px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(244, 242, 236, 0.94); color: #06110c; font-size: 27px;
+  /* The button carries its own contrast now that nothing behind it is dimmed:
+     a ring and a soft dark halo, so it reads over the light diagram card as well
+     as over the dark background. */
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55), 0 0 0 7px rgba(6, 12, 10, 0.26),
+              inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: tapin 0.22s cubic-bezier(.3,1.3,.4,1);
 }
+@keyframes tapin {
+  from { opacity: 0; transform: scale(0.82); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.tap:hover span { transform: scale(1.06); transition: transform 0.16s; }
 
 .hint { flex: none; padding: 8px 0 11px; text-align: center; color: var(--muted); font-size: 11px; }
 .center { flex: 1; display: grid; place-items: center; text-align: center; padding: 26px; }
@@ -500,7 +571,9 @@ kbd {
    upward over the diagram and clipped the takeaway line off the bottom of the
    card. The stage stops where the caption starts, and the caption is a fixed
    height whatever the sentence — see .flow below. */
-.stage { top: 11.5%; bottom: 39%; }
+/* The right inset is the rail's column. Without it the diagram card runs the
+   full width and the action buttons sit on top of the drawing. */
+.stage { top: 11.5%; bottom: 39%; padding-right: 56px; }
 
 /* THE DIAGRAM CARD IS LIGHT, AND THIS IS THE BIGGEST LEGIBILITY FIX HERE.
    Read the palette SVG_SYSTEM gives the model: #E1F5EE pale mint fills, #1D9E75
@@ -526,7 +599,42 @@ kbd {
    row a definite minmax(0, 1fr) height makes 100% mean "the band" all the way
    down, and preserveAspectRatio letterboxes the drawing inside it instead. */
 .reel .stage { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
-.reel .stageinner { height: 100%; min-height: 0; overflow: hidden; }
+.reel .stageinner { height: 100%; min-height: 0; overflow: hidden; position: relative; }
+
+/* AMBIENT MOTION INSIDE THE CARD, because most of the card is not the drawing.
+   cropFor() sizes every beat of a short to ONE shared box — the union of the ink
+   across all its frames — so the scale never jumps between beats. The cost is that
+   a sparse frame is drawn at the busy frame's scale and the rest of the card is
+   empty: "add some animation inside the white block it seems empty".
+   Two very quiet layers, both behind the drawing:
+     ::before  a soft wash in the short's own hue, drifting on a 26s loop
+     ::after   a faint grid, sliding one cell over 34s
+   Kept under 5% alpha. The card has to stay the calm, bright surface the diagram
+   is read against — the moment this is noticeable it is competing with the amber
+   element the frame is actually about. */
+.reel .stageinner::before,
+.reel .stageinner::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.reel .stageinner::before {
+  background:
+    radial-gradient(58% 42% at 22% 18%, hsl(var(--hue) 62% 58% / 0.085) 0%, transparent 70%),
+    radial-gradient(52% 46% at 82% 84%, hsl(calc(var(--hue) + 48) 60% 56% / 0.07) 0%, transparent 72%);
+  animation: cardwash 26s ease-in-out infinite alternate;
+}
+.reel .stageinner::after {
+  background-image:
+    linear-gradient(hsl(var(--hue) 30% 42% / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--hue) 30% 42% / 0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+  animation: cardgrid 34s linear infinite;
+}
+@keyframes cardwash {
+  from { transform: translate3d(-2.5%, -2%, 0) scale(1.05); opacity: 0.75; }
+  to   { transform: translate3d(2.5%, 2%, 0) scale(1.14); opacity: 1; }
+}
+@keyframes cardgrid { from { background-position: 0 0, 0 0; } to { background-position: 34px 34px, 34px 34px; } }
+
+/* The drawing sits above both. */
+.reel .svgwrap, .reel .bigtext { position: relative; z-index: 1; }
 .reel .svgwrap.animated { height: 100%; min-height: 0; }
 .reel .svgwrap.animated svg { width: 100%; height: 100%; max-height: 100%; }
 
@@ -636,13 +744,31 @@ kbd {
   --accent: hsl(var(--hue) 34% 52%);
   --accent-2: hsl(calc(var(--hue) + 26) 30% 46%);
 }
+/* THIS IS THE RULE THAT PAINTS, and it was measurably black.
+   Sampling a rendered frame at 22% saturation / 14% lightness: the brightest pixel
+   in the entire background was rgb(24,32,37) and most of it was rgb(6,9,10). "I
+   don't see any background like its not visible" was a literal description of the
+   output, not an impression.
+
+   It got that dark for a real reason — the comment above says it, and it still
+   holds: the diagram card is light, and it has to stay the brightest thing on
+   screen. But 22/14 overshot into black. 42/24 is roughly halfway back to the 62/26
+   this was reduced FROM, which is enough for each short's hue to actually read
+   while the card still wins by a wide margin. */
 .reel .reelbg {
   background:
-    radial-gradient(120% 80% at 50% -5%, hsl(var(--hue) 22% 14%) 0%, transparent 60%),
-    linear-gradient(170deg, #0b0f11 0%, #06090a 100%);
+    radial-gradient(125% 85% at 50% -5%, hsl(var(--hue) 42% 24%) 0%, transparent 64%),
+    radial-gradient(95% 70% at 10% 104%, hsl(calc(var(--hue) + 44) 38% 20%) 0%, transparent 60%),
+    radial-gradient(80% 55% at 96% 66%, hsl(calc(var(--hue) - 34) 34% 17%) 0%, transparent 62%),
+    linear-gradient(170deg, #0e181c 0%, #080f12 60%, #050a0c 100%);
 }
-.reel .reelbg::before { display: none; }   /* the rotating conic sweep */
-.reel .reelbg::after { opacity: 0.28; }    /* the dot grid */
+/* The conic sweep is back on, at a third of its old strength. It was switched off
+   with the saturation, and it is the only thing that moves behind a HELD frame —
+   the diagram finishes building about halfway through each beat and then sits
+   still, so without this the reel really is a static picture for seconds at a
+   time. Slow and dim enough that it never pulls the eye off the drawing. */
+.reel .reelbg::before { display: block; opacity: 0.34; }
+.reel .reelbg::after { opacity: 0.34; }    /* the dot grid */
 
 /* The 3D field is depth, not decoration. */
 .reel .threestage { opacity: 0.38; }
@@ -673,8 +799,14 @@ kbd {
 }
 .reel .flow .word.next { color: rgba(244, 242, 236, 0.34); }
 
-.reel .tap { background: rgba(4, 7, 8, 0.5); backdrop-filter: blur(2px); }
-.reel .tap span { background: rgba(244, 242, 236, 0.95); color: #08130e; }
+/* PAUSING SHOWS A BUTTON, IT DOES NOT VEIL THE SHORT. This is the rule that wins
+   (the .tap block further up is the base). It was a 50% black wash plus a 2px
+   backdrop blur over the ENTIRE reel, so pausing to look at a diagram — far and
+   away the most likely reason anyone pauses — dimmed and blurred the diagram they
+   paused to look at. The overlay still spans the reel, because the whole surface
+   is the tap target for resuming; it just draws nothing but the button. */
+.reel .tap { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.reel .tap span { background: rgba(244, 242, 236, 0.96); color: #08130e; }
 
 
 /* ============================================================================
@@ -764,3 +896,49 @@ kbd {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.55),
               0 0 0 2px hsl(var(--hue) 45% 55% / 0.75);
 }
+
+
+/* --------------------------------------------------------------- capture mode
+   #capture/<id>, the page shorts/video.py photographs. The reel normally sits in
+   a rounded card inside a scrolling feed with a page background around it; a
+   video file has no page around it, so here it fills the frame edge to edge.
+   Nothing interactive is rendered at all — see CaptureStage. */
+.reel.capture {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  transform: none; opacity: 1; border-radius: 0; box-shadow: none; margin: 0;
+  /* aspect-ratio AND max-height both have to go. The base .reel rule sets
+     `aspect-ratio: 9/16` and `max-height: calc(100% - 28px)`, and they survived
+     into capture: the element measured 1080x1781 inside a 1080x1920 viewport, so
+     every frame of every downloaded video had a 139px black band along the
+     bottom — 7% of the picture, dead. */
+  max-width: none; max-height: none; min-height: 100vh; aspect-ratio: auto;
+}
+.reel.capture .stage { border-radius: 0; padding-right: 3.5%; }
+
+/* ----------------------------------------------------------- redraw composer
+   Anchored over the reel next to the rail, because the frames it is describing
+   are on screen behind it. Not a modal: covering the picture with a dialog that
+   asks what is wrong with the picture is the obvious thing to get wrong. */
+.redrawbox {
+  position: absolute; right: 62px; bottom: 6%; z-index: 6; width: min(290px, 72%);
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  border-radius: 14px; background: rgba(10, 16, 18, 0.93);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: redrawin 0.16s ease-out;
+}
+@keyframes redrawin {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.redrawbox b { font-size: 12px; color: var(--cream); font-weight: 700; }
+.redrawbox textarea {
+  width: 100%; resize: none; font: inherit; font-size: 12px; line-height: 1.45;
+  color: var(--cream); background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 9px; padding: 8px 9px;
+}
+.redrawbox textarea:focus { outline: none; border-color: var(--teal-hi); }
+.redrawbox textarea::placeholder { color: rgba(238, 244, 240, 0.38); }
+.redrawfoot { display: flex; align-items: center; gap: 7px; }
+.redrawfoot .hintline { font-size: 9.5px; }

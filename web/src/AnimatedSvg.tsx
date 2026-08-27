@@ -44,7 +44,17 @@ import { useEffect, useMemo, useRef } from "react";
  * held back from the budget so that "whole" includes the last arrival's own
  * animation, not just the moment it was told to start.
  */
-const BUILD_FRACTION = 0.72;
+// 0.55, DOWN FROM 0.72, because the reviewer's complaint flipped direction:
+// "the visuals coming late after the text came". Both failure modes described in
+// the pacing comment below are real, and this sits between them — at 0.72 the
+// picture only finished about three quarters of the way through the sentence
+// explaining it, so for most of every beat the viewer was reading a caption
+// against a half-drawn diagram. At 0.55 the frame completes a little past the
+// midpoint and then HOLDS, whole and still, for the rest of the line.
+//
+// This is the knob to turn if it still feels wrong in either direction: lower
+// means the picture leads the voice, higher means it trails.
+const BUILD_FRACTION = 0.55;
 const MIN_STEP_MS = 420;
 
 /**
@@ -65,6 +75,9 @@ const DEFAULT_BEAT_MS = 4500;
 
 /** Never subdivide a frame into more arrivals than a viewer can follow. */
 const MAX_STEPS = 5;
+
+/** How much larger than the short's shared crop a sparse frame may be drawn. */
+const ZOOM_CAP = 1.6;
 
 /** How long a stroke takes to draw itself along its own length. */
 const DRAW_MS = 520;
@@ -415,6 +428,43 @@ function applyCrop(root: SVGSVGElement, crop: Box): void {
       y0 = Math.min(y0, ink.y - pad);
       x1 = Math.max(x1, ink.x + ink.width + pad);
       y1 = Math.max(y1, ink.y + ink.height + pad);
+
+      // A SPARSE FRAME IS ALLOWED TO COME FORWARD, up to ZOOM_CAP.
+      //
+      // The short's crop is the UNION of every frame's ink, which is what keeps the
+      // scale stable from beat to beat — and it is also why a thin frame is drawn
+      // tiny. Measured across six shorts, most frames fill 60-89% of the shared box
+      // and the sparse ones collapse: what_is_a_component beat 2 is a one-line code
+      // panel filling 25% of it, marooned in white. That is the "the white block
+      // seems empty" complaint, and it is arithmetic rather than taste.
+      //
+      // So the box shrinks toward THIS frame's own ink, but never below
+      // shared/ZOOM_CAP. A frame that already fills the union is untouched; a thin
+      // one grows until it is reasonable and then stops, so the eye still reads
+      // successive beats as one composition at one scale rather than a slideshow
+      // that zooms. 1.6 is about the largest step that does not read as a jump.
+      // SOLVED FOR HEIGHT, KEEPING THE BOX'S ASPECT — not by scaling both axes by
+      // one ratio, which was the first attempt and clipped. Shrinking a 4:3 box by
+      // the ratio that fits a tall thin drawing makes the box narrower than the
+      // drawing, and the measurement said so: frames came back at 105% and 122% of
+      // their crop, meaning the picture was being cut off at the edges.
+      //
+      // So: pick the smallest height that (a) fits the ink on BOTH axes at this
+      // box's aspect ratio and (b) is no less than shared/ZOOM_CAP, then derive the
+      // width from it. Containment is arithmetic rather than hope.
+      const boxW = x1 - x0, boxH = y1 - y0;
+      const aspect = boxW / boxH;
+      const needH = Math.max(
+        (ink.width + pad * 2) / aspect,   // wide enough once width is derived
+        ink.height + pad * 2,             // tall enough on its own
+        boxH / ZOOM_CAP,                  // never more than ZOOM_CAP closer in
+      );
+      if (needH < boxH) {
+        const cx = ink.x + ink.width / 2, cy = ink.y + ink.height / 2;
+        const hh = needH / 2, hw = (needH * aspect) / 2;
+        x0 = cx - hw; x1 = cx + hw;
+        y0 = cy - hh; y1 = cy + hh;
+      }
     }
   } catch {
     // getBBox throws on a subtree that is not laid out; the short's crop stands.

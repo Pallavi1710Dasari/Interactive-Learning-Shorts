@@ -304,6 +304,73 @@ def check_grounding(script: Script, source_text: str,
 _QUOTE_NOISE = re.compile(r"[^a-z0-9]+")
 MIN_QUOTE_WORDS = 4
 
+#: A CODE QUOTE IS EXEMPT FROM THE WORD FLOOR, and leaving it out made a whole
+#: class of short unbuildable.
+#:
+#: _flatten strips every non-alphanumeric before counting, which is right for prose
+#: — it is what lets a curly apostrophe or a line-wrapped sentence still match. On a
+#: line of code it is destructive: `font-family: "Roboto";` counts as THREE words,
+#: `color: blue;` as two, `input()` as ONE. And `font-family: "Roboto";` is not a
+#: hypothetical — it is the example SCRIPT_SYSTEM gives the model of a GOOD citation.
+#:
+#: So the brief said "quote the line of code", the grader said "at least 4 words",
+#: and a beat citing a short code line could satisfy neither. All three retries
+#: failed with `source_quotes: beat 1 quote is only 1 words`, the reviewer saw a red
+#: chip on a script whose citation was perfect, and no rewording could fix it.
+#:
+#: The floor exists to reject a bare word — "binary", "False" — offered as evidence.
+#: A code line is the opposite of that: it is the most specific citation the
+#: material can offer. So code is judged on length instead, and still has to be
+#: found in the section like every other quote.
+MIN_QUOTE_CHARS = 6
+#: `:` and CamelCase are in here for a reason that took a real failure to find.
+#: `SyntaxError: invalid syntax` is three words, is the literal output the material
+#: prints, and is exactly what a beat about syntax errors should cite — and it was
+#: rejected as "a fragment, not a sentence" because the marks below only looked for
+#: brackets and semicolons. An error message, a dict key, a `label:` — all are the
+#: document's own literal text rather than a sentence about it. A colon in real
+#: prose almost always sits in a clause long enough to clear the word floor before
+#: this is ever consulted.
+_CODE_MARKS = re.compile(
+    r"[{}()\[\];=<>/\\]|::|--|:\s|\w+\.\w+|[a-z][A-Z]|^\s*[.#@]\w")
+
+
+def _is_code_quote(raw: str) -> bool:
+    """Does this quote read as a line of code rather than a sentence of prose?"""
+    text = raw.strip()
+    if len(text) < MIN_QUOTE_CHARS:
+        return False
+    return bool(_CODE_MARKS.search(text))
+
+
+def _is_whole_sentence(raw: str) -> bool:
+    """
+    Is this a COMPLETE sentence, however short?
+
+    THE SECOND HALF OF THE SAME BUG. Exempting code from the word floor fixed
+    `input()` and left this: a floor of four words rejects
+
+        "HTTP is stateless."
+        "Paging removes fragmentation."
+
+    which are three words each after _flatten strips the full stop, and which are
+    exactly the sentence a beat should be citing. The reviewer got
+    `source_quotes: beat 2 quote is only 3 words` on a citation that was perfect,
+    with no way to satisfy it — the material simply does not contain a longer way
+    of saying it.
+
+    A terminal full stop is what separates a short SENTENCE from a short FRAGMENT,
+    and the fragment is the thing the floor was built to catch: "the browser window"
+    and "a valid bit" are three words with no stop and cite nothing. Two words is
+    the floor even here, so a stray "It." is still refused.
+
+    The quote must still be found verbatim in the section — that check is untouched
+    and is what actually establishes the citation. This only decides whether a short
+    quote is allowed to try.
+    """
+    text = raw.strip()
+    return text.endswith((".", "!", "?")) and len(_flatten(text).split()) >= 2
+
 
 def _flatten(text: str) -> str:
     """Collapse to bare alphanumerics so punctuation and whitespace cannot bite.
@@ -411,8 +478,15 @@ def check_source_quotes(script: Script, source_text: str,
             missing.append(f"beat {i} has no source_quote")
             continue
         flat = _flatten(quote)
-        if len(flat.split()) < MIN_QUOTE_WORDS:
-            thin.append(f"beat {i} quote is only {len(flat.split())} words")
+        if (len(flat.split()) < MIN_QUOTE_WORDS
+                and not _is_code_quote(quote)
+                and not _is_whole_sentence(quote)):
+            # THE QUOTE IS IN THE MESSAGE. Without it the reviewer was told a word
+            # count and left to guess which of four beats it meant and what it had
+            # said — and the model was asked to fix a string it could not see.
+            thin.append(f'beat {i} quote is only {len(flat.split())} words: '
+                        f'"{quote[:60]}" — a fragment, not a sentence. Quote the '
+                        f'whole sentence it came from, ending at its full stop')
             continue
         if flat not in haystack:
             if elsewhere and flat in elsewhere:
@@ -443,8 +517,22 @@ def check_source_quotes(script: Script, source_text: str,
     #
     # One repeat is allowed, because a closing takeaway legitimately lands on the
     # same sentence an earlier beat introduced.
+    #
+    # `max(1, ...)`, NOT `max(2, ...)`, and the difference is the whole rule at the
+    # smallest size. The floor of 2 made the sentence above false for a two-beat
+    # answer: it needed 2 distinct quotes from 2 beats, which is zero repeats — the
+    # one thing the comment says is allowed. And the failure was unescapable, because
+    # the advice it printed ("or use fewer beats") means going to ONE answer beat,
+    # which check_dialogue_shape rejects. A short whose section carries one strong
+    # sentence had nothing it could do but fail:
+    #
+    #   source_quotes: 2 answer beats rest on only 1 distinct sentence(s)
+    #
+    # The padding this exists to catch is four beats propped on one sentence, and
+    # `len(answers) - 1` still catches exactly that. Two beats sharing a citation on
+    # a sixteen-second short is a question answered in two parts, not filler.
     quotes = {_flatten(b.source_quote or "") for _, b in answers}
-    needed = max(2, len(answers) - 1)
+    needed = max(1, len(answers) - 1)
     if len(quotes) < needed:
         return GraderResult("source_quotes", False,
             f"{len(answers)} answer beats rest on only {len(quotes)} distinct "
@@ -910,6 +998,105 @@ def _frame_labels(frame) -> list[str]:
     return [str(x) for x in out if str(x).strip()]
 
 
+def _only_grew(a, b) -> bool:
+    """
+    Is `b` just `a` with something appended — the same picture, one item longer?
+
+    THE HOLE THIS CLOSES, and it is the one the reviewer actually complained about.
+    _near_same bails out at `len(la) != len(lb)`, so ADDING an element counted as a
+    developed picture. Measured on a shipped HTTP short, the three frames were:
+
+        icons: Browser, Server
+        icons: Browser, HTTP, Server
+        icons: Browser, HTTP, Server, Developer
+
+    Every transition "changed the picture" by that test, so frames_develop passed —
+    and what plays is one row of pictograms with a fourth pictogram arriving. The
+    viewer has seen the composition by beat 1; beats 2 and 3 add a box to it. That
+    is the "same visual for every point" complaint, scoring a pass.
+
+    GROWTH IS NOT FORBIDDEN, it is just not sufficient ON ITS OWN. A short whose
+    every transition is an append is a single slide revealed in pieces. One append
+    among real changes is fine, and the caller only fails a short where growth (or
+    a moved accent) is the ONLY thing that ever happens.
+
+    Requires the same template and the same drawn pictograms in order, with `a`'s
+    labels appearing in `b` in the same order — an append or an insert, with nothing
+    removed and nothing replaced. A frame that REPLACES an element is a real change
+    and is deliberately not matched here.
+    """
+    if a.template != b.template:
+        return False
+    ga, gb = [g.icon for g in a.glyphs], [g.icon for g in b.glyphs]
+    la, lb = _frame_labels(a), _frame_labels(b)
+    if (len(ga), len(la)) == (len(gb), len(lb)):
+        return False                      # same size — that is _near_same's job
+    if len(ga) > len(gb) or len(la) > len(lb):
+        return False                      # b is smaller: something was removed
+    return _is_subsequence(ga, gb) and _is_subsequence(
+        [_norm_label(x) for x in la], [_norm_label(x) for x in lb])
+
+
+def _norm_label(text: str) -> frozenset:
+    """A label as the stem set a viewer reads, so a parenthetical is not a change."""
+    return frozenset(_stems(str(text))) or frozenset([str(text).strip().lower()])
+
+
+def _is_subsequence(small: list, big: list) -> bool:
+    """Does `small` appear inside `big` in order, allowing gaps?"""
+    it = iter(big)
+    return all(any(x == y for y in it) for x in small)
+
+
+def check_frames_vary_template(unit: ShortUnit) -> GraderResult:
+    """
+    A short may not be built from a single template.
+
+    THE COMPLAINT THIS EXISTS FOR: "for a theory topic it giving the same visual for
+    all the points so it looks not good and repetitive". Measured across the 32 units
+    in output/, SIX were one template end to end — four `code` panels in a row, four
+    `table` frames in a row, three `icons` rows in a row — and every one of them
+    passed every design grader there was.
+
+    WHY THIS IS A SEPARATE GRADER AND NOT PART OF frames_develop. That one asks
+    whether each transition changes the picture, which is a question about PAIRS. A
+    short can pass it pair by pair and still be four variations on one layout, because
+    "the table gained a row" is a change and four tables is still four tables. This
+    asks the question about the WHOLE short, which is the level the complaint lives
+    at: the viewer is not comparing beat 3 to beat 2, they are watching one shape for
+    fifteen seconds.
+
+    Deliberately the loosest rule that catches the complaint: TWO distinct templates
+    is enough to pass. The point is not to force variety for its own sake — a short
+    that genuinely wants two code frames and a diagram should pass, and does. It is
+    to reject the degenerate case where the model picked one layout and never
+    reconsidered. `layout.py` ships ten templates; `icons` alone was 34% of every
+    frame drawn, and `preview` and `stat` were under 3% each.
+
+    Held to shorts with three or more distinct frames. Two frames of the same
+    template is a held picture, which frames_develop already reasons about properly.
+    """
+    refs: list[str] = []
+    for beat in unit.beats:
+        if not refs or refs[-1] != beat.visual_ref:
+            refs.append(beat.visual_ref)
+    templates = [unit.visuals[r].frame.template for r in refs
+                 if r in unit.visuals and unit.visuals[r].frame is not None]
+    if len(templates) < 3:
+        return GraderResult("frames_vary_template", True,
+                            f"{len(templates)} frame(s) — too few to call repetitive")
+    distinct = sorted(set(templates))
+    if len(distinct) < 2:
+        return GraderResult(
+            "frames_vary_template", False,
+            f"all {len(templates)} frames use the same template ({distinct[0]}) — "
+            f"the short is one layout repeated, which reads as the same visual on "
+            f"every beat. Give at least one beat a different kind of picture.")
+    return GraderResult("frames_vary_template", True,
+                        f"{len(distinct)} templates across {len(templates)} frames "
+                        f"({', '.join(distinct)})")
+
+
 def check_frames_are_visual(unit: ShortUnit) -> GraderResult:
     """
     A frame has to be a PICTURE of the idea, not the sentence about it in a box.
@@ -1215,12 +1402,19 @@ def check_frames_develop(unit: ShortUnit) -> GraderResult:
     if len(frames) < 2:
         return GraderResult("frames_develop", True, "single frame, nothing to compare")
 
-    identical, roles_only, total = [], 0, 0
+    identical, roles_only, grew, total = [], 0, 0, 0
     for a, b in zip(frames, frames[1:]):
         total += 1
         # _near_same, not fingerprint equality: a label with a parenthetical added
         # is the same picture, and comparing label text exactly let that through.
         if not _near_same(a, b):
+            # AN APPEND IS NOT A NEW PICTURE EITHER. See _only_grew: the shipped
+            # HTTP short grew Browser+Server into Browser+HTTP+Server into
+            # Browser+HTTP+Server+Developer and passed every transition, because
+            # each one "changed". Counted separately from roles_only so the failure
+            # message can say which of the two shapes it actually is.
+            if _only_grew(a, b):
+                grew += 1
             continue
         roles_only += 1
         if _roles(a) == _roles(b):
@@ -1255,8 +1449,18 @@ def check_frames_develop(unit: ShortUnit) -> GraderResult:
                             f"{roles_only} of {total} frame transition(s) only move the "
                             f"accent on the same picture — the viewer sees one static "
                             f"slide with a highlight sliding over it")
+    # EVERY transition an append means the whole short is one composition revealed
+    # in pieces — nothing is ever replaced, so beat 1 already showed the shape. One
+    # append among real changes is a legitimate build and is not failed here.
+    if grew and grew == total:
+        return GraderResult("frames_develop", False,
+                            f"all {total} transition(s) only ADD to the previous frame "
+                            f"— the picture never changes, it only grows, so the viewer "
+                            f"has seen the whole composition by the first beat. Replace "
+                            f"something, or give a beat a different kind of picture")
     return GraderResult("frames_develop", True,
-                        f"all {total} transition(s) change the picture")
+                        f"all {total} transition(s) change the picture"
+                        + (f" ({grew} by adding to it)" if grew else ""))
 
 
 def _roles(frame) -> tuple:
@@ -1433,6 +1637,7 @@ SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_r
 #: Unit graders that need only the unit.
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_svg_quality, check_frames_are_visual, check_frames_develop,
+                  check_frames_vary_template,
                   check_samples_differ, check_code_frames_quote_source,
                   check_icons_are_pictures, check_diagram_matches_narration]
 

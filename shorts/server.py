@@ -15,7 +15,7 @@ Cost shape, worth knowing before clicking:
 
 So Step 2 is cheap and Step 3 is not. Only finalize what a human approved.
 """
-import json, re, uuid
+import json, re, threading, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -603,8 +603,96 @@ def finalize(body: FinalizeIn):
     # Only what this build produced. Returning every unit in output/ meant
     # approving one short and then being shown seven, which is not what the
     # reviewer asked for.
-    fresh = [s for s in feed.collect() if s["short_id"] in set(built)]
+    #
+    # QUARANTINED SHORTS ARE REPORTED, NOT SILENTLY DROPPED, and that is the whole
+    # point of this block. feed.collect() hides "needs_review"/"rejected" from the
+    # student feed, which is correct — but this response was assembled from that
+    # same filtered list, so a build whose shorts were ALL held back by the judge
+    # came back as built:[five ids], failed:[], shorts:[].
+    #
+    # The browser reads that as success with nothing in it. `failed` is empty so no
+    # error renders, and step 3 shows "No reels yet. Paste material in step 1,
+    # approve some answers in step 2" — advice to redo the two steps that had just
+    # succeeded. Meanwhile five paid-for units are sitting in output/ with the
+    # judge's problems attached and nothing anywhere says so.
+    #
+    # A check that can throw work away has to be the thing that explains itself.
+    # The units come back under their own key with their verdicts, and the reviewer
+    # is told what the judge objected to.
+    produced = {u["short_id"]: u for u in feed.collect(include_quarantined=True)
+                if u["short_id"] in set(built)}
+    fresh = [u for u in produced.values() if u["status"] not in feed.QUARANTINED]
+    held = [u for u in produced.values() if u["status"] in feed.QUARANTINED]
+    for u in held:
+        print(f"    ! {u['short_id']} held out of the reel ({u['status']})")
     return {"built": built, "failed": failed, "warnings": warned, "shorts": fresh,
+            "quarantined": held,
+            "usage": usage.since(cursor), "total": usage.totals()}
+
+
+class RevisualIn(BaseModel):
+    short_id: str
+    instruction: str
+
+
+@app.post("/api/revisual")
+def revisual(body: RevisualIn):
+    """
+    Redraw ONE short's pictures from a reviewer's note. One paid call, usually.
+
+    THE ASYMMETRY THIS CLOSES. A script the reviewer dislikes has had a note box
+    since step 2 — say what is wrong, get a rewrite. The PICTURES had nothing. The
+    only way to change a diagram was `redraw --redesign`, which selects on grader
+    failures across the whole of output/ and takes no opinion: a frame that passes
+    every grader and is simply confusing was unfixable from the app.
+
+    That is the wrong way round, because the pictures are the half a viewer complains
+    about. The note goes down the same channel the design graders use — see
+    design_visuals(note=...) — so it is carried across retries rather than lost the
+    first time a grader trips.
+
+    Writes the unit back, so the next feed read and the next MP4 render both pick it
+    up. The reel this belongs to is already built and paid for; this replaces its
+    frames, not the short.
+    """
+    note = body.instruction.strip()
+    if not note:
+        raise HTTPException(400, "say what should change about the pictures")
+
+    path = config.OUTPUT_DIR / f"{body.short_id}.json"
+    if not path.exists():
+        raise HTTPException(404, f"no such short: {body.short_id}")
+    unit = ShortUnit(**json.loads(path.read_text()))
+
+    from .redraw import _section_for
+    section = _section_for(unit)
+    if section is None:
+        raise HTTPException(
+            422,
+            f"the material {body.short_id} was built from is no longer on disk, so "
+            f"its frames cannot be redrawn against it — re-upload it and rebuild.")
+
+    cursor = usage.mark()
+    script = Script(short_id=unit.short_id, question=unit.question, beats=unit.beats)
+    visuals, problems = design_visuals(script, section, previous=unit.visuals, note=note)
+    # A renamed ref would fail ShortUnit's every_ref_resolved validator and lose the
+    # short; keep the old frame for anything the redesign did not cover.
+    for ref, old in unit.visuals.items():
+        visuals.setdefault(ref, old)
+    unit.visuals = visuals
+
+    warnings = [f"{r.name}: {r.reason}"
+                for r in checks.run_unit_graders(unit, section.text) if not r.passed]
+    path.write_text(unit.model_dump_json(indent=2))
+
+    # The cached MP4 was rendered from the frames this just replaced.
+    stale = config.OUTPUT_DIR / unit.short_id / "reel.mp4"
+    stale.unlink(missing_ok=True)
+
+    fresh = [u for u in feed.collect(include_quarantined=True)
+             if u["short_id"] == unit.short_id]
+    return {"short": fresh[0] if fresh else None,
+            "problems": problems, "warnings": warnings,
             "usage": usage.since(cursor), "total": usage.totals()}
 
 
@@ -658,19 +746,105 @@ if _SAMPLES.exists():
               StaticFiles(directory=_SAMPLES, html=True), name="voice-samples")
 
 
+#: Renders in flight, by short_id. A render is ~90s of CPU with no API calls, so it
+#: is cheap to repeat and expensive to WAIT on — the point of this registry is that
+#: the browser does not hold a request open for a minute and a half.
+_RENDERS: dict[str, dict] = {}
+_RENDER_LOCK = threading.Lock()
+#: One render at a time. Each already runs three browsers of its own (see
+#: video.DEFAULT_WORKERS); letting two shorts render at once just makes both slower.
+_RENDER_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="render")
+
+
+def _render_job(short_id: str) -> None:
+    """Run one render, keeping its progress where /api/video/status can see it."""
+    from . import video as videomod
+
+    def progress(done: int, total: int) -> None:
+        with _RENDER_LOCK:
+            job = _RENDERS.get(short_id)
+            if job:
+                job.update(done=done, total=total, status="rendering")
+
+    try:
+        videomod.render(short_id, progress=progress)
+        with _RENDER_LOCK:
+            _RENDERS[short_id] = {**_RENDERS.get(short_id, {}),
+                                  "status": "done", "error": None}
+    except BaseException as e:      # noqa: BLE001 - surfaced to the client
+        with _RENDER_LOCK:
+            _RENDERS[short_id] = {**_RENDERS.get(short_id, {}), "status": "error",
+                                  "error": f"{type(e).__name__}: {e}"}
+
+
+def _check_id(short_id: str) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", short_id):
+        raise HTTPException(400, "bad short_id")
+
+
+@app.post("/api/video/{short_id}")
+def start_render(short_id: str):
+    """
+    Begin rendering, and return immediately.
+
+    WHY THIS IS NO LONGER SYNCHRONOUS. The old handler's docstring said a render was
+    "seconds, no API calls... a job queue would be more moving parts than the work
+    justifies", and that was true when it screenshotted one still per BEAT. It now
+    photographs the real player at 30fps and takes about 90 seconds, and a
+    minute-and-a-half HTTP request is a different animal: it survives on localhost
+    only because nothing in the path has a read timeout. Any proxy in front of this
+    would cut it at 60s, and the browser gets no progress out of it either way.
+
+    Idempotent — asking again while one is in flight returns the job already running
+    rather than starting a second.
+    """
+    _check_id(short_id)
+    if not (config.OUTPUT_DIR / f"{short_id}.json").exists():
+        raise HTTPException(404, f"no such short: {short_id}")
+
+    from . import video as videomod
+    with _RENDER_LOCK:
+        job = _RENDERS.get(short_id)
+        if job and job.get("status") in ("queued", "rendering"):
+            return {"short_id": short_id, **job}
+        # Cached AND current — the fingerprint check inside render() covers a stale
+        # video from an older renderer, so this only short-circuits a real hit.
+        mp4 = config.OUTPUT_DIR / short_id / "reel.mp4"
+        stamp = config.OUTPUT_DIR / short_id / "reel.stamp"
+        unit = config.OUTPUT_DIR / f"{short_id}.json"
+        if mp4.exists() and videomod._stamp_matches(
+                stamp, videomod._renderer_fingerprint(), unit):
+            _RENDERS[short_id] = {"status": "done", "done": 1, "total": 1, "error": None}
+            return {"short_id": short_id, **_RENDERS[short_id]}
+        _RENDERS[short_id] = {"status": "queued", "done": 0, "total": 0, "error": None}
+    _RENDER_POOL.submit(_render_job, short_id)
+    with _RENDER_LOCK:
+        return {"short_id": short_id, **_RENDERS[short_id]}
+
+
+@app.get("/api/video/{short_id}/status")
+def render_status(short_id: str):
+    """Where a render has got to. Poll this; it is cheap and does no work."""
+    _check_id(short_id)
+    with _RENDER_LOCK:
+        job = _RENDERS.get(short_id)
+    if not job:
+        return {"short_id": short_id, "status": "idle", "done": 0, "total": 0,
+                "error": None}
+    return {"short_id": short_id, **job}
+
+
 @app.get("/api/video/{short_id}")
 def video(short_id: str):
     """
-    Render (or serve the cached) MP4 for one short, as a file download.
+    Serve the finished MP4.
 
-    Synchronous on purpose. A render is a few Chrome screenshots and one ffmpeg
-    pass — seconds, no API calls, no cost — so a job queue with polling would be
-    more moving parts than the work justifies. The result is cached beside the unit
-    and only rebuilt when the unit JSON is newer, so a second click is instant.
+    Still renders synchronously if asked for a short that has none — the CLI and any
+    script that just wants the file keep working — but the app posts first and polls,
+    so in practice this is a cache hit by the time it is called.
     """
     from . import video as videomod
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", short_id):
-        raise HTTPException(400, "bad short_id")
+    _check_id(short_id)
     try:
         mp4 = videomod.render(short_id)
     except FileNotFoundError as e:

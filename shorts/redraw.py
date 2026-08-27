@@ -87,6 +87,7 @@ def _design_problems(unit: ShortUnit) -> list[str]:
     """
     section = _section_for(unit)
     results = [checks.check_frames_are_visual(unit), checks.check_frames_develop(unit),
+               checks.check_frames_vary_template(unit),
                checks.check_samples_differ(unit), checks.check_svg_quality(unit),
                checks.check_icons_are_pictures(unit)]
     if section is not None:

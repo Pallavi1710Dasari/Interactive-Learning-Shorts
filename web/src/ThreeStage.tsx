@@ -55,7 +55,18 @@ export function ThreeStage({ hue, active, speaking, beat }: {
 
     const width = mount.clientWidth || 414;
     const height = mount.clientHeight || 736;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // HALF RESOLUTION WHEN THE RENDERER IS PHOTOGRAPHING THIS, and it is the
+    // single biggest lever on how long a download takes. Headless Chrome has no
+    // GPU, so SwiftShader rasterises this particle field in software on every one
+    // of the ~400 frames of a short — measured, hiding this layer entirely took a
+    // 75-frame capture from 30s to 19s, so it was over half the per-frame cost.
+    //
+    // It does not need the pixels. It is an out-of-focus depth field sitting at
+    // 0.38 opacity behind a diagram card; a half-scale buffer stretched back up is
+    // indistinguishable from the full one, and it quarters the fill cost. The
+    // player still gets full resolution.
+    const capturing = !!(window as unknown as Record<string, unknown>).__captureMode;
+    renderer.setPixelRatio(capturing ? 0.5 : Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
     renderer.setClearAlpha(0);
     mount.appendChild(renderer.domElement);
@@ -121,11 +132,34 @@ export function ThreeStage({ hue, active, speaking, beat }: {
     let pulse = 0;
     let lastBeat = live.current.beat;
     let breath = 0;
+    let lastCaptured: number | null = null;
     const clock = new THREE.Clock();
 
     const tick = () => {
       frame = requestAnimationFrame(tick);
-      const t = clock.getElapsedTime();
+      // CAPTURE OVERRIDE. shorts/video.py photographs this page one frame at a
+      // time, which takes far longer in wall time than the short lasts — so a
+      // clock reading the wall would drift the depth layer out of step with the
+      // picture it sits behind. CaptureStage publishes the VIDEO time instead, and
+      // when it is present that is the only clock this loop obeys.
+      const captured = (window as unknown as Record<string, unknown>).__captureTime;
+      const t = typeof captured === "number" ? captured : clock.getElapsedTime();
+
+      // UNDER CAPTURE, RENDER ONCE PER VIDEO FRAME — not once per animation frame.
+      //
+      // The renderer spends most of its wall clock encoding a screenshot and
+      // shipping it over the DevTools socket, and this loop kept running flat out
+      // the whole time: rebuilding the particle buffer and re-rendering the scene
+      // dozens of times for a single video frame that had not changed. In software
+      // rasterisation on a headless box that is the most expensive thing on the
+      // page, and it was competing for CPU with the very encode it was waiting on.
+      //
+      // The capture clock only moves when seek() is called, so comparing against it
+      // collapses all that to exactly one render per frame. There is nothing to see
+      // in between — the page is not being photographed then.
+      if (typeof captured === "number" && captured === lastCaptured) return;
+      lastCaptured = typeof captured === "number" ? captured : null;
+
       const state = live.current;
 
       if (state.beat !== lastBeat) { lastBeat = state.beat; pulse = 1; }

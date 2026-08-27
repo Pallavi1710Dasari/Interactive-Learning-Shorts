@@ -159,7 +159,11 @@ is a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTE
 - Copy, do not retype from memory, and do not tidy it up. It is checked by exact
   match AGAINST THE SECTION — not against the whole document — and a beat whose
   quote is not found in the section is rejected.
-- At least 4 words. One sentence is ideal; two adjacent sentences are allowed.
+- At least 4 words of PROSE. One sentence is ideal; two adjacent sentences are
+  allowed. A line of CODE is exempt from that count and may be short — `input()`
+  and `color: blue;` are complete, specific citations — but it must still be copied
+  from the section exactly and must still be at least a few characters. A bare word
+  ("binary", "False") is never a citation, in prose or in code.
 - Quote a sentence that STATES something. A heading, a title, or a list label is
   not evidence — "What are header and heading elements in HTML?" is a question the
   material asks, not a fact it establishes. Cite the sentence that answers it.

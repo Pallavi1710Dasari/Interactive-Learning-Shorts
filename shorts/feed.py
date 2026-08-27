@@ -23,6 +23,13 @@ from . import config
 SIDECARS = {"manifest.json", "topics.json", "smoke_unit.json", "usage.json"}
 MIN_BEAT_SECONDS = 1.4
 
+# The two statuses that keep a short out of the student-facing reel. Named here
+# because collect() is not the only caller that has to reason about them: the
+# finalize endpoint has to tell the reviewer that a short it just paid for was
+# held back, and it can only do that if "held back" is one shared definition
+# rather than a tuple written out twice and drifting.
+QUARANTINED = ("needs_review", "rejected")
+
 
 def _timeline(unit: ShortUnit) -> tuple[list[dict], float]:
     """
@@ -164,7 +171,7 @@ def collect(include_quarantined: bool = False) -> list[dict]:
             continue
         # "rejected" is the CLI path's word for the same thing — run.py sets it when
         # the judge verdict fails — and it was being shown to students too.
-        if unit.status in ("needs_review", "rejected") and not include_quarantined:
+        if unit.status in QUARANTINED and not include_quarantined:
             continue
         beats, total = _timeline(unit)
         units.append({

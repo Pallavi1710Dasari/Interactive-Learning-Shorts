@@ -17,3 +17,7 @@ imageio-ffmpeg>=0.5
 # The other local option, piper-tts, stays a manual install — it is rougher, and
 # only worth it if you would rather not keep 330MB of Kokoro on disk.
 kokoro-onnx>=0.4
+# Driving headless Chrome over the DevTools protocol, for shorts/video.py.
+# It arrived as a uvicorn[standard] transitive before; video.py imports it
+# directly, so it is declared rather than borrowed.
+websockets>=12

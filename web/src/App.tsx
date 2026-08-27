@@ -1,15 +1,65 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getHealth, getShorts, getUsage, type MaterialResult, type UsageTotals } from "./api";
+import { getHealth, getShorts, getUsage, renderStatus, startRender,
+         type MaterialResult, type UsageTotals } from "./api";
 import { CostPill } from "./CostPill";
 import { Reel } from "./Reel";
 import { StepMaterial } from "./StepMaterial";
 import { StepReview } from "./StepReview";
+import { CaptureStage } from "./CaptureStage";
 import { pickVoices, useVoices } from "./useNarration";
 import type { Feedback, Unit } from "./types";
 
 type Step = "material" | "review" | "reels";
 
 export default function App() {
+  // #capture/<short_id> — the MP4 renderer's entry point, and deliberately the
+  // FIRST thing checked. It must render the short and nothing else: no topbar, no
+  // step crumbs, no cost pill. shorts/video.py photographs whatever is on this
+  // page, so anything drawn here ends up in the file someone posts.
+  const capture = useCaptureRoute();
+  if (capture) return <CaptureRoute shortId={capture} />;
+
+  return <Workspace />;
+}
+
+/** The short id in #capture/<id>, or null when this is a normal page load. */
+function useCaptureRoute(): string | null {
+  const [route] = useState(() => {
+    const [head, id] = location.hash.replace(/^#/, "").split("/");
+    return head === "capture" && id ? decodeURIComponent(id) : null;
+  });
+  return route;
+}
+
+/**
+ * One short, alone on the page, for the renderer to photograph.
+ *
+ * It fetches the feed rather than being handed a unit, because the renderer opens
+ * this URL cold in a fresh browser. `window.__captureError` is set on failure so
+ * the renderer can fail with the reason instead of timing out on a blank page.
+ */
+function CaptureRoute({ shortId }: { shortId: string }) {
+  const [unit, setUnit] = useState<Unit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    getShorts()
+      .then((all) => {
+        const hit = all.find((u) => u.short_id === shortId);
+        if (!hit) throw new Error(`no such short in the feed: ${shortId}`);
+        setUnit(hit);
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        (window as unknown as Record<string, unknown>).__captureError = msg;
+        setError(msg);
+      });
+  }, [shortId]);
+  if (error) return <div className="center"><b>capture failed</b><p>{error}</p></div>;
+  if (!unit) return null;
+  return <CaptureStage unit={unit} />;
+}
+
+function Workspace() {
   const [step, setStep] = useState<Step>("material");
   const [material, setMaterial] = useState<MaterialResult | null>(null);
   const [shorts, setShorts] = useState<Unit[]>([]);
@@ -91,7 +141,13 @@ export default function App() {
           onDone={(s) => { setShorts(s); setStep("reels"); }}
         />
       )}
-      {step === "reels" && <Reels shorts={shorts} focus={focus} />}
+      {step === "reels" && (
+        <Reels shorts={shorts} focus={focus}
+               // A redraw replaces one short's frames on the server; swap it in
+               // here so the feed shows the new pictures without a refetch.
+               onReplace={(next) => setShorts((all) =>
+                 all.map((u) => (u.short_id === next.short_id ? next : u)))} />
+      )}
     </div>
   );
 }
@@ -113,7 +169,9 @@ function Crumb({ n, label, on, done, disabled, onClick }: {
 }
 
 /** Step 3 — reels only. No Q&A panel: reviewing was step 2's job. */
-function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
+function Reels({ shorts, focus, onReplace }: {
+  shorts: Unit[]; focus?: string | null; onReplace: (u: Unit) => void;
+}) {
   const [active, setActive] = useState(0);
   const [voiceOn, setVoiceOn] = useState(true);
   const [rate, setRate] = useState(1);
@@ -160,47 +218,49 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
       if (e.key === "j") slots.current[active + 1]?.scrollIntoView({ behavior: "smooth" });
       if (e.key === "k") slots.current[active - 1]?.scrollIntoView({ behavior: "smooth" });
       if (e.key === "m") setVoiceOn((v) => !v);
-      if (e.key === "d") void download();
+      // "d" is handled inside <Reel>, which knows which short is on screen and
+      // owns the rail button it belongs to. Handling it here as well fired the
+      // render twice for one keypress.
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
-  if (!shorts.length) {
-    return (
-      <div className="center">
-        <div>
-          <b>No reels yet</b>
-          <p className="lede">Paste material in step 1, approve some answers in step 2.</p>
-          <code>python -m shorts.run content/session_18_paging.md --topics 5 --no-tts</code>
-        </div>
-      </div>
-    );
-  }
-
-  const picked = pickVoices(voices);
-  const recorded = shorts.filter((s) => s.audio_url).length;
-
   // DOWNLOAD THE SHORT ON SCREEN, as an MP4.
   //
-  // The render is synchronous on the server and takes a few seconds the first time
-  // (Chrome screenshots one frame per beat, ffmpeg muxes them with the recorded
-  // audio), then it is cached. So the button has to show that it is working, or a
-  // click looks like it did nothing and gets clicked again.
+  // HOOKS BEFORE THE EARLY RETURN, and that is not a style preference: this
+  // useState pair used to sit BELOW the `if (!shorts.length) return` above, so on
+  // the render where the feed arrives React saw two hooks appear out of nowhere and
+  // the component's hook order changed. It survived only because the empty branch
+  // is rare on a machine that already has units in output/.
   //
-  // A plain <a href download> cannot do that — it fires and forgets, with no hook
-  // for "started" or "failed". Fetching the blob lets the button say "rendering…",
-  // and lets a failure surface as a message instead of a silently broken save.
+  // The render is a real capture of the player now — every frame photographed at
+  // 30fps — so the first download of a short takes a minute rather than seconds
+  // and the button MUST say so. It is cached afterwards.
   const [saving, setSaving] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
-  const current = shorts[active];
 
-  const download = async () => {
-    if (!current || saving) return;
-    setSaving(current.short_id);
+  const [progress, setProgress] = useState(0);
+
+  const download = useCallback(async (unit: Unit) => {
+    if (!unit || saving) return;
+    setSaving(unit.short_id);
     setSaveErr(null);
+    setProgress(0);
     try {
-      const res = await fetch(`/api/video/${encodeURIComponent(current.short_id)}`);
+      // POST-THEN-POLL, because the render is about ninety seconds. It used to be
+      // one GET held open for the whole of it, which worked on localhost only
+      // because nothing in the path times out — and gave the button nothing to show
+      // but a spinner. Now the server owns the job and this asks how far it is.
+      let job = await startRender(unit.short_id);
+      while (job.status === "queued" || job.status === "rendering") {
+        await new Promise((r) => setTimeout(r, 900));
+        job = await renderStatus(unit.short_id);
+        if (job.total) setProgress(Math.round((100 * job.done) / job.total));
+      }
+      if (job.status === "error") throw new Error(job.error ?? "render failed");
+
+      const res = await fetch(`/api/video/${encodeURIComponent(unit.short_id)}`);
       if (!res.ok) {
         let msg = `render failed (${res.status})`;
         try { msg = (await res.json()).detail ?? msg; } catch { /* keep the status */ }
@@ -210,7 +270,7 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${current.short_id}.mp4`;
+      a.download = `${unit.short_id}.mp4`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -221,8 +281,31 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
       setSaveErr(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(null);
+      setProgress(0);
     }
-  };
+  }, [saving]);
+
+  // Reachable now only by opening the app with an empty output/ — a build that
+  // produces nothing playable keeps the reviewer on step 2, next to the reasons,
+  // instead of dumping them here to read setup advice for work they already did.
+  if (!shorts.length) {
+    return (
+      <div className="center">
+        <div>
+          <b>No reels yet</b>
+          <p className="lede">
+            Paste material in step 1, approve some answers in step 2. Shorts the judge
+            scored under the bar are held back from the reel and reported on step 2 —
+            they stay in <code>output/</code> with their verdict.
+          </p>
+          <code>python -m shorts.run content/session_18_paging.md --topics 5 --no-tts</code>
+        </div>
+      </div>
+    );
+  }
+
+  const picked = pickVoices(voices);
+  const recorded = shorts.filter((s) => s.audio_url).length;
 
   return (
     <div className="reelswrap">
@@ -236,11 +319,6 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
                  onChange={(e) => setRate(+e.target.value)} />
           <span className="hintline">{rate.toFixed(1)}×</span>
         </label>
-        <button className="primary sm" onClick={download}
-                disabled={!current || !!saving}
-                title="download this reel as an MP4 (d)">
-          {saving ? "⏳ rendering…" : "⬇ download reel"}
-        </button>
         <span className="spacer" />
         {saveErr && <span className="error sm">{saveErr}</span>}
         {/* Name the narrator that is actually going to speak. Advertising the
@@ -262,7 +340,10 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
         {shorts.map((unit, i) => (
           <div className="slot" key={unit.short_id} ref={(el) => { slots.current[i] = el; }}>
             <Reel unit={unit} active={i === active} voiceOn={voiceOn} rate={rate}
-                  onFeedback={onFeedback} />
+                  onFeedback={onFeedback} onDownload={download}
+                  downloading={saving === unit.short_id}
+                  downloadPct={saving === unit.short_id ? progress : 0}
+                  onRedrawn={onReplace} />
           </div>
         ))}
       </div>
@@ -270,7 +351,8 @@ function Reels({ shorts, focus }: { shorts: Unit[]; focus?: string | null }) {
       <div className="hint">
         scroll for the next short · <kbd>space</kbd> pause (stops the voice) ·{" "}
         <kbd>←</kbd>/<kbd>→</kbd> beat · <kbd>j</kbd>/<kbd>k</kbd> short ·{" "}
-        <kbd>l</kbd> like · <kbd>m</kbd> mute · <kbd>d</kbd> download
+        <kbd>l</kbd> like · <kbd>s</kbd> save · <kbd>m</kbd> mute ·{" "}
+        <kbd>r</kbd> replay · <kbd>d</kbd> download
       </div>
     </div>
   );

@@ -467,10 +467,21 @@ Every cell, box and row takes a role, and the role decides its colour:
   "plain"  present and relevant, but not what is being said right now.
   "lost"   something wasted, rejected, invalid or unusable. Used sparingly.
   "quiet"  context the viewer should not read yet.
-Moving the hero between beats, on the same template, is how the explanation is
-carried. That is the "one composition that builds" rule, made concrete: keep the
-SAME template and the SAME cells across the beats of a short, and change which one
-is the hero.
+Moving the hero is how a SINGLE frame directs attention. It is NOT how a short is
+built, and reading it that way is what produced the defect this brief spends most of
+its length warning about.
+
+DO NOT keep the same template and the same cells across the beats of a short. Four
+beats of one template is one slide shown four times, however the accent moves on it,
+and it is rejected by a grader that counts the distinct templates in your answer.
+A short of three or more frames MUST use at least two different templates.
+
+The "one composition that builds" rule is about the SUBJECT, not the shape: every
+frame is a picture of the same idea, and the pictures are allowed — expected — to be
+different kinds of picture. Showing the effect in a "preview" and then the rule that
+caused it in a "code" frame is one explanation in two pictures. Showing the same
+"icons" row four times with one more pictogram each time is not; the viewer has read
+the whole composition during beat one.
 
 KEEP THE LABELS SHORT — 14 CHARACTERS OR FEWER
 The renderer will shrink a long label, wrap it to two lines, and finally truncate
@@ -642,7 +653,8 @@ def _design_graders(section: Section | None = None):
     warning printed after the short is written.
     """
     from .. import checks
-    graders = [checks.check_frames_develop, checks.check_frames_are_visual,
+    graders = [checks.check_frames_develop, checks.check_frames_vary_template,
+               checks.check_frames_are_visual,
                checks.check_icons_are_pictures, checks.check_samples_differ]
     if section is not None:
         graders.append(lambda u: checks.check_code_frames_quote_source(u, section.text))
@@ -652,7 +664,8 @@ def _design_graders(section: Section | None = None):
 def design_visuals(script: Script, section: Section | None = None, *,
                    draw: bool = True,
                    previous: dict[str, Visual] | None = None,
-                   attempts: int = MAX_DESIGN_ATTEMPTS) -> tuple[dict[str, Visual], list[str]]:
+                   attempts: int = MAX_DESIGN_ATTEMPTS,
+                   note: str | None = None) -> tuple[dict[str, Visual], list[str]]:
     """
     Design the frames, grade them, and ask again for the ones that failed.
 
@@ -686,7 +699,17 @@ def design_visuals(script: Script, section: Section | None = None, *,
 
     best: dict[str, Visual] | None = None
     best_problems: list[str] | None = None
-    feedback: str | None = None
+    # A HUMAN'S NOTE SEEDS THE FEEDBACK CHANNEL the graders already use, rather than
+    # getting its own prompt. write_script works this way for scripts and the reason
+    # is the same here: the model has one place it reads "your last answer was
+    # rejected, here is why", so a reviewer saying "the second frame is unreadable"
+    # arrives through the channel that is already known to change the next attempt.
+    # It is carried forward across retries, so a grader failure never discards it.
+    feedback: str | None = (
+        f"A human reviewer looked at these frames and asked for this change:\n{note.strip()}\n\n"
+        f"Apply it. Everything below is in addition to it, never instead of it."
+        if note and note.strip() else None
+    )
 
     for attempt in range(1, max(1, attempts) + 1):
         # ONE BAD ATTEMPT MUST NOT LOSE THE GOOD ONES.
@@ -741,7 +764,8 @@ def design_visuals(script: Script, section: Section | None = None, *,
         if attempt < attempts:
             print(f"    redesign {attempt}/{attempts} for {script.short_id}: "
                   + "; ".join(p[:110] for p in problems[:2]))
-        feedback = "\n".join(f"  - {p}" for p in problems)
+        graded = "\n".join(f"  - {p}" for p in problems)
+        feedback = f"{feedback}\n\nIt also broke these hard rules:\n{graded}" if note else graded
 
     # Every attempt unusable: hand back what the caller already had rather than an
     # empty dict, which would fail validation at the call site for a different reason.

@@ -1,41 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatedSvg } from "./AnimatedSvg";
-import { Avatar } from "./Avatars";
-import { FlowingCaption } from "./FlowingCaption";
-import { ThreeStage } from "./ThreeStage";
-import type { Feedback, Unit } from "./types";
 import { useNarration } from "./useNarration";
+import { Avatar } from "./Avatars";
+import { ReelStage, beatFill, hueFor } from "./ReelStage";
+import { CommentIcon, DownloadIcon, HeartIcon, RedrawIcon, ReplayIcon, SaveIcon,
+         ShareIcon, SpinnerIcon, VolumeIcon } from "./RailIcons";
+import { revisual } from "./api";
+import type { Feedback, Unit } from "./types";
 
 /**
  * One short, playing.
  *
- * ONE THING AT A TIME. THAT IS THE WHOLE LAYOUT RULE.
- * This frame used to carry, simultaneously: a diagram, a three-word headline chip
- * over the diagram, the spoken line as a caption, the short's question along the
- * bottom, and two illustrated characters at a desk. Five things competing inside a
- * phone-sized rectangle, and a first-time viewer read none of them — the eye had
- * nowhere to land, and the caption and the question said overlapping things in two
- * different places.
- *
- * So the frame is now two zones and nothing else:
- *   the diagram   — the thing to remember, given the whole upper frame
- *   the caption   — the sentence being spoken, flowing word by word
- *
- * The chip went because it repeated the diagram's own title. The question footer
- * went because the first beat IS the question, spoken and captioned. The characters
- * went because they carried no information and took a quarter of the height.
- *
- * No question/answer review panel here either by design — reviewing happens in
- * step 2. A learner watching a reel should see what a learner sees.
+ * The PICTURE lives in <ReelStage>, which the MP4 renderer draws too — see that
+ * file for why. What is left here is everything a video file cannot have: the
+ * clock, the keyboard, and the controls down the right-hand side.
  */
 export function Reel({
-  unit, active, voiceOn, rate, onFeedback,
+  unit, active, voiceOn, rate, onFeedback, onDownload, downloading, downloadPct,
+  onRedrawn,
 }: {
   unit: Unit;
   active: boolean;
   voiceOn: boolean;
   rate: number;
   onFeedback: (f: Feedback) => void;
+  /** Save this short as an MP4. Lives in the rail, where a reel's actions live. */
+  onDownload?: (unit: Unit) => void;
+  downloading?: boolean;
+  /** 0-100 while the MP4 renders, so the button can show real progress. */
+  downloadPct?: number;
+  /** The short, with its frames replaced, after a redraw. */
+  onRedrawn?: (unit: Unit) => void;
 }) {
   const n = useNarration(unit.beats, unit.seconds,
                          { enabled: voiceOn, rate, active, audioUrl: unit.audio_url });
@@ -45,27 +39,33 @@ export function Reel({
   // clock — see Narration.completed for why that read as an unfinished video.
   const finished = n.completed;
   const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [shared, setShared] = useState<string | null>(null);
+  const [flagged, setFlagged] = useState(false);
+  // The redraw composer. Open state and text live here rather than in App because
+  // the note is about THIS short and nothing above needs to know it was typed.
+  const [redrawOpen, setRedrawOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [redrawing, setRedrawing] = useState(false);
+  const [redrawErr, setRedrawErr] = useState<string | null>(null);
 
-  // Every frame of this short, so AnimatedSvg can crop them all to one shared box
-  // instead of letting each beat pick its own scale. See cropFor().
-  const frames = useMemo(
-    () => unit.beats.map((b) => b.svg ?? "").filter(Boolean),
-    [unit.beats],
-  );
+  const sendRedraw = async () => {
+    if (!note.trim() || redrawing) return;
+    setRedrawing(true);
+    setRedrawErr(null);
+    try {
+      const r = await revisual(unit.short_id, note);
+      if (r.short) onRedrawn?.(r.short);
+      setNote("");
+      setRedrawOpen(false);
+    } catch (e) {
+      setRedrawErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRedrawing(false);
+    }
+  };
 
-  // A stable per-short hue so the feed does not look like one long identical page —
-  // but confined to a narrow teal-to-green band.
-  //
-  // It used to hash across the whole 360-degree wheel, which gave some shorts a hot
-  // magenta frame and others acid yellow. Against a light diagram card that reads as
-  // garish rather than varied, and a saturated caption panel competes with the one
-  // amber element in the drawing that is supposed to be the brightest thing on
-  // screen. 55 degrees is enough for one short not to look like the last one.
-  const hue = useMemo(() => {
-    let h = 0;
-    for (const c of unit.short_id) h = (h * 31 + c.charCodeAt(0)) % 360;
-    return 152 + (h % 56);
-  }, [unit.short_id]);
+  const hue = useMemo(() => hueFor(unit.short_id), [unit.short_id]);
 
   useEffect(() => {
     if (active || n.progress <= 0.05) return;
@@ -77,6 +77,19 @@ export function Reel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
+  // COPIES THE DEEP LINK, rather than opening a share sheet that is not there.
+  // #reels/<id> is a real route (see App.tsx), so this produces a URL that opens
+  // this exact short — which is what a share button is for on a feed whose items
+  // are individually addressable.
+  const share = async () => {
+    const url = `${location.origin}/#reels/${encodeURIComponent(unit.short_id)}`;
+    try {
+      if (navigator.share) await navigator.share({ title: unit.question, url });
+      else { await navigator.clipboard.writeText(url); setShared("link copied"); }
+    } catch { setShared("copy failed"); }
+    setTimeout(() => setShared(null), 1800);
+  };
+
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
@@ -86,105 +99,122 @@ export function Reel({
       else if (e.key === "ArrowLeft") { e.preventDefault(); n.goToBeat(n.beat - 1); }
       else if (e.key === "r") n.replay();
       else if (e.key === "l") setLiked((v) => !v);
+      else if (e.key === "s") setSaved((v) => !v);
+      else if (e.key === "d") onDownload?.(unit);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, n]);
+  }, [active, n, unit, onDownload]);
 
   const isAsking = beat.speaker === "interviewer";
 
   return (
     <div className={`reel${active ? " live" : ""}`} style={{ ["--hue" as string]: hue }}>
-      <div className="reelbg" />
-      {/* WebGL depth behind everything. Mounted only while this reel is the one on
-          screen — see ThreeStage for why that matters in a long feed. */}
-      <ThreeStage hue={hue} active={active} speaking={n.speaking} beat={n.beat} />
+      {/* ReelStage owns .stage; clicking the picture pauses, and pausing
+          silences the voice. */}
+      <ReelStage
+        unit={unit}
+        beatIndex={n.beat}
+        time={n.time}
+        speaking={n.speaking}
+        hue={hue}
+        progressPct={beatFill(n.progress, n.beat, unit.beats.length)}
+        onStageClick={n.toggle}
+      />
 
-      {/* Story-style segments: one per beat, the current one filling. */}
-      <div className="segments">
-        {unit.beats.map((_, i) => (
-          <span key={i} className="seg">
-            <span
-              className="segfill"
-              style={{
-                width: i < n.beat ? "100%" : i === n.beat ? `${beatFill(n, i, unit)}%` : "0%",
-              }}
-            />
-          </span>
-        ))}
-      </div>
-
-      <header className="reelhead">
-        {/* The mode marker. It changes with the speaker, which the 🤔 in the action
-            rail never did — that one is a feedback button, but sitting there
-            unchanged through question AND answer it read as a broken indicator. So
-            the indicator is here, next to the name it belongs to, and it moves. */}
-        <div className="who">
-          <span className="mode" aria-hidden="true">{isAsking ? "🤔" : "📖"}</span>
-          {isAsking ? "Asking" : "Answering"}
-        </div>
-        <div className="tagline">
-          §{unit.section}
-          {unit.judge && <> · <span title="faithfulness / clarity / pace">
-            {unit.judge.faithfulness}·{unit.judge.clarity}·{unit.judge.pace}
-          </span></>}
-        </div>
-      </header>
-
-      {/* The visual. Click anywhere to pause — and pausing silences the voice. */}
-      <div className="stage" onClick={n.toggle}>
-        <div className="stageinner" key={beat.visual_ref}>
-          {beat.svg ? (
-            // Keyed on the visual_ref so a beat that REUSES the previous frame's
-            // visual does not replay its build. That is the point of the "one
-            // composition" design: the picture holds, and only the narration moves.
-            <AnimatedSvg svg={beat.svg} beatKey={beat.visual_ref}
-                         composition={frames}
-                         beatMs={(beat.end - beat.start) * 1000} />
-          ) : (
-            <div className="bigtext">{beat.on_screen}</div>
-          )}
-        </div>
-      </div>
-
-      {/* The narration itself, revealed word by word under the voice saying it.
-          It used to show `on_screen` — three words, read instantly, then nothing
-          to follow for the rest of the beat. The spoken line, flowing, is what
-          lets a viewer watch with the sound off and still follow the answer. */}
-      <div className={`bubble ${isAsking ? "left" : "right"}`}>
-        <FlowingCaption line={beat.line} words={beat.words} time={n.time}
-                        speaker={beat.speaker} />
-      </div>
-
-      {/* Instagram-style action rail */}
+      {/* The action rail. Reads top to bottom the way a reel's does: react, then
+          respond, then pass it on, then keep it. The speaker avatar sits at the
+          top because on a reel that slot is whose post it is, and here the
+          "author" of the moment is whoever is talking. */}
       <div className="rail">
-        <button className={liked ? "on" : ""} onClick={() => setLiked((v) => !v)} title="like (l)">
-          <span className="glyph">{liked ? "♥" : "♡"}</span>
-        </button>
-        {/* The character whose turn it is, small, and mouthing along while the
-            voice runs — the .avatar.speaking keyframes are already in styles.css.
-            This slot held three different glyphs before: 🤔 read as a speaker
-            state that never changed, ⚑ read as a bare mark, ❓ read as a control.
-            The honest answer was that a speaker indicator belongs here and the
-            drawn characters already ARE that indicator, so they came back — as an
-            icon rather than the full desk scene that used to eat a quarter of the
-            frame.
-
-            Note this replaces the "mark this moment confusing" button, so that
-            feedback signal is no longer collectable from the reel. The `confusing`
-            event and its handling are untouched, and README Part E still describes
-            drop-off capture, so putting a control back is a one-line change. */}
         <div className="whocell" title={isAsking ? "interviewer asking" : "student answering"}>
-          <Avatar speaker={beat.speaker} speaking={n.speaking} size={30} />
+          <Avatar speaker={beat.speaker} speaking={n.speaking} size={34} />
         </div>
-        <button onClick={n.replay} title="replay (r)"><span className="glyph">↻</span></button>
+
+        <button className={`railbtn${liked ? " on" : ""}`}
+                onClick={() => setLiked((v) => !v)} title="like (l)">
+          <HeartIcon filled={liked} />
+          <em>{liked ? 1 : 0}</em>
+        </button>
+
+        {/* The honest label for "this confused me". It is the one feedback signal
+            the reel can collect that the pipeline actually consumes — see
+            README Part E — so it keeps a button rather than being dropped for a
+            comment box the server has nowhere to put. */}
+        <button className="railbtn"
+                onClick={() => { onFeedback({ short_id: unit.short_id, event: "confusing",
+                                              at: +n.time.toFixed(1) });
+                                 setFlagged(true); setTimeout(() => setFlagged(false), 1600); }}
+                title="mark this moment confusing (c)">
+          <CommentIcon />
+          <em>{flagged ? "noted" : "unclear"}</em>
+        </button>
+
+        <button className="railbtn" onClick={share} title="copy a link to this short">
+          <ShareIcon />
+          <em>{shared ?? "share"}</em>
+        </button>
+
+        <button className={`railbtn${saved ? " on" : ""}`}
+                onClick={() => setSaved((v) => !v)} title="save (s)">
+          <SaveIcon filled={saved} />
+          <em>{saved ? "saved" : "save"}</em>
+        </button>
+
+        <button className={`railbtn${downloading ? " busy" : ""}`} disabled={downloading}
+                onClick={() => onDownload?.(unit)} title="download this reel (d)">
+          {downloading ? <SpinnerIcon /> : <DownloadIcon />}
+          <em>{downloading ? (downloadPct ? `${downloadPct}%` : "start\u2026") : "mp4"}</em>
+        </button>
+
+        <button className={`railbtn${redrawOpen ? " on" : ""}`}
+                onClick={() => setRedrawOpen((v) => !v)}
+                title="redraw these frames from a note">
+          <RedrawIcon />
+          <em>redraw</em>
+        </button>
+
+        <button className="railbtn" onClick={n.replay} title="replay (r)">
+          <ReplayIcon />
+          <em>replay</em>
+        </button>
+
         <div className="railstate"
              title={n.recorded ? "recorded narration"
                    : n.voiceReady ? "browser voice" : "no voice available"}>
-          {voiceOn ? (n.voiceReady ? (n.speaking ? "🔊" : "🔈") : "⚠") : "🔇"}
-          {n.recorded && <em>hd</em>}
+          <VolumeIcon level={!voiceOn ? "off" : !n.voiceReady ? "warn"
+                             : n.speaking ? "on" : "idle"} />
+          <em>{n.recorded ? "hd" : voiceOn ? "voice" : "muted"}</em>
         </div>
       </div>
+
+      {/* The redraw composer. Anchored to the rail, over the reel, because the
+          thing being described is on screen behind it. */}
+      {redrawOpen && (
+        <div className="redrawbox" onClick={(e) => e.stopPropagation()}>
+          <b>What should the pictures show instead?</b>
+          <textarea
+            autoFocus value={note} rows={3}
+            placeholder={'e.g. "frame 2 is unreadable \u2014 show the page table as a table, not icons"'}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void sendRedraw();
+              if (e.key === "Escape") setRedrawOpen(false);
+            }}
+          />
+          {redrawErr && <span className="error sm">{redrawErr}</span>}
+          <div className="redrawfoot">
+            <span className="hintline">{"\u2318"}/Ctrl + Enter</span>
+            <span className="spacer" />
+            <button className="ghost sm" onClick={() => setRedrawOpen(false)}>cancel</button>
+            <button className="primary sm" disabled={!note.trim() || redrawing}
+                    onClick={sendRedraw}>
+              {redrawing ? "redrawing\u2026" : "Redraw"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Big centre affordance */}
       {!n.playing && active && (
@@ -194,13 +224,4 @@ export function Reel({
       )}
     </div>
   );
-}
-
-/** How full the current segment should be, so it animates rather than jumping. */
-function beatFill(n: { progress: number }, i: number, unit: Unit): number {
-  const beats = unit.beats.length;
-  if (!beats) return 0;
-  const per = 1 / beats;
-  const within = (n.progress - i * per) / per;
-  return Math.max(0, Math.min(100, within * 100));
 }

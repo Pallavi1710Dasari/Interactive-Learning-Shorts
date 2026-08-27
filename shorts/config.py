@@ -156,6 +156,14 @@ def _judge_warning() -> str | None:
                 f"family for the judge.")
     return None
 
+# ------------------------------------------------------------------- video render
+#
+# shorts/video.py photographs the REAL player at #capture/<id> rather than drawing
+# its own page, so it needs somewhere to point a browser at. Defaults to the local
+# server; override when the app is served on another port.
+VIDEO_BASE_URL = os.getenv("VIDEO_BASE_URL", "http://127.0.0.1:8000").strip()
+
+
 # ------------------------------------------------------------------ neural voice
 #
 # Voice ids are OPTIONAL. Leaving them blank makes voice.py pick two contrasting

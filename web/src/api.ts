@@ -79,16 +79,55 @@ export const regenerate = (
     doc_id, topic, instruction, target, qa,
   });
 
+export type FinalizeResult = {
+  built: string[];
+  failed: { topic_id: string; error: string }[];
+  /** Unit graders that failed on a short that was built anyway, by short_id.
+   *  These judge the PICTURES, and they run after the money is spent — so a
+   *  frame that came back as a slide of its own narration is reported here
+   *  rather than throwing the short away. Regenerate the ones worth it. */
+  warnings: Record<string, string[]>;
+  /** Built, paid for, on disk — and scored under the bar by the judge, so held
+   *  out of the reel. `built` counts these; `shorts` does not. Never infer a
+   *  failure from `shorts.length === 0` alone: a build can produce nothing
+   *  playable with `failed` completely empty, and this is why. */
+  quarantined: Unit[];
+  shorts: Unit[];
+  usage: UsageTotals;
+  total: UsageTotals;
+};
+
 export const finalize = (doc_id: string, approved: { topic: Topic; qa: QA }[]) =>
-  post<{ built: string[]; failed: { topic_id: string; error: string }[];
-         /** Unit graders that failed on a short that was built anyway, by short_id.
-          *  These judge the PICTURES, and they run after the money is spent — so a
-          *  frame that came back as a slide of its own narration is reported here
-          *  rather than throwing the short away. Regenerate the ones worth it. */
-         warnings: Record<string, string[]>;
-         shorts: Unit[]; usage: UsageTotals; total: UsageTotals }>(
-    "/api/finalize", { doc_id, approved },
-  );
+  post<FinalizeResult>("/api/finalize", { doc_id, approved });
+
+export type RevisualResult = {
+  short: Unit | null;
+  /** Design graders still failing after the retries — the reel is watchable anyway. */
+  problems: string[];
+  warnings: string[];
+  usage: UsageTotals;
+  total: UsageTotals;
+};
+
+/** Redraw ONE short's frames from a free-text note. See POST /api/revisual. */
+export const revisual = (short_id: string, instruction: string) =>
+  post<RevisualResult>("/api/revisual", { short_id, instruction });
+
+export type RenderJob = {
+  short_id: string;
+  status: "idle" | "queued" | "rendering" | "done" | "error";
+  done: number; total: number; error: string | null;
+};
+
+/** Begin (or rejoin) a render. Returns immediately — poll renderStatus. */
+export const startRender = (short_id: string) =>
+  post<RenderJob>(`/api/video/${encodeURIComponent(short_id)}`, {});
+
+export async function renderStatus(short_id: string): Promise<RenderJob> {
+  const res = await fetch(`/api/video/${encodeURIComponent(short_id)}/status`);
+  if (!res.ok) throw new Error(await detail(res));
+  return res.json();
+}
 
 export async function getShorts(): Promise<Unit[]> {
   const res = await fetch("/api/shorts");

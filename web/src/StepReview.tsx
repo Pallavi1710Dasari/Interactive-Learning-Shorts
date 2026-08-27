@@ -31,6 +31,10 @@ export function StepReview({
   // Shorts that BUILT but failed a diagram grader. Separate from buildError: the
   // reel exists and is watchable, its picture is just weaker than it should be.
   const [buildWarnings, setBuildWarnings] = useState<string[]>([]);
+  // Shorts the judge scored under the bar. They exist and are paid for, but
+  // feed.collect keeps them out of the reel — so this step is the only place the
+  // reviewer can be told they happened, and why.
+  const [held, setHeld] = useState<Unit[]>([]);
 
   const patch = (i: number, next: Partial<ReviewItem>) =>
     setItems((prev) => prev.map((it, k) => (k === i ? { ...it, ...next } : it)));
@@ -101,6 +105,7 @@ export function StepReview({
   async function build() {
     setBuilding(true);
     setBuildError(null);
+    setHeld([]);
     try {
       const r = await finalize(
         material.doc_id,
@@ -113,7 +118,21 @@ export function StepReview({
       setBuildWarnings(
         Object.entries(r.warnings ?? {}).map(([id, ws]) => `${id} — ${ws.join("; ")}`),
       );
-      onDone(r.shorts);
+      setHeld(r.quarantined ?? []);
+
+      // ONLY LEAVE THIS STEP IF THERE IS SOMETHING TO WATCH.
+      //
+      // onDone() was called unconditionally, and onDone switches App to step 3 —
+      // which unmounts this component and takes every message set above it down
+      // with it. So the run where the judge quarantined all five shorts set
+      // buildError, set the warnings, and then destroyed both before a single
+      // frame rendered them. What the reviewer saw was step 3 reading "No reels
+      // yet. Paste material in step 1, approve some answers in step 2", which is
+      // both wrong and unactionable: the material was pasted, the answers were
+      // approved, the shorts were built, and they are on disk.
+      //
+      // Nothing playable means staying here, where the reasons are.
+      if (r.shorts.length) onDone(r.shorts);
     } catch (e) {
       setBuildError((e as Error).message);
     } finally {
@@ -170,6 +189,26 @@ export function StepReview({
         </button>
       </div>
       {buildError && <div className="error">{buildError}</div>}
+      {held.length > 0 && (
+        <div className="warn">
+          <b>
+            {held.length} short{held.length === 1 ? " was" : "s were"} built but held
+            out of the reel — the judge scored {held.length === 1 ? "it" : "them"} under the bar
+          </b>
+          <span>
+            {held.length === 1 ? "It is" : "They are"} on disk with the verdict attached.
+            Fix the wording with a note below and regenerate, or leave{" "}
+            {held.length === 1 ? "it" : "them"} — nothing is lost.
+          </span>
+          {held.map((u) => (
+            <span key={u.short_id}>
+              <b>{u.short_id}</b>
+              {u.judge && ` — faithfulness ${u.judge.faithfulness}/5, clarity ${u.judge.clarity}/5, pace ${u.judge.pace}/5`}
+              {u.judge?.problems?.length ? `: ${u.judge.problems.join(" · ")}` : ""}
+            </span>
+          ))}
+        </div>
+      )}
       {buildWarnings.length > 0 && (
         <div className="warn">
           <b>Built, but the diagrams need work</b>

@@ -52,7 +52,7 @@ THREE SYSTEM DEPENDENCIES, none needing sudo:
   * the built web app — web/dist must exist, and the API server must be reachable,
     because the page this photographs IS the app. `cd web && npm run build`.
 """
-import argparse, base64, hashlib, json, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
+import argparse, base64, hashlib, json, os, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -64,7 +64,12 @@ WIDTH, HEIGHT = 1080, 1920
 
 #: 30 is what the user picked over a cheaper 20 when asked. Every frame is a real
 #: screenshot, so this is the single biggest lever on render time.
-FPS = 30
+#: Frames per second of the exported MP4, and the most direct lever on how long a
+#: render takes — the cost is almost exactly linear in frame count. 30 is smooth;
+#: 24 is cinema and takes a fifth less time, which on a 12-second short is about
+#: 19 seconds saved. Override with REEL_FPS when turnaround matters more than
+#: smoothness. The capture seeks to i/fps, so the animation is correct at any rate.
+FPS = max(12, min(60, int(os.getenv("REEL_FPS", "30"))))
 
 #: A frame is a seek plus a screenshot; neither should ever take this long, and a
 #: page that has stopped answering must fail rather than hang the download request.

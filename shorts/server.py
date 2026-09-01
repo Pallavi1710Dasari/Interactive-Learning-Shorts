@@ -15,7 +15,7 @@ Cost shape, worth knowing before clicking:
 
 So Step 2 is cheap and Step 3 is not. Only finalize what a human approved.
 """
-import json, re, threading, uuid
+import json, os, re, threading, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -751,9 +751,13 @@ if _SAMPLES.exists():
 #: the browser does not hold a request open for a minute and a half.
 _RENDERS: dict[str, dict] = {}
 _RENDER_LOCK = threading.Lock()
-#: One render at a time. Each already runs three browsers of its own (see
-#: video.DEFAULT_WORKERS); letting two shorts render at once just makes both slower.
-_RENDER_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="render")
+#: Two shorts at a time. Each render drives three browsers of its own (see
+#: video.DEFAULT_WORKERS), so this is six in flight on a machine with 28 cores —
+#: the capture is CPU-bound in SwiftShader and contends, so more than two turns a
+#: queue into a traffic jam. One was too strict: a second person clicking download
+#: waited out the whole of somebody else's render before their own started, with a
+#: progress bar sitting at 0% and nothing to say why.
+_RENDER_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="render")
 
 
 def _render_job(short_id: str) -> None:
@@ -857,6 +861,208 @@ def video(short_id: str):
                         filename=f"{short_id}.mp4")
 
 
+# --------------------------------------------------------------- the voice studio
+#
+# Recording a voice, hearing it read something, and deciding to keep it are three
+# steps of ONE decision made by ear — so they belong on one screen, not spread
+# across a .env edit and a CLI. Everything below serves that screen.
+
+_VOICE_JOBS: dict[str, dict] = {}
+_VOICE_LOCK = threading.Lock()
+#: One at a time: there is a single Chatterbox worker with one model in it.
+_VOICE_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="voice")
+
+
+def _voice_job(job_id: str, refs: dict, lines: list[tuple[str, str]]) -> None:
+    """
+    Speak `lines` — (speaker, text) in order — each in its own speaker's voice.
+
+    ONE TRACK, BOTH VOICES. The lab used to take a single clip and say one line
+    with it, which answers "what does this clip sound like" but not the question
+    actually being asked: do these two voices work TOGETHER. A reel is an exchange,
+    and two voices that are each fine alone can still be too similar to tell apart
+    or jarring back to back. So the preview is the exchange.
+    """
+    from . import providers, tts
+    from .schema import Script, Beat
+
+    def mark(**kw):
+        with _VOICE_LOCK:
+            _VOICE_JOBS[job_id] = {**_VOICE_JOBS.get(job_id, {}), **kw}
+
+    try:
+        cb = providers._REGISTRY["chatterbox"]
+        if not Path(config.CHATTERBOX_PYTHON).exists():
+            raise RuntimeError(
+                "Chatterbox is not installed. In a terminal:  python3 -m venv "
+                "venv-chatterbox && venv-chatterbox/bin/pip install chatterbox-tts")
+        mark(status="speaking")
+        out_dir = (config.OUTPUT_DIR / "voice-lab" / job_id).resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # A speaker with no clip of its own borrows the other's, so one uploaded
+        # voice still previews rather than erroring.
+        only = next(iter(refs.values()))
+        use = {"interviewer": str(refs.get("interviewer", only)),
+               "student": str(refs.get("student", only))}
+
+        beats = [Beat(speaker=who, line=text, on_screen="voice lab",
+                      visual_ref="v") for who, text in lines]
+        script = Script(short_id=f"lab_{job_id}", question=lines[0][1], beats=beats)
+        # PASSED, NOT ASSIGNED TO GLOBALS. Setting config.CHATTERBOX_VOICE_* here
+        # did nothing once a voice had been adopted, because Chatterbox.resolve()
+        # reads voices/settings.json first — so the preview played the adopted
+        # voices and the clip you had just uploaded was never used.
+        audio = tts.synthesize(script, out_dir=out_dir, provider=cb, voices=use)
+        mark(status="done", audio_url=f"/api/voice/lab/{job_id}.mp3",
+             seconds=round(audio.duration_seconds, 1), error=None)
+    except BaseException as e:      # noqa: BLE001 - shown to the user
+        mark(status="error", error=f"{type(e).__name__}: {e}")
+
+
+@app.post("/api/voice/speak")
+async def voice_speak(
+    text_interviewer: str = Form(default=""),
+    text_student: str = Form(default=""),
+    clip_interviewer: UploadFile | None = File(default=None),
+    clip_student: UploadFile | None = File(default=None),
+):
+    """
+    Preview one or two voices reading an exchange. Returns a job id; poll the job.
+
+    Asynchronous because the first call of a run loads the model — about 158
+    seconds on CPU — and a synchronous request would time out having told the
+    person nothing while they waited.
+    """
+    job_id = uuid.uuid4().hex[:12]
+    lab = config.OUTPUT_DIR / "voice-lab"
+    lab.mkdir(parents=True, exist_ok=True)
+
+    refs: dict[str, str] = {}
+    for who, upload in (("interviewer", clip_interviewer), ("student", clip_student)):
+        if upload is None:
+            continue
+        raw = await upload.read()
+        if len(raw) < 4000:
+            raise HTTPException(
+                400, f"the {who} clip is too short to clone a voice from — "
+                     f"7 to 20 seconds of clear speech works best")
+        suffix = Path(upload.filename or "clip.wav").suffix.lower()
+        if suffix not in (".wav", ".mp3", ".m4a", ".ogg", ".webm", ".flac"):
+            suffix = ".wav"
+        ref = lab / f"{job_id}_{who}{suffix}"
+        ref.write_bytes(raw)
+        refs[who] = str(ref)
+
+    if not refs:
+        raise HTTPException(400, "upload a voice for at least one speaker")
+
+    # In beat order, and the interviewer must go first — Script validates that, and
+    # it is the order a reel is heard in anyway.
+    lines: list[tuple[str, str]] = []
+    if text_interviewer.strip():
+        lines.append(("interviewer", text_interviewer.strip()))
+    if text_student.strip():
+        lines.append(("student", text_student.strip()))
+    if not lines:
+        raise HTTPException(400, "type something for the voices to say")
+    if lines[0][0] != "interviewer":
+        lines.insert(0, ("interviewer", "Here is the question."))
+
+    with _VOICE_LOCK:
+        _VOICE_JOBS[job_id] = {"status": "queued", "error": None,
+                               "audio_url": None, "refs": refs}
+    _VOICE_POOL.submit(_voice_job, job_id, refs, lines)
+    return {"job_id": job_id, "status": "queued", "speakers": sorted(refs)}
+
+
+@app.get("/api/voice/job/{job_id}")
+def voice_job(job_id: str):
+    """How far a preview has got. Poll this; it is cheap and does no work."""
+    with _VOICE_LOCK:
+        job = _VOICE_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(404, "no such job")
+    # `refs` are server-side paths; the browser has no use for them.
+    return {"job_id": job_id,
+            **{k: v for k, v in job.items() if k != "refs"},
+            "speakers": sorted(job.get("refs") or {})}
+
+
+@app.get("/api/voice/lab/{name}")
+def voice_lab_audio(name: str):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", name):
+        raise HTTPException(400, "bad name")
+    path = config.OUTPUT_DIR / "voice-lab" / Path(name).stem / "audio.mp3"
+    if not path.exists():
+        raise HTTPException(404, "not rendered")
+    return FileResponse(path, media_type="audio/mpeg")
+
+
+@app.post("/api/voice/adopt")
+def voice_adopt(job_id: str = Form(...)):
+    """
+    Keep these voices. Copies each speaker's clip into voices/ and makes it live.
+
+    Takes no speaker argument any more: the job already knows which slots were
+    filled, so adopting is "keep what I just listened to" rather than a second set
+    of choices made after the fact.
+
+    Writes voices/settings.json rather than .env — the choice was made by ear in
+    the app, and it has to survive a restart without sending anyone to an editor.
+    """
+    with _VOICE_LOCK:
+        job = _VOICE_JOBS.get(job_id)
+    if not job or job.get("status") != "done":
+        raise HTTPException(400, "those voices have not been generated yet")
+
+    config.VOICE_DIR.mkdir(parents=True, exist_ok=True)
+    settings = config.voice_settings()
+    adopted = []
+    for who, ref in (job.get("refs") or {}).items():
+        src = Path(ref)
+        dest = config.VOICE_DIR / f"{who}{src.suffix}"
+        dest.write_bytes(src.read_bytes())
+        settings[who] = str(dest)
+        adopted.append(who)
+    # One voice uploaded means both speakers use it, rather than half a
+    # configuration that cannot narrate a reel.
+    if len(adopted) == 1:
+        other = "student" if adopted[0] == "interviewer" else "interviewer"
+        settings.setdefault(other, settings[adopted[0]])
+    settings["provider"] = "chatterbox"
+    config.VOICE_SETTINGS.write_text(json.dumps(settings, indent=2))
+    config.TTS_PROVIDER = "chatterbox"
+    return {"ok": True, "adopted": adopted, **_voice_state()}
+
+
+@app.post("/api/voice/reset")
+def voice_reset():
+    """Go back to whatever .env says — undo an adoption."""
+    config.VOICE_SETTINGS.unlink(missing_ok=True)
+    config.TTS_PROVIDER = os.getenv("TTS_PROVIDER", "auto").strip()
+    return {"ok": True, **_voice_state()}
+
+
+def _voice_state() -> dict:
+    from . import providers
+    chosen = config.voice_settings()
+    cb = providers._REGISTRY["chatterbox"]
+    ok, why = cb.available()
+    active_ok, active_why = voice.configured()
+    return {
+        "chosen": {k: v for k, v in chosen.items() if k in ("interviewer", "student")},
+        "chatterbox_ready": ok, "chatterbox_reason": why,
+        "installed": Path(config.CHATTERBOX_PYTHON).exists(),
+        "active": active_why, "active_ok": active_ok,
+    }
+
+
+@app.get("/api/voice/state")
+def voice_state():
+    return _voice_state()
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "stub": config.STUB, "model": config.MODEL_GENERATOR,
@@ -884,11 +1090,31 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--reload", action="store_true")
+    # 127.0.0.1 BY DEFAULT, deliberately: this serves an unauthenticated API that
+    # can spend money on model calls, so it should not appear on a network unless
+    # somebody asks. `--host 0.0.0.0` is the ask — for opening the reels on a phone
+    # or a second machine, which is the one thing localhost cannot do.
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="0.0.0.0 to reach it from other devices on your network")
     args = ap.parse_args()
     if not WEB_DIST.exists():
         print("note: web/dist not built — run `cd web && npm run build`, "
               "or use `npm run dev` on :5173 which proxies here")
-    uvicorn.run("shorts.server:app", host="127.0.0.1", port=args.port, reload=args.reload)
+    if args.host not in ("127.0.0.1", "localhost"):
+        import socket
+        try:
+            probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            probe.connect(("8.8.8.8", 80))
+            lan = probe.getsockname()[0]
+            probe.close()
+        except Exception:
+            lan = args.host
+        print(f"\n  reachable from other devices at  http://{lan}:{args.port}")
+        print(f"  the voice you keep lives on THIS machine, so every device that\n"
+              f"  opens that address shares it — upload once, not once per device.")
+        print(f"  note: recording from a microphone needs localhost or https, so\n"
+              f"  on other devices use the upload button.\n")
+    uvicorn.run("shorts.server:app", host=args.host, port=args.port, reload=args.reload)
 
 
 if __name__ == "__main__":

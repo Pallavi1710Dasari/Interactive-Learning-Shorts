@@ -942,3 +942,107 @@ kbd {
 .redrawbox textarea::placeholder { color: rgba(238, 244, 240, 0.38); }
 .redrawfoot { display: flex; align-items: center; gap: 7px; }
 .redrawfoot .hintline { font-size: 9.5px; }
+
+/* ------------------------------------------------------------------ voice lab
+   A full-surface panel rather than a modal: recording, listening and deciding is
+   a sitting-down task, and a dialog that has to be dismissed to see the result of
+   the thing it is doing gets in the way of exactly the loop this exists for. */
+.voicelab {
+  position: fixed; inset: 0; z-index: 40; overflow: auto;
+  background: linear-gradient(170deg, #0c1416 0%, #080e10 100%);
+  padding: 26px 24px 60px;
+}
+.vlhead { display: flex; align-items: flex-start; gap: 20px; max-width: 1080px; margin: 0 auto 22px; }
+.vlhead h1 { font-size: 24px; margin: 0 0 4px; }
+.vlhead .lede { margin: 0; max-width: 62ch; }
+.vlgrid {
+  max-width: 1080px; margin: 0 auto; display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+.vlcard {
+  background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px; padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 10px;
+}
+.vlcard h2 { font-size: 15px; margin: 0; display: flex; align-items: center; gap: 9px; }
+.vlnum {
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--teal-hi); color: #06110c; font-size: 12px; font-weight: 800;
+}
+.vlcard .why { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.vlcard textarea {
+  width: 100%; resize: vertical; font: inherit; font-size: 13px; line-height: 1.5;
+  color: var(--cream); background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.13); border-radius: 10px; padding: 10px 11px;
+}
+.vlcard textarea:focus { outline: none; border-color: var(--teal-hi); }
+.vlrow { display: flex; align-items: center; gap: 9px; }
+.vlrow.wrap { flex-wrap: wrap; }
+.filebtn { cursor: pointer; display: inline-flex; align-items: center; }
+button.rec { background: #e8735a; border-color: #e8735a; color: #1a0d0a; }
+button.rec::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1a0d0a;
+  margin-right: 7px; animation: recblink 1s steps(2, start) infinite;
+}
+@keyframes recblink { to { opacity: 0.25; } }
+.vlclip, .vlresult {
+  display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--muted);
+  background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 10px;
+}
+.vlresult { border: 1px solid rgba(47, 211, 155, 0.3); }
+.vlclip audio, .vlresult audio { width: 100%; height: 34px; }
+.vlstate {
+  margin-top: 4px; display: flex; flex-direction: column; gap: 5px;
+  font-size: 12px; color: var(--muted);
+}
+.vlstate span {
+  display: inline-block; min-width: 92px; color: var(--cream); font-weight: 600;
+}
+.vlrevoice {
+  display: flex; flex-direction: column; gap: 7px; margin-top: 4px; padding: 11px;
+  border-radius: 10px; background: rgba(242, 177, 75, 0.07);
+  border: 1px solid rgba(242, 177, 75, 0.26);
+}
+.vlrevoice b { font-size: 12px; color: var(--cream); }
+.vlrevoice .why { margin: 0; font-size: 11.5px; }
+.vlrevoice button { align-self: flex-start; }
+
+/* The upload target is the whole point of step 1, so it is a surface rather than
+   a button hiding beside one. */
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 26px 16px; cursor: pointer; text-align: center;
+  border: 1.5px dashed rgba(255, 255, 255, 0.22); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03); transition: border-color .15s, background .15s;
+}
+.dropzone:hover, .dropzone[data-dragging] {
+  border-color: var(--teal-hi); background: rgba(47, 211, 155, 0.08);
+}
+.dropzone b { font-size: 13px; color: var(--cream); }
+.dropzone span { font-size: 11.5px; color: var(--muted); }
+
+/* Two voice slots, side by side, so the pairing is the visible unit. */
+.vlcard.wide { grid-column: 1 / -1; }
+.vslots { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.vslot {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  border-radius: 12px; background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.vslothead { display: flex; align-items: baseline; gap: 8px; }
+.vslothead b { font-size: 13px; color: var(--cream); }
+.vslothead small { color: var(--muted); font-size: 11px; }
+.dropzone.sm { padding: 18px 12px; }
+.vslotclip { display: flex; flex-direction: column; gap: 6px; }
+.vslotname { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.vslotclip audio { width: 100%; height: 32px; }
+.linky {
+  background: none; border: none; padding: 0; margin-left: auto; cursor: pointer;
+  color: var(--teal-hi); font: inherit; font-size: 11.5px; text-decoration: underline;
+}
+/* The header's voice chip. Green when the narration is a voice you supplied, so
+   "is it still mine?" is answerable at a glance from any screen in the app. */
+.voicechip.mine {
+  color: #0d1214; background: var(--teal-hi); border-color: var(--teal-hi);
+  font-weight: 700;
+}
+.voicechip.mine::before { content: "●"; margin-right: 5px; font-size: 9px; }

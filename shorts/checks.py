@@ -5,7 +5,7 @@ Every grader takes an object and returns a GraderResult. Never raise — a grade
 that crashes tells you nothing; a grader that returns passed=False with a reason
 tells you what to fix.
 """
-import re
+import html, re
 from dataclasses import dataclass, field
 from .schema import (
     Script, ShortUnit, MIN_SECONDS, MAX_SECONDS,
@@ -696,6 +696,14 @@ def svg_problems(svg: str, max_width: float = MAX_TEXT_WIDTH,
 
     for attrs, body in _TEXT_EL.findall(svg or ""):
         label = re.sub(r"<[^>]+>", "", body)
+        # UNESCAPE BEFORE MEASURING. The width test multiplies character count by a
+        # font size, and character count has to mean GLYPHS — what a reader sees —
+        # not the length of the XML entities encoding them. Unescaped, every code
+        # frame containing HTML or a comparison was over-measured: `&lt;h1` counted
+        # as six characters for three, `=&gt;` as five for two, so a wrapped and
+        # perfectly legible JSX line was still reported as 68 chars "wider than the
+        # canvas allows". The frame was fine; the ruler was wrong.
+        label = html.unescape(label)
         label = re.sub(r"\s+", " ", label).strip()
         if not label:
             continue

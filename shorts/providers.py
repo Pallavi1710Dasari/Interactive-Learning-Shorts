@@ -26,7 +26,7 @@ A provider reports its own availability rather than being probed from outside, s
 """
 from __future__ import annotations
 
-import base64
+import base64, json, subprocess, tempfile, threading, time
 from pathlib import Path
 
 import requests
@@ -63,6 +63,18 @@ class Provider:
     def voices(self) -> list[str]:
         """Human-readable voice names, for --check."""
         return []
+
+    def installed(self) -> tuple[bool, str]:
+        """
+        Can this provider run AT ALL, ignoring which voices are configured?
+
+        Separate from available() because a caller supplying its own reference
+        clips — the voice studio previewing an upload — needs to know the engine
+        works, not whether a voice has been chosen. Defaults to available(), which
+        is right for every provider whose voices come from an account rather than
+        from a file the caller is holding.
+        """
+        return self.available()
 
     def synth(self, text: str, voice_id: str, speaker: str) -> bytes:
         raise NotImplementedError
@@ -451,6 +463,148 @@ def _download(url: str, dest: Path) -> None:
 
 # -------------------------------------------------------------------------- piper
 
+class Chatterbox(Provider):
+    """
+    Chatterbox, running locally, speaking in a voice YOU supply.
+
+    THIS IS THE ONE THAT CLONES. Every other provider here has a fixed catalogue —
+    you pick am_michael or en-US-Neural2-D from what the model already knows. This
+    one takes a RECORDING and speaks in that voice: point
+    CHATTERBOX_VOICE_STUDENT at a clip of someone talking and every student beat of
+    every short is generated in their voice, zero-shot, with no training step. The
+    clip is the whole configuration.
+
+    IT RUNS IN A DIFFERENT VIRTUALENV, over a pipe. chatterbox-tts pins
+    torch==2.6.0 and transformers==5.2.0, which do not belong next to this
+    project's own dependencies, so it lives in venv-chatterbox/ and is driven as a
+    resident subprocess — see shorts/chatterbox_worker.py for the protocol.
+
+    THE WORKER IS STARTED ONCE AND KEPT. Loading the model costs about 158 seconds
+    on CPU; a process per beat would pay that per LINE, so a four-beat short would
+    spend eleven minutes loading a model it used four times. Started lazily on the
+    first synth, reused for the rest of the run, and stopped with the interpreter.
+
+    SPEED, PLAINLY: measured at roughly 3.1x slower than realtime on this CPU, so a
+    twenty-second short takes about a minute. On a CUDA box it is faster than
+    realtime. Kokoro is ~30x quicker and costs the same nothing; this is the trade
+    you are making for a voice that is yours.
+    """
+    name = "chatterbox"
+    suffix = ".wav"
+
+    def __init__(self) -> None:
+        self._proc = None
+        self._lock = threading.Lock()
+        self._info: dict = {}
+
+    # ------------------------------------------------------------------ config
+    def resolve(self) -> dict[str, str]:
+        # The UI's choice wins. A clip is picked by ear, in the app; requiring a
+        # .env edit afterwards to make it stick would put a text editor in the
+        # middle of a listening decision. Falls back to the environment, so a
+        # command-line setup keeps working untouched.
+        chosen = config.voice_settings()
+        return {
+            "interviewer": (chosen.get("interviewer")
+                            or config.CHATTERBOX_VOICE_INTERVIEWER),
+            "student": (chosen.get("student")
+                        or config.CHATTERBOX_VOICE_STUDENT),
+        }
+
+    def voices(self) -> list[str]:
+        """The configured reference clips. There is no catalogue to list."""
+        return [v for v in self.resolve().values() if v]
+
+    def available(self) -> tuple[bool, str]:
+        exe = Path(config.CHATTERBOX_PYTHON)
+        if not exe.exists():
+            return False, (f"no interpreter at {exe} — create it with\n"
+                           f"    python3 -m venv venv-chatterbox && "
+                           f"venv-chatterbox/bin/pip install chatterbox-tts")
+        refs = self.resolve()
+        missing = [k for k, v in refs.items() if not v]
+        if missing:
+            return False, ("no reference clip for " + ", ".join(missing) +
+                           " — set CHATTERBOX_VOICE_INTERVIEWER and "
+                           "CHATTERBOX_VOICE_STUDENT to audio files of the two "
+                           "voices you want")
+        for who, ref in refs.items():
+            if not Path(ref).exists():
+                return False, f"the {who} reference clip does not exist: {ref}"
+        return True, (f"ready (local clone of "
+                      f"{Path(refs['student']).name} / "
+                      f"{Path(refs['interviewer']).name})")
+
+    def installed(self) -> tuple[bool, str]:
+        """Only the interpreter matters when the caller brings its own clips."""
+        exe = Path(config.CHATTERBOX_PYTHON)
+        if not exe.exists():
+            return False, (f"no interpreter at {exe} — create it with\n"
+                           f"    python3 -m venv venv-chatterbox && "
+                           f"venv-chatterbox/bin/pip install chatterbox-tts")
+        return True, "ready (clips supplied by the caller)"
+
+    # ------------------------------------------------------------------ worker
+    def _ensure(self):
+        """Start the resident worker, or return the one already running."""
+        if self._proc is not None and self._proc.poll() is None:
+            return self._proc
+        print("    chatterbox: loading the model (about 2-3 minutes on CPU, once)")
+        proc = subprocess.Popen(
+            [config.CHATTERBOX_PYTHON, "-m", "shorts.chatterbox_worker"],
+            cwd=str(config.ROOT), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        ready = self._read(proc, config.CHATTERBOX_START_TIMEOUT)
+        if not ready.get("ok"):
+            proc.kill()
+            raise RuntimeError(f"chatterbox worker: {ready.get('error', 'no reply')}")
+        self._info = ready
+        print(f"    chatterbox: ready on {ready.get('device')} "
+              f"in {ready.get('load_seconds')}s")
+        self._proc = proc
+        return proc
+
+    @staticmethod
+    def _read(proc, timeout: float) -> dict:
+        """One JSON line from the worker, or a dict explaining why there was none."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            line = proc.stdout.readline()
+            if not line:
+                return {"ok": False, "error": "worker exited"}
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                return json.loads(line)
+            except ValueError:
+                continue        # progress bars and library chatter
+        return {"ok": False, "error": f"no reply within {timeout:.0f}s"}
+
+    def synth(self, text: str, voice_id: str, speaker: str) -> bytes:
+        if not voice_id:
+            raise RuntimeError(
+                f"no chatterbox reference clip for {speaker} — set "
+                f"CHATTERBOX_VOICE_{speaker.upper()}")
+        # One at a time: the worker is a single process with one model in it.
+        with self._lock:
+            proc = self._ensure()
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                out = f.name
+            req = {"text": text, "ref": voice_id, "out": out,
+                   "exaggeration": config.CHATTERBOX_EXAGGERATION,
+                   "cfg_weight": config.CHATTERBOX_CFG_WEIGHT}
+            proc.stdin.write(json.dumps(req) + "\n")
+            proc.stdin.flush()
+            reply = self._read(proc, config.CHATTERBOX_SYNTH_TIMEOUT)
+        try:
+            if not reply.get("ok"):
+                raise RuntimeError(f"chatterbox: {reply.get('error', 'no reply')}")
+            return Path(out).read_bytes()
+        finally:
+            Path(out).unlink(missing_ok=True)
+
+
 class Piper(Provider):
     """
     Piper, running locally on the CPU. No account, no key, no per-character cost.
@@ -516,7 +670,8 @@ class Piper(Provider):
 
 # ------------------------------------------------------------------------ chooser
 
-_REGISTRY = {p.name: p for p in (ElevenLabs(), Kokoro(), Google(), Piper())}
+_REGISTRY = {p.name: p for p in (ElevenLabs(), Chatterbox(), Kokoro(),
+                                 Google(), Piper())}
 
 # Best first. "auto" walks this and takes the first that is available, so adding a
 # key upgrades the voice without touching any config.
@@ -525,7 +680,12 @@ _REGISTRY = {p.name: p for p in (ElevenLabs(), Kokoro(), Google(), Piper())}
 # account, and it is at least Neural2's equal to most ears. That ordering is a
 # judgement call, not a measurement — swap the two entries if you disagree, or set
 # TTS_PROVIDER to settle it for a single run.
-_PREFERENCE = ("elevenlabs", "kokoro", "google", "piper")
+#
+# Chatterbox sits second because when it IS configured it is a deliberate
+# choice — it only reports available once you have pointed it at reference
+# clips, so reaching it under "auto" means you asked for it. It is below
+# elevenlabs on speed, not on quality: ~3x slower than realtime on CPU.
+_PREFERENCE = ("elevenlabs", "chatterbox", "kokoro", "google", "piper")
 
 
 # Providers that have told us, this process, that they will not synthesise at all.
@@ -554,7 +714,22 @@ def get(name: str | None = None) -> Provider:
     An explicit TTS_PROVIDER always wins, and fails loudly if it is not usable —
     silently falling back would mean asking for ElevenLabs and quietly shipping
     Piper, which is worse than an error.
+
+    A VOICE KEPT IN THE UI OUTRANKS .env, and leaving that out made "keep these
+    voices" a half-measure. Adopting wrote the clips to voices/settings.json and
+    set config.TTS_PROVIDER in the SERVER'S memory — which is gone on restart, and
+    was never true for any other process. So the clips were stored, chatterbox was
+    ready, and the next reel was still narrated by whatever .env said. The store
+    records the provider too; honour it, or the button does not mean what it says.
+
+    `revert to .env` deletes the store, which is how you get back.
     """
+    if name is None:
+        chosen = config.voice_settings().get("provider")
+        if chosen and chosen in _REGISTRY:
+            ok, _ = _REGISTRY[chosen].available()
+            if ok:
+                return _REGISTRY[chosen]
     name = (name or config.TTS_PROVIDER or "auto").strip().lower()
 
     if name != "auto":

@@ -1218,6 +1218,51 @@ def _preview(frame: Frame, enter: int) -> tuple[str, int]:
     return out, enter
 
 
+#: The smallest font a code line may be shrunk to before it wraps instead. Below
+#: this, check_svg_quality is right that nobody can read it on a phone.
+MIN_CODE_SIZE = 30
+
+
+def _wrap_code(text: list[str], cells: list, inner: float) -> tuple[list[str], list]:
+    """
+    Fold code lines too long to be legible, keeping each fragment's role.
+
+    Returns (lines, cells) still one-to-one, so the hero highlight lands on the row
+    the hero line actually occupies. A wrapped hero keeps its role on every fragment
+    — the lit band then covers the whole statement, which is what it is highlighting.
+    """
+    limit = max(24, int(inner / (MIN_CODE_SIZE * CHAR_W_MONO)))
+    if all(len(t) <= limit for t in text):
+        return text, cells
+
+    out_text: list[str] = []
+    out_cells: list = []
+    for raw, cell in zip(text, cells):
+        if len(raw) <= limit:
+            out_text.append(raw)
+            out_cells.append(cell)
+            continue
+        indent = " " * (len(raw) - len(raw.lstrip(" ")))
+        hang = indent + "  "
+        rest, first = raw.strip(), True
+        while rest:
+            room = limit - len(indent if first else hang)
+            if len(rest) <= room:
+                chunk, rest = rest, ""
+            else:
+                # Break after a space if there is one in the last third, so the fold
+                # lands between tokens rather than through the middle of a name.
+                cut = rest.rfind(" ", int(room * 0.6), room)
+                cut = cut if cut > 0 else room
+                chunk, rest = rest[:cut].rstrip(), rest[cut:].lstrip()
+            out_text.append((indent if first else hang) + chunk)
+            out_cells.append(cell)
+            first = False
+    # Still bounded: a snippet folded into a wall of rows is its own kind of
+    # unreadable, and MAX_CODE_LINES exists to stop that.
+    return out_text[:MAX_CODE_LINES + 2], out_cells[:MAX_CODE_LINES + 2]
+
+
 def _code(frame: Frame, enter: int) -> tuple[str, int]:
     """
     The material's own snippet, on a dark panel, with one line lit.
@@ -1250,6 +1295,22 @@ def _code(frame: Frame, enter: int) -> tuple[str, int]:
     inner = USABLE - 2 * pad
 
     text = [str(c.label).expandtabs(2).rstrip() for c in lines]
+
+    # LONG LINES WRAP INSTEAD OF SHRINKING THE WHOLE PANEL.
+    #
+    # Size is bounded by the widest line, so ONE long line drags everything down to
+    # fit it. The real case: a single 62-character JSX line
+    #
+    #     const Welcome = () => <h1 className="message">Hello, User</h1>;
+    #
+    # forced 24px, which made the panel 161px tall inside a 1080 canvas — 26% of its
+    # crop, the worst-filling frame measured anywhere — and tripped check_svg_quality
+    # for unreadable text at the same time. Both are the same fact: the line does not
+    # fit on one row at a legible size, so it should occupy two.
+    #
+    # Wrapped at a token boundary where there is one, with a hanging indent so the
+    # continuation still reads as part of its own statement.
+    text, lines = _wrap_code(text, lines, inner)
     widths = sorted(len(t) for t in text)
 
     # ONE OUTLIER MUST NOT SHRINK THE WHOLE BLOCK, which is what sizing from the
@@ -1275,7 +1336,20 @@ def _code(frame: Frame, enter: int) -> tuple[str, int]:
     avail_h = BODY_BOTTOM - BODY_TOP - chrome_h - 2 * pad
     by_width = inner / (sizing_w * CHAR_W_MONO)
     by_height = (avail_h / len(lines)) / 1.62
-    size = max(18, int(min(44.0, by_width, by_height)) // 2 * 2)
+    # THE CEILING SCALES WITH HOW MUCH THERE IS TO SHOW, and a flat 44 was the last
+    # piece of "the code visuals are correct but not focused".
+    #
+    # 44px is a sensible size for a seven-line snippet. Applied to a ONE-line one it
+    # is absurd: `username = input()` rendered as a 193px-tall strip floating in a
+    # 1080 canvas, about a tenth of the card, with the rest empty. Measured across
+    # six shorts, that frame filled 26% of its crop while every other frame managed
+    # 60-90%. Nothing was wrong with it — there was just nothing to look at.
+    #
+    # A short snippet is not less important than a long one, it is MORE: it is the
+    # single line the whole beat is about. So it gets the room. by_width still binds
+    # — a line cannot grow past the panel — so these are ceilings, not sizes.
+    ceiling = {1: 96.0, 2: 78.0, 3: 64.0, 4: 54.0}.get(len(lines), 44.0)
+    size = max(18, int(min(ceiling, by_width, by_height)) // 2 * 2)
     char_w = size * CHAR_W_MONO
     limit = max(8, int(inner / char_w))
     line_h = size * 1.62

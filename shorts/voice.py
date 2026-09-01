@@ -73,7 +73,15 @@ def synthesize(script: Script) -> Audio | None:
     blocked: Exception | None = None
     for provider in providers.chain():
         try:
-            return tts.synthesize(script, provider=provider)
+            audio = tts.synthesize(script, provider=provider)
+            # Record WHO spoke, so _from_cache can tell a re-record after a voice
+            # change from a genuine cache hit.
+            try:
+                (audio_dir(script.short_id) / "voice.json").write_text(
+                    _stamp_for(provider))
+            except OSError:
+                pass          # a missing stamp only costs a re-record
+            return audio
         except tts.AccountBlocked as e:
             providers.mark_blocked(provider.name)
             blocked = e
@@ -88,6 +96,44 @@ def synthesize(script: Script) -> Audio | None:
     return None
 
 
+def _voice_stamp(directory: Path) -> str:
+    """What voice made the track in `directory`, or "" if it predates stamping."""
+    try:
+        return (directory / "voice.json").read_text().strip()
+    except OSError:
+        return ""
+
+
+def _stamp_for(provider) -> str:
+    """The identity of one provider's current voice configuration."""
+    import hashlib
+    h = hashlib.sha256()
+    h.update(provider.name.encode())
+    for who, ref in sorted(provider.resolve().items()):
+        h.update(who.encode())
+        h.update(str(ref).encode())
+        clip = Path(str(ref))
+        if clip.exists() and clip.is_file():
+            st = clip.stat()
+            h.update(f"{st.st_size}:{st.st_mtime_ns}".encode())
+    return h.hexdigest()[:16]
+
+
+def _current_voice_stamp() -> str:
+    """
+    An identity for the voice that would speak right now.
+
+    Hashes the reference clips' CONTENT, not their paths: replacing
+    voices/student.wav with a different recording at the same name is a different
+    voice and has to invalidate, and a path comparison would miss that entirely.
+    """
+    from . import providers
+    try:
+        return _stamp_for(providers.get())
+    except Exception:
+        return ""
+
+
 def _from_cache(script: Script) -> Audio | None:
     """
     Rebuild an Audio from a track already on disk.
@@ -100,6 +146,18 @@ def _from_cache(script: Script) -> Audio | None:
     directory = audio_dir(script.short_id)
     track, timings = existing(script.short_id), directory / "timings.json"
     if not track or not timings.exists():
+        return None
+
+    # THE VOICE IS PART OF THE KEY, and leaving it out broke the one workflow the
+    # voice studio exists for. The docstring above is right that a changed SCRIPT
+    # must miss — but a changed VOICE must miss too, and it did not: the test was
+    # the word list and the beat count, both of which are identical when the only
+    # thing that changed is who is speaking.
+    #
+    # So adopting a new voice and re-recording returned every existing track
+    # unchanged, from the previous voice, reporting success. The person hears no
+    # difference and reasonably concludes the new voice did not take.
+    if _voice_stamp(directory) != _current_voice_stamp():
         return None
     try:
         words = [WordTiming(**w) for w in json.loads(timings.read_text())]
@@ -150,6 +208,71 @@ def _report() -> None:
             print(f"{'':13} voices: {provider.resolve()}")
 
 
+#: What an auditioned clip is made to say. Two sentences, because one is not enough
+#: to hear whether a cloned voice holds together across a sentence boundary, and
+#: because this is roughly the length of one real beat.
+_AUDITION_LINE = (
+    "So everything a computer processes gets represented using only two values "
+    "— ones and zeros. That is why we call it binary.")
+
+
+def _audition(clip: str) -> int:
+    """
+    Speak one line in the voice of `clip`, so a candidate can be judged in a minute.
+
+    THE POINT IS THE LOOP. Choosing a reference clip is a taste decision made by
+    listening, and before this the only way to hear one was to edit .env, re-record
+    a whole short and play that — a five-minute round trip per candidate, with the
+    project's real configuration changed on every attempt. This changes nothing:
+    it takes a path, writes one mp3 next to it, and prints where.
+    """
+    from pathlib import Path as _P
+    from . import providers, tts
+    from .schema import Script, Beat
+
+    src = _P(clip)
+    if not src.exists():
+        print(f"! no such clip: {src}")
+        return 1
+
+    cb = providers._REGISTRY["chatterbox"]
+    exe = _P(config.CHATTERBOX_PYTHON)
+    if not exe.exists():
+        print(f"! Chatterbox is not installed at {exe}\n"
+              f"  python3 -m venv venv-chatterbox && "
+              f"venv-chatterbox/bin/pip install chatterbox-tts")
+        return 1
+
+    out_dir = config.OUTPUT_DIR / "voice-auditions" / src.stem
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # The first beat must be the interviewer — Script validates that, and it is the
+    # right shape anyway: both refs point at the clip being auditioned, so this
+    # speaks the sample line in that one voice regardless of who is nominally
+    # talking.
+    script = Script(short_id=f"audition_{src.stem}",
+                    question=_AUDITION_LINE,
+                    beats=[Beat(speaker="interviewer", line=_AUDITION_LINE,
+                                on_screen="audition", visual_ref="v")])
+    print(f"auditioning {src} — the model loads once, this takes a couple of minutes")
+    # The clip is BOTH voices: an audition is about one speaker at a time. Passed
+    # explicitly rather than assigned to config, which an adopted voice overrides.
+    try:
+        audio = tts.synthesize(script, out_dir=out_dir.resolve(), provider=cb,
+                               voices={"interviewer": str(src), "student": str(src)})
+    except Exception as e:
+        print(f"! {type(e).__name__}: {e}")
+        return 1
+    print(f"\n  reference : {src}")
+    print(f"  spoken    : {audio.file}   ({audio.duration_seconds:.1f}s)")
+    print(f"\nplay them back to back:\n"
+          f"  ffplay -nodisp -autoexit {src}\n"
+          f"  ffplay -nodisp -autoexit {audio.file}\n"
+          f"\nhappy with it? put it in .env:\n"
+          f"  TTS_PROVIDER=chatterbox\n"
+          f"  CHATTERBOX_VOICE_STUDENT={src}")
+    return 0
+
+
 def main():
     import argparse
     from .schema import ShortUnit
@@ -160,6 +283,9 @@ def main():
     ap.add_argument("--check", action="store_true", help="report every provider")
     ap.add_argument("--force", action="store_true", help="re-record even if cached")
     ap.add_argument("--provider", help="override TTS_PROVIDER for this run")
+    ap.add_argument("--try", dest="try_clip", metavar="CLIP",
+                    help="audition one reference clip through Chatterbox and exit — "
+                         "speaks a sample line in that voice, changes nothing")
     args = ap.parse_args()
 
     if args.provider:
@@ -168,6 +294,9 @@ def main():
     if args.check:
         _report()
         return
+
+    if args.try_clip:
+        raise SystemExit(_audition(args.try_clip))
 
     ok, why = configured()
     print(f"provider: {why}")

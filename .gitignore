@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 venv/
+venv-chatterbox/
 output/
 web/node_modules/
 web/dist/

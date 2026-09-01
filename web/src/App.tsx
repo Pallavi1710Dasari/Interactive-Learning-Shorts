@@ -5,6 +5,7 @@ import { CostPill } from "./CostPill";
 import { Reel } from "./Reel";
 import { StepMaterial } from "./StepMaterial";
 import { StepReview } from "./StepReview";
+import { VoiceLab } from "./VoiceLab";
 import { CaptureStage } from "./CaptureStage";
 import { pickVoices, useVoices } from "./useNarration";
 import type { Feedback, Unit } from "./types";
@@ -61,6 +62,20 @@ function CaptureRoute({ shortId }: { shortId: string }) {
 
 function Workspace() {
   const [step, setStep] = useState<Step>("material");
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  // THE ACTIVE VOICE IS SHOWN IN THE HEADER, not only inside the panel that sets
+  // it. The voice is stored on the SERVER and shared by every device pointed at
+  // it, so "which voice is live" is a fact about the app rather than about this
+  // browser — and if it can only be seen by opening a dialog, the honest answer to
+  // "is it still my voice?" is a click away instead of on screen.
+  const [voiceNow, setVoiceNow] = useState<string | null>(null);
+  const readVoice = useCallback(() => {
+    fetch("/api/voice").then((r) => r.json())
+      .then((v) => setVoiceNow(v.reason ?? null)).catch(() => {});
+  }, []);
+  useEffect(() => { readVoice(); }, [readVoice]);
+  // Re-read when the studio closes: that is the only thing that can change it.
+  useEffect(() => { if (!voiceOpen) readVoice(); }, [voiceOpen, readVoice]);
   const [material, setMaterial] = useState<MaterialResult | null>(null);
   const [shorts, setShorts] = useState<Unit[]>([]);
   const [health, setHealth] = useState<Awaited<ReturnType<typeof getHealth>> | null>(null);
@@ -118,6 +133,11 @@ function Workspace() {
         <span className="spacer" />
         {total && <CostPill total={total} delta={delta} />}
         <span className="hintline">{health ? (health.stub ? "stub mode" : health.model) : "…"}</span>
+        <button className={`ghost sm voicechip${voiceNow?.startsWith("chatterbox") ? " mine" : ""}`}
+                onClick={() => setVoiceOpen(true)}
+                title={voiceNow ? `narration: ${voiceNow}` : "set the narration voice"}>
+          {voiceNow?.startsWith("chatterbox") ? "your voice" : "voice"}
+        </button>
         <button
           className="ghost sm"
           onClick={() => {
@@ -141,6 +161,8 @@ function Workspace() {
           onDone={(s) => { setShorts(s); setStep("reels"); }}
         />
       )}
+      {voiceOpen && <VoiceLab onClose={() => setVoiceOpen(false)} />}
+
       {step === "reels" && (
         <Reels shorts={shorts} focus={focus}
                // A redraw replaces one short's frames on the server; swap it in

@@ -71,12 +71,33 @@ def _to_wav(raw: bytes, suffix: str, dest: Path, exe: str) -> float:
 
 def synthesize(script: Script, out_dir: Path | None = None,
                gap: float | None = None,
-               provider: providers.Provider | None = None) -> Audio:
+               provider: providers.Provider | None = None,
+               voices: dict[str, str] | None = None) -> Audio:
     """
     Render every beat with the right voice, join them, and report exact beat spans.
+
+    `voices` OVERRIDES provider.resolve() FOR THIS CALL, and it exists because of a
+    bug that was invisible until someone tried the obvious thing twice.
+
+    The voice studio previews a clip you have just uploaded. It used to do that by
+    assigning config.CHATTERBOX_VOICE_* and letting resolve() pick them up — which
+    worked exactly once. After the first adoption, voices/settings.json exists, and
+    Chatterbox.resolve() reads that store BEFORE the environment (deliberately: a
+    choice made in the UI has to outrank a stale .env). So every later preview
+    silently used the ADOPTED voices instead of the uploaded ones: upload a
+    different voice, press play, hear the old one, conclude the upload did nothing.
+
+    Passing the voices in removes the ambiguity — a caller that knows which clips it
+    means says so, rather than mutating global configuration and hoping the
+    precedence rules fall its way. It is also the thread-safe shape: two previews at
+    once were writing the same module-level globals.
     """
     provider = provider or providers.get()
-    ok, why = provider.available()
+    # With explicit voices the question is whether the ENGINE runs, not whether a
+    # voice has been configured — the caller is holding the clips. available()
+    # would fail here for a Chatterbox that simply has not been adopted yet, which
+    # is the normal state while auditioning one.
+    ok, why = provider.installed() if voices else provider.available()
     if not ok:
         raise RuntimeError(f"{provider.name}: {why}")
 
@@ -89,7 +110,7 @@ def synthesize(script: Script, out_dir: Path | None = None,
     out_dir.mkdir(parents=True, exist_ok=True)
     gap = config.VOICE_BEAT_GAP if gap is None else gap
 
-    voices = provider.resolve()
+    voices = voices or provider.resolve()
     missing = [k for k, v in voices.items() if not v]
     if missing:
         raise RuntimeError(f"{provider.name}: no voice configured for "
@@ -153,9 +174,15 @@ def _join(parts: list[str], out: Path, gap: float, exe: str) -> None:
         seq += [p, str(silence)]
     seq = seq[:-1]                      # no trailing silence
 
+    # ABSOLUTE PATHS IN THE LIST. ffmpeg's concat demuxer resolves each entry
+    # relative to the LIST FILE, and the list file is in the system temp dir — so a
+    # relative beat path became /tmp/output/.../beat_00.wav and the join failed with
+    # "No such file or directory" on files that were sitting right there. It never
+    # bit in production because out_dir defaults to config.OUTPUT_DIR, which is
+    # absolute; it bit the moment anything passed a relative directory in.
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         for p in seq:
-            f.write(f"file '{p}'\n")
+            f.write(f"file '{Path(p).resolve()}'\n")
         listfile = f.name
 
     _run([exe, "-y", "-f", "concat", "-safe", "0", "-i", listfile,

@@ -204,6 +204,59 @@ KOKORO_VOICE_STUDENT     = os.getenv("KOKORO_VOICE_STUDENT", "af_heart").strip()
 # Drives espeak's phonemisation, so it must match the accent of the chosen voices.
 KOKORO_LANG = os.getenv("KOKORO_LANG", "en-us").strip()
 
+def _f_late(key: str, default: float) -> float:
+    try:
+        return float(os.getenv(key, "") or default)
+    except ValueError:
+        return default
+
+
+# --- chatterbox (local, offline, free — Resemble AI's Chatterbox, zero-shot cloning)
+#
+# THE ONE THAT TAKES YOUR OWN VOICE. Point these at a recording of a real person
+# and every beat that speaker says is generated in that voice — there is no
+# training step and no per-voice setup, the clip IS the configuration. That is
+# what separates it from kokoro/piper, whose voices are fixed in the model.
+#
+# THE CLIP SETS THE CEILING. 7-20 seconds, one speaker, no music or background,
+# ordinary speaking pace. A noisy reference produces a noisy voice on every short
+# it is used for, and no amount of tuning below recovers it.
+#
+# Lives in its own virtualenv because it pins torch and transformers — see
+# shorts/chatterbox_worker.py for why, and CHATTERBOX_PYTHON for where.
+CHATTERBOX_PYTHON = os.getenv(
+    "CHATTERBOX_PYTHON", str(ROOT / "venv-chatterbox" / "bin" / "python")).strip()
+#: Voices chosen in the UI, which outrank the environment.
+#:
+#: A reference clip is picked by LISTENING, so it is chosen in the app rather than
+#: in a file — and a choice made in the app has to survive a restart without asking
+#: anyone to edit .env. This is that store: shorts/server.py writes it when someone
+#: adopts a voice, and Chatterbox.resolve() reads it before falling back to the
+#: environment. Absent, everything behaves exactly as it did before.
+VOICE_DIR = ROOT / "voices"
+VOICE_SETTINGS = VOICE_DIR / "settings.json"
+
+
+def voice_settings() -> dict:
+    """What the UI has chosen, or {} if it has chosen nothing."""
+    try:
+        import json
+        return json.loads(VOICE_SETTINGS.read_text())
+    except Exception:
+        return {}
+
+
+CHATTERBOX_VOICE_INTERVIEWER = os.getenv("CHATTERBOX_VOICE_INTERVIEWER", "").strip()
+CHATTERBOX_VOICE_STUDENT     = os.getenv("CHATTERBOX_VOICE_STUDENT", "").strip()
+# Expressiveness and pacing. 0.5/0.5 is the model's default; raising exaggeration
+# emotes more, lowering cfg_weight slows the delivery down.
+CHATTERBOX_EXAGGERATION = _f_late("CHATTERBOX_EXAGGERATION", 0.5)
+CHATTERBOX_CFG_WEIGHT   = _f_late("CHATTERBOX_CFG_WEIGHT", 0.5)
+# Loading the model takes ~158s on CPU, and the worker has to be given time to do
+# it before the first beat is asked for.
+CHATTERBOX_START_TIMEOUT = _f_late("CHATTERBOX_START_TIMEOUT", 420.0)
+CHATTERBOX_SYNTH_TIMEOUT = _f_late("CHATTERBOX_SYNTH_TIMEOUT", 300.0)
+
 # --- piper (local, offline, free)
 PIPER_DATA_DIR = os.getenv("PIPER_DATA_DIR", str(ROOT / "output" / "piper-voices")).strip()
 PIPER_VOICE_INTERVIEWER = os.getenv("PIPER_VOICE_INTERVIEWER", "en_US-ryan-medium").strip()

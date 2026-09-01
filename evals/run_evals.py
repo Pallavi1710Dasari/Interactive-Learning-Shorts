@@ -41,6 +41,8 @@ UNIT_GRADERS = {
     "icons_are_pictures": checks.check_icons_are_pictures,
     "samples_differ":     checks.check_samples_differ,
     "svg_quality":        checks.check_svg_quality,
+    "frames_match_strategy": checks.check_frames_match_strategy,
+    "one_hero_per_frame":    checks.check_one_hero_per_frame,
 }
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"

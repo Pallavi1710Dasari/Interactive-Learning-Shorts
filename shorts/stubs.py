@@ -47,6 +47,10 @@ def fake(model_cls, system: str, user: str):
     if name == "EvalReport":
         return model_cls(faithfulness=5, clarity=5, pace=4,
                          diagram_correct=True, problems=[])
+    if name == "VisualStrategy":
+        return model_cls(**_strategy(user))
+    if name == "VisionReport":
+        return model_cls(**_vision(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 
@@ -175,6 +179,57 @@ def _spans(sentences: list[str]) -> list[str]:
     return spans or [" ".join(sentences)]
 
 
+def _refs(user: str) -> list[str]:
+    """The visual_refs a prompt is asking about, in beat order."""
+    listed = _find(r"(?:in this order|these refs)[^:]*:\s*(.+)$", user, re.M) or ""
+    refs = (re.findall(r"'([^']+)'", listed)
+            or re.findall(r"^\[([a-z0-9_]+)\]", user, re.M))
+    return list(dict.fromkeys(refs))
+
+
+def _strategy(user: str) -> dict:
+    """A plan whose relationships MATCH what _visuals() goes on to draw.
+
+    The two stubs have to agree or an offline run fails on itself:
+    check_frames_match_strategy compares the relationship planned here against the
+    template chosen there, and _visuals draws every frame as a "bar". "structure"
+    is the relationship a bar can honestly carry, so that is what this claims —
+    a stub that planned a "process" would have the smoke test reporting a
+    contradiction the real pipeline does not have.
+    """
+    refs = _refs(user)
+    lines = dict(re.findall(r"^\[([a-z0-9_]+)\]\s*\w+:\s*(.+)$", user, re.M))
+    beats = []
+    for i, ref in enumerate(refs):
+        subject = lines.get(ref, ref.replace("_", " "))
+        beats.append({
+            "ref": ref,
+            "concept": subject[:90],
+            "relationship": "structure",
+            "must_see": f"a row of cells with the {i + 1}th one accented",
+            "changes_from_previous": "" if i == 0 else "one more cell joins the row",
+            "focus": f"cell {i + 1}",
+        })
+    return {"subject": "a stub composition that grows one cell per beat",
+            "beats": beats}
+
+
+def _vision(user: str) -> dict:
+    """Every frame passes, with no composition problems.
+
+    A stub judge that FAILED frames would send the offline run round the redesign
+    loop three times against a stub designer that returns the same answer every
+    time — three identical attempts and a warning, on every short, for no signal.
+    The plumbing is what the stub is for; the verdict is what the real judge is for.
+    """
+    refs = re.findall(r"^IMAGE \d+ — ref: (\S+)$", user, re.M)
+    return {"frames": [{"ref": ref, "visual_correctness": 9,
+                        "educational_clarity": 8, "text_dependency": 3,
+                        "animation_relevance": 7, "concept_communication": 8,
+                        "problems": []} for ref in refs],
+            "composition_problems": []}
+
+
 def _visuals(user: str) -> dict:
     """
     A real Frame per ref, so a stub run exercises the actual renderer.
@@ -193,10 +248,7 @@ def _visuals(user: str) -> dict:
     nothing. This models the wanted one: one composition, short noun labels, and the
     accent moving between beats.
     """
-    listed = _find(r"in this order:\s*(.+)$", user, re.M) or ""
-    refs = (re.findall(r"'([^']+)'", listed)
-            or re.findall(r"^\[([a-z0-9_]+)\]", user, re.M))
-    refs = list(dict.fromkeys(refs))
+    refs = _refs(user)
 
     # Labels are taken from the NARRATION, not invented. check_diagram_matches_
     # narration compares a frame's label words against the beats and the source, and

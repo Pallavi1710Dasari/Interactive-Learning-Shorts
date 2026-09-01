@@ -109,6 +109,7 @@ MAX_ROWS = 4
 MAX_CODE_LINES = 7
 MAX_PANELS = 2
 MAX_PANEL_ITEMS = 4
+MAX_LEVELS = 4
 
 
 # --------------------------------------------------------------------- text
@@ -405,7 +406,9 @@ def _mapping(frame: Frame, enter: int) -> tuple[str, int]:
             arrow(gutter_x0 + 16, row_y(i) + row_h / 2, gutter_x1 - 8, row_y(i) + row_h / 2,
                   role="")
             for i in range(paired))
-        out += group(arrows, enter, "flow")
+        # "travel", NOT "flow" — see _icons below for why this template gets a
+        # payload sent along the arrow rather than dashes marching on it.
+        out += group(arrows, enter, "travel")
         enter += 1
     return out, enter
 
@@ -502,6 +505,138 @@ def _stat(frame: Frame, enter: int) -> tuple[str, int]:
         lines, size = fit(frame.caption, USABLE, 48, 32, max_lines=2)
         out += group(text_block(lines, VIEW / 2, mid + 150, size, MUTED, 600), enter)
         enter += 1
+    return out, enter
+
+
+def _hierarchy(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    Levels stacked, each one physically resting on the one below it.
+
+    RULE 9 HAD NO SHAPE, AND THE FRAME IT PRODUCED IS QUOTED IN THE BRIEF. Asked to
+    draw "Users, Applications, Operating System, Hardware" the only pictorial
+    template available was `icons`, which lays things out IN A ROW — so a stack of
+    layers was drawn as four pictograms side by side, which claims they sit
+    alongside each other as peers. The arrangement contradicted the concept, and
+    the only thing carrying the real relationship was the reading order of four
+    labels. Delete the labels and it is four pictures in a line.
+
+    Stacked, the claim is in the geometry. The widths step outward as they descend
+    so the base reads as the thing everything else stands on, and the slabs TOUCH —
+    no gutter — because a gap between them would read as four separate objects
+    again, which is the defect being fixed.
+
+    Top of the list is the top of the stack. That is the convention every layered
+    architecture diagram uses, so `levels` reads in the order it is written.
+    """
+    levels = (frame.levels or [Cell()])[:MAX_LEVELS]
+    n = len(levels)
+    avail = BODY_BOTTOM - BODY_TOP
+    h = min(150, avail / n)
+    total = n * h
+    top = BODY_TOP + (avail - total) / 2
+
+    # The base is the full width and every level above steps in by a fixed amount,
+    # which is what makes the stack read as a pyramid rather than as a column of
+    # identical boxes. Capped so a four-level stack does not taper to a sliver.
+    step_in = min(90, USABLE * 0.09)
+
+    # IT BUILDS FROM THE BOTTOM UP, and that is the animation carrying the concept
+    # rather than decorating it.
+    #
+    # The arrival order is the one thing this renderer can say about a diagram that
+    # a still cannot, and on every other template it says something weak — "here is
+    # the reading order". Here it can state the claim itself: you cannot rest on a
+    # foundation that is not there yet. A viewer who watches the hardware land, then
+    # the OS settle onto it, then the applications onto that, has been shown the
+    # dependency before a single label is read. Built top-down, the same four slabs
+    # appear to hang in the air waiting for a floor, which is the relationship
+    # backwards.
+    #
+    # Rules 6 and 9 together: the structure is in the arrangement, and the order in
+    # which the arrangement appears is the structure being explained.
+    out = ""
+    for i, level in enumerate(levels):
+        inset = step_in * (n - 1 - i)
+        w = USABLE - 2 * inset
+        x = MARGIN + inset
+        y = top + i * h
+        # Bottom slab first. `levels` is written top-down because that is how a
+        # layered diagram is read and named; it is DRAWN in reverse.
+        stage = enter + (n - 1 - i)
+        # rx small, not 0: rounded corners between touching slabs leave little
+        # diamonds of background that read as gaps if they are too generous.
+        out += group(box(x, y, w, h, level.role, rx=8)
+                     + label_in_box(level.label, x, y, w, h, level.role, hi=44, lo=24),
+                     stage, "focus" if level.role == "hero" else None)
+    return out, enter + n
+
+
+def _cause_effect(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    The cause, an arrow, the effect. Both on screen at once.
+
+    RULE 10. Before this, a cause-and-effect beat went to `flow`, which draws
+    equal boxes in a column — so "the missing semicolon breaks the whole rule"
+    rendered as two identical steps stacked up, indistinguishable from a two-stage
+    process. A process is a thing that proceeds; a cause is a thing that MAKES
+    another thing true, and the difference is the whole point of the beat.
+
+    Two things carry it here that `flow` cannot. The arrow is horizontal, so the
+    direction is read left to right rather than as descent through time. And the
+    arrow is LABELLED with the mechanism when there is one — the word on the arrow
+    is the only place in this renderer where the relationship itself, rather than
+    the things it relates, gets to be named.
+
+    The effect is drawn larger than the cause. A cause-effect frame whose two
+    boxes are the same size is a frame with no focus, and the beat is always about
+    the effect: the cause is the setup and the effect is what the viewer is being
+    told to look at.
+    """
+    cause = frame.cause or Cell(label="")
+    effect = frame.effect or Cell(label="")
+
+    # The corridor is wide enough to hold the mechanism label, because that label
+    # has nowhere else to go — see below. 150 was not, and "parser stops" ran out
+    # of the corridor and across the effect box.
+    gap = 210                                  # the arrow's reserved corridor
+    cause_w = (USABLE - gap) * 0.44
+    effect_w = (USABLE - gap) * 0.56           # the effect is the bigger shape
+    # Tall enough to fill the body band. At 200/250 the two boxes sat in the middle
+    # of a 590px band with a third of it empty above them, which reads on a phone
+    # as a diagram that failed to load.
+    cause_h, effect_h = 300, 380
+    mid = (BODY_TOP + BODY_BOTTOM) / 2
+
+    cx = MARGIN
+    ex = MARGIN + cause_w + gap
+
+    out = group(box(cx, mid - cause_h / 2, cause_w, cause_h, cause.role)
+                + label_in_box(cause.label, cx, mid - cause_h / 2, cause_w, cause_h,
+                               cause.role, hi=44, lo=24),
+                enter, "focus" if cause.role == "hero" else None)
+    enter += 1
+
+    # The arrow arrives BETWEEN the two, on its own beat, so the viewer sees the
+    # cause, then the link being made, then the result — which is rule 10's
+    # "animate cause -> effect" expressed as arrival order.
+    tail, tip = cx + cause_w + 18, ex - 12
+    link = arrow(tail, mid, tip, mid, role="")
+    if frame.mechanism:
+        # Its own strip above the shaft, FITTED TO THE CORRIDOR and centred on the
+        # corridor — not on the span between the two box centres, which is what it
+        # used to be and which put the label's right half inside the effect box.
+        # This is the module's rule 1: text is fitted to a rectangle reserved for
+        # it, and the corridor is that rectangle.
+        lines, size = fit(frame.mechanism, tip - tail, 30, 18, max_lines=2)
+        link += text_block(lines, (tail + tip) / 2, mid - 58, size, MUTED, 700)
+    out += group(link, enter, "flow")
+    enter += 1
+
+    out += group(box(ex, mid - effect_h / 2, effect_w, effect_h, effect.role)
+                 + label_in_box(effect.label, ex, mid - effect_h / 2, effect_w,
+                                effect_h, effect.role, hi=48, lo=26),
+                 enter, "focus" if effect.role == "hero" else None)
+    enter += 1
     return out, enter
 
 
@@ -1030,6 +1165,20 @@ def _icons(frame: Frame, enter: int) -> tuple[str, int]:
     mid = (BODY_TOP + BODY_BOTTOM) / 2 - label_h / 2
     top = mid - size / 2
 
+    # ONE TYPE SIZE FOR THE WHOLE ROW, measured before anything is drawn.
+    #
+    # Fitting each label independently gives them different sizes — "Users" at 40px
+    # beside "Applications" at 30px — and unequal type in a row of peers is a claim
+    # the frame does not mean to make: the eye reads the biggest word as the
+    # important one, which competes with the amber hero for exactly the attention
+    # the accent is supposed to direct. So every label takes the size of the label
+    # that needed the most shrinking.
+    def _label_fit(text: str):
+        fitted = fit_unbroken(text, cell, 40, 24, max_lines=2)
+        return fitted if fitted else fit(text, cell, 40, 24, max_lines=2)
+
+    label_size = min((_label_fit(g.label)[1] for g in glyphs if g.label), default=40)
+
     out = ""
     centres: list[float] = []
     for i, glyph in enumerate(glyphs):
@@ -1044,7 +1193,27 @@ def _icons(frame: Frame, enter: int) -> tuple[str, int]:
         draw = PICTOGRAMS.get(glyph.icon, _pict_box)
         body = draw(cx - size / 2, top, size, line, accent)
         if glyph.label:
-            lines, fs = fit(glyph.label, cell, 40, 24, max_lines=2)
+            # fit_unbroken FIRST, and this was a real defect the vision judge
+            # caught by reading the rendered frame: a four-glyph row gives each
+            # label a 210px cell, and fit() starts at 40px where that is nine
+            # characters. "Applications" does not fit, so wrap() hard-split it and
+            # fit() accepted the result because TWO LINES IS WITHIN THE LIMIT — the
+            # frame shipped reading "Applicati / ons" under the pictogram.
+            #
+            # It scored zero problems from every structural check: not an overflow,
+            # not a collision, not a wrong label. Only something looking at the
+            # picture could see it, and something looking at the picture is what
+            # found it.
+            #
+            # fit_unbroken refuses to cut a word and steps down instead, landing at
+            # 24px where the whole word fits on one line. Falling back to fit() when
+            # even that fails keeps the label inside its cell, which is still the
+            # right last resort.
+            lines, _ = _label_fit(glyph.label)
+            # Re-wrapped at the row's shared size, since a label that fitted on one
+            # line at 40px may need two at 30px.
+            lines, fs = fit_unbroken(glyph.label, cell, label_size, label_size,
+                                     max_lines=2) or (lines, label_size)
             body += text_block(lines, cx, top + size + label_h * 0.45, fs,
                                ink if glyph.role != "plain" else INK, 700)
         out += group(body, enter, "focus" if glyph.role == "hero" else None)
@@ -1055,7 +1224,18 @@ def _icons(frame: Frame, enter: int) -> tuple[str, int]:
             arrow(centres[i] + size / 2 + 14, top + size / 2,
                   centres[i + 1] - size / 2 - 8, top + size / 2, role="")
             for i in range(n - 1))
-        out += group(shafts, enter, "flow")
+        # RULE 8 WANTS THE THING THAT MOVES TO BE DRAWN MOVING, and "flow" does not
+        # do that. Marching dashes say "this arrow is active"; they do not show
+        # anything arriving anywhere. On the two templates that exist for
+        # transfer — pictograms with what passes between them, and a row-for-row
+        # lookup — a token that leaves one box and lands in the other is the
+        # explanation itself, and it is the difference between motion that
+        # decorates a diagram and motion that IS the diagram.
+        #
+        # Only these two. A vertical `flow` is a process advancing through stages,
+        # where the dash march already reads as progression, and a `cause_effect`
+        # arrow is causation rather than transport — nothing is being carried.
+        out += group(shafts, enter, "travel")
         enter += 1
     return out, enter
 
@@ -1473,6 +1653,7 @@ _TEMPLATES = {
     "bar": _bar, "mapping": _mapping, "split": _split, "flow": _flow,
     "table": _table, "stat": _stat, "code": _code, "compare": _compare,
     "preview": _preview, "icons": _icons,
+    "hierarchy": _hierarchy, "cause_effect": _cause_effect,
     # LEGACY. Not offered to the model any more — a frame whose whole content is a
     # sentence is the "visuals are just text" complaint in its purest form, and it
     # was landing on EVERY short because the brief made it the last beat's job.

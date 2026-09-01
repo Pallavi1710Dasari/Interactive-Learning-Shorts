@@ -227,6 +227,82 @@ class Panel(BaseModel):
     role: Role = "plain"
 
 
+#: What KIND of claim a beat makes. This is the axis the visual is chosen on, and
+#: naming it explicitly is the whole point of the strategist step.
+#:
+#: The educational visual rules the reviewer wrote are mostly rules about THIS
+#: field — "if the concept describes a process, animate the process"; "if it
+#: describes a comparison, show both states simultaneously"; "if it describes data
+#: movement, animate the data movement". None of them can be followed by a step
+#: that never decides which one it is looking at, and the old pipeline never did:
+#: spec_visuals went straight from a sentence to a template name, so the
+#: relationship was implicit in a choice rather than a thing that could be checked.
+#:
+#: Made explicit, it becomes checkable. A beat that says "process" and renders a
+#: static "bar" is a detectable mismatch; the same frame with no declared
+#: relationship is just a frame.
+Relationship = Literal[
+    "process",        # a sequence of events -> rule 6, animate it
+    "comparison",     # two states weighed against each other -> rule 7, both at once
+    "data_movement",  # something travels from A to B -> rule 8, animate the travel
+    "hierarchy",      # containment or levels -> rule 9, spatial hierarchy
+    "cause_effect",   # this makes that happen -> rule 10, animate cause then effect
+    "structure",      # one thing divided into named parts, held still
+    "effect",         # how something LOOKS; the picture IS the answer
+    "quantity",       # a figure is the whole point
+]
+
+
+class BeatStrategy(BaseModel):
+    """What ONE beat's frame has to make a viewer see, decided before any template.
+
+    THE STEP THAT WAS MISSING. spec_visuals was asked to do two different jobs in
+    one call: decide what the viewer should see, and pick the shape that shows it.
+    Asked for both at once it did the second one — a template name is a concrete,
+    answerable thing and "what should someone SEE to understand this" is not — so
+    the frames came out well-formed and educationally empty. That is the reviewer's
+    scoring exactly: visual correctness 9, educational clarity 4.
+
+    Separating them forces the question to be answered in words, in its own field,
+    before a template is on the table. The template is then chosen to serve an
+    answer that already exists rather than standing in for one.
+    """
+    ref: str
+
+    #: The ONE idea this beat teaches, in a learner's words. Not the beat's
+    #: sentence — the idea under it.
+    concept: str
+
+    #: What kind of claim it is. Decides which visual rules apply.
+    relationship: Relationship
+
+    #: WHAT THE VIEWER MUST SEE — objects, relationships, states. Written as
+    #: things on a screen, never as a sentence to print.
+    #:
+    #: Rule 3 is the test this field exists to pass: the scene must communicate
+    #: the concept even if all text is removed. If what is written here stops
+    #: making sense once you delete the labels, the strategy is a caption.
+    must_see: str
+
+    #: What a viewer would notice changing since the previous beat, with the sound
+    #: off. Empty on the first beat.
+    changes_from_previous: str = ""
+
+    #: The single object that carries the accent. Exactly one, always.
+    focus: str
+
+
+class VisualStrategy(BaseModel):
+    """The composition plan for one short, before any of it is drawn."""
+
+    #: What the whole short is a picture OF — the one subject every frame develops.
+    subject: str
+    beats: list[BeatStrategy] = Field(default_factory=list)
+
+    def by_ref(self) -> dict[str, BeatStrategy]:
+        return {b.ref: b for b in self.beats}
+
+
 class Frame(BaseModel):
     """
     One diagram, described as STRUCTURE rather than as coordinates.
@@ -253,7 +329,8 @@ class Frame(BaseModel):
     #: renderer and SPEC_SYSTEM. It stays in the union only so the units already in
     #: output/ still load and can be re-rendered.
     template: Literal["bar", "mapping", "split", "flow", "table", "stat",
-                      "code", "compare", "preview", "icons", "takeaway"]
+                      "code", "compare", "preview", "icons",
+                      "hierarchy", "cause_effect", "takeaway"]
     title: str = ""
     #: LEGACY, and no longer drawn. This was "the one supporting line under the
     #: diagram", and what the model actually put in it was the sentence being
@@ -313,6 +390,93 @@ class Frame(BaseModel):
     #: icons — draw arrows between the pictograms, for a sequence rather than a set.
     arrows: bool = True
 
+    #: hierarchy — levels stacked top to bottom, each resting on the one below.
+    #:
+    #: RULE 9 ("if the concept describes hierarchy, use spatial hierarchy") had no
+    #: shape to be expressed in. The nearest pictorial template was `icons`, which
+    #: lays its glyphs out IN A ROW — so the layered-system frame the brief quotes
+    #: as its worst example, "Users / Applications / Operating System / Hardware",
+    #: was drawn as four peers side by side. The arrangement said the opposite of
+    #: the concept, and only the reading order of the labels carried the truth.
+    levels: list[Cell] = Field(default_factory=list)
+
+    #: cause_effect — the thing that makes something happen, and what happens.
+    #:
+    #: Rule 10. These went to `flow` before, which draws equal boxes descending a
+    #: column and therefore says "a process with two stages" — a different claim
+    #: from "this makes that true", and the beat is always about the second one.
+    cause: Optional[Cell] = None
+    effect: Optional[Cell] = None
+    #: cause_effect — the mechanism, written ON the arrow. The one place in this
+    #: renderer where the RELATIONSHIP gets named rather than the things it joins.
+    mechanism: Optional[str] = None
+
+
+class VisualScore(BaseModel):
+    """What the educational vision judge saw when it LOOKED at one rendered frame.
+
+    Every other score in this file is a judgement about text. This one is a
+    judgement about a picture, and the axes are the reviewer's own, kept on their
+    0-10 scale rather than squeezed onto EvalReport's 1-5 so the numbers in the
+    brief and the numbers in the report are the same numbers.
+
+    TEXT_DEPENDENCY RUNS BACKWARDS AND THAT IS DELIBERATE. It is the only field
+    here where high is bad, because it measures a defect rather than a quality:
+    how much of this frame's meaning is carried by reading rather than by seeing.
+    The reviewer scored the old frames 8/10 on it and marked it BAD. Flipping it to
+    a "visual independence" score would have made every axis point the same way and
+    made the field stop meaning what it was named for, so it keeps its direction
+    and every comparison against it is spelled out at the point of use.
+    """
+    #: Is the SVG sound — valid, positioned, nothing clipped or overlapping?
+    #: The templates make this true by construction, so a low score here is a
+    #: renderer bug worth knowing about rather than a redesign to ask for.
+    visual_correctness: int = Field(ge=0, le=10)
+
+    #: Could a learner understand the concept from this picture? The gate.
+    educational_clarity: int = Field(ge=0, le=10)
+
+    #: HIGH IS BAD. How much of the frame's meaning needs reading. 10 means it is
+    #: a slide of words; 0 means the picture would teach with every label erased.
+    text_dependency: int = Field(ge=0, le=10)
+
+    #: Does the motion carry the concept, or is it decoration? Scored from the
+    #: still plus the motion plan the judge is given in text — see skills/vision.py.
+    animation_relevance: int = Field(ge=0, le=10)
+
+    #: Does the visual show the RELATIONSHIP the beat is about?
+    concept_communication: int = Field(ge=0, le=10)
+
+    #: Specific, actionable defects. These are what a redesign is shown.
+    problems: list[str] = Field(default_factory=list)
+
+    #: Which ref this scored, so a report can be read without its dict key.
+    ref: str = ""
+
+    def failures(self) -> list[str]:
+        """Every threshold this frame is under, as sentences a redesign can act on.
+
+        Imported late so schema stays importable without config — the thresholds
+        are configuration, and this module is what config-free tools parse.
+        """
+        from . import config
+        out = []
+        if self.educational_clarity < config.VISION_MIN_CLARITY:
+            out.append(
+                f"educational_clarity {self.educational_clarity}/10 is below "
+                f"{config.VISION_MIN_CLARITY}: a learner could not understand the "
+                f"concept from this picture")
+        if self.text_dependency > config.VISION_MAX_TEXT_DEPENDENCY:
+            out.append(
+                f"text_dependency {self.text_dependency}/10 is above "
+                f"{config.VISION_MAX_TEXT_DEPENDENCY}: the frame's meaning is carried "
+                f"by reading it, not by seeing it")
+        return out
+
+    @property
+    def passed(self) -> bool:
+        return not self.failures()
+
 
 class Visual(BaseModel):
     """Output of Skills 3 and 4."""
@@ -327,6 +491,16 @@ class Visual(BaseModel):
     #: kept on the unit so a frame can be re-rendered after a layout fix without
     #: spending another LLM call.
     frame: Optional[Frame] = None
+
+    #: What the strategist decided this frame had to make a viewer see, kept so a
+    #: later redesign or a human reviewer can read the intent rather than
+    #: reverse-engineering it from the template that was chosen.
+    strategy: Optional[BeatStrategy] = None
+
+    #: The vision judge's verdict on the rendered pixels, when one was taken.
+    #: None means it was not run (no browser, or turned off), which is
+    #: deliberately distinct from a zero — see skills/vision.py.
+    score: Optional[VisualScore] = None
 
 
 class WordTiming(BaseModel):

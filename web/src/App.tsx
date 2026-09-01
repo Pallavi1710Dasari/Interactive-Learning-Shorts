@@ -161,7 +161,15 @@ function Workspace() {
           onDone={(s) => { setShorts(s); setStep("reels"); }}
         />
       )}
-      {voiceOpen && <VoiceLab onClose={() => setVoiceOpen(false)} />}
+      {voiceOpen && (
+        <VoiceLab
+          onClose={() => setVoiceOpen(false)}
+          // Saving a voice is the start of making something, not the end of a
+          // settings errand — so it hands back to step 1 rather than leaving the
+          // person on a panel they are finished with.
+          onKept={() => { readVoice(); setStep("material"); }}
+        />
+      )}
 
       {step === "reels" && (
         <Reels shorts={shorts} focus={focus}

@@ -72,6 +72,68 @@ MODEL_JUDGE     = os.getenv("MODEL_JUDGE", "claude-opus-5")
 # So: same tier as the generator or better. Defaults to the generator.
 MODEL_DIAGRAM   = os.getenv("MODEL_DIAGRAM", "").strip() or MODEL_GENERATOR
 
+# The model that decides WHAT THE VIEWER SHOULD SEE, before any template is picked
+# — skills/strategy.spec_strategy.
+#
+# This step is new and it exists because the old pipeline had no answer to the
+# question. spec_visuals went from a spoken sentence straight to a template name,
+# which means "what should someone see to understand this?" was never asked out
+# loud; it was answered implicitly, as a side effect of picking a shape, and the
+# frames that came out scored 9/10 on correctness and 4/10 on educational clarity.
+#
+# It is the most open-ended call here — no fixed vocabulary to fill in, just a
+# judgement about teaching — so it wants the same tier as the design step or
+# better. Defaults to MODEL_DIAGRAM.
+MODEL_STRATEGIST = os.getenv("MODEL_STRATEGIST", "").strip() or MODEL_DIAGRAM
+
+# The model that LOOKS AT THE RENDERED FRAMES — skills/vision.judge_frames.
+#
+# MUST BE MULTIMODAL. It is handed PNGs, and a text-only model behind this setting
+# fails at the gateway rather than degrading, which is the right way round: a
+# vision judge that silently stopped looking would approve everything, and that is
+# the exact failure MODEL_JUDGE's note below spends a paragraph on.
+#
+# Same reasoning as MODEL_JUDGE for the tier, and then some. Deciding whether a
+# picture teaches is harder than deciding whether a sentence is grounded, and it is
+# the only gate in this pipeline that can catch a frame which is correct, on
+# vocabulary, well-formed and still communicates nothing. Defaults to MODEL_JUDGE.
+MODEL_VISION_JUDGE = os.getenv("MODEL_VISION_JUDGE", "").strip() or MODEL_JUDGE
+
+#: Whether the vision judge runs at all. On by default; set VISION_JUDGE=0 to skip
+#: the rasterise-and-look pass and keep the free structural graders only.
+#:
+#: It is also skipped automatically when there is no Chromium to rasterise with,
+#: so turning it off is about cost rather than about compatibility.
+VISION_JUDGE = os.getenv("VISION_JUDGE", "1").strip().lower() not in ("0", "false", "no")
+
+
+def _i(key: str, default: int) -> int:
+    try:
+        return int(os.getenv(key, "") or default)
+    except ValueError:
+        return default
+
+
+#: Redesign a frame whose educational_clarity is under this, out of 10.
+#:
+#: 7 is the reviewer's own number ("if educational_clarity < 7: regenerate"). It is
+#: the gate because it is the axis that was failing — 4/10 measured — and because
+#: it is the one a redesign can actually move. Raising it toward 9 spends every
+#: attempt on most shorts; the judge's own scores across a batch are the thing to
+#: read before changing it, which is why they are written onto every Visual.
+VISION_MIN_CLARITY = _i("VISION_MIN_CLARITY", 7)
+
+#: Redesign a frame whose text_dependency is OVER this, out of 10. HIGH IS BAD here
+#: — it measures how much of the frame has to be READ rather than seen.
+#:
+#: Gated alongside clarity rather than instead of it because the two fail
+#: separately. A wall of words scores low on clarity and high on this one, but a
+#: frame can also be perfectly clear BECAUSE it is a sentence — clarity 8,
+#: text_dependency 9 — and that frame passes a clarity-only gate while being
+#: precisely the defect the whole brief is about ("the visuals are just text, and
+#: the text is just the narration").
+VISION_MAX_TEXT_DEPENDENCY = _i("VISION_MAX_TEXT_DEPENDENCY", 5)
+
 #: Tier words that mark a light/fast model. Matched as WHOLE SEGMENTS of the model
 #: id, not as substrings — "gemini" contains "mini", so a plain `in` test called
 #: google/gemini-2.5-pro a light tier and printed a warning telling the user their
@@ -96,7 +158,7 @@ def model_warnings() -> list[str]:
     What IS detectable is a small number of configurations whose failure mode is
     silence rather than an error.
     """
-    out = [w for w in (_judge_warning(), _diagram_warning()) if w]
+    out = [w for w in (_judge_warning(), _diagram_warning(), _vision_warning()) if w]
     return out
 
 
@@ -132,6 +194,28 @@ def _diagram_warning() -> str | None:
                 f"document gives it. Underpowered there produces accurate-looking "
                 f"frames that are wrong. Unset it to follow MODEL_GENERATOR "
                 f"({MODEL_GENERATOR}), or raise it.")
+    return None
+
+
+def _vision_warning() -> str | None:
+    """MODEL_VISION_JUDGE on a light tier, or aimed at the model it is grading.
+
+    Same failure shape as the text judge and worse consequences. This gate exists
+    to catch frames that every cheap check already approved, so when it approves
+    too, nothing else is left — and a light multimodal model asked "does this
+    picture teach the concept" answers yes to almost any tidy diagram.
+    """
+    vision, designer = MODEL_VISION_JUDGE.lower(), MODEL_DIAGRAM.lower()
+    if _is_light_tier(vision):
+        return (f"MODEL_VISION_JUDGE ({MODEL_VISION_JUDGE}) is a light/fast tier. It "
+                f"is the last gate in the pipeline and the only one that can see a "
+                f"frame — a weak one here does not fail loudly, it scores every tidy "
+                f"diagram 8/10 and the visuals stop improving. Point it at a frontier "
+                f"multimodal model.")
+    if vision == designer:
+        return (f"MODEL_VISION_JUDGE and MODEL_DIAGRAM are both {MODEL_DIAGRAM} — the "
+                f"model that designed the frame is grading the frame, and it scores "
+                f"its own composition generously. Use a different family.")
     return None
 
 

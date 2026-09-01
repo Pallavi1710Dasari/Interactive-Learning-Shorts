@@ -1,0 +1,92 @@
+{
+ "short_id": "accent_on_everything",
+ "session_id": "eval",
+ "source_section_id": "3.3",
+ "question": "What is HTTP and how do browsers and servers use it?",
+ "estimated_seconds": 18.0,
+ "beats": [
+  {
+   "speaker": "interviewer",
+   "line": "What is HTTP and how do browsers and servers use it?",
+   "on_screen": "What is HTTP?",
+   "visual_ref": "q_http"
+  },
+  {
+   "speaker": "student",
+   "line": "HTTP is the Web's language: how browsers and servers communicate.",
+   "on_screen": "The language of the web",
+   "visual_ref": "d_language",
+   "source_quote": "HTTP is the language of the Web."
+  },
+  {
+   "speaker": "student",
+   "line": "Browsers use HTTP to request and receive information from servers.",
+   "on_screen": "Request and receive",
+   "visual_ref": "d_exchange",
+   "source_quote": "A browser requests and receives information from a server."
+  }
+ ],
+ "visuals": {
+  "q_http": {
+   "ref": "q_http",
+   "type": "diagram",
+   "spec": "the two parties",
+   "frame": {
+    "template": "flow",
+    "title": "Two memory accesses",
+    "steps": [
+     {
+      "label": "Access Page Table",
+      "role": "hero"
+     },
+     {
+      "label": "Access Data",
+      "role": "hero"
+     }
+    ]
+   }
+  },
+  "d_language": {
+   "ref": "d_language",
+   "type": "diagram",
+   "spec": "the exchange",
+   "frame": {
+    "template": "flow",
+    "title": "One exchange",
+    "steps": [
+     {
+      "label": "Request",
+      "role": "hero"
+     },
+     {
+      "label": "Response",
+      "role": "plain"
+     }
+    ]
+   }
+  },
+  "d_exchange": {
+   "ref": "d_exchange",
+   "type": "diagram",
+   "spec": "what comes back",
+   "frame": {
+    "template": "icons",
+    "title": "What arrives",
+    "glyphs": [
+     {
+      "icon": "server",
+      "label": "Server",
+      "role": "plain"
+     },
+     {
+      "icon": "page",
+      "label": "Page",
+      "role": "hero"
+     }
+    ],
+    "arrows": true
+   }
+  }
+ },
+ "status": "draft"
+}

@@ -41,10 +41,12 @@ they were text. Three things caused it and all three are fixed here.
 """
 
 from pydantic import BaseModel
-from ..schema import Script, Visual, Section, Frame
+from ..schema import Script, Visual, Section, Frame, VisualStrategy
 from ..llm import ask_json
 from .. import config
 from . import layout
+from .strategy import EDUCATIONAL_VISUAL_RULES, as_brief as strategy_brief,\
+    plan_strategy
 
 
 class FramedVisual(BaseModel):
@@ -66,6 +68,49 @@ OF, then give each beat a frame that shows the part of it that beat is about.
 
 A viewer who watched four unrelated diagrams remembers none of them. A viewer who
 watched one thing develop remembers the thing.
+
+__RULES__
+
+YOU ARE NOT DECIDING WHAT THE VIEWER SEES. THAT IS ALREADY DECIDED.
+A strategist has been through this short ahead of you and written down, for every
+beat, the concept it teaches, what KIND of claim it makes, what the viewer must
+see, and which single object is the focus. That brief is below and it is
+authoritative about WHAT. Your job is HOW: choose the shape that shows it and
+supply the words.
+
+This split exists because doing both at once did not work. Asked for a scene and a
+template in the same breath, the template won every time — it is a concrete choice
+from a fixed list and "what should someone see to understand this" is not — so the
+shapes came out chosen carefully and the pictures came out chosen by accident.
+Correct, tidy, and teaching nothing.
+
+So read `must see` before you look at the template list, and pick the shape that
+serves it. If NO shape serves it, say so by picking the closest one and getting the
+words right — do not quietly redesign the scene into something a template fits,
+because the strategy is what the rendered frame is graded against afterwards.
+
+`relationship` NARROWS THE TEMPLATE, AND IT IS THE FASTEST WAY TO THE RIGHT SHAPE:
+
+  process        -> "flow", or "icons" with arrows=true. Rule 6: the stages are
+                    drawn in order and the movement between them is on screen.
+  comparison     -> "compare". Rule 7: BOTH STATES AT ONCE, side by side. Never
+                    two beats showing one side each — a difference the viewer has
+                    to hold in memory across a cut is a difference they did not
+                    see.
+  data_movement  -> "icons" with arrows=true, or "mapping". Rule 8: the thing that
+                    moves, where it starts, where it lands, and the path between.
+  hierarchy      -> "hierarchy". Rule 9: levels stacked, or boxes inside boxes, so
+                    the structure is in the ARRANGEMENT. A hierarchy drawn as a
+                    flat row is a hierarchy the viewer cannot see.
+  cause_effect   -> "cause_effect". Rule 10: the cause and the effect both on
+                    screen with the direction between them drawn.
+  structure      -> "split", "bar", or "table".
+  effect         -> "preview". Rule 3 at its strongest: the picture IS the answer.
+  quantity       -> "stat".
+
+Take that mapping unless the material gives you something better, and the one
+thing that IS better is the document's own artifact: a "code" frame of the rule
+being taught beats a paraphrase of it in any shape, because it is the thing itself.
 
 BUT "DEVELOP" MEANS SOMETHING CHANGES. RECOLOURING ONE CELL IS NOT A NEW FRAME.
 This is the defect to avoid, and it is the one that gets complained about:
@@ -434,6 +479,33 @@ __ICON_LIST__
              Use this and NOT "table" for a comparison. A table is a lookup, so its
              two columns claim a row-for-row correspondence — and two alternatives
              are not a correspondence, they are a choice.
+  "hierarchy" LEVELS STACKED, each resting on the one below, widening as they
+             descend. For containment, layering, or anything where one thing sits
+             ON TOP OF or INSIDE another: users above applications above the OS
+             above the hardware; an element inside its parent.
+             -> levels: 2 to 4, each {label, role}. TOP OF THE LIST IS THE TOP OF
+                THE STACK.
+             THIS IS RULE 9, AND ITS ABSENCE PRODUCED THE FRAME THIS BRIEF QUOTES
+             AS ITS WORST. "Users, Applications, Operating System, Hardware" had no
+             stacked shape to go in, so it went to "icons" — which lays things out
+             IN A ROW, claiming the four are peers standing side by side. That is
+             the opposite of what the beat said, and the only thing carrying the
+             truth was the order of four words. Stacked, the relationship is in the
+             geometry: erase every label and a viewer still sees what rests on what.
+             Never draw a hierarchy as a row. Never draw a row as a hierarchy.
+  "cause_effect"
+             THE CAUSE, AN ARROW, THE EFFECT — both on screen at once, left to
+             right. For "this makes that happen": a missing semicolon and the rule
+             that stops applying, a cache miss and the fetch it triggers.
+             -> cause, effect: one {label, role} each. mechanism: OPTIONAL, 1-3
+                words naming HOW — it is drawn on the arrow, and it is the only
+                place in this renderer where the relationship itself gets named
+                rather than the two things it joins. Leave it out rather than
+                filling it with a restatement of the effect.
+             Rule 10. Use this and NOT "flow": flow draws equal boxes descending a
+             column, which says "a process with two stages" — a different claim
+             from "this makes that true". The effect is drawn larger than the
+             cause, because the beat is always about the effect.
 
 PICK THE TEMPLATE FROM THE RELATIONSHIP, NOT FROM THE SUBJECT
 Ask what the sentence CLAIMS, and the template follows:
@@ -448,6 +520,8 @@ Ask what the sentence CLAIMS, and the template follows:
   things, and what passes between them   -> "icons"
   the material teaches it with code      -> "code"
   a single figure is the whole point     -> "stat"
+  one thing sits on top of / inside another -> "hierarchy"
+  this MAKES that happen                 -> "cause_effect"
 
 Work down that list in order of how CONCRETE the frame ends up. A "code" frame of
 the document's own rule beats a "flow" of your paraphrase of it every time, because
@@ -502,7 +576,8 @@ for a human reading the unit later. It is not drawn.
 
 Output JSON:
 {"visuals":[{"ref":"...","spec":"one sentence","frame":{
-  "template":"bar|mapping|split|flow|table|stat|code|compare|preview|icons",
+  "template":"bar|mapping|split|flow|table|stat|code|compare|preview|icons|
+              hierarchy|cause_effect",
   "title":"...",
   "cells":[{"label":"...","role":"plain|hero|lost|quiet"}], "cells_title":"...",
   "left":[...], "right":[...], "left_title":"...", "right_title":"...",
@@ -513,6 +588,9 @@ Output JSON:
   "code_caption":"style.css",
   "panels":[{"title":"...","role":"...","items":[{"label":"...","role":"..."}]}],
   "glyphs":[{"icon":"browser","label":"Browser","role":"hero"}], "arrows":true,
+  "levels":[{"label":"Hardware","role":"plain"}],
+  "cause":{"label":"...","role":"plain"}, "effect":{"label":"...","role":"hero"},
+  "mechanism":"parser stops",
   "samples":[{"text":"Tourism","label":"Lobster","font":"Lobster","scale":3,
               "weight":700,"italic":false,"decoration":null,"color":"blue",
               "background":null,"role":"hero"}]}}]}
@@ -528,11 +606,13 @@ _ICON_LINES = "\n".join(
     "                " + ", ".join(layout.OFFERED_ICONS[i:i + 7])
     for i in range(0, len(layout.OFFERED_ICONS), 7))
 SPEC_SYSTEM = SPEC_SYSTEM.replace("__ICON_LIST__", _ICON_LINES)
+SPEC_SYSTEM = SPEC_SYSTEM.replace("__RULES__", EDUCATIONAL_VISUAL_RULES)
 
 
 def spec_visuals(script: Script, section: Section | None = None,
                  feedback: str | None = None,
-                 model_override: str | None = None) -> dict[str, Visual]:
+                 model_override: str | None = None,
+                 strategy: VisualStrategy | None = None) -> dict[str, Visual]:
     """
     One call for the whole short: a template and its words for every visual_ref.
 
@@ -587,6 +667,22 @@ and its numbers, copied exactly. Not from its prose.
 ---
 """
 
+    if strategy is not None:
+        # BEFORE the "design one composition" instruction and AFTER the material,
+        # so it is the last substantive thing read: the brief tells the model how
+        # to choose a shape, the material tells it what the words are, and this
+        # tells it what the picture has to accomplish. Read in that order, the
+        # strategy is what the shape is chosen FOR rather than a constraint applied
+        # to a shape already picked.
+        user += f"""
+THE VISUAL STRATEGY FOR THIS SHORT — what each beat's frame must make the viewer
+SEE. This was decided before any template was on the table and it is authoritative
+about WHAT. You choose HOW.
+---
+{strategy_brief(strategy, refs)}
+---
+"""
+
     user += (f"\nDesign ONE composition and assign a frame to each of these refs, in "
              f"this order: {refs}\nThe last one, {refs[-1]}, is that composition "
              f"finished, with the hero on the thing that answers the question — it is "
@@ -620,7 +716,9 @@ moved — one honest still is better than two frames pretending to differ."""
                     model=model_override or config.MODEL_DIAGRAM,
                     max_tokens=4000, label="visual_spec")
 
-    return {v.ref: Visual(ref=v.ref, type="diagram", spec=v.spec, frame=v.frame)
+    by_ref = strategy.by_ref() if strategy else {}
+    return {v.ref: Visual(ref=v.ref, type="diagram", spec=v.spec, frame=v.frame,
+                          strategy=by_ref.get(v.ref))
             for v in plan.visuals}
 
 
@@ -655,7 +753,24 @@ def _design_graders(section: Section | None = None):
     from .. import checks
     graders = [checks.check_frames_develop, checks.check_frames_vary_template,
                checks.check_frames_are_visual,
-               checks.check_icons_are_pictures, checks.check_samples_differ]
+               checks.check_icons_are_pictures, checks.check_samples_differ,
+               # Both new, both free, both acting on things the brief already
+               # asked for and nothing had ever checked.
+               #
+               # frames_match_strategy is the enforceable half of the educational
+               # visual rules — rules 6 to 10 are all "if the concept describes X,
+               # the visual must do Y", and with `relationship` written down per
+               # beat that becomes a set membership test. It costs nothing and it
+               # catches the contradiction a redesign can always fix: a hierarchy
+               # drawn as a row, a comparison split across two beats.
+               #
+               # one_hero_per_frame measured 18 of the 38 units in output/ with at
+               # least one frame that had no focus at all, or that marked every
+               # element of a group as the hero. "A composition of equal parts has
+               # no focus" has been in the brief from the start; this is the first
+               # thing to act on it.
+               checks.check_frames_match_strategy,
+               checks.check_one_hero_per_frame]
     if section is not None:
         graders.append(lambda u: checks.check_code_frames_quote_source(u, section.text))
     return graders
@@ -665,7 +780,8 @@ def design_visuals(script: Script, section: Section | None = None, *,
                    draw: bool = True,
                    previous: dict[str, Visual] | None = None,
                    attempts: int = MAX_DESIGN_ATTEMPTS,
-                   note: str | None = None) -> tuple[dict[str, Visual], list[str]]:
+                   note: str | None = None,
+                   vision: bool = True) -> tuple[dict[str, Visual], list[str]]:
     """
     Design the frames, grade them, and ask again for the ones that failed.
 
@@ -690,12 +806,56 @@ def design_visuals(script: Script, section: Section | None = None, *,
     than the last: a second try that fixes two defects and introduces one is still
     the better frame set, and returning the final attempt regardless would sometimes
     ship a worse design than the one it replaced.
+
+    TWO STAGES ARE NEW, AND THEY BRACKET THE ONE THAT WAS ALREADY HERE.
+
+    BEFORE: a strategy. skills/strategy.plan_strategy decides what each beat has to
+    make a viewer SEE, in words, before a template is on the table. The loop below
+    was rerunning a step that had never been asked that question, so three attempts
+    produced three differently-shaped versions of the same misunderstanding.
+
+    AFTER: the vision judge. Every gate that existed read the Frame's structure,
+    and structure is exactly what was already fine — 9/10 on correctness against
+    4/10 on educational clarity. skills/vision.judge_frames rasterises the finished
+    SVGs and LOOKS at them, which is the only way to catch a frame that is
+    well-formed, on-vocabulary, accurate, and teaches nothing.
+
+    It runs ONLY on a design that has already passed every free structural grader,
+    for the same reason audit() holds the text judge back: paying a multimodal call
+    to look at a frame we already know is broken buys nothing. So the common path
+    is one design call plus one vision call, and the vision call is skipped
+    entirely when `draw` is off (there is no picture), when VISION_JUDGE=0, or when
+    there is no browser to rasterise with.
     """
     from ..schema import ShortUnit
 
     # Every ref the beats actually name. A returned design MUST cover all of them or
     # ShortUnit will not validate — see the ref-drift note below.
     needed = {b.visual_ref for b in script.beats}
+
+    refs, seen = [], set()
+    for b in script.beats:
+        if b.visual_ref not in seen:
+            seen.add(b.visual_ref)
+            refs.append(b.visual_ref)
+
+    # ONE STRATEGY FOR THE SHORT, PLANNED ONCE AND REUSED ACROSS ATTEMPTS.
+    #
+    # A rejected frame is usually a drawing problem, not a plan problem: the scene
+    # was right and the shape chosen for it was not. Re-planning on every attempt
+    # would throw away a correct plan to fix a wrong drawing, and the next attempt
+    # would then be solving a different problem from the one that failed. It IS
+    # re-planned when the judge keeps rejecting the same frame for what it shows
+    # rather than how it looks — see the concept_communication check below.
+    #
+    # Never fatal. A short with no strategy designs exactly the way it did before
+    # this step existed, which is worse but is not broken.
+    strategy: VisualStrategy | None = None
+    try:
+        strategy = plan_strategy(script, section)
+    except Exception as e:
+        print(f"    strategy for {script.short_id} unavailable "
+              f"({type(e).__name__}: {str(e)[:90]}) — designing from the beats alone")
 
     best: dict[str, Visual] | None = None
     best_problems: list[str] | None = None
@@ -723,7 +883,8 @@ def design_visuals(script: Script, section: Section | None = None, *,
         # moved on, discarding two perfectly usable earlier attempts. Five of nine
         # units in one sweep were silently left un-redesigned this way.
         try:
-            visuals = spec_visuals(script, section, feedback=feedback)
+            visuals = spec_visuals(script, section, feedback=feedback,
+                                   strategy=strategy)
             if draw:
                 visuals = render_diagrams(visuals, script, section)
 
@@ -747,6 +908,28 @@ def design_visuals(script: Script, section: Section | None = None, *,
                               beats=script.beats, visuals=visuals)
             problems = [f"{r.name}: {r.reason}"
                         for r in (g(probe) for g in _design_graders(section)) if not r.passed]
+
+            # THE VISION GATE, and it only opens once the free checks are clean.
+            #
+            # Ordering is the whole cost story. A design with a fabricated code
+            # line or four identical frames is already known to be going round
+            # again, and rasterising it to ask a multimodal model what it thinks
+            # would buy a second opinion on a decided question. Structural first,
+            # free; pixels second, paid, and only on a candidate.
+            vision_problems: list[str] = []
+            if vision and draw and problems == []:
+                from .vision import judge_frames, problems_for_redesign
+                try:
+                    scored, composition = judge_frames(script, visuals, strategy, section)
+                except Exception as e:
+                    print(f"    vision judge for {script.short_id} unavailable "
+                          f"({type(e).__name__}: {str(e)[:90]})")
+                    scored, composition = {}, []
+                for ref, score in scored.items():
+                    if ref in visuals:
+                        visuals[ref].score = score
+                vision_problems = problems_for_redesign(scored, composition)
+                problems += vision_problems
         except Exception as e:
             print(f"    attempt {attempt}/{attempts} for {script.short_id} unusable: "
                   f"{type(e).__name__}: {str(e)[:120]}")
@@ -764,6 +947,32 @@ def design_visuals(script: Script, section: Section | None = None, *,
         if attempt < attempts:
             print(f"    redesign {attempt}/{attempts} for {script.short_id}: "
                   + "; ".join(p[:110] for p in problems[:2]))
+
+        # REDRAWING A SCENE THAT WAS NEVER GOING TO TEACH IS WHAT THE OLD LOOP DID.
+        #
+        # When the judge rejects a frame for concept_communication, it is saying the
+        # picture does not show the RELATIONSHIP — which is a verdict on the plan,
+        # not on the shape the plan was poured into. Asking the design step again
+        # against the same strategy gets a different arrangement of the same wrong
+        # idea, three times, and then ships the least-bad one.
+        #
+        # So on a repeat failure the strategy itself is re-planned, with the
+        # judge's own words. Deliberately not on the FIRST failure: the commonest
+        # rejection is a good scene drawn in the wrong template, and that is fixed
+        # by redesigning against the plan that is already right.
+        if vision_problems and attempt >= 2 and strategy is not None and attempt < attempts:
+            weak = [sc for sc in (v.score for v in visuals.values()) if sc is not None
+                    and sc.concept_communication < config.VISION_MIN_CLARITY]
+            if weak:
+                try:
+                    strategy = plan_strategy(script, section,
+                                             feedback="\n".join(f"  - {p}" for p in vision_problems))
+                    print(f"    re-planned the strategy for {script.short_id}: the judge "
+                          f"rejected what {len(weak)} frame(s) SHOW, not how they look")
+                except Exception as e:
+                    print(f"    strategy re-plan failed ({type(e).__name__}) — "
+                          f"keeping the original plan")
+
         graded = "\n".join(f"  - {p}" for p in problems)
         feedback = f"{feedback}\n\nIt also broke these hard rules:\n{graded}" if note else graded
 

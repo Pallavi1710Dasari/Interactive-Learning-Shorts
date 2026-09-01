@@ -1628,6 +1628,183 @@ def check_code_frames_quote_source(unit: ShortUnit,
                         f"{checked} code line(s) quoted from the material")
 
 
+#: Which templates honestly express which kind of claim.
+#:
+#: This table is the enforceable half of the educational visual rules. Rules 6 to
+#: 10 are all of the form "if the concept describes X, the visual must do Y", and
+#: until the strategist existed there was no field saying what X was — so they were
+#: advice in a prompt and nothing more. With `relationship` written down per beat,
+#: most of them become a set membership test that costs nothing.
+#:
+#: DELIBERATELY PERMISSIVE. Each entry lists every template that can honestly carry
+#: that relationship, not the single best one, because picking the best is a
+#: judgement and this is a gate. "code" is in almost every row on purpose: the
+#: material's own snippet is a legitimate picture of nearly any claim the material
+#: makes, and rejecting it would push the designer off the most grounded frame it
+#: can draw. What this catches is the flat contradiction — a hierarchy drawn as a
+#: row, a comparison split across two beats, a process drawn as a still table.
+_RELATIONSHIP_TEMPLATES = {
+    # Rule 6: the stages, in order, with the movement between them drawn.
+    "process":       {"flow", "icons", "code", "cause_effect"},
+    # Rule 7: BOTH STATES AT ONCE. A `bar` or a `stat` shows one.
+    "comparison":    {"compare", "preview", "table", "code"},
+    # Rule 8: the thing that moves, where it starts, where it lands.
+    "data_movement": {"icons", "mapping", "flow", "cause_effect"},
+    # Rule 9: spatial hierarchy. A row of peers is the thing being rejected.
+    "hierarchy":     {"hierarchy", "split", "code"},
+    # Rule 10: cause and effect both on screen, direction drawn.
+    "cause_effect":  {"cause_effect", "flow", "compare", "code"},
+    "structure":     {"split", "bar", "table", "mapping", "code", "hierarchy", "icons"},
+    "effect":        {"preview", "code", "compare"},
+    "quantity":      {"stat", "bar", "table"},
+}
+
+
+def check_frames_match_strategy(unit: ShortUnit) -> GraderResult:
+    """
+    A frame must be drawn in a shape that can carry the claim it was planned for.
+
+    THE RULE THIS ENFORCES, AND WHY IT COULD NOT BE ENFORCED BEFORE. The reviewer's
+    rules 6 to 10 all condition on the KIND of concept — animate a process, show a
+    comparison's two states simultaneously, use spatial hierarchy for a hierarchy.
+    Every one of them was unenforceable, not because it was hard to check but
+    because nothing in the pipeline had ever decided which kind a beat was. The
+    design step went from a sentence straight to a template name, so the
+    relationship existed only as an unstated premise inside a choice.
+
+    skills/strategy.py writes it down. Once it is written down, "this beat is a
+    hierarchy and it was drawn as a row of equal boxes" is a set membership test.
+
+    The single most valuable case is `comparison`. Rule 7 says show both states
+    simultaneously, and the way that rule gets broken is not a bad drawing — it is
+    a short that gives beat 2 the "before" and beat 3 the "after", each drawn
+    perfectly. Every existing grader passes that: the frames differ, the templates
+    vary, the labels are grounded. And the viewer never sees the two side by side,
+    so they never see the difference, which was the entire point of the beat.
+
+    Skipped silently for any frame with no strategy — units built before the
+    strategist existed, and the eval harness, must still grade cleanly.
+    """
+    offenders = []
+    checked = 0
+    for ref, visual in unit.visuals.items():
+        plan, frame = visual.strategy, visual.frame
+        if plan is None or frame is None:
+            continue
+        allowed = _RELATIONSHIP_TEMPLATES.get(plan.relationship)
+        if not allowed:
+            continue
+        checked += 1
+        if frame.template not in allowed:
+            offenders.append(
+                f"[{ref}] was planned as a '{plan.relationship}' claim and drawn as "
+                f"'{frame.template}', which cannot show it — use one of "
+                f"{', '.join(sorted(allowed))}")
+
+    if not checked:
+        return GraderResult("frames_match_strategy", True, "no strategy to check against")
+    if offenders:
+        return GraderResult("frames_match_strategy", False, "; ".join(offenders))
+    return GraderResult("frames_match_strategy", True,
+                        f"{checked} frame(s) drawn in a shape that carries their claim")
+
+
+def check_one_hero_per_frame(unit: ShortUnit) -> GraderResult:
+    """
+    Every frame needs a focus, and no single row of a frame may have two.
+
+    "A composition of equal parts has no focus" is stated in the brief and was
+    never checked. Both ways of breaking it are bad in the same way: a frame with
+    the accent on three things asks the viewer to look at three things at once,
+    which is the same as asking them to look at nothing, and a frame with no accent
+    leaves them scanning. Measured across the 38 units in output/, a quarter of all
+    frames had no hero at all.
+
+    ONE HERO PER COLLECTION, NOT ONE PER FRAME, and the difference is a real design
+    the first version of this grader was wrong about. A `mapping` frame draws two
+    columns and highlights a CORRESPONDENCE across them:
+
+        left:  [Page 0 quiet, Page 1 HERO, Page 2 quiet]
+        right: [Frame 5 quiet, Frame 9 HERO, Frame 2 quiet]
+
+    That is two hero elements and exactly one focus — "page 1 lives in frame 9" is
+    a single claim that needs both of its ends lit, and dimming either one draws an
+    arrow from a highlighted box to an unremarkable one. The same is true of a
+    `compare` frame accenting the recommended card and the one item inside it that
+    makes the case.
+
+    So the rule is applied WITHIN each list, where it is unambiguous: two heroes in
+    one row of cells really are two accents competing, because there is no
+    relationship between them for the pair to express.
+    """
+    offenders = []
+    for ref, visual in unit.visuals.items():
+        frame = visual.frame
+        if frame is None:
+            continue
+
+        # Each entry is one collection that is laid out as a unit — a row, a
+        # column, the items inside one card. Heroes are counted inside each.
+        collections: list[tuple[str, list[str]]] = [
+            ("cells", [c.role for c in frame.cells]),
+            ("left column", [c.role for c in frame.left]),
+            ("right column", [c.role for c in frame.right]),
+            ("parts", [c.role for c in frame.parts]),
+            ("steps", [c.role for c in frame.steps]),
+            ("code lines", [c.role for c in frame.code_lines]),
+            ("samples", [c.role for c in frame.samples]),
+            ("glyphs", [c.role for c in frame.glyphs]),
+            ("levels", [c.role for c in frame.levels]),
+            ("rows", [r.role for r in frame.rows]),
+            ("panels", [p.role for p in frame.panels]),
+            ("cause/effect", [c.role for c in (frame.cause, frame.effect)
+                              if c is not None]),
+        ]
+        for i, panel in enumerate(frame.panels, 1):
+            collections.append((f"panel {i} items", [c.role for c in panel.items]))
+
+        populated = [(n, roles) for n, roles in collections if roles]
+        # `stat` and `takeaway` draw one thing and hard-code it as the focus, so
+        # they carry no roles at all and cannot be judged this way.
+        if not populated:
+            continue
+
+        # ALL of a group being hero, not merely SEVERAL. Measured across output/,
+        # "several" caught a pattern that is right far more often than it is wrong:
+        #
+        #     cells: [P1 quiet, P1 quiet, Free HERO, P2 quiet, Free HERO, Free HERO]
+        #
+        # Three heroes and one focus — "the free space is scattered" is a claim
+        # about a CATEGORY of cells, and lighting only one of the three gaps would
+        # state it falsely. The accent is doing exactly its job.
+        #
+        # What is never right is a group where EVERY element is the hero:
+        #
+        #     steps: [1. Access Page Table HERO, 2. Access Data HERO]
+        #
+        # An accent that is universal is not an accent. There is no contrast left
+        # for the eye to find, so the frame reads as uniformly loud, and that is
+        # the same defect as having no hero at all wearing brighter paint.
+        # Two or more elements, because a one-element group is trivially "all".
+        drowned = [n for n, roles in populated
+                   if len(roles) > 1 and all(r == "hero" for r in roles)]
+        if drowned:
+            offenders.append(
+                f"[{ref}] marks EVERY element of its {', '.join(drowned)} as hero — an "
+                f"accent on everything is an accent on nothing. Light the one element "
+                f"this beat is about and let the rest carry 'plain'.")
+            continue
+        if not any("hero" in roles for _, roles in populated):
+            offenders.append(
+                f"[{ref}] ({frame.template}) has no element marked hero — nothing is "
+                f"emphasised, so the viewer has nowhere to look first. Mark the one "
+                f"thing this beat is about.")
+
+    if offenders:
+        return GraderResult("one_hero_per_frame", False, "; ".join(offenders))
+    return GraderResult("one_hero_per_frame", True, "every frame has a single focus")
+
+
 def check_technical_beats_use_diagrams(unit: ShortUnit) -> GraderResult:
     """Non-negotiable #4: technical content must not be rendered by an image model."""
     offenders = [v.ref for v in unit.visuals.values() if v.type == "image"
@@ -1645,7 +1822,8 @@ SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_r
 #: Unit graders that need only the unit.
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_svg_quality, check_frames_are_visual, check_frames_develop,
-                  check_frames_vary_template,
+                  check_frames_vary_template, check_frames_match_strategy,
+                  check_one_hero_per_frame,
                   check_samples_differ, check_code_frames_quote_source,
                   check_icons_are_pictures, check_diagram_matches_narration]
 

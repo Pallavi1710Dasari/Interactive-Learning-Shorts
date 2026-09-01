@@ -1046,3 +1046,11 @@ button.rec::before {
   font-weight: 700;
 }
 .voicechip.mine::before { content: "●"; margin-right: 5px; font-size: 9px; }
+.vlsaved {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding: 12px;
+  border-radius: 11px; background: rgba(47, 211, 155, 0.1);
+  border: 1px solid rgba(47, 211, 155, 0.38);
+}
+.vlsaved b { font-size: 13px; color: var(--teal-hi); }
+.vlsaved span { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.vlsaved button { align-self: flex-start; }

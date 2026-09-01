@@ -30,6 +30,7 @@ from .parse import parse_markdown, find_section
 from .skills.select import select_topics_with_notes
 from .skills.script import write_script
 from .skills.visuals import design_visuals, render_diagrams
+from . import raster
 from .skills.audit import judge_script
 from . import checks, config, feed, usage, voice
 
@@ -1036,6 +1037,62 @@ def voice_adopt(job_id: str = Form(...)):
     return {"ok": True, "adopted": adopted, **_voice_state()}
 
 
+@app.post("/api/voice/keep")
+async def voice_keep(
+    clip_interviewer: UploadFile | None = File(default=None),
+    clip_student: UploadFile | None = File(default=None),
+):
+    """
+    Keep uploaded clips as the narration voices, WITHOUT previewing them first.
+
+    THE PREVIEW WAS MANDATORY AND SHOULD NOT HAVE BEEN. Adopting used to work only
+    from a finished preview job, so the button sat disabled until someone had
+    pressed "Speak it" and waited out a two-minute model load. Uploading two clips
+    and pressing Keep — the obvious thing — did nothing at all, silently, because a
+    disabled button has no way to say why.
+
+    Previewing is still there and still worth doing; it is just not a toll gate on
+    the way to saving. This path costs nothing and takes no time: the clips are
+    copied and recorded, and the model is not loaded until something is narrated.
+    """
+    uploads = [("interviewer", clip_interviewer), ("student", clip_student)]
+    if not any(u for _, u in uploads):
+        raise HTTPException(400, "upload a voice for at least one speaker")
+
+    config.VOICE_DIR.mkdir(parents=True, exist_ok=True)
+    settings = config.voice_settings()
+    kept = []
+    for who, upload in uploads:
+        if upload is None:
+            continue
+        raw = await upload.read()
+        if len(raw) < 4000:
+            raise HTTPException(
+                400, f"the {who} clip is too short to clone a voice from — "
+                     f"7 to 20 seconds of clear speech works best")
+        suffix = Path(upload.filename or "clip.wav").suffix.lower()
+        if suffix not in (".wav", ".mp3", ".m4a", ".ogg", ".webm", ".flac"):
+            suffix = ".wav"
+        # One name per speaker, so replacing a voice replaces its file rather than
+        # leaving the old one behind for the next reader to wonder about.
+        for stale in config.VOICE_DIR.glob(f"{who}.*"):
+            stale.unlink(missing_ok=True)
+        dest = config.VOICE_DIR / f"{who}{suffix}"
+        dest.write_bytes(raw)
+        settings[who] = str(dest)
+        kept.append(who)
+
+    # One voice uploaded means both speakers use it, rather than half a
+    # configuration that cannot narrate a reel.
+    if len(kept) == 1:
+        other = "student" if kept[0] == "interviewer" else "interviewer"
+        settings[other] = settings[kept[0]]
+    settings["provider"] = "chatterbox"
+    config.VOICE_SETTINGS.write_text(json.dumps(settings, indent=2))
+    config.TTS_PROVIDER = "chatterbox"
+    return {"ok": True, "kept": kept, **_voice_state()}
+
+
 @app.post("/api/voice/reset")
 def voice_reset():
     """Go back to whatever .env says — undo an adoption."""
@@ -1067,6 +1124,14 @@ def voice_state():
 def health():
     return {"ok": True, "stub": config.STUB, "model": config.MODEL_GENERATOR,
             "judge": config.MODEL_JUDGE, "diagram": config.MODEL_DIAGRAM,
+            "strategist": config.MODEL_STRATEGIST,
+            # The vision judge reports whether it CAN run, not just which model it
+            # would use. It needs a Chromium to rasterise with, and the failure
+            # mode when there is none is silent by design — the pipeline carries on
+            # with the structural graders — so the fact that the last gate is not
+            # running has to be visible somewhere.
+            "vision_judge": config.MODEL_VISION_JUDGE if config.VISION_JUDGE else None,
+            "vision_judge_ready": bool(config.VISION_JUDGE and raster.available()),
             # Surfaced, not buried in a log nobody reads. A misconfigured judge is
             # invisible by construction — it approves everything — so the one place
             # it can be noticed is next to the model name it applies to.

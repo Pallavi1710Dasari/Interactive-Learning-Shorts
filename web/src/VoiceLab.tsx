@@ -36,7 +36,11 @@ const ROLE: Record<Slot, { title: string; hint: string }> = {
   student: { title: "Student", hint: "gives the answer" },
 };
 
-export function VoiceLab({ onClose }: { onClose: () => void }) {
+export function VoiceLab({ onClose, onKept }: {
+  onClose: () => void;
+  /** Voices saved — hand control back so the user can go and make a reel. */
+  onKept?: () => void;
+}) {
   const [state, setState] = useState<State | null>(null);
   const [clips, setClips] = useState<Partial<Record<Slot, File>>>({});
   const [urls, setUrls] = useState<Partial<Record<Slot, string>>>({});
@@ -46,6 +50,7 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ url: string; job: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/voice/state").then((r) => r.json()).then(setState).catch(() => {});
@@ -99,15 +104,33 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
     } finally { setBusy(false); setStatus(null); }
   }
 
-  async function adopt() {
-    if (!result) return;
-    setBusy(true); setErr(null);
+  /**
+   * Save the voices. Does NOT require a preview.
+   *
+   * It used to: the button was `disabled={!result}`, so uploading two clips and
+   * pressing Keep did nothing at all — silently, because a disabled button cannot
+   * explain itself. Previewing is worth doing and still here; it is not a toll
+   * gate. If a preview HAS been generated the job is adopted (its clips are
+   * already on the server); otherwise the uploads are posted directly.
+   */
+  async function keep() {
+    if (!filled.length || busy) return;
+    setBusy(true); setErr(null); setSaved(null);
     try {
-      const form = new FormData();
-      form.set("job_id", result.job);
-      const res = await fetch("/api/voice/adopt", { method: "POST", body: form });
+      let res: Response;
+      if (result) {
+        const form = new FormData();
+        form.set("job_id", result.job);
+        res = await fetch("/api/voice/adopt", { method: "POST", body: form });
+      } else {
+        const form = new FormData();
+        for (const sl of filled) form.set(`clip_${sl}`, clips[sl]!);
+        res = await fetch("/api/voice/keep", { method: "POST", body: form });
+      }
       if (!res.ok) throw new Error((await res.json()).detail ?? `HTTP ${res.status}`);
-      setState(await res.json());
+      const next = await res.json();
+      setState(next);
+      setSaved(next.active ?? "saved");
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally { setBusy(false); }
@@ -214,9 +237,25 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
             Saved for every reel you build from now on. Reels you have already made
             are left exactly as they are.
           </p>
-          <button className="primary" disabled={!result || busy} onClick={adopt}>
-            Keep these voices
+          <button className="primary" disabled={!filled.length || busy} onClick={keep}>
+            {busy ? <Spinner label="saving…" /> : "Keep these voices"}
           </button>
+          {!filled.length && (
+            <span className="why">Upload a voice above first.</span>
+          )}
+
+          {saved && (
+            <div className="vlsaved">
+              <b>✓ Saved</b>
+              <span>
+                Every reel you build from now on is narrated in these voices.
+                Existing reels are unchanged.
+              </span>
+              <button className="primary sm" onClick={() => { onKept?.(); onClose(); }}>
+                Make a reel →
+              </button>
+            </div>
+          )}
 
           <div className="vlstate">
             <div><span>now speaking</span> {state?.active ?? "…"}</div>

@@ -301,6 +301,75 @@ cases:
     expect:
       passed: true
 
+  - id: E023
+    name: A hierarchy drawn as a flat row of peers is rejected
+    why: >
+      The exact frame the visual brief quotes as the worst thing this pipeline has
+      shipped: "Users, Applications, Operating System, Hardware" as four pictograms
+      side by side. Every existing grader passes it — the labels come from the
+      narration, the pictograms draw what they name, the frames differ — and the
+      arrangement says the four are peers standing in a line, which is the opposite
+      of what the beat says. Only the reading order of four words carried the truth.
+
+      It was unenforceable until skills/strategy.py wrote the relationship down.
+      Rules 6 to 10 are all "if the concept describes X, the visual must do Y", and
+      nothing had ever decided what X was. With `relationship: hierarchy` on the
+      beat it is a set membership test that costs nothing. E024 is the success half.
+    type: unit_grader
+    grader: frames_match_strategy
+    fixture: evals/fixtures/hierarchy_as_row.json
+    expect:
+      passed: false
+      reason_contains: "planned as a 'hierarchy' claim"
+
+  - id: E024
+    name: The same claim drawn as a stack is accepted
+    why: >
+      The success half of E023, and the reason layout.py gained a `hierarchy`
+      template rather than the grader just banning `icons`. Rejecting a shape is
+      only useful if there is a right shape to move to — the stack puts the claim
+      in the geometry, so it survives having its labels deleted, which is rule 3.
+    type: unit_grader
+    grader: frames_match_strategy
+    fixture: evals/fixtures/hierarchy_as_stack.json
+    expect:
+      passed: true
+
+  - id: E025
+    name: A frame that marks every element as the hero is rejected
+    why: >
+      "A composition of equal parts has no focus" has been in the brief from the
+      start and nothing had ever checked it. Measured across the 38 units in
+      output/, 18 had at least one frame with no accent at all or with the accent on
+      everything — this fixture is the second kind, frozen from tlb_purpose as it
+      shipped: two flow steps, both hero. An accent that is universal is not an
+      accent, so the viewer has nothing to look at first.
+
+      Deliberately ALL and not SEVERAL. Several heroes in one group is right far
+      more often than it is wrong — lighting the three scattered "Free" cells of a
+      memory bar is one claim about a category, and lighting only one of them would
+      state it falsely. E026 is the success half.
+    type: unit_grader
+    grader: one_hero_per_frame
+    fixture: evals/fixtures/accent_on_everything.json
+    expect:
+      passed: false
+      reason_contains: "accent on everything is an accent on nothing"
+
+  - id: E026
+    name: A frame with a single clear focus is accepted
+    why: >
+      The success half of E025. Without it the cheapest way to make the grader green
+      is to reject every frame that has more than one role in play, which would take
+      out the mapping frames whose hero is a CORRESPONDENCE — "page 1 lives in frame
+      9" needs both of its ends lit, and dimming either draws an arrow from a
+      highlighted box to an unremarkable one.
+    type: unit_grader
+    grader: one_hero_per_frame
+    fixture: evals/fixtures/developing_frames.json
+    expect:
+      passed: true
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

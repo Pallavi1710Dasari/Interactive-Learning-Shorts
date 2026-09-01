@@ -31,7 +31,7 @@ REASONING CONTROL IS NOT PORTABLE — see _reasoning() below. "Thinking off" is 
 Anthropic spelling, and two of the three families this project now runs on answer
 it differently. Never hand-write thinking={...} at a call site; ask _reasoning().
 """
-import json, re, time
+import base64, json, re, time
 from typing import TypeVar, Type
 from pydantic import BaseModel, ValidationError
 import anthropic
@@ -74,7 +74,20 @@ def client() -> anthropic.Anthropic:
 # and wrong for pro. Every call to gemini-2.5-pro failed with
 # "Reasoning is mandatory for this endpoint and cannot be disabled." until it was
 # added here, which made the model look broken when it was the request that was.
-_REASONING_MANDATORY = ("gpt-5", "o1", "o3", "o4", "gemini-2.5-pro", "gemini-3-pro")
+_REASONING_MANDATORY = ("gpt-5", "o1", "o3", "o4")
+
+#: Gemini's *-pro tiers refuse it too, and THE VERSION SEGMENT MOVES, which is why
+#: this is a pattern and not two more strings in the tuple above. The tuple used to
+#: carry "gemini-2.5-pro" and "gemini-3-pro" as literals, and setting
+#: MODEL_DIAGRAM=google/gemini-3.1-pro-preview matched neither — "gemini-3-pro" is
+#: not a substring of "gemini-3.1-pro-preview" — so every visual_spec call went out
+#: asking to disable reasoning and came back 400 "Reasoning is mandatory for this
+#: endpoint and cannot be disabled." The whole design step failed, and it read as a
+#: broken model rather than as a stale string in this file.
+#:
+#: -pro is load-bearing: gemini flash ACCEPTS disabling and the saving is real
+#: (38 output tokens against 194), so this must not widen to the whole family.
+_REASONING_MANDATORY_RE = re.compile(r"gemini-\d+(?:\.\d+)*-pro")
 
 # The floor to ask for when reasoning cannot be switched off. Measured on
 # gpt-5-mini through OpenRouter, same trivial prompt: no thinking field at all
@@ -102,7 +115,8 @@ def _reasoning(model: str, think: bool) -> dict:
     """
     if think:
         return {}
-    if any(m in model for m in _REASONING_MANDATORY):
+    if any(m in model for m in _REASONING_MANDATORY) \
+            or _REASONING_MANDATORY_RE.search(model):
         return {"thinking": {"type": "enabled", "budget_tokens": MIN_REASONING_TOKENS}}
     return {"thinking": {"type": "disabled"}}
 
@@ -159,6 +173,35 @@ def _system(system: str, model: str):
              "cache_control": {"type": "ephemeral"}}]
 
 
+#: The largest a rasterised frame is sent at. A 1080-square diagram is legible to a
+#: vision model well below its native size, and every pixel is paid for on the way
+#: in — see raster.PNG_WIDTH, which is where the downscale actually happens. This is
+#: only the guard that stops an oversized PNG being sent by a careless caller.
+MAX_IMAGE_BYTES = 4_000_000
+
+
+def _content(user: str, images: list[bytes] | None):
+    """The user turn, as a plain string or as image blocks followed by the text.
+
+    IMAGES FIRST, TEXT LAST, which is not cosmetic: Anthropic's own guidance is that
+    a question placed after the images it is about is answered more accurately than
+    the same question placed before them. The vision judge asks the hardest question
+    in this pipeline — "would a learner understand the concept from this picture
+    alone" — so it gets the ordering that measures best.
+    """
+    if not images:
+        return user
+    blocks = []
+    for img in images:
+        if len(img) > MAX_IMAGE_BYTES:
+            raise ValueError(f"image is {len(img)} bytes, over the {MAX_IMAGE_BYTES} cap "
+                             f"— rasterise it smaller rather than sending it")
+        blocks.append({"type": "image",
+                       "source": {"type": "base64", "media_type": "image/png",
+                                  "data": base64.b64encode(img).decode()}})
+    return blocks + [{"type": "text", "text": user}]
+
+
 def call(system: str, user: str, model: str | None = None, max_tokens: int = 4000,
          think: bool = False, label: str = "llm"):
     """One raw message call. Thinking off unless asked for — see module docstring."""
@@ -184,12 +227,20 @@ def ask_json(
     retries: int = 2,
     label: str = "llm",
     think: bool = False,
+    images: list[bytes] | None = None,
 ) -> T:
     """
     Call the model, parse JSON, validate against a pydantic class.
 
     On a validation error it retries and shows the model its own mistake — which
     fixes malformed output far more often than a blind retry.
+
+    `images` makes the call MULTIMODAL — PNG bytes, sent ahead of the text. This is
+    the whole mechanism behind the educational vision judge: every other step in
+    this pipeline grades a diagram by reading the JSON it was built from, which
+    cannot see that a frame is legible-but-meaningless. Looking at the rendered
+    pixels is the only way to ask "would a learner understand this picture", and
+    that question is the one the visuals were failing.
 
     An EMPTY response is handled separately from an invalid one. Showing the model
     an empty assistant turn and asking it to "fix the JSON" teaches it nothing and
@@ -202,7 +253,8 @@ def ask_json(
 
     model = model or config.MODEL_GENERATOR
     system = system + "\n\nReturn ONLY raw JSON. No prose, no markdown fences."
-    messages = [{"role": "user", "content": user}]
+    content = _content(user, images)
+    messages = [{"role": "user", "content": content}]
     budget = max_tokens
     last_err = None
 
@@ -223,7 +275,7 @@ def ask_json(
                 f"empty response (stop_reason={resp.stop_reason}, "
                 f"output_tokens={resp.usage.output_tokens}, budget={budget})")
             budget = min(budget * 2, 16000)
-            messages = [{"role": "user", "content": user}]
+            messages = [{"role": "user", "content": content}]
             time.sleep(1)
             continue
 
@@ -247,7 +299,7 @@ def ask_json(
             if resp.stop_reason == "max_tokens":
                 budget = min(budget * 2, 16000)      # truncated mid-JSON
             messages = [
-                {"role": "user", "content": user},
+                {"role": "user", "content": content},
                 {"role": "assistant", "content": raw[:4000]},
                 {"role": "user", "content":
                     f"That failed validation:\n\n{e}\n\nReturn corrected JSON only."},

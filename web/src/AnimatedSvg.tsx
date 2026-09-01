@@ -82,6 +82,17 @@ const ZOOM_CAP = 1.6;
 /** How long a stroke takes to draw itself along its own length. */
 const DRAW_MS = 520;
 
+//: The travelling payload — see ferry(). Amber, because it is the one thing on the
+//: frame that is moving and the palette already reserves amber for "look here".
+const TOKEN_R = 13;
+const TOKEN_FILL = "#F2B14B";
+//: One crossing. Slow enough to follow with the eye, short enough to repeat two or
+//: three times inside a typical beat so a viewer who looked away still catches one.
+const TRAVEL_MS = 1500;
+//: How finely the path is sampled into keyframes. A straight arrow needs two; 24
+//: costs nothing and keeps the motion smooth if a curved connector is ever drawn.
+const TOKEN_SAMPLES = 24;
+
 /** The palette's amber — SVG_SYSTEM reserves it for the element under discussion. */
 const AMBER = /#f2b14b/i;
 
@@ -158,6 +169,11 @@ export function AnimatedSvg({ svg, beatKey, composition, beatMs }: {
         // one drawing being added to.
         const base = role === "base";
         if (!base) running.push(...enter(el, delay));
+
+        // "travel" gets a payload sent along the arrow INSTEAD of dashes marching
+        // on it — the two together are visual noise, and only one of them is an
+        // explanation. See ferry().
+        if (role === "travel") running.push(...ferry(el, base ? 0 : delay));
 
         const flows = role === "flow" || (!role && isArrow(el));
         if (flows) running.push(...march(el, base ? 0 : delay));
@@ -290,6 +306,79 @@ function draw(el: SVGElement, timing: KeyframeAnimationOptions): Animation | nul
  * keyframes with no backwards fill the pattern only applies once the delay is up,
  * which is after the draw has finished and handed the property back.
  */
+/**
+ * A payload that leaves the source, crosses the arrow, and lands on the target.
+ *
+ * RULE 8 SAYS "IF THE CONCEPT DESCRIBES DATA MOVEMENT, ANIMATE THE DATA MOVEMENT",
+ * and march() does not do that. Marching dashes say "this arrow is active"; nothing
+ * departs and nothing arrives, so a viewer watching a browser fetch a stylesheet
+ * sees a busy line between two pictures rather than the file going across. That is
+ * most of why animation relevance scored 3/10 — the motion was real, well-paced,
+ * and about nothing.
+ *
+ * Sampled along the path with getPointAtLength rather than driven by `offset-path`,
+ * which is the tidier CSS and is not what the render pipeline can rely on: frames
+ * are photographed one at a time by seeking a paused timeline (shorts/video.py), and
+ * a sampled keyframe list seeks exactly. It also composes with the arrow having just
+ * been drawn by draw(), which owns stroke-dasharray for its own duration.
+ *
+ * The token fades in at the tail and out at the tip so it reads as leaving and
+ * arriving rather than as a dot orbiting a line for ever.
+ */
+function ferry(group: SVGElement, delay: number): Animation[] {
+  const svg = group.ownerSVGElement;
+  if (!svg) return [];
+
+  // Every shaft in the group, and only the shafts: `arrow()` emits a <line> for
+  // the shaft and a <polygon> for the head, and a token sliding along the outline
+  // of a triangle is not what anybody meant. A mapping frame's group holds one
+  // shaft per row, and each of them carries its own payload.
+  const shafts = Array.from(group.querySelectorAll<SVGGeometryElement>("line, path"));
+  const out: Animation[] = [];
+
+  for (const shaft of shafts) {
+    if (typeof shaft.getTotalLength !== "function") continue;
+    let length = 0;
+    try { length = shaft.getTotalLength(); } catch { continue; }
+    if (!length || !isFinite(length)) continue;
+
+    const token = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    token.setAttribute("r", String(TOKEN_R));
+    token.setAttribute("fill", TOKEN_FILL);
+    token.setAttribute("opacity", "0");
+    // Appended to the arrow's own group, so it is removed with the rest of the
+    // frame when the next beat replaces innerHTML — and so it inherits nothing
+    // that would need undoing.
+    group.appendChild(token);
+
+    const frames: Keyframe[] = [];
+    for (let i = 0; i <= TOKEN_SAMPLES; i++) {
+      const at = (length * i) / TOKEN_SAMPLES;
+      let p: DOMPoint;
+      try { p = shaft.getPointAtLength(at); } catch { break; }
+      const edge = i === 0 || i === TOKEN_SAMPLES;
+      frames.push({
+        transform: `translate(${p.x}px, ${p.y}px)`,
+        // Held opaque across the middle and faded only at the two ends.
+        opacity: edge ? 0 : 1,
+        offset: i / TOKEN_SAMPLES,
+      });
+    }
+    if (frames.length < 2) { token.remove(); continue; }
+
+    out.push(token.animate(frames, {
+      duration: TRAVEL_MS,
+      // After the shaft has finished drawing itself: a payload crossing a line
+      // that is still being drawn arrives before the road does.
+      delay: delay + DRAW_MS + 80,
+      iterations: Infinity,
+      easing: "cubic-bezier(.4,0,.5,1)",
+    }));
+  }
+  return out;
+}
+
+
 function march(el: SVGElement, delay: number): Animation[] {
   const geo = el as unknown as SVGGeometryElement;
   if (typeof geo.getTotalLength !== "function") return [];

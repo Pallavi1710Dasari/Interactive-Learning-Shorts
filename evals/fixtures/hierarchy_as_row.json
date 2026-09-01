@@ -1,0 +1,112 @@
+{
+ "short_id": "hierarchy_drawn_as_row",
+ "session_id": "eval",
+ "source_section_id": "3.3",
+ "question": "What actually is an operating system, and where does it sit?",
+ "estimated_seconds": 18.0,
+ "beats": [
+  {
+   "speaker": "interviewer",
+   "line": "What is HTTP and how do browsers and servers use it?",
+   "on_screen": "What is HTTP?",
+   "visual_ref": "q_http"
+  },
+  {
+   "speaker": "student",
+   "line": "HTTP is the Web's language: how browsers and servers communicate.",
+   "on_screen": "The language of the web",
+   "visual_ref": "d_language",
+   "source_quote": "HTTP is the language of the Web."
+  },
+  {
+   "speaker": "student",
+   "line": "Browsers use HTTP to request and receive information from servers.",
+   "on_screen": "Request and receive",
+   "visual_ref": "d_exchange",
+   "source_quote": "A browser requests and receives information from a server."
+  }
+ ],
+ "visuals": {
+  "q_http": {
+   "ref": "q_http",
+   "type": "diagram",
+   "spec": "the two parties",
+   "frame": {
+    "template": "icons",
+    "title": "Where the OS sits",
+    "glyphs": [
+     {
+      "icon": "user",
+      "label": "Users",
+      "role": "plain"
+     },
+     {
+      "icon": "folder",
+      "label": "Applications",
+      "role": "plain"
+     },
+     {
+      "icon": "gear",
+      "label": "Operating System",
+      "role": "hero"
+     },
+     {
+      "icon": "chip",
+      "label": "Hardware",
+      "role": "plain"
+     }
+    ]
+   },
+   "strategy": {
+    "ref": "q_http",
+    "concept": "the operating system sits between the applications and the hardware",
+    "relationship": "hierarchy",
+    "must_see": "four layers stacked, each resting on the one below it",
+    "changes_from_previous": "",
+    "focus": "the operating system layer"
+   }
+  },
+  "d_language": {
+   "ref": "d_language",
+   "type": "diagram",
+   "spec": "the exchange",
+   "frame": {
+    "template": "flow",
+    "title": "One exchange",
+    "steps": [
+     {
+      "label": "Request",
+      "role": "hero"
+     },
+     {
+      "label": "Response",
+      "role": "plain"
+     }
+    ]
+   }
+  },
+  "d_exchange": {
+   "ref": "d_exchange",
+   "type": "diagram",
+   "spec": "what comes back",
+   "frame": {
+    "template": "icons",
+    "title": "What arrives",
+    "glyphs": [
+     {
+      "icon": "server",
+      "label": "Server",
+      "role": "plain"
+     },
+     {
+      "icon": "page",
+      "label": "Page",
+      "role": "hero"
+     }
+    ],
+    "arrows": true
+   }
+  }
+ },
+ "status": "draft"
+}

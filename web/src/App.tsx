@@ -38,12 +38,17 @@ function useCaptureRoute(): string | null {
  * It fetches the feed rather than being handed a unit, because the renderer opens
  * this URL cold in a fresh browser. `window.__captureError` is set on failure so
  * the renderer can fail with the reason instead of timing out on a blank page.
+ *
+ * HELD SHORTS INCLUDED, deliberately. The ordinary feed leaves a quarantined short
+ * out, which made `python -m shorts.video <held id>` fail with "no such short in
+ * the feed" — the reel was on disk, watchable once asked for by name, and could
+ * still not be exported. Naming an id here IS asking for it by name.
  */
 function CaptureRoute({ shortId }: { shortId: string }) {
   const [unit, setUnit] = useState<Unit | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    getShorts()
+    getShorts(true)
       .then((all) => {
         const hit = all.find((u) => u.short_id === shortId);
         if (!hit) throw new Error(`no such short in the feed: ${shortId}`);
@@ -159,6 +164,13 @@ function Workspace() {
           material={material}
           onSpend={onSpend}
           onDone={(s) => { setShorts(s); setStep("reels"); }}
+          // A held short is kept out of the feed, so open the feed that includes it
+          // and point the player straight at the one being asked about.
+          onWatchHeld={(id) => {
+            getShorts(true)
+              .then((s) => { setShorts(s); setFocus(id); setStep("reels"); })
+              .catch(() => {});
+          }}
         />
       )}
       {voiceOpen && (

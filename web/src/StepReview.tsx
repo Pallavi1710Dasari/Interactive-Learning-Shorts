@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { finalize, makeScripts, regenerate, type MaterialResult, type UsageTotals } from "./api";
+import { finalize, makeScripts, regenerate, release, type MaterialResult, type UsageTotals } from "./api";
 import { Spinner } from "./Spinner";
 import { money, tokens } from "./CostPill";
 import { Interviewer, Student } from "./Avatars";
@@ -13,12 +13,19 @@ import type { QA, ReviewItem, Unit } from "./types";
  * Regeneration takes a free-text note; that note is the whole point of the step.
  */
 export function StepReview({
-  material, onDone, onSpend,
+  material, onDone, onSpend, onWatchHeld,
 }: {
   material: MaterialResult;
   onDone: (shorts: Unit[]) => void;
   onSpend: (delta: UsageTotals, total: UsageTotals) => void;
+  /** Open one held short in the player. It is left out of the ordinary feed, so
+   *  this is the only way to actually look at what the judge complained about. */
+  onWatchHeld: (short_id: string) => void;
 }) {
+  // Held shorts the reviewer has published over the judge, so the row can say so
+  // rather than still offering a button that has already been pressed.
+  const [released, setReleased] = useState<string[]>([]);
+  const [releaseErr, setReleaseErr] = useState<string | null>(null);
   const [items, setItems] = useState<ReviewItem[]>(
     material.topics.map((topic) => ({
       topic, qa: null, graders: [], state: "loading", note: "", target: "script",
@@ -197,16 +204,38 @@ export function StepReview({
           </b>
           <span>
             {held.length === 1 ? "It is" : "They are"} on disk with the verdict attached.
-            Fix the wording with a note below and regenerate, or leave{" "}
-            {held.length === 1 ? "it" : "them"} — nothing is lost.
+            Watch {held.length === 1 ? "it" : "them"} and redraw the pictures from a
+            note on the reel itself, or leave {held.length === 1 ? "it" : "them"} —
+            nothing is lost.
           </span>
           {held.map((u) => (
             <span key={u.short_id}>
               <b>{u.short_id}</b>
               {u.judge && ` — faithfulness ${u.judge.faithfulness}/5, clarity ${u.judge.clarity}/5, pace ${u.judge.pace}/5`}
               {u.judge?.problems?.length ? `: ${u.judge.problems.join(" · ")}` : ""}
+              {" "}
+              <button className="ghost sm" onClick={() => onWatchHeld(u.short_id)}>
+                Watch it →
+              </button>
+              {" "}
+              {released.includes(u.short_id)
+                ? <em>published — it is in the reel now</em>
+                : (
+                  <button
+                    className="ghost sm"
+                    title="publish it anyway; the judge's verdict is kept on the short"
+                    onClick={() => {
+                      setReleaseErr(null);
+                      release(u.short_id)
+                        .then(() => setReleased((r) => [...r, u.short_id]))
+                        .catch((e) => setReleaseErr((e as Error).message));
+                    }}>
+                    Publish anyway
+                  </button>
+                )}
             </span>
           ))}
+          {releaseErr && <span className="error">{releaseErr}</span>}
         </div>
       )}
       {buildWarnings.length > 0 && (

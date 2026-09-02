@@ -370,6 +370,36 @@ cases:
     expect:
       passed: true
 
+  - id: E027
+    name: A frame labelled with words nobody says is rejected
+    why: >
+      The most expensive real failure this project has. closure_definition scored
+      5/5/5 on faithfulness, clarity and pace and was still quarantined, because its
+      opening frame was titled "Lexical Scope" and labelled a node "Inner function" —
+      both correct JavaScript, neither ever spoken in the short or written in the
+      section. dot_vs_bracket_notation failed the same way with "SyntaxError". The
+      brief has forbidden this from the start and it was violated in 20% of shipped
+      units, so the rule needed a case behind it rather than another paragraph.
+    type: unit_grader
+    grader: diagram_matches_narration
+    fixture: evals/fixtures/labels_off_narration.json
+    expect:
+      passed: false
+      reason_contains: "in neither the narration nor the source"
+
+  - id: E028
+    name: A frame labelled from the narration is accepted
+    why: >
+      The success half of E027. The cheap way to make that grader green is to reject
+      any frame carrying a word the narration does not contain verbatim, which would
+      fail every correctly-drawn diagram in output/ — the labels here are the words
+      the short actually speaks.
+    type: unit_grader
+    grader: diagram_matches_narration
+    fixture: evals/fixtures/labels_from_narration.json
+    expect:
+      passed: true
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

@@ -95,7 +95,14 @@ naming it is what turns an abstract answer into one that lands.
   code with the line under discussion lit — instead of falling back to putting your
   sentences in boxes, which is what it does when the beats give it nothing concrete.
 
-TWO OR THREE PARTS. NOT FOUR, NOT FIVE.
+TWO OR THREE PARTS. NOT ONE, NOT FOUR, NOT FIVE.
+
+NEVER ONE. A single answer beat is rejected outright, every time, and it is the
+failure this section gets wrong most: the bound below is as hard as the bound above.
+One beat leaves one diagram on screen for the whole short and gives the viewer
+nothing that develops. If the section really only supports one sentence of answer,
+do not pad it into two — NARROW THE QUESTION in beat 1 until the section supports
+two distinct things to say, each resting on its own sentence.
 Five-point answers are what these shorts are being fixed from. Nobody watching a
 phone remembers point four, and by the time you have written it you have buried the
 one sentence that mattered under context nobody asked for. If a beat is a

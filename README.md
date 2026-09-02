@@ -20,7 +20,8 @@ If it prints 3.11 or higher, skip to 0.2. Otherwise install it — on Windows us
 
 ### 0.2 Node.js
 
-Remotion needs Node 18+.
+The web app (Vite + React) needs Node 18+. It is the player, and the video
+renderer photographs it, so this is not optional.
 
 ```bash
 node --version
@@ -30,13 +31,17 @@ If missing, install from [nodejs.org](https://nodejs.org) (LTS version).
 
 ### 0.3 FFmpeg
 
-Used to stitch the audio beats together.
+Used to stitch the audio beats together and to encode the MP4.
 
 ```bash
 ffmpeg -version
 ```
 
-If missing: `brew install ffmpeg` (macOS), `sudo apt install ffmpeg` (Ubuntu), or download from [ffmpeg.org](https://ffmpeg.org/download.html) and add it to PATH (Windows).
+**You can skip this one.** If there is no ffmpeg on PATH, both the audio path and
+the renderer fall back to the static build in the `imageio-ffmpeg` wheel, which
+`requirements.txt` already installs. Install it system-wide only if you want your
+own build: `brew install ffmpeg` (macOS), `sudo apt install ffmpeg` (Ubuntu), or
+[ffmpeg.org](https://ffmpeg.org/download.html) and add it to PATH (Windows).
 
 ### 0.4 The project
 
@@ -351,26 +356,41 @@ Prints each short as text — beats, overlays, visual specs, judge scores — an
 
 ## Part D — Render
 
-```bash
-cd render
-npm install
-npx remotion studio
-```
+**The player in the browser is the design.** There is no separate composition to
+keep in sync: `web/src/ReelStage.tsx` is the picture, the player and the renderer
+both draw it, and the renderer photographs that page one frame at a time. So an MP4
+and the reel you watched cannot drift apart.
 
-The studio opens in a browser with a live preview. Edit `src/Short.tsx` and it hot-reloads — this is where you'll spend time on look and feel.
-
-To render an approved short, from the project root:
+For look-and-feel work, edit the player and watch it live:
 
 ```bash
-python -m shorts.render <short_id>
+cd web && npm run dev        # :5173, proxies the API to :8000
 ```
 
-That copies the props, copies the audio into `render/public/` if the unit has any,
-and shells out to Remotion. It **refuses to render anything whose status is not
-`approved`** — pass `--force` only when you're debugging the renderer itself. Output
-lands in `render/out/<short_id>.mp4`.
+Rendering needs two things to be true first — the renderer photographs the **built**
+app, and a page has to be served to be photographed:
 
-**Expect the first render to look bad.** That is fine and expected. Getting one ugly MP4 out is the milestone; polish comes after. Rendering takes minutes, which is exactly why the human gate sits upstream of it.
+```bash
+cd web && npm run build
+python -m shorts.server      # leave running in its own terminal
+```
+
+Then, from the project root:
+
+```bash
+python -m shorts.video <short_id>
+```
+
+Output lands in `output/<short_id>/reel.mp4`. It is cached, and rebuilt only when
+the MP4 is missing, when the unit JSON is newer than the video, or when you pass
+`--force`. The flags worth knowing: `--fps` (default 30), `--workers` (browsers
+capturing in parallel, default 3), `--base-url` (default `http://127.0.0.1:8000`).
+
+**Budget about six seconds of wall clock per second of video** — a 12s short takes
+roughly 72s, a 22s short about 130s. That is the price of thirty real frames per
+second instead of one still per beat, and it is paid once per short. The download
+button in the web UI runs this exact code and blocks for exactly as long, so
+pre-rendering from the terminal is usually the nicer way to wait.
 
 ---
 
@@ -414,9 +434,9 @@ python -m shorts.run <doc.md> --gate-topics            # stop after topic select
 python -m shorts.run <doc.md> --topics-file output/topics.json   # resume from approved list
 python -m shorts.run <doc.md> --topics 5               # full pipeline
 python -m shorts.review                                # human gate
-python -m shorts.render <short_id>                     # approved unit -> mp4
+python -m shorts.video <short_id>                      # approved unit -> mp4
 
-cd render && npx remotion studio                       # live preview
+cd web && npm run dev                                  # live preview of the player
 ```
 
 ---

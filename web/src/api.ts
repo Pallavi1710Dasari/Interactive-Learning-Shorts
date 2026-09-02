@@ -129,8 +129,13 @@ export async function renderStatus(short_id: string): Promise<RenderJob> {
   return res.json();
 }
 
-export async function getShorts(): Promise<Unit[]> {
-  const res = await fetch("/api/shorts");
+/** Publish a held short over the judge's verdict. The verdict itself is kept. */
+export const release = (short_id: string) =>
+  post<{ short: Unit | null }>("/api/release", { short_id });
+
+/** The feed. `held` also returns shorts the judge quarantined — see GET /api/shorts. */
+export async function getShorts(held = false): Promise<Unit[]> {
+  const res = await fetch(held ? "/api/shorts?held=1" : "/api/shorts");
   if (!res.ok) throw new Error(await detail(res));
   return (await res.json()).shorts;
 }

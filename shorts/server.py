@@ -15,7 +15,7 @@ Cost shape, worth knowing before clicking:
 
 So Step 2 is cheap and Step 3 is not. Only finalize what a human approved.
 """
-import json, os, re, threading, uuid
+import json, os, re, shutil, threading, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -493,8 +493,10 @@ def finalize(body: FinalizeIn):
             # design_visuals, not spec_visuals: it grades what comes back and asks
             # again for a short whose frames repeat, print the narration, or draw a
             # capital A where a server was meant. One call for a short that passes.
+            vision_scores: dict = {}
             visuals, design_problems = design_visuals(script, section,
-                                                      draw=body.do_svg)
+                                                      draw=body.do_svg,
+                                                      scores_out=vision_scores)
 
             unit = ShortUnit(
                 short_id=script.short_id,
@@ -504,6 +506,8 @@ def finalize(body: FinalizeIn):
                 estimated_seconds=script.estimated_seconds,
                 beats=script.beats,
                 visuals=visuals,
+                # Kept, not acted on — see ShortUnit.vision_scores.
+                vision_scores=vision_scores,
                 status="approved",      # a human already approved it in step 2
             )
 
@@ -552,7 +556,14 @@ def finalize(body: FinalizeIn):
             # feedback channel the human reviewer uses in step 2, and write_script
             # already knows how to act on it.
             if unit.eval is not None and not unit.eval.passed:
-                unit = _rejudge_after_fix(unit, script, topic, section, body) or unit
+                if config.REPAIR_FAILED_SHORTS:
+                    unit = _rejudge_after_fix(unit, script, topic, section, body) or unit
+                else:
+                    print(f"    ! {unit.short_id} failed the judge "
+                          f"(f={unit.eval.faithfulness} c={unit.eval.clarity} "
+                          f"p={unit.eval.pace}) — no repair attempted "
+                          f"(REPAIR_FAILED_SHORTS=0). Its verdict is on the short; "
+                          f"redraw it from a note or publish it anyway.")
 
             if recording is not None:
                 try:
@@ -626,9 +637,26 @@ def finalize(body: FinalizeIn):
     held = [u for u in produced.values() if u["status"] in feed.QUARANTINED]
     for u in held:
         print(f"    ! {u['short_id']} held out of the reel ({u['status']})")
+
+    # WHAT THIS BUILD COST, printed per build rather than only accumulated.
+    #
+    # usage kept a running sum and nothing else, so "is a reel dearer than it used
+    # to be?" could only be answered by snapshotting the total before and after and
+    # subtracting — which is not a thing anyone does while working. The per-step
+    # split is what makes the answer actionable: it is the difference between "the
+    # build cost more" and "visual_spec made six calls when it used to make three".
+    spent = usage.since(cursor)
+    n = max(1, len(built))
+    steps = " ".join(f"{k}={v['calls']}x${v['cost']:.3f}"
+                     for k, v in sorted((spent.get("by_label") or {}).items(),
+                                        key=lambda x: -x[1]["cost"]))
+    print(f"    build cost ${spent['cost']:.3f} over {spent['calls']} call(s) for "
+          f"{len(built)} short(s) — ${spent['cost'] / n:.3f} each")
+    if steps:
+        print(f"      {steps}")
     return {"built": built, "failed": failed, "warnings": warned, "shorts": fresh,
             "quarantined": held,
-            "usage": usage.since(cursor), "total": usage.totals()}
+            "usage": spent, "total": usage.totals()}
 
 
 class RevisualIn(BaseModel):
@@ -709,10 +737,53 @@ def usage_reset():
     return usage.totals()
 
 
+class ReleaseIn(BaseModel):
+    short_id: str
+
+
+@app.post("/api/release")
+def release(body: ReleaseIn):
+    """
+    Publish a held short anyway. The reviewer overrules the judge, on the record.
+
+    THE JUDGE IS A GATE, NOT A VETO. A short it holds back is built and paid for,
+    and the verdict can be about the pictures while the script is 5/5/5 — so the
+    one person who can weigh "the diagram says 'Inner function' and I do not care"
+    had no way to say so, and the reel stayed unpublishable forever. This is that
+    way to say so.
+
+    It does NOT edit the verdict. unit.eval keeps every score and problem exactly
+    as the judge wrote them, so why the short was held is still readable after it
+    is published; only `status` moves. To fix the short properly instead, redraw
+    its pictures from a note (POST /api/revisual) or rebuild it from a better
+    question in step 2 — those change the reel, and this only changes who decides.
+    """
+    path = config.OUTPUT_DIR / f"{body.short_id}.json"
+    if not path.exists():
+        raise HTTPException(404, f"no such short: {body.short_id}")
+    unit = ShortUnit(**json.loads(path.read_text()))
+    if unit.status not in feed.QUARANTINED:
+        raise HTTPException(400, f"{body.short_id} is already in the reel "
+                                 f"(status {unit.status})")
+    unit.status = "audited"
+    path.write_text(unit.model_dump_json(indent=2))
+    print(f"    {unit.short_id} RELEASED by the reviewer over the judge's verdict")
+    fresh = [u for u in feed.collect() if u["short_id"] == unit.short_id]
+    return {"short": fresh[0] if fresh else None}
+
+
 @app.get("/api/shorts")
-def shorts():
-    """Everything currently in output/, in the shape the reel player wants."""
-    return {"shorts": feed.collect()}
+def shorts(held: bool = False):
+    """
+    Everything currently in output/, in the shape the reel player wants.
+
+    HELD SHORTS ARE OPT-IN, not hidden. feed.collect keeps a short the judge scored
+    under the bar out of the feed, which is right for the feed and wrong as a dead
+    end: step 2 told the reviewer the short exists and is on disk, and then offered
+    no way to look at it. `?held=1` is that way — asked for by name, one short at a
+    time, so a weak reel never turns up in the ordinary feed by accident.
+    """
+    return {"shorts": feed.collect(include_quarantined=held)}
 
 
 @app.get("/api/audio/{short_id}")
@@ -873,6 +944,31 @@ _VOICE_LOCK = threading.Lock()
 #: One at a time: there is a single Chatterbox worker with one model in it.
 _VOICE_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="voice")
 
+#: How many preview jobs to remember. This registry used to grow for the life of the
+#: process — one entry, plus its scratch audio on disk, per press of "Speak it", and
+#: nothing ever released either. Invisible over an afternoon, not free for a server
+#: left running for weeks. A preview matters until you adopt it or record the next
+#: one, so the last few dozen is already generous.
+_VOICE_JOBS_MAX = 32
+
+
+def _evict_voice_jobs() -> None:
+    """Drop the oldest jobs past the cap, and the scratch audio they own.
+
+    Call with _VOICE_LOCK held. Deleting the files is safe because adopting COPIES
+    the clip into voices/ (see /api/voice/adopt), so nothing removed here is the
+    last copy of a voice anyone chose to keep.
+    """
+    lab = config.OUTPUT_DIR / "voice-lab"
+    while len(_VOICE_JOBS) > _VOICE_JOBS_MAX:
+        # dict preserves insertion order, and mark() rewrites values in place
+        # rather than reinserting, so the first key is the oldest job.
+        old_id = next(iter(_VOICE_JOBS))
+        del _VOICE_JOBS[old_id]
+        shutil.rmtree(lab / old_id, ignore_errors=True)
+        for clip in lab.glob(f"{old_id}_*"):
+            clip.unlink(missing_ok=True)
+
 
 def _voice_job(job_id: str, refs: dict, lines: list[tuple[str, str]]) -> None:
     """
@@ -973,6 +1069,7 @@ async def voice_speak(
     with _VOICE_LOCK:
         _VOICE_JOBS[job_id] = {"status": "queued", "error": None,
                                "audio_url": None, "refs": refs}
+        _evict_voice_jobs()
     _VOICE_POOL.submit(_voice_job, job_id, refs, lines)
     return {"job_id": job_id, "status": "queued", "speakers": sorted(refs)}
 

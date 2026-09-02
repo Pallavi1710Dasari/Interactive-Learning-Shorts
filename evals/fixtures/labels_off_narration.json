@@ -1,0 +1,50 @@
+{
+ "short_id": "labels_off_narration",
+ "session_id": "eval",
+ "source_section_id": "3.3",
+ "question": "What is a closure in JavaScript?",
+ "estimated_seconds": 18.0,
+ "beats": [
+  {
+   "speaker": "interviewer",
+   "line": "What is a closure in JavaScript?",
+   "on_screen": "what is a closure?",
+   "visual_ref": "q_closure"
+  },
+  {
+   "speaker": "student",
+   "line": "A closure is a function that remembers the variables around it.",
+   "on_screen": "a function that remembers",
+   "visual_ref": "d_closure",
+   "source_quote": "A closure is a function that remembers the variables around it."
+  },
+  {
+   "speaker": "student",
+   "line": "It keeps those variables even after the outer call has returned.",
+   "on_screen": "kept after return",
+   "visual_ref": "d_after",
+   "source_quote": "It keeps those variables even after the outer call has returned."
+  }
+ ],
+ "visuals": {
+  "q_closure": {
+   "ref": "q_closure",
+   "type": "diagram",
+   "spec": "pose the question",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 200\"><text x=\"10\" y=\"20\">Lexical Scope</text><text x=\"10\" y=\"40\">Inner function</text><text x=\"10\" y=\"60\">Outer variable</text></svg>"
+  },
+  "d_closure": {
+   "ref": "d_closure",
+   "type": "diagram",
+   "spec": "the function remembering",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 200\"><text x=\"10\" y=\"20\">function</text><text x=\"10\" y=\"40\">remembers</text><text x=\"10\" y=\"60\">variables</text></svg>"
+  },
+  "d_after": {
+   "ref": "d_after",
+   "type": "diagram",
+   "spec": "after the outer call returns",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 200\"><text x=\"10\" y=\"20\">variables</text><text x=\"10\" y=\"40\">returned</text><text x=\"10\" y=\"60\">kept</text></svg>"
+  }
+ },
+ "status": "draft"
+}

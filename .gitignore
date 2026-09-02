@@ -6,5 +6,4 @@ venv-chatterbox/
 output/
 web/node_modules/
 web/dist/
-web/public/shorts.json
 web/.ssr/

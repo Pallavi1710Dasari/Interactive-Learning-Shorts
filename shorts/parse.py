@@ -12,6 +12,14 @@ from .schema import Section
 # Matches "## 3.2 Address translation and the page table"
 HEADING = re.compile(r"^(?P<hashes>#{2,3})\s+(?P<num>[\d.]+)?\s*(?P<title>.+?)\s*$")
 
+#: The same shape at ANY heading depth, used only when the strict pass finds nothing.
+#: A space after the hashes stays mandatory on purpose: without it "#!/bin/sh" and
+#: "#include <stdio.h>" both read as headings.
+HEADING_ANY = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<num>[\d.]+)?\s*(?P<title>.+?)\s*$")
+
+#: Opening or closing line of a fenced code block.
+_FENCE = re.compile(r"^\s*(```|~~~)")
+
 
 def parse_markdown(path: str | Path) -> list[Section]:
     """
@@ -39,13 +47,42 @@ def parse_markdown(path: str | Path) -> list[Section]:
     mistake it for an invented sub-id and trim it away.
     """
     lines = Path(path).read_text(encoding="utf-8").splitlines()
+    sections = _scan(lines, HEADING)
+    if not sections:
+        # NOTHING MATCHED "## " OR "### ", so rather than refuse the document, read
+        # it at whatever depth its author actually used. This is a fallback and not
+        # the rule, and the difference matters: promoting "####" to a section
+        # boundary in general would shred a document that uses it properly. A page
+        # with "## 2 Property access" over "#### 2.1 Dot" and "#### 2.2 Bracket"
+        # means ONE section holding both examples, and splitting it there would hand
+        # the writer half a comparison. So the strict pass wins whenever it finds
+        # anything at all, and this runs only when the alternative is "no sections".
+        sections = _scan(lines, HEADING_ANY)
+    return [s for s in sections if s.text.strip()]
+
+
+def _scan(lines: list[str], pattern: re.Pattern) -> list[Section]:
+    """One pass over the lines, cutting a new Section at every heading match.
+
+    Fenced code is skipped. Reading material is mostly code, and at the depths this
+    tolerates a heading and a comment are the same characters: "# set the page size"
+    inside a shell block is a comment, and treating it as a section start would slice
+    the block in half and cite the halves separately.
+    """
     sections: list[Section] = []
     current: dict | None = None
-    parent_num: str | None = None       # id of the most recent depth-2 heading
+    parent_num: str | None = None       # id of the most recent top-level heading
     used: dict[str, int] = {}
+    fenced = False
 
     for i, line in enumerate(lines, start=1):
-        m = HEADING.match(line)
+        if _FENCE.match(line):
+            fenced = not fenced
+            if current is not None:
+                current["body"].append(line)
+            continue
+
+        m = None if fenced else pattern.match(line)
         if m:
             if current:
                 current["end_line"] = i - 1
@@ -55,7 +92,7 @@ def parse_markdown(path: str | Path) -> list[Section]:
             num = (m.group("num") or "").strip(". ")
             title = m.group("title").strip()
 
-            if depth == 2:
+            if depth <= 2:
                 parent_num = num or None
                 base = num or _slug(title)
             elif num and parent_num:
@@ -75,7 +112,7 @@ def parse_markdown(path: str | Path) -> list[Section]:
         current["end_line"] = len(lines)
         sections.append(_close(current))
 
-    return [s for s in sections if s.text.strip()]
+    return sections
 
 
 def _close(cur: dict) -> Section:

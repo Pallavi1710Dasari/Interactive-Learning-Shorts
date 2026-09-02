@@ -6,7 +6,7 @@ The eval runner. Run this before every prompt change and after every fix.
 
 Exit code is non-zero if any case fails, so you can wire it into CI later.
 """
-import argparse, json, sys
+import argparse, inspect, json, sys
 from pathlib import Path
 
 import yaml
@@ -43,6 +43,7 @@ UNIT_GRADERS = {
     "svg_quality":        checks.check_svg_quality,
     "frames_match_strategy": checks.check_frames_match_strategy,
     "one_hero_per_frame":    checks.check_one_hero_per_frame,
+    "diagram_matches_narration": checks.check_diagram_matches_narration,
 }
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
@@ -77,7 +78,14 @@ def run_code_case(case: dict, sections) -> tuple[bool, str]:
 def run_unit_case(case: dict, sections) -> tuple[bool, str]:
     """A frame-level case. The fixture is a whole ShortUnit, not a Script."""
     unit = ShortUnit(**json.loads((ROOT / case["fixture"]).read_text()))
-    result = UNIT_GRADERS[case["grader"]](unit)
+    # Most frame graders read only the unit. check_diagram_matches_narration also
+    # grounds labels against the section, so hand it the source when it asks for
+    # one — by signature rather than by name, so the next such grader just works.
+    grader = UNIT_GRADERS[case["grader"]]
+    if "source_text" in inspect.signature(grader).parameters:
+        result = grader(unit, source_for(case, sections))
+    else:
+        result = grader(unit)
     exp = case["expect"]
 
     if result.passed != exp["passed"]:

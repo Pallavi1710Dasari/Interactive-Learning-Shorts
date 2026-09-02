@@ -114,6 +114,42 @@ def _i(key: str, default: int) -> int:
         return default
 
 
+#: Whether a short the judge fails gets one automatic repair attempt. OFF by default.
+#:
+#: THE REPAIR IS A SECOND FULL BUILD. It rewrites the script, redesigns every frame
+#: around the new words, and re-judges — one script call, up to DESIGN_ATTEMPTS
+#: visual calls, a vision call and a judge call. So a short that fails the judge used
+#: to cost roughly twice a short that passed, and the result is DISCARDED unless it
+#: scores strictly better. Observed on closure_definition: the repair came back
+#: f=4 against the original's f=5, was correctly thrown away, and the whole second
+#: build was paid for.
+#:
+#: It is off rather than on because the cheaper defences arrived after it: the
+#: supportability screen kills unanswerable questions for $0.008 before any of this,
+#: and a held short can now be watched and published by hand. Turn it back on with
+#: REPAIR_FAILED_SHORTS=1 when getting a short over the bar matters more than the
+#: second build it costs.
+REPAIR_FAILED_SHORTS = os.getenv("REPAIR_FAILED_SHORTS", "0").strip().lower() in ("1", "true", "yes")
+
+#: Whether the supportability screen makes its one model call. On by default.
+#:
+#: The free half of the screen always runs; this only governs the batched model call
+#: that catches a question the material mentions but never settles. Set
+#: SCREEN_QUESTIONS=0 to skip it — one call cheaper per build, and back to finding
+#: out at the judge, after the diagrams are drawn and paid for.
+SCREEN_QUESTIONS = os.getenv("SCREEN_QUESTIONS", "1").strip().lower() not in ("0", "false", "no")
+
+#: How many times the visual step may redesign a short's frames before giving up.
+#:
+#: MEASURED, NOT GUESSED: across 44 shorts this pipeline spent 266 visual_spec calls
+#: — six per short — and 58% of its total bill, because every grader failure bought
+#: another full redesign and the repair pass then bought another round of them. Three
+#: attempts is generous for a model that has already been told what it got wrong; the
+#: second attempt fixes most of what the first got wrong, and the third mostly buys
+#: a differently-flawed frame at full price. Raise it when tuning the brief, where
+#: you want the loop to work hard; leave it low for ordinary builds.
+DESIGN_ATTEMPTS = max(1, _i("DESIGN_ATTEMPTS", 2))
+
 #: Redesign a frame whose educational_clarity is under this, out of 10.
 #:
 #: 7 is the reviewer's own number ("if educational_clarity < 7: regenerate"). It is

@@ -150,11 +150,25 @@ shorts get most ("showing same visuals again and again which feel bore"). A
 composition that builds does not revisit. If a later beat genuinely needs an earlier
 picture back, give it that beat's visual_ref and hold the picture honestly.
 
-DO NOT OPEN ON A CARD THAT RESTATES THE QUESTION. Beat 1's frame is not a title
-slide and not a "what is being asked" placeholder — those are the frames that get
-skipped past. Beat 1 draws THE SUBJECT, as an object: the two things about to be
-related, the device, the file, the structure. If the honest answer is "the subject
-is an abstract idea", draw what it acts on or sits between.
+TITLE BEAT 1 WITH THE QUESTION, AND DRAW THE SUBJECT UNDER IT.
+
+Beat 1 is the interviewer ASKING, and the frame has to look like the thing being
+asked or the reel opens on a mismatch: the voice poses a question while the picture
+presents a finished topic, and a viewer arriving on it cannot tell a question from a
+conclusion. So the frame's `title` is the question, phrased AS a question and short
+enough to read at a glance — "What is a Function?", "Which runs first?", "Why does
+dot fail here?" — not the subject as a noun phrase. "CSS color property" is the
+wrong title for beat 1; "What does color do?" is the right one.
+
+The BODY of the frame is unchanged, and this is the half that keeps it from being a
+title slide: it still draws THE SUBJECT as an object — the two things about to be
+related, the device, the file, the structure. Interrogative title, real drawing
+underneath. A frame whose whole content is the question set large is the placeholder
+this has always rejected, and it is still rejected; the question belongs in the
+title, over a picture, never instead of one.
+
+If the honest answer is "the subject is an abstract idea", draw what it acts on or
+sits between, and title that with the question.
 
 AND DO NOT OPEN ON THE ANSWER'S CODE. Beat 1 is the interviewer's question, and its
 frame should show the SUBJECT — the thing being asked about, drawn — not the listing
@@ -233,6 +247,19 @@ Three rules, and all three are verified by code after you answer:
     document, which is why this is checked rather than trusted.
   * A "preview" sample must RENDER what its caption claims — see that template.
   * Every label must come from the narration, the material's code, or its values.
+    USE ONLY the concepts, labels, values and examples explicitly provided in the
+    narration or the source material. Do not infer, assume, or introduce any
+    additional technical term from your own knowledge. If a concept is not
+    mentioned or explained in the source, it MUST NOT appear in the diagram.
+
+    This is the rule most often broken, and it is broken by being RIGHT. Asked to
+    draw `person.1`, a frame labelled the outcome "SyntaxError" — true of
+    JavaScript, and absent from the section, whose only stated outcome for a bad
+    property access is `undefined`. Asked to draw a closure, a frame titled itself
+    "Lexical Scope" and named a node "Inner function", neither of which is ever
+    spoken. Correct knowledge the source does not contain is precisely the failure
+    mode: a viewer cannot tell your expertise from the material's, so a term you
+    supplied reads as something the lesson taught, and the lesson never did.
 
 If you cannot support a claim, make a smaller claim. A frame showing one rule
 correctly beats a frame showing three where one is invented.
@@ -724,7 +751,7 @@ moved — one honest still is better than two frames pretending to differ."""
 
 #: How many times the visual step may be asked again before its best answer ships.
 #: The script step has used 3 since the beginning; this matches it.
-MAX_DESIGN_ATTEMPTS = 3
+MAX_DESIGN_ATTEMPTS = config.DESIGN_ATTEMPTS
 
 #: The graders a redesign can actually act on. All structural, all free, all about
 #: the DESIGN rather than the drawing — a failure here means asking the model again
@@ -781,7 +808,8 @@ def design_visuals(script: Script, section: Section | None = None, *,
                    previous: dict[str, Visual] | None = None,
                    attempts: int = MAX_DESIGN_ATTEMPTS,
                    note: str | None = None,
-                   vision: bool = True) -> tuple[dict[str, Visual], list[str]]:
+                   vision: bool = True,
+                   scores_out: dict | None = None) -> tuple[dict[str, Visual], list[str]]:
     """
     Design the frames, grade them, and ask again for the ones that failed.
 
@@ -917,6 +945,7 @@ def design_visuals(script: Script, section: Section | None = None, *,
             # would buy a second opinion on a decided question. Structural first,
             # free; pixels second, paid, and only on a candidate.
             vision_problems: list[str] = []
+            attempt_scores: dict = {}
             if vision and draw and problems == []:
                 from .vision import judge_frames, problems_for_redesign
                 try:
@@ -928,6 +957,7 @@ def design_visuals(script: Script, section: Section | None = None, *,
                 for ref, score in scored.items():
                     if ref in visuals:
                         visuals[ref].score = score
+                attempt_scores = dict(scored)
                 vision_problems = problems_for_redesign(scored, composition)
                 problems += vision_problems
         except Exception as e:
@@ -941,6 +971,12 @@ def design_visuals(script: Script, section: Section | None = None, *,
 
         if best_problems is None or len(problems) < len(best_problems):
             best, best_problems = visuals, problems
+            # Recorded for the attempt actually kept, so a stored score always
+            # describes the frame that shipped rather than one that was thrown away.
+            if scores_out is not None:
+                scores_out.clear()
+                scores_out.update({ref: sc.model_dump()
+                                   for ref, sc in (attempt_scores or {}).items()})
         if not problems:
             return visuals, []
 

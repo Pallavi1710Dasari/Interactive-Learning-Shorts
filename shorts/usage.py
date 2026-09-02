@@ -138,8 +138,20 @@ def totals() -> dict:
 
 
 def mark() -> int:
-    """Cursor for measuring one request's spend."""
+    """Cursor for measuring one request's spend.
+
+    IT LOADS THE LEDGER FIRST, and that is not housekeeping. The cursor is an index
+    into _calls, and record() fills _calls lazily — so marking before anything had
+    been recorded returned 0, the first record() then loaded the whole history
+    behind it, and since(0) reported EVERY call ever made as the cost of this one
+    request. Measured: a two-token ping billed at $11.71.
+
+    server.py happened to be immune because it calls load() at import. Nothing else
+    was, and the ledger's own note ("record() loads lazily too, so every other entry
+    point is covered") was wrong about exactly this one.
+    """
     with _lock:
+        _load_locked()
         return len(_calls)
 
 

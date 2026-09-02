@@ -1,6 +1,9 @@
 """SKILL 1 — short-selection. Doc in, topics out."""
 import re
 
+from pydantic import BaseModel
+
+from .. import config
 from ..schema import TopicList, Section
 from ..parse import sections_as_prompt_block
 from ..llm import ask_json
@@ -158,8 +161,11 @@ def select_topics_with_notes(sections: list[Section],
     topics = ask_json(SYSTEM, user, TopicList, max_tokens=3000, label="select")
     topics, id_notes = repair_section_ids(topics, sections)
     topics, quote_notes = drop_unanswerable(topics, sections)
+    # Before the cut to `target`, so a dropped topic promotes the next-ranked one
+    # rather than leaving the batch short — the overshoot IS the replacement bench.
+    topics, screen_notes = drop_unsupported(topics, sections)
     topics, rank_notes = keep_most_important(topics, target)
-    return topics, id_notes + quote_notes + rank_notes
+    return topics, id_notes + quote_notes + screen_notes + rank_notes
 
 
 #: Below this, a question is not worth a short. See the rubric in SYSTEM.
@@ -389,6 +395,169 @@ def drop_unanswerable(topics: TopicList,
         for topic, why in dropped:
             print(f"    ~ {topic.id}: {why}")
         return topics, [f"{t.id}: unverified answer ({w})" for t, w in dropped]
+
+    for topic, why in dropped:
+        notes.append(f"{topic.id}: dropped, {why}")
+        print(f"  ! {notes[-1]}")
+    return TopicList(topics=kept), notes
+
+
+
+# ------------------------------------------------------- the supportability screen
+#
+# WHY A SECOND SCREEN, WHEN drop_unanswerable ALREADY RUNS
+# That one asks "is the answer_quote really in the document" — a PRESENCE check. It
+# cannot see the failure that costs the most: a question the material mentions but
+# does not SETTLE. The case that prompted this was "When must you use bracket
+# notation instead of dot?", whose answer_quote ("Use Dot notation when the key is a
+# valid Identifier.") is in the source, verbatim, and whose real answer is not. The
+# section never demonstrates dot notation failing on a key with a space, never
+# defines "valid identifier", and shows only `undefined` as an outcome. So the script
+# had to infer the interesting half, the judge caught it as unfaithful, and the short
+# was quarantined AFTER a script call, six diagram calls and a judge call.
+#
+# Screening here is the cheapest place it can possibly be caught, and it needs no
+# replacement machinery: OVERSHOOT already asks for more candidates than are kept, so
+# dropping a bad one simply promotes the next-ranked topic. That IS the swap.
+
+#: A question whose topical words are mostly absent from the material is asking about
+#: something the material does not discuss. Deliberately loose — this half is the free
+#: pass and only has to catch the blunt cases; the model catches the subtle ones.
+MAX_FOREIGN_QUESTION_SHARE = 0.5
+
+
+class _Verdict(BaseModel):
+    id: str
+    supported: bool
+    why: str = ""
+
+
+class _ScreenReport(BaseModel):
+    findings: list[_Verdict]
+
+
+SCREEN_SYSTEM = """You decide whether a section of reading material actually SETTLES a
+question, using only what the section says.
+
+You are not being asked whether the question is a good one, nor whether you know the
+answer. You know this subject and that knowledge is exactly what must not be used
+here: the video built from this question may state only what the material states, so
+a question you can answer from expertise but the section does not settle is the
+failure this step exists to catch.
+
+Mark supported = false when answering well would need ANY of:
+  * a fact, term or definition the section never gives
+  * a demonstration the section never shows — a question about when something FAILS
+    needs the section to show it failing, not merely a rule implying it would
+  * an example the section does not contain
+  * a distinction the section never draws
+
+Mark supported = true when the section states or demonstrates the answer outright,
+so a careful writer could answer using only sentences from it.
+
+IT MUST ALSO SUPPORT MORE THAN ONE SENTENCE OF ANSWER, and this half is missed most
+often. The format is one question and then TWO OR THREE answer beats, each resting
+on a DIFFERENT sentence from the section — so a question the section settles in a
+single line is unsupported here even though it is answered. It cannot be split, the
+writer pads or repeats to fill the second beat, and the graders reject it. Ask
+whether the section gives at least two distinct things to say in answer. If the
+honest answer is "one sentence covers it", mark it false.
+
+A WORKED EXAMPLE, from a short this screen was built after. The section states
+"Use Dot notation when the key is a valid Identifier." and shows person.firstName,
+person["firstName"], person.gender // undefined, and person[a]. It never defines
+"valid identifier", never accesses a key containing a space, and never shows dot
+notation failing on one.
+
+  QUESTION: "When must you use bracket notation instead of dot?"   -> false
+
+The rule IS stated, so the question looks settled — and it is not. Answering it
+usefully means naming which keys force brackets, and that is precisely what the
+section leaves to inference. THE SHALLOW HALF BEING STATED IS NOT ENOUGH: judge a
+question by whether the material settles the part that makes it worth asking, not
+by whether some sentence in it gestures at the topic. A question whose interesting
+half is an inference is unsupported however plainly its dull half is written down.
+
+Be strict. Dropping a weak question costs nothing — another candidate takes its
+place — while keeping one costs a script, several diagram calls and a judge call
+before anybody finds out. When genuinely unsure, mark it false.
+
+Return JSON:
+{"findings":[{"id":"<topic id>","supported":true,"why":"<one clause>"}]}
+Every id you were given must appear exactly once."""
+
+
+def drop_unsupported(topics: TopicList,
+                     sections: list[Section]) -> tuple[TopicList, list[str]]:
+    """
+    Drop topics whose cited section cannot settle them without inference.
+
+    Two passes, cheap first. A word-overlap heuristic removes questions about things
+    the material never discusses, for free; whatever survives goes to one batched
+    model call — one call for the whole candidate list, not one per topic, because
+    the judgement is the same shape for each and the section text is shared.
+
+    Nothing is dropped when every topic fails, for the same reason drop_unanswerable
+    does the same: a screen that empties the list leaves the user with no topics and
+    no way to see why, which is worse than letting the downstream graders decide.
+    """
+    from ..checks import _flatten, _stems, _is_topical, _grounded
+
+    by_id = {s.section_id: s for s in sections}
+    document = " ".join(s.text for s in sections)
+    doc_stems = set(_stems(document))
+
+    kept, dropped, notes = [], [], []
+
+    # --- pass 1: free -------------------------------------------------------
+    for topic in topics.topics:
+        asked = {stem: word for stem, word in _stems(topic.topic or "").items()
+                 if _is_topical(word)}
+        if not asked:
+            kept.append(topic)
+            continue
+        foreign = [w for stem, w in asked.items() if not _grounded(stem, doc_stems)]
+        if len(foreign) / len(asked) > MAX_FOREIGN_QUESTION_SHARE:
+            dropped.append((topic, f"asks about {', '.join(sorted(foreign)[:4])}, "
+                                   f"which the material never discusses"))
+        else:
+            kept.append(topic)
+
+    # --- pass 2: one model call over the survivors --------------------------
+    if kept and not config.STUB and config.SCREEN_QUESTIONS:
+        blocks = []
+        for topic in kept:
+            section = by_id.get(topic.source_section_id)
+            body = (section.text if section else document)[:6000]
+            blocks.append(f"### topic id: {topic.id}\n"
+                          f"QUESTION: {topic.topic}\n"
+                          f"SECTION {topic.source_section_id}:\n{body}")
+        user = ("Decide, for each topic below, whether its section settles its "
+                "question using only what that section says.\n\n"
+                + "\n\n".join(blocks))
+        try:
+            report = ask_json(SCREEN_SYSTEM, user, _ScreenReport,
+                              max_tokens=1500, label="screen")
+        except Exception as e:
+            print(f"  ! question screen skipped ({type(e).__name__}: {e}) — "
+                  f"the downstream graders still apply")
+        else:
+            verdicts = {v.id: v for v in report.findings}
+            survivors = []
+            for topic in kept:
+                v = verdicts.get(topic.id)
+                if v is not None and not v.supported:
+                    dropped.append((topic, f"the section does not settle it — {v.why}"))
+                else:
+                    survivors.append(topic)
+            kept = survivors
+
+    if not kept and dropped:
+        print(f"  ! every topic failed the supportability screen ({len(dropped)}) — "
+              f"keeping them all rather than returning nothing.")
+        for topic, why in dropped:
+            print(f"    ~ {topic.id}: {why}")
+        return topics, [f"{t.id}: unscreened ({w})" for t, w in dropped]
 
     for topic, why in dropped:
         notes.append(f"{topic.id}: dropped, {why}")

@@ -1,11 +1,17 @@
 """
 Turns the unit JSON in output/ into the payload the web app plays.
 
-    python -m shorts.feed            # writes web/public/shorts.json
+    python -m shorts.feed            # writes output/shorts.json
 
 This is the only place that decides what a "reel" looks like as data — the API
 serves the same structure from /api/shorts, so the app has one shape to render
 whether it is reading a file or talking to the server.
+
+THE APP DOES NOT READ THE FILE. It always calls /api/shorts; nothing in web/src
+references shorts.json. The export used to land in web/public/, which meant Vite
+copied a 428KB snapshot into every build for no reader — so it writes to output/
+now. Keep it for inspecting a feed by hand or feeding something outside this repo;
+do not expect the player to pick it up.
 
 There is deliberately no HTML renderer here any more. The React app in web/ is
 the single UI; a second hand-written player was one more thing to keep in sync.
@@ -200,7 +206,7 @@ def build_json(out: Path | None = None) -> Path:
     units = collect()
     if not units:
         raise SystemExit("no units in output/ — run `python -m shorts.run <doc>` first")
-    out = out or config.ROOT / "web" / "public" / "shorts.json"
+    out = out or config.OUTPUT_DIR / "shorts.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(units, indent=2), encoding="utf-8")
     print(f"wrote {out}  ({len(units)} shorts, {sum(u['diagrams'] for u in units)} diagrams)")

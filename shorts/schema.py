@@ -566,6 +566,20 @@ class ShortUnit(BaseModel):
     visuals: dict[str, Visual]
     audio: Optional[Audio] = None
     eval: Optional[EvalReport] = None
+    #: What the vision judge scored each frame, kept instead of thrown away.
+    #:
+    #: RECORDED, NEVER READ BACK. judge_frames already rasterises every frame and
+    #: scores it, the design loop uses those scores to decide on a redesign, and then
+    #: they were discarded — so "which of my frames are weak" could only be answered
+    #: by paying for the judgement again, one short at a time. Storing it makes that
+    #: a question about output/ rather than about the API.
+    #:
+    #: Nothing downstream consumes this. It is not sent to any model (spec_visuals is
+    #: handed `previous` visuals, not the unit), it is not in the feed payload
+    #: (feed.collect builds its keys explicitly), and it is not rendered. Optional and
+    #: empty by default so every unit written before it still loads.
+    vision_scores: dict[str, dict] = Field(default_factory=dict)
+
     #: "needs_review" is the quarantine state: the short was built and paid for, and
     #: the judge scored it below the bar (see EvalReport.passed). It stays on disk
     #: with its verdict attached so a human can read what was wrong and decide, but

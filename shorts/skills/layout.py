@@ -29,7 +29,7 @@ the model used to have to remember to add. See web/src/AnimatedSvg.tsx.
 """
 import re
 
-from ..schema import Frame, Cell, TableRow, Panel, Sample, Glyph
+from ..schema import Frame, Cell, TableRow, Panel, Sample, Glyph, Slot, Store
 from .. import config
 
 VIEW = 1080
@@ -1726,11 +1726,249 @@ def _compare(frame: Frame, enter: int) -> tuple[str, int]:
     return out, enter
 
 
+#: The most slots a store may draw. Past this the slots are narrower than their
+#: own labels and the container stops reading as a container.
+MAX_SLOTS = 6
+
+#: How far outside the container an arriving or leaving item is drawn, and the
+#: length of the arrow between it and its slot. One slot-height, so the movement
+#: reads as "one place" rather than as a jump across the frame.
+TRAVEL_GAP = 1.0
+
+
+def _state(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    A container of slots, an index that points into it, and something moving.
+
+    THE GAP THIS FILLS. Every other template here is a list of Cells, and a Cell is
+    a label in a box, so a stack could only ever be drawn as three rectangles
+    reading "Push 1", "Push 2", "Push 3". The words did the teaching and the picture
+    did nothing — the reviewer's note was that the reels "look like they are just
+    reading some lines, not explaining". A concept that HOLDS things and CHANGES
+    needs three things this schema had no way to say: a place that may be empty, an
+    index that marks one of those places, and a thing in the act of arriving or
+    leaving.
+
+    ONE TEMPLATE FOR EVERY SUCH CONCEPT, rather than one per data structure. A stack
+    is vertical, open at the top, with the pointer on the top slot. A queue is
+    horizontal with a pointer at each end. An array or a page table is horizontal
+    and closed, indexed by position. Memory frames are the same with a page
+    arriving into a free one. They differ in their labels, not in their shape.
+
+    THE ARRIVING SLOT IS DRAWN OUTSIDE THE CONTAINER, with an arrow into the place
+    it is going, and its group carries data-role="travel" so
+    web/src/AnimatedSvg.tsx ferries a payload along that arrow, plus data-slide so
+    the item itself translates into its slot. That is the difference between a
+    diagram of a push and a push happening on screen.
+    """
+    store = frame.store or Store()
+    slots = list(store.slots or [])[:MAX_SLOTS]
+    if not slots:
+        slots = [Slot()]
+    n = len(slots)
+    vertical = store.orientation == "vertical"
+
+    # The container is centred in the body band, and it leaves a lane at the entry
+    # end for whatever is arriving or leaving. The lane is reserved whether or not
+    # this frame uses it, so a store does not jump between beats when one beat has
+    # a push in it and the next does not.
+    band_top, band_bottom = BODY_TOP + 40, BODY_BOTTOM - 40
+    moving = next((s for s in slots if s.state in ("arriving", "leaving")), None)
+
+    if vertical:
+        slot_h = min(120.0, (band_bottom - band_top) / (n + TRAVEL_GAP + 0.6))
+        slot_w = min(USABLE * 0.44, 360.0)
+        lane = slot_h * TRAVEL_GAP
+        stack_h = n * slot_h
+        base_y = band_top + lane + stack_h          # the floor of the container
+        x0 = VIEW / 2 - slot_w / 2
+
+        def slot_xy(i: int) -> tuple[float, float]:
+            # index 0 at the BASE, growing upward, which is what a stack does.
+            return x0, base_y - (i + 1) * slot_h
+    else:
+        slot_w = min(190.0, USABLE / (n + TRAVEL_GAP))
+        slot_h = min(150.0, (band_bottom - band_top) * 0.42)
+        lane = slot_w * TRAVEL_GAP
+        row_w = n * slot_w
+        x0 = VIEW / 2 - row_w / 2
+        # The row sits low enough to leave the lane ABOVE it, because a closed
+        # store is entered perpendicular to its axis — a page does not come in
+        # past frame 0 to reach frame 2, it drops into frame 2 from outside.
+        base_y = band_top + slot_h * TRAVEL_GAP + 30
+
+        def slot_xy(i: int) -> tuple[float, float]:
+            return x0 + i * slot_w, base_y
+
+    out = ""
+
+    # --- the container itself, three-sided when it is open ------------------
+    #
+    # Drawn as lines rather than as a box with a missing side, because a rect with
+    # no top is not a rect. The open end is where things enter: the top for a
+    # vertical store, the left for a horizontal one.
+    pad = 10
+    if vertical:
+        cx, cy = x0 - pad, base_y - stack_h - pad
+        cw, ch = slot_w + 2 * pad, stack_h + 2 * pad
+    else:
+        cx, cy = x0 - pad, base_y - pad
+        cw, ch = row_w + 2 * pad, slot_h + 2 * pad
+
+    wall = f'stroke="{STROKE}" stroke-width="7" fill="none" stroke-linecap="round"'
+    if store.open_end:
+        if vertical:
+            # left, floor, right — open at the top
+            out += (f'<path d="M{cx:.0f} {cy:.0f} L{cx:.0f} {cy + ch:.0f} '
+                    f'L{cx + cw:.0f} {cy + ch:.0f} L{cx + cw:.0f} {cy:.0f}" {wall}/>')
+        else:
+            # top, right, bottom — open at the left
+            out += (f'<path d="M{cx:.0f} {cy:.0f} L{cx + cw:.0f} {cy:.0f} '
+                    f'L{cx + cw:.0f} {cy + ch:.0f} L{cx:.0f} {cy + ch:.0f}" {wall}/>')
+    else:
+        out += (f'<rect x="{cx:.0f}" y="{cy:.0f}" width="{cw:.0f}" height="{ch:.0f}" '
+                f'rx="16" {wall}/>')
+    # BELOW THE CONTAINER, ALWAYS. Above it is the entry lane for a vertical store
+    # and for a closed one, so a label placed there is overdrawn by whatever is
+    # arriving — measured: "Stack" disappeared under the pushed item, and
+    # "Physical frames" came out with a page sitting on top of the word.
+    if store.label:
+        lines, size = fit(store.label, cw, 34, 24, max_lines=1)
+        out += text_block(lines, cx + cw / 2, cy + ch + 34, size, MUTED, 600)
+    # The container is scenery: it is there in every beat, so it must not re-enter
+    # on each one. "base" is exactly that contract — see AnimatedSvg.
+    out = group(out, enter, "base")
+    enter += 1
+
+    # --- the slots ----------------------------------------------------------
+    body = ""
+    for i, slot in enumerate(slots):
+        if slot.state != "resting":
+            continue                        # drawn outside, below
+        x, y = slot_xy(i)
+        if slot.label:
+            body += box(x + 6, y + 5, slot_w - 12, slot_h - 10, slot.role, rx=10)
+            body += label_in_box(slot.label, x + 6, y + 5, slot_w - 12, slot_h - 10,
+                                 slot.role)
+        else:
+            # AN EMPTY SLOT IS DRAWN, dashed and quiet. It is how the viewer sees
+            # that there is room — "nowhere to push" is only visible if the places
+            # are visible.
+            body += box(x + 6, y + 5, slot_w - 12, slot_h - 10, "quiet", rx=10,
+                        dashed=True)
+    if body:
+        out += group(body, enter)
+        enter += 1
+
+    # --- the pointer --------------------------------------------------------
+    #
+    # -1 IS A REAL VALUE and is drawn below the base, because that is how an empty
+    # stack states itself. Anything past the far end is drawn at that end rather
+    # than dropped.
+    if store.pointer:
+        at = store.pointer_at
+        if at is None:
+            at = n - 1
+        shown = max(-1, min(at, n - 1))
+        if vertical:
+            if shown < 0:
+                py = base_y + slot_h * 0.45
+            else:
+                px_unused, py = slot_xy(shown)
+                py = py + slot_h / 2
+            tip_x = x0 - pad - 16
+            out += group(
+                arrow(tip_x - 74, py, tip_x, py, "focus")
+                + text_block([store.pointer], tip_x - 78 - 4, py - 4, 32, AMBER, 700,
+                             anchor="end"),
+                enter, "focus")
+        else:
+            if shown < 0:
+                px = x0 - slot_w * 0.45
+            else:
+                px, py_unused = slot_xy(shown)
+                px = px + slot_w / 2
+            # UNDER the row, for the same reason the label moved: the lane above a
+            # horizontal store is where a page arrives, and an index drawn into it
+            # collides with the thing it is supposed to be pointing at.
+            # Below the store LABEL, which is itself below the container — the two
+            # were sharing the same 60px of strip and the shaft ran through the
+            # word ("Physica|l frames").
+            tip_y = base_y + slot_h + pad + 58
+            out += group(
+                arrow(px, tip_y + 60, px, tip_y, "focus")
+                + text_block([store.pointer], px, tip_y + 100, 32, AMBER, 700),
+                enter, "focus")
+        enter += 1
+
+    # --- whatever is moving -------------------------------------------------
+    if moving is not None:
+        i = slots.index(moving)
+        sx, sy = slot_xy(i)
+        arriving = moving.state == "arriving"
+
+        # WHERE A THING ENTERS FROM DEPENDS ON WHETHER THE CONTAINER IS OPEN, and
+        # getting this wrong is not cosmetic — the first cut placed the item one
+        # slot beyond its target, which for a stack put the arriving box INSIDE the
+        # container among the empty slots, and for a row of frames drew it on top
+        # of the neighbour it was meant to arrive beside.
+        #
+        # An OPEN store is entered past its open end: a stack from above the whole
+        # container, a queue from beyond its left. The arrow then runs along the
+        # container's axis and through any empty slots on the way, which is what
+        # falling in looks like.
+        #
+        # A CLOSED store has no end to enter by, so the thing arrives PERPENDICULAR
+        # to the axis, straight into the one slot it is going to. A page arriving in
+        # frame 2 does not travel past frames 0 and 1 to get there.
+        if store.open_end and vertical:
+            ox, oy = x0, cy - lane
+        elif store.open_end:
+            ox, oy = cx - lane, base_y
+        elif vertical:
+            ox, oy = x0 - slot_w - 40, sy
+        else:
+            ox, oy = sx, cy - lane
+
+        along_axis = store.open_end
+        if (vertical and along_axis) or (not vertical and not along_axis):
+            a_from = (sx + slot_w / 2, oy + slot_h + 4)
+            a_to = (sx + slot_w / 2, sy - 4)
+        else:
+            a_from = (ox + slot_w + 4, sy + slot_h / 2)
+            a_to = (sx - 4, sy + slot_h / 2)
+        if not arriving:
+            a_from, a_to = a_to, a_from       # the arrow points OUT
+
+        item = box(ox + 6, oy + 5, slot_w - 12, slot_h - 10, moving.role, rx=10)
+        item += label_in_box(moving.label or "?", ox + 6, oy + 5,
+                             slot_w - 12, slot_h - 10, moving.role)
+        # data-slide carries the offset the item travels FROM, so the animator can
+        # translate it into place without recomputing any geometry.
+        dx, dy = (sx - ox), (sy - oy)
+        out += (f'<g data-enter="{enter}" data-role="travel" '
+                f'data-slide="{-dx:.0f},{-dy:.0f}">'
+                + arrow(a_from[0], a_from[1], a_to[0], a_to[1], "flow")
+                + item + "</g>")
+        enter += 1
+
+        # The place it is going to or coming from, so the movement has a
+        # destination on screen rather than an implied one.
+        if arriving:
+            ph = group(box(sx + 6, sy + 5, slot_w - 12, slot_h - 10, "quiet",
+                           rx=10, dashed=True), enter)
+            out += ph
+            enter += 1
+
+    return out, enter
+
+
 _TEMPLATES = {
     "bar": _bar, "mapping": _mapping, "split": _split, "flow": _flow,
     "table": _table, "stat": _stat, "code": _code, "compare": _compare,
     "preview": _preview, "icons": _icons,
     "hierarchy": _hierarchy, "cause_effect": _cause_effect,
+    "state": _state,
     # LEGACY. Not offered to the model any more — a frame whose whole content is a
     # sentence is the "visuals are just text" complaint in its purest form, and it
     # was landing on EVERY short because the brief made it the last beat's job.

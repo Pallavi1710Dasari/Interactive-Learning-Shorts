@@ -186,6 +186,11 @@ export function AnimatedSvg({ svg, beatKey, composition, beatMs }: {
         // explanation. See ferry().
         if (role === "travel") running.push(...ferry(el, base ? 0 : delay));
 
+        // A travelling group that carries an offset also MOVES ITSELF into place.
+        // The two are complementary rather than alternatives: ferry sends a payload
+        // down the arrow to show the path, slide carries the item along it.
+        if (el.dataset.slide) running.push(...slide(el, base ? 0 : delay));
+
         const flows = role === "flow" || (!role && isArrow(el));
         if (flows) running.push(...march(el, base ? 0 : delay));
         if (role === "focus" || (!role && isAmber(el))) running.push(...breathe(el, delay));
@@ -336,6 +341,39 @@ function draw(el: SVGElement, timing: KeyframeAnimationOptions): Animation | nul
  * The token fades in at the tail and out at the tip so it reads as leaving and
  * arriving rather than as a dot orbiting a line for ever.
  */
+/**
+ * An element that TRAVELS INTO PLACE, rather than fading in where it belongs.
+ *
+ * WHY THIS EXISTS. Every other entrance here animates a mark appearing: enter()
+ * fades and lifts, draw() strokes a line along itself, ferry() sends a dot down an
+ * arrow. All of them animate the DRAWING. None of them animates the SUBJECT — and
+ * for a concept that is about something moving, the subject moving IS the
+ * explanation. A pushed item that fades in on top of a stack has been placed
+ * there; a pushed item that slides in from outside has arrived, and the viewer
+ * sees which of those two things the beat is claiming.
+ *
+ * The offset comes from the renderer as data-slide="dx,dy" — the vector the
+ * element travels FROM, in user units — because layout.py already knows the
+ * geometry and recomputing it here from bounding boxes would be a second, drifting
+ * source of the same numbers. See _state() in shorts/skills/layout.py.
+ */
+function slide(el: SVGElement, delay: number): Animation[] {
+  const raw = el.dataset.slide;
+  if (!raw) return [];
+  const [dx, dy] = raw.split(",").map(Number);
+  if (!isFinite(dx) || !isFinite(dy) || (dx === 0 && dy === 0)) return [];
+  return [el.animate(
+    [
+      { transform: `translate(${dx}px, ${dy}px)`, opacity: 0, offset: 0 },
+      { transform: `translate(${dx * 0.12}px, ${dy * 0.12}px)`, opacity: 1, offset: 0.72 },
+      { transform: "translate(0px, 0px)", opacity: 1, offset: 1 },
+    ],
+    // Slower than enter()'s 440ms: this is a movement to be followed, not a mark
+    // appearing, and the eye has to have time to see WHERE it came from.
+    { duration: 900, delay, easing: "cubic-bezier(.25,.9,.2,1)", fill: "both" },
+  )];
+}
+
 function ferry(group: SVGElement, delay: number): Animation[] {
   const svg = group.ownerSVGElement;
   if (!svg) return [];

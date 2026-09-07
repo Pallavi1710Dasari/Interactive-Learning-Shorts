@@ -1088,6 +1088,97 @@ cases:
     expect:
       template_includes: [code]
 
+  # ------------------------------------------- state / mechanism visuals
+  #
+  # The `state` template and its Store/Slot schema, added because every other
+  # template in this renderer is a list of Cells and a Cell is a label in a box.
+  # A stack could therefore only be drawn as three rectangles reading "Push 1",
+  # "Push 2", "Push 3" — the words doing the teaching and the picture doing
+  # nothing, which is the reviewer's note that the reels "look like they are just
+  # reading some lines, not explaining".
+
+  - id: E064
+    name: A store whose contents change across beats is visual progression
+    why: >
+      The wiring test, and it fails loudly if the graders cannot SEE a store. Every
+      frame in this fixture is the same vertical container; what changes is what is
+      in it — empty, then A arriving, then C arriving onto A and B, then C leaving.
+
+      _frame_labels is what frames_progress, frames_develop, _near_same and
+      frames_are_visual all read a frame through, and it enumerated cells, panels
+      and rows. A store's slots were invisible to it, so all four of these frames
+      would have looked like the same empty picture and a developing composition
+      would have been reported as one static slide. If this case ever fails, slot
+      labels have been dropped out of _frame_labels again.
+    type: unit_grader
+    grader: frames_progress
+    fixture: evals/fixtures/visual_state_happens.json
+    expect:
+      passed: true
+
+  - id: E065
+    name: Naming the operations in boxes is not visual progression
+    why: >
+      The failure half of E064, and it is the defect the whole `state` template
+      exists to replace: one row of boxes labelled with the operation names, held
+      for the entire short, with the accent moving between them. Nothing is ever
+      drawn that was not on screen in beat one.
+
+      Note what this case does NOT claim. No grader here can tell "Push 1 / Push 2 /
+      Push 3" apart from a drawn stack when the labels genuinely change per beat —
+      that judgement is not countable, and pretending otherwise would mean a grader
+      that guesses. What is countable is a picture that never changes, and that is
+      what this freezes.
+    type: unit_grader
+    grader: frames_progress
+    fixture: evals/fixtures/visual_state_named_not_shown.json
+    expect:
+      passed: false
+      reason_contains: "only the accent moves"
+
+  - id: E066
+    name: The moving slot is the frame's focus
+    why: >
+      one_hero_per_frame counts heroes within each GROUP of elements laid out
+      together, and a store's slots are such a group — they had to be added to the
+      list or a state frame would have had no judgeable collection at all and the
+      grader would have skipped it silently.
+
+      Occupied slots only, deliberately: an empty slot carries "plain" by default,
+      so counting the free places would make a container holding two lit items look
+      like it has plenty of unaccented elements.
+
+      The fixture also freezes the role rule the brief now states — the arriving or
+      leaving item is the hero, because it is what the beat is about. "lost" is for
+      something wasted or invalid, which a popped value is not.
+    type: unit_grader
+    grader: one_hero_per_frame
+    fixture: evals/fixtures/visual_state_happens.json
+    expect:
+      passed: true
+
+  - id: E067
+    name: A push/pop beat is drawn with the state template
+    why: >
+      The behavioural half. E064 to E066 prove the capability is wired and visible
+      to the graders; this proves it is USED, which is the thing that actually
+      changes what a student sees.
+
+      Section 6.1 teaches the push/pop mechanism. Before the `state` template
+      existed the design step had no shape that could hold a container, a place and
+      a thing in motion, so it reached for `bar` or `icons` and let the labels
+      carry the meaning — measured across output/, 74% of the scenes the strategy
+      step described as motion or containment were drawn as labelled-box templates.
+
+      Costs a strategy call and a design call, so it runs under --judge.
+    type: golden
+    step: visuals
+    input: evals/fixtures/code_vs_concept.md
+    section_id: "6.1"
+    fixture: evals/fixtures/objective_is_mechanism.json
+    expect:
+      template_includes: [state]
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

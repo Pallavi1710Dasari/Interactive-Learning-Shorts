@@ -1030,6 +1030,17 @@ def _frame_labels(frame) -> list[str]:
     for panel in frame.panels:
         out.append(panel.title)
         out.extend(item.label for item in panel.items)
+    # A STORE'S SLOTS ARE LABELS TOO, and leaving them out would have made every
+    # `state` frame look empty to _near_same, _only_grew, frames_progress and
+    # frames_are_visual — so a stack whose contents changed on every beat would
+    # have counted as the same picture five times.
+    #
+    # An EMPTY slot contributes nothing here on purpose: it is drawn, and it is
+    # meaningful, but it puts no word on screen and this function is defined as
+    # the words.
+    if frame.store is not None:
+        out.extend(slot.label for slot in frame.store.slots)
+        out.extend(filter(None, [frame.store.label, frame.store.pointer]))
     out.extend(filter(None, [frame.cells_title, frame.left_title, frame.right_title,
                              frame.value, frame.caption, frame.note]))
     return [str(x) for x in out if str(x).strip()]
@@ -1143,7 +1154,8 @@ def check_frames_progress(unit: ShortUnit) -> GraderResult:
     # the accent sits. Two frames with the same labels and a different accent are
     # the same picture with the highlight moved — which is a real thing a beat may
     # do, and is not a new picture.
-    contents = [(f.template, tuple(_frame_labels(f)), tuple(g.icon for g in f.glyphs))
+    contents = [(f.template, tuple(_frame_labels(f)), tuple(g.icon for g in f.glyphs),
+                 _slot_states(f))
                 for f in frames]
     states = [(c, _roles(f)) for c, f in zip(contents, frames)]
 
@@ -1455,6 +1467,18 @@ def _near_same(a, b) -> bool:
         return False
     if tuple(g.icon for g in a.glyphs) != tuple(g.icon for g in b.glyphs):
         return False
+    # A SLOT'S STATE IS PART OF THE PICTURE, not part of the accent. `resting`
+    # draws the item inside the container; `arriving` and `leaving` draw it OUTSIDE
+    # with an arrow. So two frames with identical slot labels can be entirely
+    # different drawings, and comparing labels alone called them the same one.
+    #
+    # Measured on a real stack short: frame 1 showed A, B, C with B leaving from
+    # the middle, and frame 3 showed A, B, C all resting. Same labels, and the
+    # `returns` check reported frame 3 as "the same picture as frame 1", so a short
+    # that had just demonstrated an invalid pop and then shown the settled stack
+    # was failed for revisiting where it started.
+    if _slot_states(a) != _slot_states(b):
+        return False
     la, lb = _frame_labels(a), _frame_labels(b)
     if len(la) != len(lb):
         return False
@@ -1604,6 +1628,20 @@ def check_frames_develop(unit: ShortUnit) -> GraderResult:
                         + (f" ({grew} by adding to it)" if grew else ""))
 
 
+def _slot_states(frame) -> tuple:
+    """Which of a store's slots are resting, arriving or leaving.
+
+    Separate from _roles because these are two different questions and the frame
+    comparisons need them apart: a role says which element is ACCENTED, a state
+    says where the element is DRAWN. Changing an accent is not a new picture;
+    moving an item out of the container is.
+    """
+    store = getattr(frame, "store", None)
+    if store is None:
+        return ()
+    return tuple((slot.label, slot.state) for slot in store.slots)
+
+
 def _roles(frame) -> tuple:
     """Which element is emphasised, across every template that has elements."""
     return (
@@ -1613,6 +1651,11 @@ def _roles(frame) -> tuple:
         tuple((p.role, tuple(i.role for i in p.items)) for p in frame.panels),
         tuple(g.role for g in frame.glyphs),
         tuple(s.role for s in frame.samples),
+        # A store's roles AND its slot states. The state belongs here rather than
+        # with the labels because a frame whose only change is that the top item is
+        # now leaving HAS changed what the viewer sees, and _roles is what
+        # frames_develop compares when the labels are equal.
+        tuple((sl.role, sl.state) for sl in (frame.store.slots if frame.store else ())),
     )
 
 
@@ -1778,16 +1821,29 @@ def check_code_frames_quote_source(unit: ShortUnit,
 #: row, a comparison split across two beats, a process drawn as a still table.
 _RELATIONSHIP_TEMPLATES = {
     # Rule 6: the stages, in order, with the movement between them drawn.
-    "process":       {"flow", "icons", "code", "cause_effect"},
+    # "state" is here and FIRST in intent: a process whose stages are states of one
+    # container — pushing, popping, filling, draining — is drawn by showing the
+    # container in those states, not by a row of boxes naming them.
+    "process":       {"state", "flow", "icons", "code", "cause_effect"},
     # Rule 7: BOTH STATES AT ONCE. A `bar` or a `stat` shows one.
-    "comparison":    {"compare", "preview", "table", "code"},
-    # Rule 8: the thing that moves, where it starts, where it lands.
-    "data_movement": {"icons", "mapping", "flow", "cause_effect"},
+    #
+    # "state" satisfies that rule when the two things compared are PLACES IN ONE
+    # CONTAINER, which is a real and common case rather than a loophole: "the top
+    # slot is reachable and the ones below it are not" is one container with one
+    # slot in hero and the rest in quiet, both on screen, no cut in between. A
+    # `compare` frame would draw the same stack twice to say it.
+    "comparison":    {"compare", "preview", "table", "code", "state"},
+    # Rule 8: the thing that moves, where it starts, where it lands. A `state`
+    # frame draws exactly that when the destination is a place in a container.
+    "data_movement": {"state", "icons", "mapping", "flow", "cause_effect"},
     # Rule 9: spatial hierarchy. A row of peers is the thing being rejected.
     "hierarchy":     {"hierarchy", "split", "code"},
     # Rule 10: cause and effect both on screen, direction drawn.
     "cause_effect":  {"cause_effect", "flow", "compare", "code"},
-    "structure":     {"split", "bar", "table", "mapping", "code", "hierarchy", "icons"},
+    # `state` earns a place here for the STILL case: a container with its slots and
+    # its index, nothing moving, is a picture of how the thing is arranged.
+    "structure":     {"split", "bar", "table", "mapping", "code", "hierarchy",
+                      "icons", "state"},
     "effect":        {"preview", "code", "compare"},
     "quantity":      {"stat", "bar", "table"},
 }
@@ -1892,6 +1948,12 @@ def check_one_hero_per_frame(unit: ShortUnit) -> GraderResult:
             ("panels", [p.role for p in frame.panels]),
             ("cause/effect", [c.role for c in (frame.cause, frame.effect)
                               if c is not None]),
+            # OCCUPIED slots only. An empty slot carries "plain" by default and is
+            # not a candidate for the accent, so counting them would make a store
+            # with two items and four empty places look like it has plenty of
+            # unaccented elements when in fact both of its items are lit.
+            ("slots", [sl.role for sl in (frame.store.slots if frame.store else ())
+                       if sl.label]),
         ]
         for i, panel in enumerate(frame.panels, 1):
             collections.append((f"panel {i} items", [c.role for c in panel.items]))

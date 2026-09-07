@@ -659,6 +659,67 @@ class Cell(BaseModel):
     role: Role = "plain"
 
 
+class Slot(BaseModel):
+    """One position in a Store — occupied or empty, and possibly in motion.
+
+    A SLOT IS A PLACE, NOT A LABEL, and that distinction is the whole reason this
+    model exists. Every other container in this schema is a list of Cells, which
+    are labels in boxes, so the only way to draw a stack was three boxes reading
+    "Push 1", "Push 2", "Push 3" — the words doing the work a picture should do.
+    A slot is a place that may hold something, so an EMPTY one is drawable and a
+    full one is drawable and the difference between two frames can be that
+    something moved between them.
+    """
+    #: What occupies this slot. EMPTY STRING MEANS EMPTY, and it is drawn — an
+    #: empty slot is how a viewer sees there is room, which is half of what a
+    #: stack, a queue or a page table is about.
+    label: str = ""
+    role: Role = "plain"
+
+    #: Where this slot's contents are in the movement the beat describes.
+    #:
+    #: "resting"  sitting in the container.
+    #: "arriving" entering it on this beat — drawn OUTSIDE the container's open end
+    #:            with an arrow in, and animated travelling along that arrow.
+    #: "leaving"  being removed on this beat — drawn outside with the arrow out.
+    #:
+    #: This is the field that makes a concept HAPPEN rather than be labelled. A
+    #: push is a slot marked arriving; a pop is the top slot marked leaving.
+    state: Literal["resting", "arriving", "leaving"] = "resting"
+
+
+class Store(BaseModel):
+    """A container of slots, with an optional index pointing into it.
+
+    ONE SHAPE FOR EVERY CONCEPT THAT HOLDS THINGS: a stack (vertical, open at the
+    top, pointer at the top slot), a queue (horizontal, pointers at both ends), an
+    array or page table (horizontal, closed, indexed), a set of memory frames (a
+    page arriving into a free one). Adding a template per data structure would be
+    ten templates that differ by their labels; this is the one they have in common.
+    """
+    #: The container's own name — "Stack", "Frames", "Queue". Not a sentence.
+    label: str = ""
+
+    #: Vertical grows upward from the base, which is what a stack does. Horizontal
+    #: runs left to right from index 0, which is what an array or a queue does.
+    orientation: Literal["vertical", "horizontal"] = "vertical"
+
+    slots: list[Slot] = Field(default_factory=list)
+
+    #: The index marker: what it is called, and which slot it points at.
+    #:
+    #: `pointer_at` may be -1, and that is not an error — it is how an empty stack
+    #: is drawn, with `top = -1` marking the space below the base. A pointer that
+    #: names a position outside the slots is drawn at the nearest edge rather than
+    #: dropped, because "past the end" is a real state a viewer needs to see.
+    pointer: Optional[str] = None
+    pointer_at: Optional[int] = None
+
+    #: Draw the container open at the end things enter by — three sides, not four.
+    #: True for a stack or a queue, False for a fixed array whose ends are its own.
+    open_end: bool = True
+
+
 class TableRow(BaseModel):
     cells: list[str] = Field(default_factory=list)
     role: Role = "plain"
@@ -831,7 +892,7 @@ class Frame(BaseModel):
     #: output/ still load and can be re-rendered.
     template: Literal["bar", "mapping", "split", "flow", "table", "stat",
                       "code", "compare", "preview", "icons",
-                      "hierarchy", "cause_effect", "takeaway"]
+                      "hierarchy", "cause_effect", "state", "takeaway"]
     title: str = ""
     #: LEGACY, and no longer drawn. This was "the one supporting line under the
     #: diagram", and what the model actually put in it was the sentence being
@@ -900,6 +961,11 @@ class Frame(BaseModel):
     #: was drawn as four peers side by side. The arrangement said the opposite of
     #: the concept, and only the reading order of the labels carried the truth.
     levels: list[Cell] = Field(default_factory=list)
+
+    #: The `state` template's container. See Store and Slot: this is the only field
+    #: in the Frame that can express a thing HAPPENING rather than a thing being
+    #: named, so it is what a process or a state change should be drawn with.
+    store: Optional[Store] = None
 
     #: cause_effect — the thing that makes something happen, and what happens.
     #:

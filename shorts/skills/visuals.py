@@ -91,14 +91,20 @@ because the strategy is what the rendered frame is graded against afterwards.
 
 `relationship` NARROWS THE TEMPLATE, AND IT IS THE FASTEST WAY TO THE RIGHT SHAPE:
 
-  process        -> "flow", or "icons" with arrows=true. Rule 6: the stages are
+  process        -> "state" WHEN THE STAGES ARE STATES OF ONE CONTAINER, otherwise
+                    "flow", or "icons" with arrows=true. Rule 6: the stages are
                     drawn in order and the movement between them is on screen.
+                    Pushing, popping, filling, draining, a buffer emptying — all
+                    of those are one thing in successive states, and "state" draws
+                    the thing in those states instead of naming the stages.
   comparison     -> "compare". Rule 7: BOTH STATES AT ONCE, side by side. Never
                     two beats showing one side each — a difference the viewer has
                     to hold in memory across a cut is a difference they did not
                     see.
-  data_movement  -> "icons" with arrows=true, or "mapping". Rule 8: the thing that
-                    moves, where it starts, where it lands, and the path between.
+  data_movement  -> "state" WHEN WHAT IT MOVES INTO IS A PLACE IN A CONTAINER (a
+                    page into a free frame, a value into a slot), otherwise "icons"
+                    with arrows=true, or "mapping". Rule 8: the thing that moves,
+                    where it starts, where it lands, and the path between.
   hierarchy      -> "hierarchy". Rule 9: levels stacked, or boxes inside boxes, so
                     the structure is in the ARRANGEMENT. A hierarchy drawn as a
                     flat row is a hierarchy the viewer cannot see.
@@ -281,6 +287,8 @@ things are exactly what a diagram is for:
   a number, size or range         -> a "stat" frame
   two named alternatives          -> a "compare" frame
   a structure, layout or sequence -> "split", "bar", "flow", "mapping"
+  a container that HOLDS things   -> "state": a stack, a queue, an array, a set of
+                                     frames, and anything entering or leaving one
 
 Take the first row that fits before the later ones. A document about how text looks
 is best drawn by showing the text; its code block is the SECOND-best picture of it,
@@ -362,6 +370,67 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
              term set large is the takeaway card this brief already removed, wearing
              a different template name. If your beat has no figure in it, this is
              not your template — draw the thing.
+  "state"    A CONTAINER OF SLOTS, an index pointing into it, and something in the
+             act of arriving or leaving. THIS IS THE ONE TEMPLATE THAT SHOWS A
+             CONCEPT HAPPENING rather than naming it, and it is the right answer far
+             more often than its novelty suggests.
+
+             Use it for anything that HOLDS things and CHANGES: a stack, a queue,
+             an array, a page table, a set of memory frames, a buffer.
+
+             Fill `store`:
+               label         the container's name — "Stack", "Frames". Not a
+                             sentence.
+               orientation   "vertical" grows upward from a base, which is what a
+                             stack does. "horizontal" runs left to right from index
+                             0, which is what an array or a queue does.
+               slots         the places, IN ORDER. A slot with an empty label is an
+                             EMPTY PLACE and is drawn as one — do not omit them,
+                             because the free room is half of what the viewer needs
+                             to see. "Nowhere to push" is only visible if the
+                             places are visible.
+               pointer       the index's name AS IT WOULD BE WRITTEN — "top = 2",
+                             "head", "frame 2".
+               pointer_at    which slot it marks. -1 IS CORRECT AND MEANINGFUL for
+                             an empty stack: it draws below the base, which is how
+                             `top = -1` states itself.
+               open_end      true for a stack or a queue, which are entered past an
+                             end. false for a fixed array or a set of frames, whose
+                             ends are their own and which are entered from outside
+                             straight into one slot.
+
+             AND SET A SLOT'S `state` WHEN THE BEAT IS ABOUT MOVEMENT:
+               "arriving"  it is entering on THIS beat. Drawn outside the container
+                           with an arrow in, and animated travelling along it.
+               "leaving"   it is being removed on this beat. Drawn outside, arrow
+                           out.
+             A push is one slot marked arriving. A pop is the top slot marked
+             leaving. THIS IS THE FIELD THAT MAKES THE CONCEPT HAPPEN — a stack
+             short whose beats are four boxes reading "Push 1", "Push 2" has
+             labelled the operations instead of performing them, and that is the
+             defect this template exists to end.
+
+             THE MOVING SLOT IS THE FRAME'S HERO. Whatever is arriving or leaving is
+             what the beat is about, so give it role "hero" and let the resting
+             items carry "plain". Do NOT reach for "lost" for a departing item: lost
+             means wasted, rejected or unusable, and a popped value is none of those
+             — it is the answer the beat is delivering. Reserve "lost" for a real
+             failure, such as a push that cannot happen because the store is full.
+
+             AND IF THE MOVE ITSELF IS THE INVALID ONE — a pop from the middle, a
+             push into a full store — then "lost" IS right for it, and the frame
+             still needs a hero somewhere: mark the slot the operation IS allowed
+             on. That contrast is the whole picture. "Why can't pop take from the
+             middle?" is a middle slot leaving in "lost" beside the top slot in
+             "hero", and a viewer reads the rule off the two of them without a
+             word of narration. A frame with a lost item and nothing lit says only
+             that something is wrong, not what is right instead.
+
+             ACROSS BEATS, KEEP THE STORE AND CHANGE ITS CONTENTS. Beat 2 pushes,
+             beat 3 pushes again, beat 4 pops: the same container, three different
+             states of it. That is a developing composition and it is what
+             frames_progress rewards.
+
   "code"     A code or markup snippet on a dark editor panel, one line lit. RIGHT
              WHEN THE CODE IS THE LEARNING OBJECTIVE — its syntax, its structure or
              what it does when it runs.

@@ -1,0 +1,131 @@
+{
+  "short_id": "state_named_not_shown",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "What happens to the items as you push and pop a stack?",
+  "estimated_seconds": 28.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What happens to the items as you push and pop a stack?",
+      "on_screen": "Stack",
+      "visual_ref": "q_stack"
+    },
+    {
+      "speaker": "student",
+      "line": "Pushing puts the first item into the slot the index moves to.",
+      "on_screen": "Step 1",
+      "visual_ref": "d_push_a",
+      "source_quote": "Pushing places a new item on top of the items already there"
+    },
+    {
+      "speaker": "student",
+      "line": "Each push lands on the slot above, and the index follows it upward.",
+      "on_screen": "Step 2",
+      "visual_ref": "d_push_c",
+      "source_quote": "Pushing places a new item on top of the items already there"
+    },
+    {
+      "speaker": "student",
+      "line": "Popping takes the top item away and leaves the rest untouched.",
+      "on_screen": "Step 3",
+      "visual_ref": "d_pop",
+      "source_quote": "Pushing places a new item on top of the items already there"
+    }
+  ],
+  "visuals": {
+    "q_stack": {
+      "ref": "q_stack",
+      "type": "diagram",
+      "spec": "state q_stack",
+      "frame": {
+        "template": "bar",
+        "title": "Stack operations",
+        "cells": [
+          {
+            "label": "Push",
+            "role": "hero"
+          },
+          {
+            "label": "Pop",
+            "role": "plain"
+          },
+          {
+            "label": "Top",
+            "role": "plain"
+          }
+        ]
+      }
+    },
+    "d_push_a": {
+      "ref": "d_push_a",
+      "type": "diagram",
+      "spec": "state d_push_a",
+      "frame": {
+        "template": "bar",
+        "title": "Stack operations",
+        "cells": [
+          {
+            "label": "Push",
+            "role": "plain"
+          },
+          {
+            "label": "Pop",
+            "role": "hero"
+          },
+          {
+            "label": "Top",
+            "role": "plain"
+          }
+        ]
+      }
+    },
+    "d_push_c": {
+      "ref": "d_push_c",
+      "type": "diagram",
+      "spec": "state d_push_c",
+      "frame": {
+        "template": "bar",
+        "title": "Stack operations",
+        "cells": [
+          {
+            "label": "Push",
+            "role": "plain"
+          },
+          {
+            "label": "Pop",
+            "role": "plain"
+          },
+          {
+            "label": "Top",
+            "role": "hero"
+          }
+        ]
+      }
+    },
+    "d_pop": {
+      "ref": "d_pop",
+      "type": "diagram",
+      "spec": "state d_pop",
+      "frame": {
+        "template": "bar",
+        "title": "Stack operations",
+        "cells": [
+          {
+            "label": "Push",
+            "role": "hero"
+          },
+          {
+            "label": "Pop",
+            "role": "plain"
+          },
+          {
+            "label": "Top",
+            "role": "plain"
+          }
+        ]
+      }
+    }
+  },
+  "status": "draft"
+}

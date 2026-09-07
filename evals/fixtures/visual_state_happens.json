@@ -1,0 +1,191 @@
+{
+  "short_id": "state_happens",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "What happens to the items as you push and pop a stack?",
+  "estimated_seconds": 28.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What happens to the items as you push and pop a stack?",
+      "on_screen": "Stack",
+      "visual_ref": "q_stack"
+    },
+    {
+      "speaker": "student",
+      "line": "Pushing puts the first item into the slot the index moves to.",
+      "on_screen": "Step 1",
+      "visual_ref": "d_push_a",
+      "source_quote": "Pushing places a new item on top of the items already there"
+    },
+    {
+      "speaker": "student",
+      "line": "Each push lands on the slot above, and the index follows it upward.",
+      "on_screen": "Step 2",
+      "visual_ref": "d_push_c",
+      "source_quote": "Pushing places a new item on top of the items already there"
+    },
+    {
+      "speaker": "student",
+      "line": "Popping takes the top item away and leaves the rest untouched.",
+      "on_screen": "Step 3",
+      "visual_ref": "d_pop",
+      "source_quote": "Pushing places a new item on top of the items already there"
+    }
+  ],
+  "visuals": {
+    "q_stack": {
+      "ref": "q_stack",
+      "type": "diagram",
+      "spec": "state q_stack",
+      "frame": {
+        "template": "state",
+        "title": "An empty stack",
+        "store": {
+          "label": "Stack",
+          "orientation": "vertical",
+          "slots": [
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            }
+          ],
+          "pointer": "top = -1",
+          "pointer_at": -1,
+          "open_end": true
+        }
+      }
+    },
+    "d_push_a": {
+      "ref": "d_push_a",
+      "type": "diagram",
+      "spec": "state d_push_a",
+      "frame": {
+        "template": "state",
+        "title": "Push A",
+        "store": {
+          "label": "Stack",
+          "orientation": "vertical",
+          "slots": [
+            {
+              "label": "A",
+              "role": "hero",
+              "state": "arriving"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            }
+          ],
+          "pointer": "top = 0",
+          "pointer_at": 0,
+          "open_end": true
+        }
+      }
+    },
+    "d_push_c": {
+      "ref": "d_push_c",
+      "type": "diagram",
+      "spec": "state d_push_c",
+      "frame": {
+        "template": "state",
+        "title": "Push C",
+        "store": {
+          "label": "Stack",
+          "orientation": "vertical",
+          "slots": [
+            {
+              "label": "A",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "B",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "C",
+              "role": "hero",
+              "state": "arriving"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            }
+          ],
+          "pointer": "top = 2",
+          "pointer_at": 2,
+          "open_end": true
+        }
+      }
+    },
+    "d_pop": {
+      "ref": "d_pop",
+      "type": "diagram",
+      "spec": "state d_pop",
+      "frame": {
+        "template": "state",
+        "title": "Pop returns C",
+        "store": {
+          "label": "Stack",
+          "orientation": "vertical",
+          "slots": [
+            {
+              "label": "A",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "B",
+              "role": "plain",
+              "state": "resting"
+            },
+            {
+              "label": "C",
+              "role": "hero",
+              "state": "leaving"
+            },
+            {
+              "label": "",
+              "role": "plain",
+              "state": "resting"
+            }
+          ],
+          "pointer": "top = 1",
+          "pointer_at": 1,
+          "open_end": true
+        }
+      }
+    }
+  },
+  "status": "draft"
+}

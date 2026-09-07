@@ -1037,6 +1037,57 @@ cases:
       relationship_by_ref:
         d_handler_steps: [process, data_movement]
 
+  - id: E062
+    name: A mechanism concept is not drawn as code just because the section has code
+    why: >
+      THE CODE-FIRST RULE THIS FREEZES OUT. The design brief used to route on the
+      source form — "the material teaches it with code -> code" — and stated that a
+      code frame "beats a paraphrase of it in any shape, because it is the thing
+      itself", with the template catalogue adding that a relevant code block made
+      code "ALMOST ALWAYS THE RIGHT TEMPLATE".
+
+      That is a fidelity argument, and fidelity is not what a frame is for. It made
+      the presence of a snippet decide the picture, so a short about how a stack
+      works showed push() and pop() rather than items entering and leaving a stack.
+
+      Section 6.1 of the fixture material is written to trigger exactly that: it
+      teaches the push/pop MECHANISM and it contains a Python code block. The brief
+      now works down an objective-first order, so at most one beat may spend itself
+      on the snippet as supporting evidence.
+
+      Two calls, so it runs under --judge with the other golden cases. E063 is the
+      guard on the other side.
+    type: golden
+    step: visuals
+    input: evals/fixtures/code_vs_concept.md
+    section_id: "6.1"
+    fixture: evals/fixtures/objective_is_mechanism.json
+    expect:
+      template_at_most:
+        code: 1
+
+  - id: E063
+    name: Code IS the primary visual when the code is the learning objective
+    why: >
+      The guard on E062, and the reason that fix is a re-ordering rather than a ban.
+      Level 5 of the brief's order is code as the primary visual, and it is right
+      whenever the thing the student must understand is the code's syntax, its
+      structure, or what it does when it runs.
+
+      Section 6.2 asks how a CSS declaration is written part by part — the property,
+      the colon, the value, the semicolon, and when quotation marks are required.
+      The syntax IS the objective, so a code frame is not a shortcut here, it is the
+      only honest picture. If this ever comes back with no code frame, the
+      objective-first ordering has been over-applied into a ban and shorts that
+      really are about syntax will be drawn as paraphrases of it.
+    type: golden
+    step: visuals
+    input: evals/fixtures/code_vs_concept.md
+    section_id: "6.2"
+    fixture: evals/fixtures/objective_is_syntax.json
+    expect:
+      template_includes: [code]
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

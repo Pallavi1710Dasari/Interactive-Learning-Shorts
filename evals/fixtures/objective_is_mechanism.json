@@ -1,0 +1,33 @@
+{
+  "short_id": "stack_mechanism",
+  "question": "What happens to the items in a stack when you push and then pop?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What happens to the items in a stack when you push and then pop?",
+      "on_screen": "Push then pop",
+      "visual_ref": "q_stack"
+    },
+    {
+      "speaker": "student",
+      "line": "Pushing places a new item on top of the items already there.",
+      "on_screen": "A new item on top",
+      "visual_ref": "d_push",
+      "source_quote": "Pushing places a new item on top of the items already there"
+    },
+    {
+      "speaker": "student",
+      "line": "Popping takes the top item away and leaves the rest untouched.",
+      "on_screen": "The top item leaves",
+      "visual_ref": "d_pop",
+      "source_quote": "popping takes the top item away and leaves the rest untouched"
+    },
+    {
+      "speaker": "student",
+      "line": "So pushing A then B then C leaves C on top, and the next pop returns C.",
+      "on_screen": "C comes back first",
+      "visual_ref": "d_order",
+      "source_quote": "Pushing A then B then C leaves C on top, so the next pop returns C and leaves B reachable underneath."
+    }
+  ]
+}

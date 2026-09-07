@@ -108,9 +108,11 @@ because the strategy is what the rendered frame is graded against afterwards.
   effect         -> "preview". Rule 3 at its strongest: the picture IS the answer.
   quantity       -> "stat".
 
-Take that mapping unless the material gives you something better, and the one
-thing that IS better is the document's own artifact: a "code" frame of the rule
-being taught beats a paraphrase of it in any shape, because it is the thing itself.
+Take that mapping. The material can give you better WORDS for a frame — its real
+values, its real selectors, its real numbers, and you should always prefer those to
+a paraphrase — but it does not give you a better SHAPE. In particular the presence
+of a code block is not a reason to draw a code frame: see WHAT DECIDES IS THE
+LEARNING OBJECTIVE below, which is the order to work down.
 
 BUT "DEVELOP" MEANS SOMETHING CHANGES. RECOLOURING ONE CELL IS NOT A NEW FRAME.
 This is the defect to avoid, and it is the one that gets complained about:
@@ -272,7 +274,9 @@ things are exactly what a diagram is for:
 
   a style, or anything VISUAL     -> a "preview" frame showing the real effect
   named things and what links them-> an "icons" frame of drawn pictograms
-  a code block or markup snippet  -> a "code" frame, the lines COPIED VERBATIM
+  code, WHEN THE CODE IS THE POINT   -> a "code" frame, the lines COPIED VERBATIM
+    (when the code is only how the material happens to state a mechanism, draw the
+     mechanism and keep the snippet for a supporting beat)
   a table of values               -> a "table" frame with the real values in it
   a number, size or range         -> a "stat" frame
   two named alternatives          -> a "compare" frame
@@ -358,12 +362,16 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
              term set large is the takeaway card this brief already removed, wearing
              a different template name. If your beat has no figure in it, this is
              not your template — draw the thing.
-  "code"     A code or markup snippet on a dark editor panel, one line lit. For any
-             material that teaches through code — CSS rules, HTML markup, a
-             command, a config. IF THE SECTION CONTAINS A CODE BLOCK RELEVANT TO
-             THE QUESTION, THIS IS ALMOST ALWAYS THE RIGHT TEMPLATE, and it is the
-             one that was missing while these shorts were coming out as walls of
-             text.
+  "code"     A code or markup snippet on a dark editor panel, one line lit. RIGHT
+             WHEN THE CODE IS THE LEARNING OBJECTIVE — its syntax, its structure or
+             what it does when it runs.
+             It used to say that a relevant code block in the section made this
+             "almost always the right template". That sentence was written when
+             these shorts were coming out as walls of prose, and it over-corrected:
+             a snippet in the material became a reason to draw code even when the
+             concept was a mechanism the code merely expressed. A stack short drew
+             push() and pop() instead of a stack. Use the objective test under
+             WHAT DECIDES IS THE LEARNING OBJECTIVE, not the section's contents.
              -> code_lines: up to 7, each {label, role}. `label` is ONE LINE of
                 code, copied from the material verbatim, KEEPING ITS LEADING
                 SPACES — indentation is drawn, so `  font-family: "Roboto";` nests
@@ -545,14 +553,50 @@ Ask what the sentence CLAIMS, and the template follows:
   two alternatives weighed against each  -> "compare"
   how something LOOKS, or a style        -> "preview"
   things, and what passes between them   -> "icons"
-  the material teaches it with code      -> "code"
+  the code's own syntax/structure/execution -> "code"  (see the test below)
   a single figure is the whole point     -> "stat"
   one thing sits on top of / inside another -> "hierarchy"
   this MAKES that happen                 -> "cause_effect"
 
-Work down that list in order of how CONCRETE the frame ends up. A "code" frame of
-the document's own rule beats a "flow" of your paraphrase of it every time, because
-one is the thing itself and the other is a description of the thing.
+WHAT DECIDES IS THE LEARNING OBJECTIVE, NOT WHAT THE SOURCE HAPPENS TO CONTAIN.
+This list used to end "the material teaches it with code -> code", and say that a
+code frame beat a drawing of the mechanism every time because code is "the thing
+itself". That is a FIDELITY argument, and fidelity is not what a frame is for. It
+made the presence of a snippet in the section decide the picture, so a short about
+how a stack works showed push() and pop() instead of items entering and leaving a
+stack, and a short about flexbox showed CSS properties instead of elements moving
+inside a container. Both are faithful. Neither teaches the concept.
+
+So work down THIS order, and stop at the first one the beat's concept fits:
+
+  1. THE MECHANISM OR CONCEPT ITSELF — what the thing does, drawn. Items entering
+     and leaving a stack. An address being cut in two. A page arriving in a frame.
+  2. THE RELATIONSHIP OR STATE CHANGE — the same subject before and after, or the
+     two things and what passes between them.
+  3. A DIAGRAM OR WORKED EXAMPLE — the section's own values placed in a shape that
+     shows what they do.
+  4. CODE AS SUPPORTING EVIDENCE — a snippet shown BESIDE the concept, or on one
+     beat of several, to ground what the other frames have already explained.
+  5. CODE AS THE PRIMARY VISUAL — only when the code ITSELF is what the student has
+     to learn.
+
+LEVEL 5 HAS A TEST, AND IT IS ABOUT THE BEAT, NOT THE SECTION. Ask: is the thing
+the student must end up understanding the code's SYNTAX, its STRUCTURE, or its
+EXECUTION?
+
+  YES -> "code" is right, and nothing else will do.
+         "Which part of `font-family: \"Roboto\"` is the value?" — syntax.
+         "Why is the closing brace on its own line?" — structure.
+         "What does this loop leave in `total` after three passes?" — execution.
+  NO  -> the code is evidence for something else, and something else is the frame.
+         "How does a stack work?" — the concept is the container and its items.
+         "What does the specificity score mean?" — the concept is the comparison.
+         In these, a snippet may appear on ONE beat as level 4. It may not be the
+         picture the short is built from.
+
+If the answer is no and you still want a code frame, you have chosen the shape
+because the material was convenient rather than because it teaches. Draw the
+mechanism and let the code support it.
 
 The commonest wrong choice is "mapping" for something that is really a "split". A
 logical address is NOT a mapping from "logical address" to "page number": it is one
@@ -739,8 +783,11 @@ def spec_visuals(script: Script, section: Section | None = None,
         # beats off it, which is how a frame drifts onto a neighbouring idea.
         user += f"""
 THE READING MATERIAL THIS SHORT CAME FROM — section [{section.section_id}] {section.title}
-Draw from the things this document SHOWS: its code blocks, its tables, its values
-and its numbers, copied exactly. Not from its prose.
+This is where a frame's WORDS come from, not where its SHAPE comes from. Take the
+document's real values, selectors, numbers and lines — copied exactly, never
+paraphrased — and put them in whatever shape the beat's concept needs. The presence
+of a code block here is not a reason to draw a code frame; see WHAT DECIDES IS THE
+LEARNING OBJECTIVE in the brief above.
 ---
 {section.text}
 ---

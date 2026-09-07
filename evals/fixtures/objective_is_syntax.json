@@ -1,0 +1,33 @@
+{
+  "short_id": "declaration_syntax",
+  "question": "How is a CSS declaration written, part by part?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "How is a CSS declaration written, part by part?",
+      "on_screen": "Parts of a declaration",
+      "visual_ref": "q_syntax"
+    },
+    {
+      "speaker": "student",
+      "line": "A declaration is a property, a colon, a value, and a semicolon, in that order.",
+      "on_screen": "Property, colon, value",
+      "visual_ref": "d_parts",
+      "source_quote": "A CSS declaration is written as a property, a colon, a value, and a semicolon, in that order."
+    },
+    {
+      "speaker": "student",
+      "line": "Here `font-family` is the property and the two families after it are the value.",
+      "on_screen": "Property and value",
+      "visual_ref": "d_named",
+      "source_quote": "`font-family` is the property and"
+    },
+    {
+      "speaker": "student",
+      "line": "The quotation marks are required around a family name containing a space.",
+      "on_screen": "Quotes when spaced",
+      "visual_ref": "d_quotes",
+      "source_quote": "The quotation marks are required around a family name containing a space"
+    }
+  ]
+}

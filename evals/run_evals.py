@@ -283,6 +283,49 @@ def _run_strategy_case(case: dict, sections) -> tuple[bool, str]:
     return True, ", ".join(f"{r}={g}" for r, g in seen.items())
 
 
+def _run_visuals_case(case: dict, sections) -> tuple[bool, str]:
+    """Which TEMPLATES does the design step pick for this script and section?
+
+    The one behaviour worth freezing here is what decides a code frame. The brief
+    used to route on the source form — "the material teaches it with code" — and
+    said a code frame beat a drawing of the mechanism every time, so a section that
+    happened to contain a snippet got a code-first short whatever it was teaching.
+    A stack short drew push() and pop() instead of a stack.
+
+    Two real calls (strategy, then spec), so it runs under --judge.
+    """
+    from shorts.skills.strategy import plan_strategy
+    from shorts.skills.visuals import spec_visuals
+
+    script = load_script(case["fixture"])
+    own = case.get("input")
+    doc_sections = parse_markdown(ROOT / own) if own else sections
+    sid = case.get("section_id")
+    section = find_section(doc_sections, sid) if sid else None
+
+    strategy = plan_strategy(script, section)
+    visuals = spec_visuals(script, section, strategy=strategy)
+    templates = [v.frame.template for v in visuals.values() if v.frame is not None]
+    if not templates:
+        return False, "the design step returned no frames"
+
+    exp = case["expect"]
+    counts = {t: templates.count(t) for t in sorted(set(templates))}
+    shown = ", ".join(f"{t}x{n}" for t, n in counts.items())
+
+    # "not dominant" rather than "absent": code as ONE supporting beat is level 4 of
+    # the brief's order and explicitly allowed. What is rejected is code carrying
+    # the short.
+    for t, cap in (exp.get("template_at_most") or {}).items():
+        if counts.get(t, 0) > cap:
+            return False, (f"{t} used {counts.get(t)} time(s) of {len(templates)}, "
+                           f"cap is {cap} — got {shown}")
+    for t in (exp.get("template_includes") or []):
+        if counts.get(t, 0) < 1:
+            return False, f"expected at least one {t} frame — got {shown}"
+    return True, shown
+
+
 def run_golden_case(case: dict, sections) -> tuple[bool, str]:
     """A real call to one skill, checked against a frozen expectation.
 
@@ -293,6 +336,8 @@ def run_golden_case(case: dict, sections) -> tuple[bool, str]:
     """
     if case.get("step") == "strategy":
         return _run_strategy_case(case, sections)
+    if case.get("step") == "visuals":
+        return _run_visuals_case(case, sections)
 
     from shorts.skills.select import select_topics
     result = select_topics(sections)

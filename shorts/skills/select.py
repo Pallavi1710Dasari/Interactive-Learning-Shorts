@@ -115,8 +115,10 @@ or four; a topic with only the first is TOO THIN, however central it sounds:
   d. A CORRECTABLE MISCONCEPTION — something the section states that contradicts
      what a learner would assume.
 
-Say which of these the section has, in `depth`: any of "mechanism",
-"consequence", "example", "misconception". Return at least two.
+Weigh these; do not report them. A later step reads the same section in far more
+detail and its reading is what the writer is actually handed, so a second opinion
+recorded here would only be a weaker copy of it. Your job is the gate: enough, or
+not enough.
 
 A DEFINITION IS THE CLASSIC THIN TOPIC. "What is a data type?" is answered by one
 sentence, and stretching that sentence across five beats is exactly the padding
@@ -145,7 +147,6 @@ Output JSON, ordered by importance, highest first:
 {"topics":[{"id":"snake_case_id","topic":"the question this short answers",
 "concept":"the one idea it is about, a short noun phrase",
 "importance":5,
-"depth":["mechanism","consequence","example"],
 "why_it_matters":"one sentence",
 "source_section_id":"exact id from the doc",
 "answer_quote":"the sentence from that section that answers it, copied verbatim",

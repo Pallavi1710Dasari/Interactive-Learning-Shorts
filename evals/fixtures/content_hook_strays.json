@@ -1,0 +1,55 @@
+{
+  "understanding": {
+    "section_id": "3.1",
+    "core_idea": "Paging removes the requirement for contiguity, so scattered free frames become usable and external fragmentation disappears.",
+    "teaching_sequence": [
+      {
+        "concept": "Contiguous allocation needs one unbroken block",
+        "purpose": "Establish the constraint",
+        "explanation_goal": "Learner understands what contiguity requires"
+      },
+      {
+        "concept": "External fragmentation",
+        "purpose": "Show what the constraint costs",
+        "explanation_goal": "Learner understands why free memory becomes unusable"
+      },
+      {
+        "concept": "Fixed-size frames and pages",
+        "purpose": "Show the fix",
+        "explanation_goal": "Learner understands that any page may go in any free frame"
+      }
+    ],
+    "hook_plan": {
+      "kind": "problem",
+      "hook": "enough total free memory exists, but no single block is large enough",
+      "why_it_matters": "so they see why contiguity is a problem",
+      "leads_into": "paging removes the requirement for contiguity"
+    }
+  },
+  "script": {
+    "short_id": "hook_strays",
+    "question": "Enough free memory exists, but no single block is large enough. Why?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "Enough free memory exists, but no single block is large enough. Why?",
+        "on_screen": "Enough free memory exists, but no",
+        "visual_ref": "v_q"
+      },
+      {
+        "speaker": "student",
+        "line": "Contiguous allocation forces every process to occupy one unbroken block.",
+        "on_screen": "Contiguous allocation forces every process to",
+        "visual_ref": "v_1",
+        "source_quote": "Contiguous allocation forces every process to occupy one unbroken block of"
+      },
+      {
+        "speaker": "student",
+        "line": "That constraint applies to every process the system loads.",
+        "on_screen": "That constraint applies to every process",
+        "visual_ref": "v_2",
+        "source_quote": "Over time this produces external fragmentation: enough total"
+      }
+    ]
+  }
+}

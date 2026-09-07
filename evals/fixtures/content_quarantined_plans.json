@@ -1,0 +1,57 @@
+{
+  "understanding": {
+    "section_id": "3.1",
+    "core_idea": "Paging removes the requirement for contiguity, so scattered free frames become usable and external fragmentation disappears.",
+    "teaching_sequence": [],
+    "example_plan": null,
+    "confusion_plan": null,
+    "hook_plan": null
+  },
+  "script": {
+    "short_id": "quarantined",
+    "question": "Why does an operating system use paging instead of contiguous allocation?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "Why does an operating system use paging instead of contiguous allocation?",
+        "on_screen": "Paging vs contiguous",
+        "visual_ref": "q_paging"
+      },
+      {
+        "speaker": "student",
+        "line": "Contiguous allocation forces every single process to occupy one unbroken block of physical memory.",
+        "on_screen": "One unbroken block",
+        "visual_ref": "d_contiguous",
+        "source_quote": "Contiguous allocation forces every process to occupy one unbroken block of physical memory."
+      },
+      {
+        "speaker": "student",
+        "line": "Over time that produces external fragmentation: enough total free memory exists, but no single block is large enough.",
+        "on_screen": "External fragmentation",
+        "visual_ref": "d_fragment",
+        "source_quote": "Over time this produces external fragmentation: enough total free memory exists, but no single block is large enough."
+      },
+      {
+        "speaker": "student",
+        "line": "Paging removes that requirement for contiguity, and that single change is what fixes the problem.",
+        "on_screen": "Contiguity removed",
+        "visual_ref": "d_removes",
+        "source_quote": "Paging removes the requirement for contiguity."
+      },
+      {
+        "speaker": "student",
+        "line": "Memory is divided into fixed-size frames and the logical address space into pages of the same size.",
+        "on_screen": "Frames and pages",
+        "visual_ref": "d_divide",
+        "source_quote": "Physical memory is divided into fixed-size frames and the logical address space is divided into pages of the same size."
+      },
+      {
+        "speaker": "student",
+        "line": "So any page may be placed in any free frame, which makes the scattered gaps usable.",
+        "on_screen": "Any page, any frame",
+        "visual_ref": "d_anyframe",
+        "source_quote": "Any page may be placed in any free frame."
+      }
+    ]
+  }
+}

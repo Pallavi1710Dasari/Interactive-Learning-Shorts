@@ -87,7 +87,7 @@ This runs offline. No API key needed, no cost. You should see five numbered step
 doc's own sentences (see `shorts/stubs.py`). It costs nothing and needs no keys:
 
 ```bash
-SHORTS_STUB=1 python -m shorts.run content/session_18_paging.md --limit 1 --no-tts --no-svg
+SHORTS_STUB=1 python -m shorts.run content/css_specificity.md --limit 1 --no-tts --no-svg
 ```
 
 Every grader should pass, because the stub scripts are assembled from real source
@@ -482,12 +482,23 @@ raise: the extra seconds become more beats, never longer ones, so every beat is
 still one idea with one picture. E029 is the regression guard — it is the old
 26-second known-good script, and its job is now to fail.
 
-**This needs richer reading material than the sample document.** Every section in
-`content/session_18_paging.md` is 47–78 words, and 35–50 seconds of narration is
-87–125 words. Those sections cannot fill the window honestly, which is the correct
-outcome: select's depth test will drop most of them. `stubs.py` is the one place
-that pads deliberately to reach the floor, because its only job is to exercise
-plumbing for free.
+**This needs richer reading material than `session_18_paging.md`.** Every section
+in that file is 47–78 words, and 35–50 seconds of narration is 87–125 words across
+4–5 beats that each have to say something new. Those sections cannot fill the
+window honestly — and two graders now say so independently: `plan_depth` flags the
+reading before a word is written, and `no_repetition` rejects the beats that would
+result. That is the correct outcome, not a regression.
+
+`content/css_specificity.md` is sized for the window (sections of 123–138 words,
+5–7 sentences each, with a literal worked example and a correctable misconception
+in each) and is what the free offline run points at:
+
+```bash
+SHORTS_STUB=1 python -m shorts.run content/css_specificity.md --limit 1 --no-tts --no-svg
+```
+
+Run it against `session_18_paging.md` and it fails timing. That is the document
+being too thin, and it is what a thin document is supposed to do now.
 
 Two graders keep the pressure off:
 

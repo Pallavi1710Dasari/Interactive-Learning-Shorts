@@ -9,11 +9,20 @@ review step is interactive: you cannot regenerate one answer from a batch script
 
 Cost shape, worth knowing before clicking:
   POST /api/material   1 LLM call  (topic selection)
-  POST /api/script     1 call per script, + up to 3 on the grader retry loop
+  POST /api/script     1 understanding call per SECTION (cached, shared)
+                       + 1 call per script, + up to 3 on the grader retry loop
+                       + 1 judge call per script that passes the free graders
   POST /api/regenerate 1 call
   POST /api/finalize   1 call per diagram + 1 judge call per short  <- the expensive one
 
 So Step 2 is cheap and Step 3 is not. Only finalize what a human approved.
+
+THE JUDGE NOW RUNS AT REVIEW TOO, which is the one line of this shape that moved.
+The free graders say whether a script is well FORMED; only the judge says whether
+it is TRUE, and it used to run after the human had already approved. A reviewer
+looking at a row of green chips and reading them as "correct" was making the
+obvious mistake, and the information to correct them already existed one step too
+late. Set JUDGE_AT_REVIEW=0 to go back to the old shape.
 """
 import json, os, re, shutil, threading, uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -29,10 +38,11 @@ from .schema import Script, Topic, Section, ShortUnit
 from .parse import parse_markdown, find_section
 from .skills.select import select_topics_with_notes
 from .skills.script import write_script
+from .skills.understanding import understanding_for
 from .skills.visuals import design_visuals, render_diagrams
 from . import raster
 from .skills.audit import judge_script
-from . import checks, config, feed, usage, voice
+from . import checks, config, feed, revision, usage, voice
 
 app = FastAPI(title="Interactive Learning Shorts")
 usage.load()   # cumulative across restarts
@@ -115,9 +125,65 @@ def _sections(doc_id: str) -> list[Section]:
     return parse_markdown(_doc_path(doc_id))
 
 
-def _graders(script: Script, section: Section, doc_text: str | None = None) -> list[dict]:
-    return [{"name": r.name, "passed": r.passed, "reason": r.reason}
-            for r in checks.run_script_graders(script, section.text, doc_text=doc_text)]
+def _graders(script: Script, section: Section, doc_text: str | None = None,
+             understanding=None) -> list[dict]:
+    """The grader chips the review UI shows, as plain dicts.
+
+    `understanding` is threaded through rather than looked up here, and that is the
+    whole point: every endpoint below reads the section ONCE outside its retry loop
+    and passes the same object to write_script and to this, so an attempt is graded
+    against the plan it was actually given. Omitting it — as the callers that have
+    no understanding do — simply leaves the alignment check out of the list.
+    """
+    return _chips(_grade(script, section, doc_text, understanding=understanding))
+
+
+def _grade(script: Script, section: Section, doc_text: str | None = None,
+           understanding=None):
+    """The raw GraderResults. The retry loops need these, not the chips.
+
+    revision.route reads GraderResult.details to tell a grader that SKIPPED from one
+    that passed — a distinction the UI dicts drop, and the one that decides whether
+    an area is reported as working or left out of the revision brief entirely.
+    """
+    return checks.run_script_graders(script, section.text, doc_text=doc_text,
+                                     understanding=understanding)
+
+
+def _chips(results) -> list[dict]:
+    """Grader verdicts flattened for the review UI. Unchanged shape."""
+    return [{"name": r.name, "passed": r.passed, "reason": r.reason} for r in results]
+
+
+def _review_judge(script: Script, section: Section, results) -> dict | None:
+    """The judge's verdict on a drafted script, for the reviewer to see BEFORE approving.
+
+    WHY IT IS HERE AND NOT ONLY AT FINALIZE. Every grader that runs for free answers
+    "is this well formed". None of them answers "is this true" — that means holding
+    a claim against its source, which needs a model. A reviewer reading eight green
+    chips is being told the script is well BUILT, and it is the most natural thing
+    in the world to read that as well built AND correct. The judge already knew;
+    it just ran on the far side of the human's decision.
+
+    ONLY WHEN THE FREE GRADERS PASS. There is nothing to ask a paid model about a
+    script already known to be broken, and the reviewer is going to regenerate it
+    anyway. This is the same gate finalize uses.
+
+    NEVER RAISES. A judge that has a bad minute must not cost the reviewer a draft
+    they could otherwise have read — the score is an extra, not a gate.
+    """
+    if not config.JUDGE_AT_REVIEW or script is None:
+        return None
+    if not checks.all_passed(results):
+        return None
+    try:
+        report = judge_script(script, section.text)
+    except Exception as e:
+        print(f"!! review judge {script.short_id}: {type(e).__name__}: {e}")
+        return None
+    return {"faithfulness": report.faithfulness, "clarity": report.clarity,
+            "pace": report.pace, "passed": report.passed,
+            "problems": list(report.problems or [])}
 
 
 def _as_qa(script: Script) -> dict:
@@ -227,18 +293,26 @@ def make_script(body: ScriptIn):
     doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
     feedback, attempts = None, []
     script = None
+    # Once, before the loop — the same rule the CLI follows in run.build_one. The
+    # three attempts differ by a grader's complaint, not by what the section says.
+    understanding = understanding_for(section, document=doc_text)
     for attempt in range(1, 4):
-        script = write_script(body.topic, section, feedback, document=doc_text)
-        graders = _graders(script, section, doc_text)
+        script = write_script(body.topic, section, feedback, document=doc_text,
+                              understanding=understanding)
+        results = _grade(script, section, doc_text, understanding=understanding)
+        graders = _chips(results)
         attempts.append({"attempt": attempt, "graders": graders})
-        if all(g["passed"] for g in graders):
+        if checks.all_passed(results):
             break
-        feedback = "\n".join(f"- {g['name']}: {g['reason']}"
-                             for g in graders if not g["passed"])
+        feedback = revision.feedback_for(results)
+
+    # The judge runs on the attempt that survived, so the reviewer decides with
+    # the same information finalize used to gather afterwards.
+    judge = _review_judge(script, section, results)
 
     return {"topic": body.topic.model_dump(), "section_id": section.section_id,
             "qa": _as_qa(script), "attempts": attempts,
-            "graders": attempts[-1]["graders"],
+            "graders": attempts[-1]["graders"], "judge": judge,
             "usage": usage.since(cursor), "total": usage.totals()}
 
 
@@ -275,21 +349,28 @@ def make_scripts(body: ScriptsIn):
         except KeyError as e:
             return {"topic": topic.model_dump(), "error": str(e)}
 
+        # Before the loop, and shared across the whole batch by section — several
+        # topics filed under one section wait on one reading rather than each
+        # paying for their own. See understanding_for, which does the sharing.
+        understanding = understanding_for(section, document=doc_text)
+
         feedback, script, graders = None, None, []
         try:
             for _ in range(3):
-                script = write_script(topic, section, feedback, document=doc_text)
-                graders = _graders(script, section, doc_text)
-                if all(g["passed"] for g in graders):
+                script = write_script(topic, section, feedback, document=doc_text,
+                                      understanding=understanding)
+                results = _grade(script, section, doc_text, understanding=understanding)
+                graders = _chips(results)
+                if checks.all_passed(results):
                     break
-                feedback = "\n".join(f"- {g['name']}: {g['reason']}"
-                                     for g in graders if not g["passed"])
+                feedback = revision.feedback_for(results)
         except Exception as e:
             return {"topic": topic.model_dump(), "section_id": section.section_id,
                     "error": f"{type(e).__name__}: {e}"}
 
         return {"topic": topic.model_dump(), "section_id": section.section_id,
-                "qa": _as_qa(script), "graders": graders}
+                "qa": _as_qa(script), "graders": graders,
+                "judge": _review_judge(script, section, results)}
 
     # All topics at once. The cap of 6 serialised anything larger into a second
     # round, so asking for 10 shorts took twice as long as asking for 5 for no
@@ -358,16 +439,23 @@ def regenerate(body: RegenerateIn):
     cursor = usage.mark()
     doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
     script, graders, feedback = None, [], base
+    # A reviewer's note changes what to say about the section, not what the section
+    # teaches — so the reading is unchanged, and on a section already drafted this
+    # turn it is a cache hit and costs nothing at all.
+    understanding = understanding_for(section, document=doc_text)
     for _ in range(3):
         script = write_script(body.topic, section, feedback, current=current,
-                              document=doc_text)
-        graders = _graders(script, section, doc_text)
-        if all(g["passed"] for g in graders):
+                              document=doc_text, understanding=understanding)
+        results = _grade(script, section, doc_text, understanding=understanding)
+        graders = _chips(results)
+        if checks.all_passed(results):
             break
-        broken = "\n".join(f"- {g['name']}: {g['reason']}"
-                           for g in graders if not g["passed"])
-        feedback = (f"{base}\n\nYour previous attempt also broke these hard rules. Fix them "
-                    f"WITHOUT losing the reviewer's change above:\n{broken}")
+        # The reviewer's note is the PREFIX, so it stays above the routed block and
+        # keeps governing — the note is why this call exists, and a grader complaint
+        # must never displace it.
+        feedback = revision.feedback_for(results, prefix=(
+            f"{base}\n\nYour previous attempt also broke the hard rules below. Fix them "
+            f"WITHOUT losing the reviewer's change above."))
 
     return {"topic": body.topic.model_dump(), "qa": _as_qa(script), "graders": graders,
             "usage": usage.since(cursor), "total": usage.totals()}
@@ -428,8 +516,13 @@ def _rejudge_after_fix(unit: ShortUnit, script: Script, topic: Topic,
         # The REAL topic, not a reconstructed one — Topic requires difficulty and an
         # answer sentence, and a hand-built stand-in fails validation inside the
         # try, which would make the repair silently never happen.
+        # No `document` here, so this is a distinct cache key from the drafting
+        # path above and may cost one reading. Worth it: the judge's complaint is
+        # nearly always that a beat is not supported by its section, and what the
+        # section does and does not answer is exactly what this step reports.
         fixed = write_script(topic=topic, section=section,
-                             feedback=feedback, current=script)
+                             feedback=feedback, current=script,
+                             understanding=understanding_for(section))
         # The code graders come first and are free. A rewrite that breaks a hard
         # rule is not worth a judge call.
         if not checks.all_passed(checks.run_script_graders(fixed, section.text)):
@@ -991,8 +1084,8 @@ def _voice_job(job_id: str, refs: dict, lines: list[tuple[str, str]]) -> None:
         cb = providers._REGISTRY["chatterbox"]
         if not Path(config.CHATTERBOX_PYTHON).exists():
             raise RuntimeError(
-                "Chatterbox is not installed. In a terminal:  python3 -m venv "
-                "venv-chatterbox && venv-chatterbox/bin/pip install chatterbox-tts")
+                "Chatterbox is not installed. In a terminal, once:  "
+                + config.CHATTERBOX_INSTALL_HINT)
         mark(status="speaking")
         out_dir = (config.OUTPUT_DIR / "voice-lab" / job_id).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)

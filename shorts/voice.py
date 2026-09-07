@@ -239,8 +239,7 @@ def _audition(clip: str) -> int:
     exe = _P(config.CHATTERBOX_PYTHON)
     if not exe.exists():
         print(f"! Chatterbox is not installed at {exe}\n"
-              f"  python3 -m venv venv-chatterbox && "
-              f"venv-chatterbox/bin/pip install chatterbox-tts")
+              f"  {config.CHATTERBOX_INSTALL_HINT}")
         return 1
 
     out_dir = config.OUTPUT_DIR / "voice-auditions" / src.stem

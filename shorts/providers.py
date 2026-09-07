@@ -519,8 +519,7 @@ class Chatterbox(Provider):
         exe = Path(config.CHATTERBOX_PYTHON)
         if not exe.exists():
             return False, (f"no interpreter at {exe} — create it with\n"
-                           f"    python3 -m venv venv-chatterbox && "
-                           f"venv-chatterbox/bin/pip install chatterbox-tts")
+                           f"    {config.CHATTERBOX_INSTALL_HINT}")
         refs = self.resolve()
         missing = [k for k, v in refs.items() if not v]
         if missing:
@@ -540,8 +539,7 @@ class Chatterbox(Provider):
         exe = Path(config.CHATTERBOX_PYTHON)
         if not exe.exists():
             return False, (f"no interpreter at {exe} — create it with\n"
-                           f"    python3 -m venv venv-chatterbox && "
-                           f"venv-chatterbox/bin/pip install chatterbox-tts")
+                           f"    {config.CHATTERBOX_INSTALL_HINT}")
         return True, "ready (clips supplied by the caller)"
 
     # ------------------------------------------------------------------ worker

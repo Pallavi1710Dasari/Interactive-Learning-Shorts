@@ -1836,7 +1836,1644 @@ def check_technical_beats_use_diagrams(unit: ShortUnit) -> GraderResult:
     return GraderResult("technical_visuals", True, "no technical content sent to an image model")
 
 
-SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_refusal]
+# ------------------------------------------------------- the teaching sequence
+#
+# WHY THIS IS GRADED AT ALL. The teaching sequence is the one part of the content
+# understanding that the script brief is told to FOLLOW rather than merely consult
+# — it is offered as the spine for the beats. That makes a bad one worse than none:
+# a sequence that wandered onto a neighbouring topic, or that was written as a
+# generic hook/problem/takeaway shape with the section's nouns dropped in, steers
+# the script wrong with the authority of a plan.
+#
+# Everything here is deterministic and free, and it runs on the reply to the ONE
+# understanding call — nothing is re-asked. A sequence that fails is dropped and
+# the rest of the reading is kept; see skills/understanding.understand().
+
+#: A sequence longer than this is not "the smallest sequence a beginner needs".
+#:
+#: DERIVED FROM MAX_ANSWERS, NOT RESTATED — and it was restated, which is the bug
+#: this fixes. The rationale was always relational: the script has a fixed number
+#: of answer beats, so a sequence longer than that plans an explanation the short
+#: cannot deliver, and the beats would have to drop steps silently, by whichever
+#: ones the model found hardest to say. One step over the beat count is the useful
+#: slack, because a step can be a setup that shares a beat with the one after it.
+#:
+#: Written as a literal 4, that reasoning was true only while MAX_ANSWERS was 3.
+#: When the window went to 35-50s and MAX_ANSWERS became 5, the literal silently
+#: became a cap BELOW what the script can now deliver — it would have rejected a
+#: five-step plan that four or five beats carry comfortably, and the failure would
+#: have looked like a bad reading rather than a stale constant.
+MAX_TEACHING_STEPS = MAX_ANSWERS + 1
+
+#: How much of a step's `concept` must be vocabulary the rest of the understanding
+#: already uses. Stems, not words, and prefix-matched by _grounded, so "translate"
+#: covers "translation" — this is asking "is this the same subject", not "is this
+#: the same phrasing". Below 0.5 a concept is mostly words that appear nowhere else
+#: in the reading, which is what a step borrowed from general knowledge looks like.
+MIN_CONCEPT_OVERLAP = 0.5
+
+
+def check_teaching_sequence(understanding, section_text: str | None = None) -> GraderResult:
+    """
+    Is this teaching sequence usable as the spine of a short?
+
+    Four questions, in the order they are worth asking:
+
+      1. IS THERE ONE, and is it short enough to be a plan for the script's own
+         beat budget (MAX_TEACHING_STEPS, derived from MAX_ANSWERS) rather than a
+         syllabus.
+      2. IS EVERY STEP COMPLETE. The schema already rejects a blank field, so this
+         catches what a plain string cannot: a `purpose` that repeats the concept
+         verbatim, which is the field going through the motions.
+      3. IS IT ON THE OBJECTIVE. The sequence exists to reach core_idea. A sequence
+         no step of which touches the stated idea is a plan for a different short.
+      4. ARE ITS CONCEPTS THE SECTION'S. Checked against the understanding's own
+         vocabulary — core_idea, key_points, concrete_examples, source_evidence —
+         and against the section itself when the caller has it. This is the rule
+         that stops the sequence becoming a second source of claims: a step naming
+         something nothing else in the reading mentions was not read off the page.
+
+    Never raises, like every grader here — a malformed understanding returns
+    passed=False with a reason rather than taking down the step that called it.
+    """
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+
+    if not steps:
+        return GraderResult("teaching_sequence", False,
+            "no teaching sequence — the reading says what the section contains but "
+            "not the order a beginner has to meet it in", {"steps": 0})
+
+    if len(steps) > MAX_TEACHING_STEPS:
+        return GraderResult("teaching_sequence", False,
+            f"{len(steps)} steps, over the {MAX_TEACHING_STEPS} allowed. A short is "
+            f"2-3 answer beats, so this plans more than it can deliver — cut it to "
+            f"the steps a beginner cannot do without.", {"steps": len(steps)})
+
+    # 2. Complete, and not padded to look complete.
+    incomplete = []
+    for i, step in enumerate(steps, 1):
+        concept = (getattr(step, "concept", "") or "").strip()
+        purpose = (getattr(step, "purpose", "") or "").strip()
+        goal = (getattr(step, "explanation_goal", "") or "").strip()
+        missing = [n for n, v in (("concept", concept), ("purpose", purpose),
+                                  ("explanation_goal", goal)) if not v]
+        if missing:
+            incomplete.append(f"step {i} is missing {', '.join(missing)}")
+        elif purpose.lower() == concept.lower() or goal.lower() == concept.lower():
+            incomplete.append(f"step {i} restates its concept instead of saying "
+                              f"why the step is needed or what the learner ends up with")
+    if incomplete:
+        return GraderResult("teaching_sequence", False, "; ".join(incomplete),
+                            {"steps": len(steps), "incomplete": incomplete})
+
+    # 3 and 4 both compare stems, so build the reference vocabularies once.
+    objective = set(_stems(getattr(understanding, "core_idea", "") or ""))
+    own_text = " ".join([
+        getattr(understanding, "core_idea", "") or "",
+        " ".join(getattr(understanding, "key_points", None) or []),
+        " ".join(getattr(understanding, "concrete_examples", None) or []),
+        " ".join(getattr(understanding, "source_evidence", None) or []),
+    ])
+    vocabulary = set(_stems(own_text))
+    if section_text:
+        vocabulary |= set(_stems(section_text))
+
+    # 3. On the objective. Asked of the SEQUENCE, not of each step: a step that
+    #    introduces a prerequisite legitimately shares no words with the idea it
+    #    builds toward — "page number and offset" does not mention translation.
+    #    What would be wrong is a whole sequence that never arrives.
+    if objective:
+        reached = [s for s in steps
+                   if any(_grounded(stem, objective)
+                          for stem in _stems(f"{s.concept} {s.explanation_goal}"))]
+        if not reached:
+            return GraderResult("teaching_sequence", False,
+                f"no step reaches the stated objective ({getattr(understanding, 'core_idea', '')[:80]!r}) "
+                f"— the sequence plans a different explanation from the one this "
+                f"section is for", {"steps": len(steps), "reached": 0})
+
+    # 4. Built from the section's own concepts.
+    if vocabulary:
+        drifted = []
+        for i, step in enumerate(steps, 1):
+            stems = {s: w for s, w in _stems(step.concept).items() if len(s) > 3}
+            if not stems:
+                # No content words at all — "the next part", "step two".
+                drifted.append(f"step {i} ({step.concept!r}) names no concept")
+                continue
+            unknown = sorted(stems[s] for s in stems if not _grounded(s, vocabulary))
+            if 1 - (len(unknown) / len(stems)) < MIN_CONCEPT_OVERLAP:
+                drifted.append(f"step {i} ({step.concept!r}) is not in the section's "
+                               f"vocabulary: {unknown[:6]}")
+        if drifted:
+            return GraderResult("teaching_sequence", False, "; ".join(drifted),
+                                {"steps": len(steps), "drifted": drifted})
+
+    return GraderResult("teaching_sequence", True,
+        f"{len(steps)} step(s), complete, on the objective, from the section's own concepts",
+        {"steps": len(steps)})
+
+
+# ------------------------------------- did the script actually follow the plan?
+#
+# check_teaching_sequence above asks whether the PLAN is any good. This asks
+# whether the SCRIPT took it — the two are separate questions and a short can fail
+# either one alone. A plan can be perfect and ignored, which is the failure this
+# grader exists for: the sequence goes into the brief as guidance, and guidance
+# that nothing checks is a suggestion.
+#
+# THE BIAS IS TOWARD PASSING, deliberately and throughout. Every failure here
+# spends another script call, and a grader that fires on a script a human would
+# have accepted is worse than no grader at all — it burns the retry budget that
+# the real graders (timing, source_quotes) need, and the third attempt is the one
+# that ships. So each rule below is written to catch a script that plainly did
+# something else, not to enforce the plan to the letter:
+#
+#   * coverage asks for HALF the steps, not all of them. Dropping a step the
+#     section cannot support is correct behaviour that the script brief explicitly
+#     asks for, and merging two steps into one beat is normal — the sequence may
+#     have four steps and the script has 2-3 answer beats to say them in.
+#   * order fails only on an INVERSION, and only between steps it can locate
+#     unambiguously. Ties pass, because a merged beat covers two steps at once.
+#   * focus is a gross-drift threshold, not a similarity score. The brief lets the
+#     script answer a NARROWER question than the topic asked, so a faithful script
+#     can legitimately touch half the objective and no more.
+#   * landing accepts EITHER the last step or the objective, since a narrowed
+#     question lands on the objective without reaching the final step.
+#
+# Deterministic and free, on _stems/_grounded like every other grader here — no
+# judge, no call. A failure is phrased as an instruction because it goes straight
+# back to the script step as retry feedback; see run_script_graders.
+
+#: How much of one step's concept has to turn up in the narration before that step
+#: counts as covered. Stems, prefix-matched by _grounded, so "translation" covers
+#: "translate" and a beat need not use the plan's phrasing — the plan is written in
+#: note form ("Frame plus offset") and the beat is written to be spoken aloud.
+MIN_STEP_COVERAGE = 0.5
+
+#: The share of the sequence that must survive into the script. Half, because the
+#: sequence is a plan for explaining and the script is what fits in 4-5 beats: a
+#: three-step plan delivered as two beats has done the job, and failing it would be
+#: failing the brief's own instruction to merge and to drop what the section cannot
+#: support. Below half the script is not following this plan, it is using it as a
+#: word list.
+MIN_SEQUENCE_COVERAGE = 0.5
+
+#: How much of the objective's own vocabulary the narration has to share before the
+#: short counts as being about it. Low on purpose — see the note above about the
+#: narrower question, which is the brief's prescribed escape hatch for a thin
+#: section and which lands an honest script at roughly 40%. This number is set to
+#: catch a script about something else, and nothing finer.
+MIN_OBJECTIVE_FOCUS = 0.3
+
+
+def _covered_steps(steps, beat_stems: list[set], all_stems: set):
+    """Which beat, if any, first carries each step. Returns [(i, step, beat_idx)].
+
+    MATCHED ON WHAT MAKES A STEP DIFFERENT FROM ITS NEIGHBOURS, not on its whole
+    concept, and this is the difference between a working grader and one that
+    passes everything. Steps in a sequence share vocabulary by construction —
+    "Page number and offset", "Page table lookup" and "Frame number concatenated
+    with the offset" have `page`, `number` and `offset` between them — so a single
+    beat saying "a logical address splits into a page number and an offset"
+    satisfies two thirds of the LAST step's words without going anywhere near it.
+    Measured on exactly that script: it scored 2 of 3 steps covered and passed a
+    coverage floor it should have failed.
+
+    So a step is looked for by its DISTINCTIVE stems — the ones no other step's
+    concept uses. A step whose every word is shared (the first step above owns
+    nothing: `page` belongs to step 2, `number` and `offset` to step 3) has none,
+    and falls back to its full concept, which is the lenient reading and the right
+    one: there is no evidence available to fail it on.
+
+    beat_idx is None when the step cannot be pinned to one beat — the same
+    no-distinctive-stems case. Those steps still count for COVERAGE and are left
+    out of the ORDER check, because locating them is guesswork and an order
+    failure built on a guess costs a real script call.
+    """
+    concept_stems = [set(s for s in _stems(getattr(st, "concept", "") or "")
+                         if len(s) > 3) for st in steps]
+
+    located = []
+    for i, (step, stems) in enumerate(zip(steps, concept_stems)):
+        if not stems:
+            continue
+
+        others = set().union(*(c for j, c in enumerate(concept_stems) if j != i)) \
+            if len(concept_stems) > 1 else set()
+        distinctive = stems - others
+        # What this step is judged on: its own words where it has any.
+        marks = distinctive or stems
+
+        hit = {s for s in marks if _grounded(s, all_stems)}
+        if len(hit) / len(marks) < MIN_STEP_COVERAGE:
+            continue                      # not covered at all
+
+        where = None
+        if distinctive:
+            for b, bstems in enumerate(beat_stems):
+                if any(_grounded(s, bstems) for s in distinctive):
+                    where = b
+                    break
+        located.append((i, step, where))
+    return located
+
+
+def check_follows_teaching_sequence(script: Script, understanding=None,
+                                    source_text: str | None = None) -> GraderResult:
+    """
+    Did this script take the teaching sequence it was given?
+
+    Four rules, and a script has to break one plainly to fail:
+
+      COVERAGE   at least half the steps show up in the narration, matched on stems
+                 rather than on phrases. A step the section could not support is
+                 meant to be dropped, so this is a floor, never a checklist.
+      ORDER      of the steps that can be located unambiguously, none appears before
+                 a step that was planned earlier. Ties pass — that is a merged beat.
+      FOCUS      the narration shares enough of core_idea's vocabulary to be about
+                 the objective at all.
+      LANDING    the last answer beat reaches the final step OR the objective. This
+                 is the same rule the script brief spends a page on — the short must
+                 not stop one sentence before the answer — asked against the plan.
+
+    Skips clean, passing, when there is no understanding or its sequence is empty
+    (absent, or quarantined by check_teaching_sequence). Never raises.
+    """
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    if not steps:
+        return GraderResult("follows_sequence", True,
+            "no teaching sequence — skipped", {"steps": 0, "skipped": True})
+
+    answers = [b for b in script.beats if b.speaker == "student"]
+    if not answers:
+        return GraderResult("follows_sequence", False,
+            "no student beats to compare against the teaching sequence")
+
+    beat_stems = [set(_stems(b.line)) for b in answers]
+    all_stems = set().union(*beat_stems) if beat_stems else set()
+
+    located = _covered_steps(steps, beat_stems, all_stems)
+    covered = {i for i, _, _ in located}
+
+    # --- COVERAGE -----------------------------------------------------------
+    need = max(1, round(len(steps) * MIN_SEQUENCE_COVERAGE))
+    if len(covered) < need:
+        missing = [f"step {i + 1} ({s.concept!r})"
+                   for i, s in enumerate(steps) if i not in covered]
+        return GraderResult("follows_sequence", False,
+            f"the answer covers {len(covered)} of {len(steps)} planned steps, and needs "
+            f"at least {need}. Not reached: {'; '.join(missing)}. Build the answer "
+            f"beats along the teaching sequence — or, if the section cannot support "
+            f"a step, drop it AND narrow the question in beat 1 to match what is left.",
+            {"covered": sorted(covered), "needed": need, "steps": len(steps)})
+
+    # --- ORDER --------------------------------------------------------------
+    placed = [(i, s, b) for i, s, b in located if b is not None]
+    inversions = []
+    for a in range(len(placed)):
+        for b in range(a + 1, len(placed)):
+            (i1, s1, beat1), (i2, s2, beat2) = placed[a], placed[b]
+            if beat2 < beat1:            # a later step spoken before an earlier one
+                inversions.append(
+                    f"step {i2 + 1} ({s2.concept!r}) is explained in beat {beat2 + 1}, "
+                    f"before step {i1 + 1} ({s1.concept!r}) in beat {beat1 + 1}")
+    if inversions:
+        return GraderResult("follows_sequence", False,
+            f"the answer runs the teaching sequence out of order: {'; '.join(inversions[:3])}. "
+            f"The order is the plan — a beginner cannot follow a later step before the "
+            f"one it rests on. Reorder the beats to match the sequence.",
+            {"inversions": inversions})
+
+    # --- FOCUS --------------------------------------------------------------
+    objective = {s: w for s, w in _stems(getattr(understanding, "core_idea", "") or "").items()
+                 if len(s) > 3}
+    if objective:
+        hit = [s for s in objective if _grounded(s, all_stems)]
+        focus = len(hit) / len(objective)
+        if focus < MIN_OBJECTIVE_FOCUS:
+            absent = sorted(objective[s] for s in objective if s not in hit)
+            return GraderResult("follows_sequence", False,
+                f"the answer touches only {focus:.0%} of the objective's own vocabulary "
+                f"— it is not about {getattr(understanding, 'core_idea', '')[:70]!r}. "
+                f"Never mentioned: {absent[:8]}. Rewrite the answer so it explains that "
+                f"idea, and make beat 1 ask about it.",
+                {"focus": focus, "absent": absent})
+
+    # --- LANDING ------------------------------------------------------------
+    #
+    # EITHER target is a pass, and the OR is load-bearing rather than lenient. The
+    # brief tells the script to narrow the question when the section is thin, and a
+    # narrowed short lands on the objective without ever reaching the plan's final
+    # step. Demanding the final step would fail the brief's own escape hatch.
+    last = set(_stems(answers[-1].line))
+    final_step = steps[-1]
+    targets = {s for s in _stems(f"{final_step.concept} {final_step.explanation_goal}")
+               if len(s) > 3}
+    targets |= set(objective)
+    if targets:
+        reached = [s for s in targets if _grounded(s, last)]
+        if not reached:
+            return GraderResult("follows_sequence", False,
+                f"the last beat does not land the answer: it reaches neither the final "
+                f"planned step ({final_step.concept!r}) nor the objective. The short stops "
+                f"before it has said the thing it exists to say — make the last beat "
+                f"deliver {final_step.explanation_goal!r}.",
+                {"final_step": final_step.concept})
+
+    return GraderResult("follows_sequence", True,
+        f"{len(covered)}/{len(steps)} planned step(s), in order, landing on the objective",
+        {"covered": sorted(covered), "steps": len(steps)})
+
+
+# --------------------------------------------------------------- the example plan
+#
+# Two graders, because there are two separable failures and conflating them makes
+# both unfixable: check_example_plan asks whether the READING chose a real example
+# (and runs once, on the understanding), check_uses_planned_example asks whether
+# the SCRIPT used it (and runs on every attempt, feeding the retry loop).
+#
+# The rule underneath both is the one this project keeps relearning: an example is
+# only worth anything if it came off the page. A generalised example — "a font
+# name" for `font-family: "Roboto"` — teaches less than the specific one and reads
+# as if the material said it. An invented one is a fabrication with a concrete
+# number attached, which is the most convincing kind.
+
+#: How much of an example's wording has to survive into a beat before the beat
+#: counts as having used it. Stems, so "frame numbers" matches "frame number", and
+#: NOT length-filtered the way the other checks are: examples are short and their
+#: load-bearing word is often three letters — "valid bit", "the i bit", "36px".
+MIN_EXAMPLE_USE = 0.6
+
+#: How far from its own teaching step an example may land. 1 = the beat carrying
+#: that step, or either neighbour. An example exists to make one idea concrete; two
+#: beats away it is decoration, and the learner has already moved on.
+MAX_EXAMPLE_DISTANCE = 1
+
+#: Spans in narration that are example-SHAPED: a literal a script would only say if
+#: it were showing something concrete. Used to catch an invented example when the
+#: reading said there was none to use.
+#:
+#: Digits need three characters, and that leniency is deliberate. "2" and "8" turn
+#: up in honest narration constantly ("splits into 2 parts") without being examples,
+#: and a false failure here costs a real script call — see the bias note on
+#: check_follows_teaching_sequence. "1011", "36px" and "3.2" are caught; a bare
+#: small integer is not.
+_LITERAL_PATTERNS = (
+    re.compile(r"`([^`]+)`"),                            # `input()`, `color: blue;`
+    re.compile(r"\b([A-Za-z_][\w-]*\s*[:=]\s*[^\s,.;]+)"),   # font-family: "Roboto"
+    re.compile(r"\b([A-Za-z_][\w.]*\(\))"),              # input(), len()
+    # NO TRAILING \b: a word boundary cannot hold after a non-word character, so
+    # "40%" — a fabricated statistic, the single most important literal to catch —
+    # matched nothing at all while "1011" matched fine. Trailing punctuation is
+    # stripped by _literals instead.
+    re.compile(r"\b(\d[\w.%-]{2,})"),                    # 1011, 36px, 3.2, 40%
+)
+
+
+def _literals(text: str) -> list[str]:
+    """Example-shaped spans in a piece of narration, deduplicated, in order."""
+    found: list[str] = []
+    for pattern in _LITERAL_PATTERNS:
+        for m in pattern.finditer(text):
+            span = m.group(1).strip().strip(".,;")
+            if span and span not in found:
+                found.append(span)
+    return found
+
+
+def _in_section(span: str, section_text: str) -> bool:
+    """Is this span really on the page? Flattened, like check_source_quotes.
+
+    Two ways to be supported, and the second is not a loophole: a verbatim
+    substring is the strong form, and failing that EVERY content stem of the span
+    has to occur in the section. That second form is what lets "frame numbers"
+    count as the section's "frame number" while still failing anything the section
+    never mentions — the bar is all of it, not most of it.
+    """
+    if not span.strip():
+        return False
+    if _flatten(span) and _flatten(span) in _flatten(section_text):
+        return True
+    stems = set(_stems(span))
+    if not stems:
+        return False
+    src = set(_stems(section_text))
+    return all(_grounded(s, src) for s in stems)
+
+
+def check_example_plan(understanding, section_text: str | None = None) -> GraderResult:
+    """
+    Did the reading choose a REAL example, or reach for a plausible one?
+
+    Runs once, on the understanding, next to check_teaching_sequence and with the
+    same consequence: a plan that fails is dropped and the rest of the reading is
+    kept. Skips clean when there is no plan at all.
+
+    `not_needed` is always valid and is checked no further — that is the point of
+    having it. Everything below applies to a plan that claims an example exists.
+    """
+    plan = getattr(understanding, "example_plan", None)
+    if plan is None:
+        return GraderResult("example_plan", True, "no example plan — skipped",
+                            {"skipped": True})
+
+    need = getattr(plan, "need", "not_needed")
+    if need == "not_needed":
+        return GraderResult("example_plan", True,
+            "no example needed — the section shows nothing concrete", {"need": need})
+
+    example = (getattr(plan, "example", "") or "").strip()
+    if not example:
+        return GraderResult("example_plan", False,
+            f"marked {need} but names no example", {"need": need})
+
+    # THE RULE THIS FIELD EXISTS FOR. An example that is not on the page is not an
+    # example, it is an invention wearing a specific number.
+    if section_text and not _in_section(example, section_text):
+        return GraderResult("example_plan", False,
+            f"the example {example[:60]!r} is not in the section — it was invented or "
+            f"brought in from outside", {"need": need, "example": example})
+
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    supports = getattr(plan, "supports_step", None)
+    if supports is not None and steps and not 1 <= supports <= len(steps):
+        return GraderResult("example_plan", False,
+            f"supports_step {supports} is outside the {len(steps)}-step teaching sequence",
+            {"need": need, "supports_step": supports})
+
+    if not (getattr(plan, "learner_takeaway", "") or "").strip():
+        return GraderResult("example_plan", False,
+            f"marked {need} with no learner_takeaway — nobody decided what the "
+            f"example is for", {"need": need})
+
+    return GraderResult("example_plan", True,
+        f"{need} example {example[:40]!r}, grounded in the section",
+        {"need": need, "example": example})
+
+
+def check_uses_planned_example(script: Script, understanding=None,
+                               section_text: str | None = None) -> GraderResult:
+    """
+    Did the script use the example it was told to, where it was told to?
+
+    Five rules, and only two of them can fail a script outright:
+
+      REQUIRED    the planned example must appear in an answer beat. This is the
+                  whole point of the field: `required` means the idea does not land
+                  without the worked case, so a script that skipped it did not
+                  explain the thing.
+      HELPFUL     absence is reported and PASSES. "Use it if the beats have room" is
+                  not a rule, and failing it would spend a script call arguing with
+                  the brief's own instruction to stay brief.
+      NOT_NEEDED  no example is required, and none may be invented (below).
+      PLACEMENT   when the example is used AND its teaching step can be located, the
+                  two must be within one beat of each other. Both conditions are
+                  needed before this can fail — an unlocatable step is not evidence.
+      NO INVENTION  a literal the section does not contain fails, whatever the plan
+                  says. This is the one rule that runs even with no example plan and
+                  no understanding, because "the script made up a value" is wrong
+                  independently of whether anybody planned an example.
+
+    Never raises. Skips clean when there is nothing to check.
+    """
+    answers = [b for b in script.beats if b.speaker == "student"]
+    plan = getattr(understanding, "example_plan", None)
+    need = getattr(plan, "need", None) if plan is not None else None
+    example = ((getattr(plan, "example", "") or "").strip() if plan is not None else "")
+
+    # --- NO INVENTION -------------------------------------------------------
+    #
+    # First, because it applies with or without a plan. A literal that IS the
+    # planned example is allowed by construction — check_example_plan already
+    # proved that one is on the page.
+    if section_text:
+        invented = []
+        for beat in script.beats:
+            for span in _literals(beat.line):
+                if not _in_section(span, section_text):
+                    invented.append(span)
+        if invented:
+            hint = ("The reading found no example worth using in this section, so there "
+                    "is nothing concrete to name here — explain it in general terms "
+                    "instead." if need == "not_needed" else
+                    "Use the section's own example, copied exactly, or none at all.")
+            return GraderResult("uses_example", False,
+                f"the script states {sorted(set(invented))[:5]}, which the section does "
+                f"not contain — that is an invented example. {hint}",
+                {"invented": sorted(set(invented))})
+
+    if plan is None:
+        return GraderResult("uses_example", True, "no example plan — skipped",
+                            {"skipped": True})
+    if need == "not_needed":
+        return GraderResult("uses_example", True,
+                            "no example needed, and none invented", {"need": need})
+    if not example:
+        return GraderResult("uses_example", True,
+                            f"marked {need} but the plan names no example — skipped",
+                            {"need": need, "skipped": True})
+
+    # --- WAS IT USED --------------------------------------------------------
+    #
+    # Stems, not the literal string. The plan is written in note form ("Frame plus
+    # offset") and a beat is written to be spoken, so demanding the exact phrase
+    # would fail scripts that used the example perfectly well.
+    want = set(_stems(example))
+    used_in = None
+    if want:
+        for i, beat in enumerate(answers):
+            have = set(_stems(beat.line))
+            hit = [s for s in want if _grounded(s, have)]
+            if len(hit) / len(want) >= MIN_EXAMPLE_USE:
+                used_in = i
+                break
+
+    if used_in is None:
+        if need == "helpful":
+            return GraderResult("uses_example", True,
+                f"the helpful example {example[:40]!r} was not used — allowed, the "
+                f"beats are tight", {"need": need, "used": False})
+        return GraderResult("uses_example", False,
+            f"the answer never uses the required example {example[:60]!r}. This section "
+            f"does not explain without it — work it into an answer beat so the learner "
+            f"sees {(getattr(plan, 'learner_takeaway', '') or 'what it demonstrates')!r}, "
+            f"copying it from the section exactly.",
+            {"need": need, "used": False, "example": example})
+
+    # --- PLACEMENT ----------------------------------------------------------
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    supports = getattr(plan, "supports_step", None)
+    if steps and supports and 1 <= supports <= len(steps):
+        beat_stems = [set(_stems(b.line)) for b in answers]
+        all_stems = set().union(*beat_stems) if beat_stems else set()
+        located = {i: b for i, _, b in _covered_steps(steps, beat_stems, all_stems)}
+        target = located.get(supports - 1)
+        if target is not None and abs(used_in - target) > MAX_EXAMPLE_DISTANCE:
+            step = steps[supports - 1]
+            return GraderResult("uses_example", False,
+                f"the example {example[:40]!r} is used in beat {used_in + 1}, but it belongs "
+                f"to step {supports} ({step.concept!r}), which is explained in beat "
+                f"{target + 1}. An example that far from the idea it makes concrete is "
+                f"decoration — move it next to that step.",
+                {"need": need, "used_in": used_in + 1, "step_in": target + 1})
+
+    return GraderResult("uses_example", True,
+        f"{need} example {example[:40]!r} used in beat {used_in + 1}",
+        {"need": need, "used_in": used_in + 1})
+
+
+# ------------------------------------------------------------- the confusion plan
+#
+# Same two-grader split as the example plan: check_confusion_plan asks whether the
+# READING chose a real misconception with a real correction, check_handles_confusion
+# asks what the SCRIPT did about it.
+#
+# WHAT CAN AND CANNOT BE CHECKED WITHOUT A JUDGE, said plainly because the limit
+# matters. "Does this beat contradict the correct understanding?" is a semantic
+# question and nothing here can answer it — that is the judge's job, and this step
+# is forbidden a model call. What IS decidable is ASSERTION: whether the script
+# states the wrong belief's own distinctive content with nothing anywhere near it
+# marking it as wrong. That is the failure worth catching anyway, because it is the
+# one that actively teaches the error — a short that says "a page fault means the
+# program crashed" and never negates it has done more damage than one that skipped
+# the correction. So the rules below are about polarity and assertion, not meaning,
+# and they are deliberately narrow: every one of them can only fire on evidence
+# that is actually in the text.
+
+#: How much of the correction has to survive into a beat before the clarification
+#: counts as delivered. Lower than the example threshold because a correction is a
+#: whole sentence and a beat says it in fewer words — "Each page table entry
+#: carries a valid bit indicating whether the page is currently resident" landing
+#: as "each entry carries a valid bit saying whether the page is resident" is
+#: 6 stems of 11, and that is a delivered clarification.
+MIN_CLARIFICATION_USE = 0.4
+
+#: How much of the confusion has to be ABOUT this section before the plan is
+#: believed. A misconception is not in the section — that is what makes it a
+#: misconception — so it cannot be grounded like a claim. It can be required to be
+#: on this subject, which is what stops one arriving from general knowledge.
+MIN_CONFUSION_TOPICALITY = 0.5
+
+#: Words that mark a belief as wrong, contrasted, or corrected.
+#:
+#: DELIBERATELY WIDE, including plain "but" and "however". A narrow list would fail
+#: honest scripts that negate the belief in wording this does not predict, and each
+#: such failure spends a real script call. Wide means the rule only fires when
+#: NOTHING in the sentence marks the claim as false, which is the case worth failing.
+#:
+#: "nothing" was in this list and had to come out. It is not a correction marker —
+#: "the program has crashed, so nothing more runs" is an assertion of the error
+#: with an intensifier, and matching on it let the plainest possible statement of
+#: the misconception through the rule built to catch it.
+_NEGATION = re.compile(
+    r"\b(not|never|no|isn'?t|aren'?t|wasn'?t|doesn'?t|don'?t|didn'?t|"
+    r"cannot|can'?t|won'?t|rather|instead|actually|but|however|though|although|"
+    r"despite|unlike|contrary|false|wrong|myth|misconception|mistake|"
+    r"misleading|does\s+not|is\s+not)\b", re.I)
+
+#: Wording that ATTRIBUTES a belief rather than asserting it — "you would expect
+#: the program has crashed" puts the claim in someone else's mouth, which is a
+#: legitimate way to raise a misconception before knocking it down.
+#:
+#: Separate from _NEGATION because it means something different: negation says the
+#: claim is false, attribution says the claim is someone's. Either one is enough to
+#: show the beat is not teaching the error as fact, which is all this rule asks.
+_ATTRIBUTION = re.compile(
+    r"\b((you|people|students|learners|beginners|we)\s+(might|would|may|could)?\s*"
+    r"(think|thought|believe|assume|expect|imagine)|"
+    r"seems?\s+(like|to)|sounds?\s+like|looks?\s+like|appears?\s+to)\b", re.I)
+
+#: Framing that announces a misconception is being discussed. Used ONLY under
+#: not_needed, where the reading decided there is nothing to correct and a script
+#: doing this anyway has manufactured one.
+_MISCONCEPTION_FRAMING = re.compile(
+    r"\b(a\s+common\s+(mistake|misconception|error)|commonly\s+(believed|assumed)|"
+    r"(most\s+|many\s+|a\s+lot\s+of\s+)?(people|students|learners|beginners)\s+"
+    r"(think|believe|assume|expect)|you\s+might\s+(think|assume|expect)|"
+    r"(it'?s|it\s+is)\s+(easy|tempting)\s+to\s+(think|assume)|contrary\s+to)\b", re.I)
+
+
+def _distinctive(text: str, against: str) -> set:
+    """Content stems of `text` that `against` does not also use.
+
+    The confusion and its correction are about the same thing and therefore share
+    most of their words — "a page fault means the program crashed" against "a page
+    fault is a normal trap the OS services" overlaps on the whole subject. What
+    separates them is the handful of stems only one of them has, and those are the
+    only ones that can tell a beat stating the error from a beat stating the truth.
+    """
+    return set(_stems(text)) - set(_stems(against))
+
+
+def check_confusion_plan(understanding, section_text: str | None = None) -> GraderResult:
+    """
+    Did the reading pick a real misconception, with a correction that is on the page?
+
+    Runs once, on the understanding, beside check_teaching_sequence and
+    check_example_plan, with the same consequence — a failing plan is dropped and
+    the rest of the reading kept. `not_needed` is always valid and checked no
+    further; that is the whole point of it existing.
+    """
+    plan = getattr(understanding, "confusion_plan", None)
+    if plan is None:
+        return GraderResult("confusion_plan", True, "no confusion plan — skipped",
+                            {"skipped": True})
+
+    need = getattr(plan, "need", "not_needed")
+    if need == "not_needed":
+        return GraderResult("confusion_plan", True,
+            "no misconception to correct — the short just explains", {"need": need})
+
+    confusion = (getattr(plan, "confusion", "") or "").strip()
+    correction = (getattr(plan, "correct_understanding", "") or "").strip()
+
+    if not confusion:
+        return GraderResult("confusion_plan", False,
+            f"marked {need} but names no confusion", {"need": need})
+    if not correction:
+        return GraderResult("confusion_plan", False,
+            f"marked {need} with no correct_understanding — a misconception with no "
+            f"correction is just an error handed to the viewer", {"need": need})
+
+    if section_text:
+        # THE CORRECTION IS A CLAIM, so it is checked like one.
+        if not _in_section(correction, section_text):
+            return GraderResult("confusion_plan", False,
+                f"the correction {correction[:60]!r} is not supported by the section — "
+                f"a clarification the material does not make is an invention",
+                {"need": need, "correction": correction})
+
+        # THE CONFUSION IS NOT A CLAIM, so it is checked for topicality only.
+        stems = set(_stems(confusion))
+        if stems:
+            src = set(_stems(section_text))
+            on_topic = [s for s in stems if _grounded(s, src)]
+            share = len(on_topic) / len(stems)
+            if share < MIN_CONFUSION_TOPICALITY:
+                return GraderResult("confusion_plan", False,
+                    f"the confusion {confusion[:60]!r} is only {share:.0%} in the section's "
+                    f"vocabulary — it is a misconception about something else, brought in "
+                    f"from outside", {"need": need, "topicality": share})
+
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    relates = getattr(plan, "relates_to_step", None)
+    if relates is not None and steps and not 1 <= relates <= len(steps):
+        return GraderResult("confusion_plan", False,
+            f"relates_to_step {relates} is outside the {len(steps)}-step teaching sequence",
+            {"need": need, "relates_to_step": relates})
+
+    if not (getattr(plan, "learner_takeaway", "") or "").strip():
+        return GraderResult("confusion_plan", False,
+            f"marked {need} with no learner_takeaway — nobody decided what correcting "
+            f"it achieves", {"need": need})
+
+    return GraderResult("confusion_plan", True,
+        f"{need}: {confusion[:40]!r}, corrected from the section",
+        {"need": need, "confusion": confusion})
+
+
+def check_handles_confusion(script: Script, understanding=None,
+                            section_text: str | None = None) -> GraderResult:
+    """
+    Did the script correct the planned misconception — or accidentally teach it?
+
+    Rules, in the order they can fail:
+
+      ASSERTED AS FACT   a beat states the confusion's own distinctive content and
+                         nothing IN THAT BEAT negates it, attributes it to someone,
+                         or carries the correction. Judged per beat and not across
+                         neighbours, because a false sentence said in beat 2 and
+                         fixed in beat 3 has still been said. This is the worst
+                         outcome available and it fails under EVERY need, including
+                         not_needed — teaching the error is wrong whoever planned
+                         what.
+      MANUFACTURED       under not_needed only: the script opens a "common mistake"
+                         with framing language when the reading said there was
+                         nothing to correct.
+      REQUIRED MISSING   the correction does not reach any answer beat.
+      HELPFUL MISSING    reported, and PASSES.
+
+    On "does the clarification CONTRADICT the correction" — see the note above this
+    function. Contradiction in general needs a judge and this step has none, so what
+    is enforced is the decidable half: a beat carrying the wrong belief must carry
+    the correction or a marker that it is wrong. A beat that flatly reverses the
+    correction's polarity lands in exactly that case and fails there.
+
+    Never raises. Skips clean when there is nothing to check.
+    """
+    plan = getattr(understanding, "confusion_plan", None)
+    if plan is None:
+        return GraderResult("handles_confusion", True, "no confusion plan — skipped",
+                            {"skipped": True})
+
+    need = getattr(plan, "need", "not_needed")
+    confusion = (getattr(plan, "confusion", "") or "").strip()
+    correction = (getattr(plan, "correct_understanding", "") or "").strip()
+    answers = [b for b in script.beats if b.speaker == "student"]
+
+    # --- ASSERTED AS FACT ---------------------------------------------------
+    if confusion and correction:
+        wrong_marks = _distinctive(confusion, correction)
+        right_marks = _distinctive(correction, confusion)
+        if wrong_marks:
+            for i, beat in enumerate(answers):
+                have = set(_stems(beat.line))
+                hit = [s for s in wrong_marks if _grounded(s, have)]
+                if len(hit) / len(wrong_marks) < MIN_CLARIFICATION_USE:
+                    continue                      # this beat is not about the error
+
+                # THIS BEAT, not the neighbourhood. That was the first cut and it
+                # was wrong: it passed a script that stated the falsehood flatly in
+                # beat 2 and corrected it in beat 3, which is precisely the pattern
+                # the script brief calls BAD. A viewer hears sentences in order. By
+                # the time the correction arrives the false one has been said, in
+                # the student's voice, and the beat carrying it was a beat.
+                #
+                # Three ways for the beat to be innocent, and all three are visible
+                # in its own text: it negates the claim, it attributes the claim to
+                # someone, or it carries the correction alongside.
+                if _NEGATION.search(beat.line) or _ATTRIBUTION.search(beat.line):
+                    continue
+                if right_marks and any(_grounded(s, have) for s in right_marks):
+                    continue
+
+                return GraderResult("handles_confusion", False,
+                    f"beat {i + 1} states the misconception as if it were true: {beat.line!r}. "
+                    f"The section says: {correction[:110]!r}. Never say the wrong belief on "
+                    f"its own, not even to correct it in the next beat — the viewer has "
+                    f"already heard it. Say what is actually true in the same breath.",
+                    {"need": need, "beat": i + 1, "confusion": confusion})
+
+    # --- MANUFACTURED -------------------------------------------------------
+    if need == "not_needed":
+        for i, beat in enumerate(script.beats):
+            m = _MISCONCEPTION_FRAMING.search(beat.line)
+            if m:
+                return GraderResult("handles_confusion", False,
+                    f"beat {i + 1} opens a misconception ({m.group(0)!r}) that nothing asked "
+                    f"for — the reading found nothing here worth correcting. Cut it and use "
+                    f"the beat to explain the idea instead.",
+                    {"need": need, "beat": i + 1, "framing": m.group(0)})
+        return GraderResult("handles_confusion", True,
+            "no misconception needed, and none introduced", {"need": need})
+
+    if not confusion or not correction:
+        return GraderResult("handles_confusion", True,
+            f"marked {need} but the plan is incomplete — skipped",
+            {"need": need, "skipped": True})
+
+    # --- WAS THE CORRECTION DELIVERED --------------------------------------
+    want = set(_stems(correction))
+    delivered = None
+    if want:
+        for i, beat in enumerate(answers):
+            have = set(_stems(beat.line))
+            hit = [s for s in want if _grounded(s, have)]
+            if len(hit) / len(want) >= MIN_CLARIFICATION_USE:
+                delivered = i
+                break
+
+    if delivered is None:
+        if need == "helpful":
+            return GraderResult("handles_confusion", True,
+                f"the helpful clarification was not made — allowed, a short need not "
+                f"spend a beat on it", {"need": need, "clarified": False})
+        return GraderResult("handles_confusion", False,
+            f"the answer never clarifies the required misconception ({confusion[:60]!r}). "
+            f"The section says {correction[:80]!r} — work that into the beat that explains "
+            f"it, so the learner ends up knowing "
+            f"{(getattr(plan, 'learner_takeaway', '') or 'what is actually true')!r}. "
+            f"Do not add a separate 'common mistake' beat; correct it inside the explanation.",
+            {"need": need, "clarified": False, "confusion": confusion})
+
+    return GraderResult("handles_confusion", True,
+        f"{need} misconception clarified in beat {delivered + 1}",
+        {"need": need, "clarified_in": delivered + 1})
+
+
+# ------------------------------------------------------------------- the opening
+#
+# Beat 1 is where a short is won or thrown away, and it is also where every bad
+# short-form instinct lives — the manufactured stake, the invented figure, the
+# "most people get this wrong" resting on nothing. The brief has always forbidden
+# those in prose; these two graders are what makes the ban decidable.
+#
+# The split is the same as the last three plans: check_hook_plan asks whether the
+# READING chose an opening the section can carry, check_opening_follows_hook asks
+# whether the SCRIPT opened that way.
+
+#: How much of the planned hook's vocabulary should turn up in the opening beat.
+#: LOW, and deliberately so: the plan states the hook as an idea and the script
+#: writes the sentence, so demanding phrase overlap would be demanding the exact
+#: phrase matching this step forbids. A third of the content words is enough to
+#: show the opening is about the planned thing rather than about something else.
+MIN_HOOK_ECHO = 0.3
+
+#: How much of the objective has to be in reach of the opening — beat 1 plus the
+#: first answer beat. Lower still, because an opening legitimately approaches the
+#: objective obliquely (a problem hook names the problem, not the solution). This
+#: only fails an opening that hands over to nothing.
+MIN_HOOK_LEADS_IN = 0.2
+
+#: How much of a problem or surprise hook must be grounded in the section. Not the
+#: 100% that _in_section demands of an example: a hook is a paraphrase by nature —
+#: it says the section's situation in a viewer's words — so a stem or two of
+#: connective vocabulary is expected. 80% still fails anything with a fact in it
+#: that the section does not have.
+MIN_HOOK_GROUNDING = 0.8
+
+#: The same question asked of the SCRIPT'S OPENING BEAT, and the answer has to be
+#: very different. The plan paraphrases the section; beat 1 is a spoken question in
+#: a learner's voice, and it is SUPPOSED to use everyday words the section does not.
+#: "If memory is free but split up, why can't a process use it?" is a faithful
+#: opening for a section that says "divided" rather than "split", and holding it to
+#: the plan's 80% failed it — which is exactly the phrase matching this grader is
+#: forbidden to do.
+#:
+#: This number exists to catch an opening about a DIFFERENT TOPIC. The unrelated
+#: disk-scheduling opening scores 0%; honest reworded openings score 65-75%. 0.5
+#: separates those with room on both sides, and nothing finer is being claimed.
+MIN_OPENING_GROUNDING = 0.5
+
+#: Engagement language that promises what the material does not contain. Rejected
+#: wherever it appears, under every hook kind including none at all — this is not a
+#: matter of following the plan, it is the one thing a short must never open with.
+_CLICKBAIT = re.compile(
+    r"(you\s+won'?t\s+believe|"
+    r"(most|all|almost\s+all)\s+(people|developers|students|engineers)\s+get\s+"
+    r"(this|it)\s+wrong|everyone\s+gets\s+(this|it)\s+wrong|"
+    r"(nobody|no\s+one)\s+(tells|teaches)\s+you|"
+    r"blow\s+your\s+mind|mind[\s-]?blowing|will\s+shock\s+you|"
+    r"the\s+secret\s+(to|of|behind)|what\s+(they|nobody)\s+"
+    r"(don'?t|doesn'?t)\s+want\s+you\s+to\s+know|"
+    r"\d{1,3}\s*%\s+of\s+(people|developers|students|engineers)|"
+    r"here'?s\s+the\s+trick|this\s+changes\s+everything|"
+    r"you'?re\s+doing\s+(it|this)\s+wrong)", re.I)
+
+
+def _grounded_share(text: str, source_text: str) -> float:
+    """What fraction of `text`'s content stems the source also uses. 1.0 if empty."""
+    stems = set(_stems(text))
+    if not stems:
+        return 1.0
+    src = set(_stems(source_text))
+    return len([s for s in stems if _grounded(s, src)]) / len(stems)
+
+
+def check_hook_plan(understanding, section_text: str | None = None) -> GraderResult:
+    """
+    Can the section actually carry the opening the reading chose?
+
+    Runs once, on the understanding, and a failing plan is dropped like the others.
+    `direct` is always valid and checked no further — that is what makes it a real
+    option rather than a fallback nobody picks.
+
+    GROUNDED DIFFERENTLY BY KIND, because the kinds are different sorts of thing:
+    a `problem` or a `surprise` is a CLAIM about the material and is checked as
+    one; a `question` is not a claim, so it is checked for being about this section
+    rather than for being true.
+    """
+    plan = getattr(understanding, "hook_plan", None)
+    if plan is None:
+        return GraderResult("hook_plan", True, "no hook plan — skipped", {"skipped": True})
+
+    kind = getattr(plan, "kind", "direct")
+    if kind == "direct":
+        return GraderResult("hook_plan", True,
+            "direct opening — the concept is its own hook", {"kind": kind})
+
+    hook = (getattr(plan, "hook", "") or "").strip()
+    if not hook:
+        return GraderResult("hook_plan", False,
+            f"a {kind} hook with nothing to open on", {"kind": kind})
+
+    clickbait = _CLICKBAIT.search(hook)
+    if clickbait:
+        return GraderResult("hook_plan", False,
+            f"the hook is engagement language, not content: {clickbait.group(0)!r}. "
+            f"A hook has to be something the section says", {"kind": kind})
+
+    if section_text:
+        share = _grounded_share(hook, section_text)
+        if kind in ("problem", "surprise"):
+            # A claim, so it is held to the bar a claim is held to.
+            if share < MIN_HOOK_GROUNDING:
+                return GraderResult("hook_plan", False,
+                    f"the {kind} hook {hook[:60]!r} is only {share:.0%} in the section — "
+                    f"a {kind} the material does not establish is an invention, and it is "
+                    f"the first thing the viewer hears", {"kind": kind, "grounding": share})
+        elif share < MIN_CONFUSION_TOPICALITY:
+            # A question is not a claim; it only has to be about this section.
+            return GraderResult("hook_plan", False,
+                f"the question hook {hook[:60]!r} is only {share:.0%} in the section's "
+                f"vocabulary — it opens on a different topic",
+                {"kind": kind, "grounding": share})
+
+    if not (getattr(plan, "why_it_matters", "") or "").strip():
+        return GraderResult("hook_plan", False,
+            f"a {kind} hook with no reason a learner should care", {"kind": kind})
+
+    leads = (getattr(plan, "leads_into", "") or "").strip()
+    if not leads:
+        return GraderResult("hook_plan", False,
+            f"a {kind} hook that hands over to nothing — say which concept it leads into",
+            {"kind": kind})
+
+    # AND IT HAS TO LEAD SOMEWHERE IN PARTICULAR. A hook can be grounded, sharp and
+    # about a different part of the material; that is a hook for another short.
+    objective = (getattr(understanding, "core_idea", "") or "").strip()
+    if objective and _grounded_share(leads, objective) < MIN_HOOK_LEADS_IN:
+        return GraderResult("hook_plan", False,
+            f"the hook leads into {leads[:60]!r}, which is not the objective "
+            f"({objective[:60]!r}) — it opens a different topic",
+            {"kind": kind, "leads_into": leads})
+
+    return GraderResult("hook_plan", True,
+        f"{kind} hook, grounded, leading into the objective", {"kind": kind})
+
+
+def check_opening_follows_hook(script: Script, understanding=None,
+                               section_text: str | None = None) -> GraderResult:
+    """
+    Did the script open the way the reading planned, and honestly?
+
+    Rules, in the order they can fail:
+
+      CLICKBAIT      engagement language anywhere in the script. Runs with or
+                     without a hook plan, because "you won't believe" is wrong
+                     whoever planned what.
+      UNSUPPORTED    a literal in the opening the section does not contain, or an
+                     opening mostly made of vocabulary the section never uses. The
+                     first sentence is the one a viewer trusts most.
+      ON THE HOOK    the opening echoes the planned hook OR the objective. Either
+                     is enough — a script that opened straight onto the idea has
+                     not failed by skipping a `helpful`-grade flourish.
+      LEADS IN       the objective is in reach of beat 1 plus the first answer beat.
+                     This is what "leads into the teaching sequence" means
+                     concretely: a hook that never arrives is a different topic.
+
+      `direct` skips ON THE HOOK entirely and is never failed for the absence of a
+      question, problem or surprise. It is still held to clickbait, grounding, and
+      leading in — a direct opening that opens on nothing relevant is still wrong.
+
+    No exact phrase matching anywhere: everything is stems through _grounded.
+    Never raises.
+    """
+    beats = script.beats
+    if not beats:
+        return GraderResult("opening_hook", True, "no beats — skipped", {"skipped": True})
+
+    opening = beats[0].line
+    answers = [b for b in beats if b.speaker == "student"]
+
+    # --- CLICKBAIT ----------------------------------------------------------
+    for i, beat in enumerate(beats):
+        m = _CLICKBAIT.search(beat.line)
+        if m:
+            return GraderResult("opening_hook", False,
+                f"beat {i + 1} uses engagement language the material does not support: "
+                f"{m.group(0)!r}. Cut it. The opening has to be something the section "
+                f"actually says — a real question, a real problem, or the concept itself.",
+                {"clickbait": m.group(0), "beat": i + 1})
+
+    plan = getattr(understanding, "hook_plan", None)
+    if plan is None:
+        return GraderResult("opening_hook", True, "no hook plan — skipped", {"skipped": True})
+
+    kind = getattr(plan, "kind", "direct")
+    hook = (getattr(plan, "hook", "") or "").strip()
+    objective = (getattr(understanding, "core_idea", "") or "").strip()
+
+    # --- UNSUPPORTED --------------------------------------------------------
+    if section_text:
+        for span in _literals(opening):
+            if not _in_section(span, section_text):
+                return GraderResult("opening_hook", False,
+                    f"the opening states {span!r}, which is not in the section — the first "
+                    f"sentence of the short is inventing a detail. Open on something the "
+                    f"section says.", {"invented": span})
+        share = _grounded_share(opening, section_text)
+        if share < MIN_OPENING_GROUNDING:
+            return GraderResult("opening_hook", False,
+                f"only {share:.0%} of the opening is in the section's vocabulary — it opens "
+                f"on material this short is not about. Ask about the thing the section "
+                f"explains.", {"grounding": share})
+
+    # --- ON THE HOOK --------------------------------------------------------
+    if kind != "direct" and hook:
+        echo = max(_grounded_share_of(hook, opening),
+                   _grounded_share_of(objective, opening) if objective else 0.0)
+        if echo < MIN_HOOK_ECHO:
+            return GraderResult("opening_hook", False,
+                f"the opening does not go near the planned {kind} hook ({hook[:60]!r}) or the "
+                f"objective. Beat 1 is the hook — open on that, in your own words.",
+                {"kind": kind, "echo": echo})
+
+    # --- LEADS IN -----------------------------------------------------------
+    if objective:
+        # THE FIRST TWO ANSWER BEATS, not one. With one, a problem-shaped
+        # explanation failed for being well built: state the constraint, show what
+        # it costs, then resolve it — the objective legitimately arrives in beat 3,
+        # and the rule scored that 18% against a 20% bar. A hook is not
+        # disconnected because the payoff takes two sentences.
+        #
+        # Narrowing this rule is safe now in a way it was not before
+        # check_reaches_objective existed: "the short never arrives at the idea at
+        # all" is that grader's job, asked of the whole answer and without a plan to
+        # depend on. What is left here is the question only this grader can ask —
+        # whether the OPENING hands over to the explanation or stands apart from it.
+        window = " ".join([opening] + [b.line for b in answers[:2]])
+        if _grounded_share_of(objective, window) < MIN_HOOK_LEADS_IN:
+            return GraderResult("opening_hook", False,
+                f"the opening never hands over to the objective ({objective[:70]!r}) — by the "
+                f"end of the first answer beat the short has still not started explaining it. "
+                f"Get to the idea immediately after the hook.",
+                {"kind": kind, "objective": objective[:70]})
+
+    return GraderResult("opening_hook", True,
+        f"{kind} opening, grounded, leading into the objective", {"kind": kind})
+
+
+def _grounded_share_of(text: str, within: str) -> float:
+    """Fraction of `text`'s content stems that `within` also uses. 0.0 if empty.
+
+    The mirror of _grounded_share, and separate because the empty case has to
+    answer differently: "how much of the hook did the opening echo" is 0 when there
+    is no hook to echo, where "how much of the hook is in the section" is 1 when
+    there is nothing ungrounded to find.
+    """
+    stems = set(_stems(text))
+    if not stems:
+        return 0.0
+    have = set(_stems(within))
+    return len([s for s in stems if _grounded(s, have)]) / len(stems)
+
+
+# ====================================================================== the outcome
+#
+# Everything above this line asks a technical question — is it the right length, is
+# every beat cited, did it follow the plan. A short can answer all of them and
+# still not teach anything, and that is not a hypothetical: the graders were built
+# one at a time, each one closing the hole in front of it, and none of them was
+# ever asked "so does a learner come away understanding the idea?"
+#
+# THIS IS AN ORCHESTRATION, NOT A NEW GRADER. Almost every requirement below is
+# ALREADY decided by a grader that ran — follows_sequence knows whether the
+# progression survived, uses_example and handles_confusion know whether the
+# required interventions happened, opening_hook knows whether beat 1 arrives
+# somewhere. Re-deriving any of that here would give two answers to one question
+# and a maintenance problem the first time a threshold moves. So this reads their
+# verdicts and adds exactly one thing none of them can provide: a VETO.
+#
+# THE VETO IS THE POINT. A short that passes every technical check and never
+# reaches its core_idea must not pass, and no existing grader says so on its own:
+# follows_sequence's landing rule accepts the final STEP as an alternative to the
+# objective, and it skips entirely when the sequence was quarantined — which is
+# precisely when a script is most likely to wander. objective_reached is asked
+# directly, of the answer itself, and it holds whether or not any plan survived.
+#
+# UNAVAILABLE IS NOT FAILURE, and it is the rule that keeps this honest. A plan
+# that was never made, or was dropped by its own validator, is missing GUIDANCE —
+# it is not evidence against the script. Every requirement below defaults to
+# satisfied when the thing that would judge it is absent.
+
+#: How much of the objective's vocabulary the answer as a whole has to carry.
+MIN_OBJECTIVE_COVERAGE = 0.4
+
+#: And how much of it the LAST answer beat has to carry. Lower, because the last
+#: beat is one sentence and the objective is a whole one — this asks whether the
+#: short ENDS on the idea, not whether it restates it. A short whose final beat has
+#: nothing of the objective in it has stopped somewhere else, which is the defect
+#: the script brief opens with.
+MIN_OBJECTIVE_LANDING = 0.2
+
+
+@dataclass
+class LearningOutcome:
+    """Whether this short appears to teach the thing it set out to teach.
+
+    Six requirements and a verdict. `problems` carries one line per failed
+    requirement, written as an instruction, because it is what goes back to the
+    script step as retry feedback.
+
+    Each flag is True when the requirement is MET or when it is UNAVAILABLE — see
+    the note above. `unavailable` records which ones nobody could judge, so a
+    passing outcome can be read honestly rather than as six green ticks.
+    """
+    objective_reached: bool = True
+    teaching_sequence_covered: bool = True
+    required_example_satisfied: bool = True
+    required_confusion_satisfied: bool = True
+    opening_leads_into_learning: bool = True
+    source_grounding_satisfied: bool = True
+
+    problems: list = field(default_factory=list)
+    unavailable: list = field(default_factory=list)
+    details: dict = field(default_factory=dict)
+
+    @property
+    def passed(self) -> bool:
+        return not self.problems
+
+    def as_dict(self) -> dict:
+        return {"objective_reached": self.objective_reached,
+                "teaching_sequence_covered": self.teaching_sequence_covered,
+                "required_example_satisfied": self.required_example_satisfied,
+                "required_confusion_satisfied": self.required_confusion_satisfied,
+                "opening_leads_into_learning": self.opening_leads_into_learning,
+                "source_grounding_satisfied": self.source_grounding_satisfied,
+                "passed": self.passed,
+                "problems": list(self.problems),
+                "unavailable": list(self.unavailable)}
+
+
+def _verdict(results, name: str):
+    for r in results or []:
+        if r.name == name:
+            return r
+    return None
+
+
+def check_reaches_objective(script: Script, understanding=None) -> GraderResult:
+    """
+    Does the answer actually arrive at the core idea, and END there?
+
+    THE ONE CHECK THIS STEP HAD TO ADD, because nothing else asks it unconditionally.
+    follows_sequence has a landing rule, but it accepts the final teaching STEP as
+    an alternative to the objective and it does not run at all when the sequence was
+    quarantined. This runs whenever there is a core_idea, plan or no plan, and it is
+    the veto the whole outcome hangs on.
+
+    Two halves, and they fail differently:
+      COVERAGE  the answer as a whole carries enough of the objective's vocabulary
+                to have been about it.
+      LANDING   the LAST answer beat carries some of it, so the short ends on the
+                idea rather than trailing off into a detail.
+
+    Stems throughout, so no phrasing is prescribed. Skips clean with no core_idea.
+    """
+    objective = (getattr(understanding, "core_idea", "") or "").strip()
+    if not objective:
+        return GraderResult("reaches_objective", True,
+            "no stated objective — skipped", {"skipped": True})
+
+    answers = [b for b in script.beats if b.speaker == "student"]
+    if not answers:
+        return GraderResult("reaches_objective", False, "no answer beats at all")
+
+    whole = " ".join(b.line for b in answers)
+    coverage = _grounded_share_of(objective, whole)
+    if coverage < MIN_OBJECTIVE_COVERAGE:
+        return GraderResult("reaches_objective", False,
+            f"the answer covers only {coverage:.0%} of the objective ({objective[:80]!r}) — "
+            f"whatever else it does, it does not teach that. Rewrite the answer beats to "
+            f"explain the idea itself.",
+            {"coverage": coverage, "objective": objective[:80]})
+
+    landing = _grounded_share_of(objective, answers[-1].line)
+    if landing < MIN_OBJECTIVE_LANDING:
+        return GraderResult("reaches_objective", False,
+            f"the last beat has almost nothing of the objective in it ({landing:.0%}) — the "
+            f"short explains its way toward {objective[:70]!r} and then ends on a detail. "
+            f"Make the final beat land the idea.",
+            {"coverage": coverage, "landing": landing})
+
+    return GraderResult("reaches_objective", True,
+        f"the answer reaches the objective ({coverage:.0%}) and ends on it ({landing:.0%})",
+        {"coverage": coverage, "landing": landing})
+
+
+def evaluate_learning_outcome(script: Script, understanding=None,
+                              source_text: str | None = None,
+                              results=None) -> LearningOutcome:
+    """
+    Does this short look like it teaches its objective? Deterministic, no model.
+
+    `results` is the list run_script_graders already produced. Passing it is the
+    normal path and the reason this is cheap: every requirement except the veto is
+    a verdict that has already been computed, and reading it costs nothing. When it
+    is omitted the graders it needs are run here instead, so the function is usable
+    on its own.
+
+    A requirement whose grader is absent from `results` — because there was no
+    source text, or no plan of that kind — is recorded as UNAVAILABLE and left
+    satisfied. Absent guidance is not evidence of a bad script.
+    """
+    outcome = LearningOutcome()
+
+    # --- THE VETO, computed here because nothing else asks it -----------------
+    reaches = _verdict(results, "reaches_objective") or \
+        check_reaches_objective(script, understanding)
+    if reaches.details.get("skipped"):
+        outcome.unavailable.append("objective_reached (no core_idea in the understanding)")
+    elif not reaches.passed:
+        outcome.objective_reached = False
+        # The full message, because this is the one requirement no other grader
+        # reported — everything below is cross-referenced instead of restated.
+        outcome.problems.append(f"THE SHORT DOES NOT REACH ITS OBJECTIVE. {reaches.reason}")
+    outcome.details["reaches_objective"] = reaches.details
+
+    # --- THE REUSED VERDICTS -------------------------------------------------
+    #
+    # Named, not restated. Each of these graders is in the same feedback block the
+    # script step is about to read, with its own specific instruction; repeating
+    # the text here would spend prompt on saying everything twice. What this adds
+    # is the stake — that the failure is a LEARNING failure and not a nit.
+    reused = [
+        ("teaching_sequence_covered", "follows_sequence",
+         lambda: check_follows_teaching_sequence(script, understanding, source_text),
+         "the explanation does not carry enough of the planned teaching progression"),
+        ("required_example_satisfied", "uses_example",
+         lambda: check_uses_planned_example(script, understanding, source_text),
+         "a required worked example is missing or misused"),
+        ("required_confusion_satisfied", "handles_confusion",
+         lambda: check_handles_confusion(script, understanding, source_text),
+         "a required misconception is left uncorrected, or is stated as fact"),
+        ("opening_leads_into_learning", "opening_hook",
+         lambda: check_opening_follows_hook(script, understanding, source_text),
+         "the opening does not lead into what the short teaches"),
+    ]
+    for flag, name, compute, summary in reused:
+        verdict = _verdict(results, name)
+        if verdict is None and understanding is not None:
+            verdict = compute()
+        if verdict is None:
+            outcome.unavailable.append(f"{flag} (no {name} verdict)")
+            continue
+        if verdict.details.get("skipped"):
+            outcome.unavailable.append(f"{flag} (no plan — guidance unavailable)")
+            continue
+        if not verdict.passed:
+            setattr(outcome, flag, False)
+            outcome.problems.append(f"{summary} — fix `{name}` above")
+
+    # --- GROUNDING, which is three graders answering one requirement ---------
+    grounding_names = ("source_quotes", "on_topic", "grounding")
+    seen = [(n, _verdict(results, n)) for n in grounding_names]
+    seen = [(n, v) for n, v in seen if v is not None]
+    if not seen:
+        outcome.unavailable.append("source_grounding_satisfied (no source text)")
+    else:
+        broken = [n for n, v in seen if not v.passed]
+        if broken:
+            outcome.source_grounding_satisfied = False
+            outcome.problems.append(
+                f"the short teaches things its own section does not support — "
+                f"fix {', '.join(f'`{n}`' for n in broken)} above")
+
+    return outcome
+
+
+def check_learning_outcome(script: Script, understanding=None,
+                           source_text: str | None = None,
+                           results=None) -> GraderResult:
+    """evaluate_learning_outcome as a grader, so it rides the existing retry path.
+
+    Deliberately LAST in the list and deliberately terse: the specific instructions
+    are already in the failures it names, and this adds the sentence that says what
+    those failures amount to. A short that fails only here — every technical check
+    green and the objective never reached — is the case this whole step exists for,
+    and then the reason carries the full explanation because nothing else did.
+    """
+    outcome = evaluate_learning_outcome(script, understanding, source_text, results)
+    detail = outcome.as_dict()
+
+    if outcome.passed:
+        met = [k for k, v in detail.items()
+               if k not in ("passed", "problems", "unavailable") and v]
+        note = f", {len(outcome.unavailable)} not applicable" if outcome.unavailable else ""
+        return GraderResult("learning_outcome", True,
+            f"{len(met)} learning requirement(s) met{note}", detail)
+
+    return GraderResult("learning_outcome", False,
+        "this short does not yet teach what it set out to teach. "
+        + " ".join(f"({i + 1}) {p}" for i, p in enumerate(outcome.problems)),
+        detail)
+
+
+# --------------------------------------------------------- beats that go nowhere
+#
+# THE HOLE THIS CLOSES, found in shipped output. Every grader in this file asks
+# about ONE beat: is it the right length, is it cited, is it on the section, does
+# it use the planned example. Not one of them compares a beat to the beats BESIDE
+# it, so a script could say the same thing twice and score 13 out of 13. From
+# output/html_doc_basic_structure.json, generated by the real pipeline:
+#
+#   beat 1  "This is the basic structure of any HTML document - doctype, html,
+#            head, and body, always together."
+#   beat 4  "So doctype, html, head, and body together form the structure every
+#            document follows, no matter what."
+#
+# Beat 4 is beat 1 with the words moved. It is the "so in summary" beat the script
+# brief explicitly says to delete, and a quarter of the video is spent on it.
+#
+# check_source_quotes made this WORSE rather than catching it. It demands a
+# DISTINCT citation per beat, so the cheapest way to satisfy it is to keep saying
+# the same thing while pointing at a different sentence — the grader asks for new
+# evidence and accepts it as proof of a new idea.
+#
+# NOVELTY, NOT SIMILARITY, is what is measured, and the difference is the whole
+# design. Two beats in a technical explanation SHOULD share most of their nouns —
+# "page number", "frame", "offset" recur because the subject recurs — so scoring
+# overlap would fail every honest script about one idea. What separates a
+# developing explanation from a restatement is whether the later beat brings
+# anything of its own: a mechanism, a consequence, an example, a conclusion. All
+# of those arrive as content words that have not been said yet.
+
+#: How much of a beat has to be new. A beat below this is mostly words the viewer
+#: has already heard, in a short with four or five beats to spend.
+#:
+#: MEASURED, not guessed, on the six fixtures this grader was built against:
+#:
+#:     shipped recap beat (the real bug)      0.12   fail
+#:     exact duplicate of an earlier beat     0.00   fail
+#:     reworded restatement of beat 2         0.33   fail
+#:     ---------------------------------------------------
+#:     shared technical vocabulary            0.50   pass
+#:     two adjacent but distinct steps        0.71   pass
+#:     conclusion that lands the payoff       0.78   pass
+#:
+#: The band between 0.33 and 0.50 is empty, so 0.4 sits in the gap with room on
+#: both sides. 0.3 was the first cut and it let the reworded restatement through by
+#: 0.03 — on the strength of `lett`, which is what the stemmer makes of "letting":
+#: a stopword that survives as a content stem because the suffix rule does not
+#: collapse the double consonant. A threshold that close to the noise is not a
+#: threshold, and the stemmer is not this change's to fix.
+MIN_BEAT_NOVELTY = 0.4
+
+#: And it must be restating one PARTICULAR earlier beat, not merely reusing the
+#: short's shared vocabulary. Both conditions are required before failing, so a
+#: beat that is thin but not a copy of anything is left alone — that is
+#: check_dialogue_shape's business, not this one.
+MIN_RESTATEMENT_OVERLAP = 0.5
+
+#: Below this many content words a beat carries too little signal to judge. A
+#: four-word beat can be entirely new or entirely old on the strength of one stem,
+#: and failing a script on that is a coin toss with a script call as the stake.
+MIN_JUDGEABLE_STEMS = 4
+
+
+def check_beats_develop(script: Script) -> GraderResult:
+    """
+    Does every answer beat add something, or does one of them just say it again?
+
+    Runs on every script, with or without a content understanding — repetition is
+    a defect of the writing, not of any plan, so this is an unconditional script
+    grader like timing and overlays.
+
+    A beat fails only when BOTH are true:
+      * it is mostly not new — under MIN_BEAT_NOVELTY of its content words are
+        unheard, counted against every earlier answer beat, and
+      * it is a restatement of one identifiable earlier beat, sharing at least
+        MIN_RESTATEMENT_OVERLAP of its words with that one.
+
+    Requiring both is what makes shared technical vocabulary safe. A beat that
+    reuses the subject's nouns to say something new clears the first test; a beat
+    that is merely brief clears the second.
+    """
+    answers = [b for b in script.beats if b.speaker == "student"]
+    if len(answers) < 2:
+        return GraderResult("no_repetition", True, "nothing to repeat")
+
+    stems = [set(_stems(b.line)) for b in answers]
+    offenders = []
+
+    for j in range(1, len(answers)):
+        mine = stems[j]
+        if len(mine) < MIN_JUDGEABLE_STEMS:
+            continue                       # too short to read anything into
+
+        earlier = set().union(*stems[:j])
+        fresh = [s for s in mine if not _grounded(s, earlier)]
+        novelty = len(fresh) / len(mine)
+        if novelty >= MIN_BEAT_NOVELTY:
+            continue                       # it brought something
+
+        # Which earlier beat is it saying again? The one it shares most with —
+        # named so the retry feedback can point at a beat rather than a symptom.
+        best, best_share = None, 0.0
+        for i in range(j):
+            if not stems[i]:
+                continue
+            shared = len([s for s in mine if _grounded(s, stems[i])]) / len(mine)
+            if shared > best_share:
+                best, best_share = i, shared
+
+        if best is None or best_share < MIN_RESTATEMENT_OVERLAP:
+            continue                       # thin, but not a copy of anything
+
+        offenders.append({
+            "beat": j + 1, "repeats": best + 1,
+            "novelty": round(novelty, 2), "overlap": round(best_share, 2),
+            "new_words": sorted(fresh),
+            "line": answers[j].line,
+        })
+
+    if not offenders:
+        return GraderResult("no_repetition", True,
+            f"all {len(answers)} answer beats develop the explanation",
+            {"beats": len(answers)})
+
+    worst = offenders[0]
+    detail = "; ".join(
+        f"beat {o['beat']} restates beat {o['repeats']} "
+        f"({o['overlap']:.0%} of its words are already there, only {o['novelty']:.0%} new"
+        + (f": {o['new_words']}" if o["new_words"] else "") + ")"
+        for o in offenders)
+
+    return GraderResult("no_repetition", False,
+        f"{detail}. Beat {worst['beat']} is {worst['line'][:70]!r} — the viewer has already "
+        f"heard this. Either DELETE it and let the answer be shorter, or replace it with the "
+        f"thing that beat should contribute: the mechanism behind what beat "
+        f"{worst['repeats']} said, a consequence of it, the section's own example of it, or "
+        f"the conclusion it leads to. A recap is not a beat.",
+        {"offenders": offenders})
+
+
+#: How many depth signals a plan needs to be worth a 35-50 second short.
+#:
+#: Two, not three, and not one. One is met by almost any section that parses — a
+#: three-step sequence is not hard to produce for a definition. Three would demand
+#: an example AND a misconception from nearly every section, and the readings are
+#: explicit that "not_needed" is the ordinary answer for both, so a floor of three
+#: would flag the sections those fields were written to describe honestly.
+MIN_DEPTH_SIGNALS = 2
+
+
+def check_plan_depth(understanding, section_text: str | None = None) -> GraderResult:
+    """
+    Is there enough in this reading to fill 35-50 seconds without restating?
+
+    THE ONE PLACE DEPTH IS ACTUALLY DECIDED. select.py's prompt gates on the same
+    criteria, but it judges them while ranking a whole document, from one call, and
+    nothing validates what it concluded. This reads the SAME question off the
+    validated understanding — one section, checked against the section's own text,
+    with each plan already quarantined if it did not hold up.
+
+    It exists because of an arithmetic gap the window change opened. A 35-50s short
+    is 87-125 spoken words across 4-5 beats. A section that supports two teaching
+    steps, no example and no misconception has roughly two ideas in it, and the
+    beats have to come from somewhere — so they come from restatement, which is the
+    exact defect the 18-45s window was cut to fix.
+
+    WHAT IT DOES NOT DO IS FAIL A SCRIPT. It grades the READING, so a failure means
+    the topic was a bad choice, not that the writing went wrong. Acting on it is the
+    caller's business: run.py prints it, and the length grader remains the hard gate
+    on the script itself. Wiring it to drop a topic would silently shrink a deck for
+    a judgement made from four booleans, which is more authority than it has earned.
+
+    `section_text` is accepted and unused, so this fits the same registry signature
+    as the other understanding graders. Deliberately unused: every claim in the
+    reading has ALREADY been checked against the section by the graders that ran
+    before it, so re-reading the text here would only invite this check to start
+    forming its own second opinion about content — which is the duplication the
+    whole reshuffle removed.
+
+    Inconclusive, deliberately, when the sequence was quarantined: an empty
+    teaching_sequence means the reading was thrown away, not that the section is
+    thin, and understand() has already said so on its own line. Reporting thinness
+    there would blame the section for the model's bad reading.
+    """
+    if understanding is None:
+        return GraderResult("plan_depth", True, "no reading to judge",
+                            {"conclusive": False})
+
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    if not steps:
+        return GraderResult("plan_depth", True,
+            "teaching sequence was dropped — depth cannot be judged from what is left",
+            {"conclusive": False})
+
+    def _wants(plan) -> bool:
+        return getattr(plan, "need", None) in ("required", "helpful")
+
+    points = list(getattr(understanding, "key_points", None) or [])
+    signals = {
+        "sequence": len(steps) >= 3,
+        "example": _wants(getattr(understanding, "example_plan", None)),
+        "misconception": _wants(getattr(understanding, "confusion_plan", None)),
+        "key_points": len(points) >= 3,
+    }
+    have = [k for k, v in signals.items() if v]
+
+    if len(have) < MIN_DEPTH_SIGNALS:
+        return GraderResult("plan_depth", False,
+            f"thin for a {MIN_SECONDS}-{MAX_SECONDS}s short: only "
+            f"{len(have)} depth signal(s) ({', '.join(have) or 'none'}) from "
+            f"{len(steps)} teaching step(s), "
+            f"example={getattr(getattr(understanding, 'example_plan', None), 'need', 'none')}, "
+            f"misconception={getattr(getattr(understanding, 'confusion_plan', None), 'need', 'none')}"
+            f". The beats would have to be filled by restating — this topic belongs "
+            f"to a shorter format, or to select's gate",
+            {"signals": signals, "conclusive": True})
+
+    return GraderResult("plan_depth", True,
+        f"{len(have)} depth signal(s): {', '.join(have)}",
+        {"signals": signals, "conclusive": True})
+
+
+def check_question_grounded(script: Script, source_text: str) -> GraderResult:
+    """
+    Is the interviewer's question answerable from this section, and claim-free?
+
+    THE ONE BEAT NOTHING CHECKED. source_quote lives on student beats only, so beat
+    1 — the first thing heard and the thing a viewer decides on — could say
+    anything. Seen in real output: a section reading "The basic structure of any
+    HTML document is as follows" produced "What's the REQUIRED basic structure...",
+    and required is a claim the material never makes. Harmless there; the same hole
+    lets a question promise a comparison, a reason or a guarantee the section
+    cannot deliver, and then the answer beats have to either invent it or
+    disappoint.
+
+    Two rules, both already used elsewhere in this file:
+      LITERALS   a value, code span or figure in the question must be in the
+                 section. This is the same _literals/_in_section pair that catches
+                 an invented example, applied to the beat that never had it.
+      SUBJECT    enough of the question's content words come from the section that
+                 it is asking about THIS page.
+
+    Deliberately lenient on vocabulary. A question is written in a learner's words
+    — "how does X work", "why do we need Y" — and demanding the section's phrasing
+    would fail every well-written opening. MIN_OPENING_GROUNDING is the same floor
+    check_opening_follows_hook uses, and it is set to catch a question about a
+    different topic, nothing finer.
+
+    Overlaps check_opening_follows_hook's grounding rule ON PURPOSE when a hook plan
+    survived. That one is gated behind the plan and skips whenever the plan was
+    absent or quarantined — which is exactly when an ungrounded question is most
+    likely — so this runs unconditionally and the two agree where they meet.
+    """
+    if not script.beats:
+        return GraderResult("question_grounded", True, "no beats", {"skipped": True})
+
+    question = script.beats[0].line
+    if not source_text:
+        return GraderResult("question_grounded", True, "no source text — skipped",
+                            {"skipped": True})
+
+    for span in _literals(question):
+        if not _in_section(span, source_text):
+            return GraderResult("question_grounded", False,
+                f"the question states {span!r}, which is not in the section. Beat 1 carries no "
+                f"source_quote, so nothing else catches an invented value there — ask about "
+                f"something the section actually shows.", {"invented": span})
+
+    share = _grounded_share(question, source_text)
+    if share < MIN_OPENING_GROUNDING:
+        return GraderResult("question_grounded", False,
+            f"only {share:.0%} of the question's content words are in the section — it asks "
+            f"about something this section does not cover, so the answer will either drift or "
+            f"disappoint. Ask the question THIS section answers.",
+            {"grounding": share})
+
+    return GraderResult("question_grounded", True,
+        f"the question is answerable from this section ({share:.0%} shared vocabulary)",
+        {"grounding": share})
+
+
+SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_refusal,
+                  check_beats_develop]
 
 #: Unit graders that need only the unit.
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
@@ -1864,12 +3501,39 @@ def run_unit_graders(unit: ShortUnit, source_text: str | None = None) -> list[Gr
 
 
 def run_script_graders(script: Script, source_text: str | None = None,
-                       doc_text: str | None = None) -> list[GraderResult]:
+                       doc_text: str | None = None,
+                       understanding=None) -> list[GraderResult]:
+    """
+    Every script grader, plus the ones that need something beyond the script.
+
+    `understanding` is OPTIONAL and stays optional: a caller without one — the eval
+    harness, smoke_test, audit.py — gets exactly the list it got before, and the
+    sequence-alignment check is simply not among them. Passing one adds
+    check_follows_teaching_sequence, which itself skips clean when the sequence is
+    absent or was quarantined, so there are two independent ways for this to be a
+    no-op and neither is an error.
+
+    IT MUST BE THE SAME UNDERSTANDING ON EVERY ATTEMPT. The retry loops read the
+    section once, before the loop (see skills/understanding.understanding_for), and
+    hand that one object to both write_script and this function. Grading a retry
+    against a freshly-read plan would move the target between attempts: the script
+    would be rewritten to satisfy a sequence it was never shown.
+    """
     results = [g(script) for g in SCRIPT_GRADERS]
     if source_text:
         results.append(check_source_quotes(script, source_text, doc_text=doc_text))
         results.append(check_answers_its_section(script, source_text))
         results.append(check_grounding(script, source_text, doc_text=doc_text))
+        results.append(check_question_grounded(script, source_text))
+    if understanding is not None:
+        results.append(check_follows_teaching_sequence(script, understanding, source_text))
+        results.append(check_uses_planned_example(script, understanding, source_text))
+        results.append(check_handles_confusion(script, understanding, source_text))
+        results.append(check_opening_follows_hook(script, understanding, source_text))
+        results.append(check_reaches_objective(script, understanding))
+        # LAST, and it reads `results` rather than recomputing them — it is an
+        # orchestration of the verdicts above, so it has to come after all of them.
+        results.append(check_learning_outcome(script, understanding, source_text, results))
     return results
 
 

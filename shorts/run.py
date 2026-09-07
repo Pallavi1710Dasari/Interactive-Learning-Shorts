@@ -14,11 +14,11 @@ from pathlib import Path
 from .schema import ShortUnit, TopicList
 from .parse import parse_markdown, find_section
 from .skills.select import select_topics
-from .skills.understand import understand, evidence_notes
 from .skills.script import write_script
+from .skills.understanding import understanding_for
 from .skills.visuals import design_visuals, render_diagrams
 from .skills.audit import audit
-from . import checks, config
+from . import checks, config, revision
 
 MAX_SCRIPT_RETRIES = 3
 
@@ -113,30 +113,47 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
     # price. That is the whole reason it is a separate step and not a longer script
     # prompt.
     #
-    # Never fatal, on the same terms as plan_strategy: a short with no understanding
-    # is written exactly the way it was written before this step existed. The script
-    # prompt does not consume it yet, so today a failure here costs only the log
-    # line — but the degradation is written now, while the reasoning is in view,
-    # rather than discovered later by a bad minute on the gateway.
-    understanding = None
-    try:
-        understanding = understand(topic, section)
-        print(f"    understood: {understanding.core_concept[:74]}")
-        print(f"      objective: {understanding.learning_objective[:72]}")
+    feedback = None
+
+    # READ THE SECTION ONCE, OUTSIDE THE LOOP. The retry below re-runs write_script
+    # with a grader's complaint attached, and what the section teaches has not
+    # changed between attempts — so re-reading it would buy a second opinion on a
+    # settled question at the price of another call. Cached per section too, so a
+    # deck with several shorts filed under one section pays for one reading.
+    # None when the reading failed; write_script then behaves exactly as before.
+    understanding = understanding_for(section, document=document)
+    if understanding:
+        print(f"    understood: {understanding.core_idea[:74]}")
+        print(f"      teaching: "
+              f"{' -> '.join(t.concept for t in understanding.teaching_sequence)[:70]}")
+        # Every plan is nullable BY DESIGN — understand() sets one to None when it
+        # fails its grader, so "quarantined" is a normal state here and not an
+        # error. Reading .kind off it unguarded took the whole short down.
+        _need = lambda p, a: getattr(p, a, None) or "quarantined"
+        print(f"      hook={_need(understanding.hook_plan, 'kind')} "
+              f"example={_need(understanding.example_plan, 'need')} "
+              f"misconception={_need(understanding.confusion_plan, 'need')}")
         if understanding.cannot_answer:
             print(f"      section does NOT establish: "
                   f"{'; '.join(understanding.cannot_answer)[:70]}")
-        for note in evidence_notes(understanding, section):
-            print(f"      ~ {note}")
-    except Exception as e:
+        # The depth gate, on the validated reading rather than on select's guess.
+        # Printed, not enforced: it grades the TOPIC CHOICE, and dropping a short
+        # on it would shrink the deck for a judgement made from four booleans. The
+        # length grader below is still the hard gate on the script itself.
+        depth = checks.check_plan_depth(understanding)
+        if not depth.passed:
+            print(f"      ~ {depth.reason}")
+    else:
         print(f"    understanding for {topic.id} unavailable "
-              f"({type(e).__name__}: {str(e)[:90]}) — writing from the section alone")
-
-    feedback = None
+              f"— writing from the section alone")
 
     for attempt in range(1, MAX_SCRIPT_RETRIES + 1):
-        script = write_script(topic, section, feedback, document=document)
-        results = checks.run_script_graders(script, section.text, doc_text=document)
+        script = write_script(topic, section, feedback, document=document,
+                              understanding=understanding)
+        # The SAME understanding that wrote the script grades it. Both sides of the
+        # loop read one object, so a retry is judged against the plan it was shown.
+        results = checks.run_script_graders(script, section.text, doc_text=document,
+                                            understanding=understanding)
         for r in results:
             print(f"    {r}")
 
@@ -145,7 +162,10 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
 
         # Every failed attempt is frozen, including the last one before we give up.
         saved = _save_rejected(topic, section, attempt, script, results)
-        feedback = "\n".join(f"- {r.name}: {r.reason}" for r in results if not r.passed)
+        # Grouped by revision area, correctness first, with the parts that already
+        # work named as things to keep. Same results, same retry count — see
+        # shorts/revision.py for why the flat list was costing attempts.
+        feedback = revision.feedback_for(results)
         print(f"    retry {attempt}/{MAX_SCRIPT_RETRIES} — froze attempt to rejected/{saved.name}")
     else:
         print(f"    GIVING UP on {topic.id} after {MAX_SCRIPT_RETRIES} attempts")

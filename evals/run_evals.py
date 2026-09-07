@@ -13,9 +13,9 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from shorts.schema import Script, ShortUnit
+from shorts.schema import Script, ShortUnit, SectionUnderstanding
 from shorts.parse import parse_markdown, find_section
-from shorts import checks
+from shorts import checks, revision
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,6 +27,7 @@ GRADERS = {
     "source_quotes":  lambda s, src: checks.check_source_quotes(s, src),
     "no_refusal":     lambda s, src: checks.check_no_refusal(s),
     "on_topic":       lambda s, src: checks.check_answers_its_section(s, src),
+    "no_repetition":  lambda s, src: checks.check_beats_develop(s),
 }
 
 #: Graders that read a whole ShortUnit — the FRAMES — rather than the script.
@@ -44,6 +45,32 @@ UNIT_GRADERS = {
     "frames_match_strategy": checks.check_frames_match_strategy,
     "one_hero_per_frame":    checks.check_one_hero_per_frame,
     "diagram_matches_narration": checks.check_diagram_matches_narration,
+}
+
+#: Graders that read a SCRIPT against the content understanding that produced it.
+#:
+#: These had no coverage here for the same reason the unit graders had none before
+#: them: the harness could load a Script and nothing else, so every check added in
+#: steps 5 to 9 — the ones that decide whether a short actually teaches — was
+#: unrunnable in CI. A grader with no case behind it drifts back to advisory.
+#:
+#: The functions are the PRODUCTION ones, imported, not reimplemented. This file
+#: decides what to feed them and what to expect; it never decides what they mean.
+CONTENT_GRADERS = {
+    "follows_sequence":   checks.check_follows_teaching_sequence,
+    "uses_example":       checks.check_uses_planned_example,
+    "handles_confusion":  checks.check_handles_confusion,
+    "opening_hook":       checks.check_opening_follows_hook,
+}
+
+#: Graders that read the UNDERSTANDING alone — the validators that quarantine a
+#: bad plan before any script is written.
+UNDERSTANDING_GRADERS = {
+    "teaching_sequence": checks.check_teaching_sequence,
+    "example_plan":      checks.check_example_plan,
+    "confusion_plan":    checks.check_confusion_plan,
+    "hook_plan":         checks.check_hook_plan,
+    "plan_depth":        checks.check_plan_depth,
 }
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
@@ -96,6 +123,105 @@ def run_unit_case(case: dict, sections) -> tuple[bool, str]:
         return False, f"reason missing {needle!r}; got: {result.reason}"
 
     return True, result.reason
+
+
+def load_content(fixture: str):
+    """A content fixture: an understanding, and usually the script written from it.
+
+    One file rather than two, because the pair is the unit under test — a script is
+    only right or wrong RELATIVE to the plan it was given, and splitting them makes
+    it possible to freeze a case whose halves no longer belong together.
+    """
+    data = json.loads((ROOT / fixture).read_text(encoding="utf-8"))
+    understanding = SectionUnderstanding(**data["understanding"])
+    script = Script(**data["script"]) if data.get("script") else None
+    return understanding, script
+
+
+def _check_expectations(result, exp: dict) -> tuple[bool, str]:
+    """The shared assertions: passed, skipped, and a substring of the reason."""
+    if result.passed != exp["passed"]:
+        return False, f"expected passed={exp['passed']}, got {result.passed} ({result.reason})"
+
+    if "skipped" in exp:
+        got = bool(result.details.get("skipped"))
+        if got != exp["skipped"]:
+            return False, f"expected skipped={exp['skipped']}, got {got} ({result.reason})"
+
+    needle = exp.get("reason_contains")
+    if needle and needle.lower() not in result.reason.lower():
+        return False, f"reason missing {needle!r}; got: {result.reason}"
+
+    return True, result.reason
+
+
+def run_content_case(case: dict, sections) -> tuple[bool, str]:
+    """A script graded against its own content understanding."""
+    understanding, script = load_content(case["fixture"])
+    source = source_for(case, sections)
+    name = case["grader"]
+
+    if name == "reaches_objective":
+        result = checks.check_reaches_objective(script, understanding)
+    elif name == "learning_outcome":
+        result = checks.check_learning_outcome(script, understanding, source)
+    else:
+        result = CONTENT_GRADERS[name](script, understanding, source)
+
+    ok, detail = _check_expectations(result, case["expect"])
+    if not ok:
+        return ok, detail
+
+    # A learning_outcome case may also pin which requirement broke, so a future
+    # change that fails the right short for the wrong reason is still caught.
+    for flag, want in (case["expect"].get("requirements") or {}).items():
+        got = result.details.get(flag)
+        if got != want:
+            return False, f"requirement {flag}: expected {want}, got {got}"
+    return True, detail
+
+
+def run_understanding_case(case: dict, sections) -> tuple[bool, str]:
+    """A plan validated on its own, before any script exists."""
+    understanding, _ = load_content(case["fixture"])
+    grader = UNDERSTANDING_GRADERS[case["grader"]]
+    return _check_expectations(grader(understanding, source_for(case, sections)),
+                               case["expect"])
+
+
+def run_revision_case(case: dict, sections) -> tuple[bool, str]:
+    """The whole grader suite, routed into a revision brief.
+
+    This is the only case type that runs every grader together, because that is
+    what it is testing: not whether one check fires, but whether the failures and
+    the SURVIVORS are sorted correctly for the retry. It reuses run_script_graders
+    and revision.route verbatim.
+    """
+    understanding, script = load_content(case["fixture"])
+    results = checks.run_script_graders(script, source_for(case, sections),
+                                        understanding=understanding)
+    plan = revision.route(results)
+    exp = case["expect"]
+
+    want_fix = exp.get("fix_areas")
+    if want_fix is not None and plan.failed_areas != want_fix:
+        return False, f"expected fix areas {want_fix}, got {plan.failed_areas}"
+
+    want_keep = exp.get("preserve_areas")
+    if want_keep is not None:
+        got = [a for a, _ in plan.preserve]
+        if got != want_keep:
+            return False, f"expected preserved areas {want_keep}, got {got}"
+
+    block = plan.as_feedback()
+    for needle in exp.get("block_contains", []):
+        if needle.lower() not in block.lower():
+            return False, f"revision block missing {needle!r}"
+    for needle in exp.get("block_excludes", []):
+        if needle.lower() in block.lower():
+            return False, f"revision block should not mention {needle!r}"
+
+    return True, f"fix={plan.failed_areas} preserve={[a for a, _ in plan.preserve]}"
 
 
 def run_judge_case(case: dict, sections) -> tuple[bool, str]:
@@ -159,6 +285,12 @@ def main():
                 ok, detail = run_code_case(case, sections)
             elif kind == "unit_grader":
                 ok, detail = run_unit_case(case, sections)
+            elif kind == "content_grader":
+                ok, detail = run_content_case(case, sections)
+            elif kind == "understanding_grader":
+                ok, detail = run_understanding_case(case, sections)
+            elif kind == "revision":
+                ok, detail = run_revision_case(case, sections)
             elif kind == "llm_judge":
                 ok, detail = run_judge_case(case, sections)
             else:

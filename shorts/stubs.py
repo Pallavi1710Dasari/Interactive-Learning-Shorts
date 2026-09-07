@@ -114,105 +114,92 @@ def _script(user: str) -> dict:
     # the padding that grader exists to reject, and the stub must not generate what
     # the graders reject.
     spans = _spans(sentences)
-    n_beats = max(MIN_ANSWERS, min(BEATS, len(spans) + 1))
+    # Capped by the sentences available, NOT floored at MIN_ANSWERS. Forcing four
+    # beats out of a three-sentence section is what the cycling did, and it is the
+    # padding check_beats_develop rejects — better to emit three and fail
+    # dialogue_shape honestly than to emit four that repeat.
+    n_beats = min(BEATS, len(spans), len(sentences))
 
-    # Fill each beat up to a per-beat word target, cycling the section's sentences
-    # when it is short. Built per-beat rather than by dealing a flat list into
-    # chunks, because check_dialogue_shape caps a single beat at MAX_ANSWER_WORDS
-    # and dealing sentences out blindly produced 44-word beats.
-    # PACK TO THE CAP, don't aim at the average.
+    # ONE DISTINCT SENTENCE PER BEAT, IN DOCUMENT ORDER. No cycling.
     #
-    # This used to be `budget // n_beats`, an even share of the target — and it
-    # undershot the floor once the window moved to 35-50s. The packing below is
-    # greedy over whole sentences and stops as soon as the NEXT sentence would
-    # cross MAX_BEAT_WORDS, so a beat reliably lands under whatever figure it is
-    # given. Handed 19 it produced 17, and five of those plus a short question is
-    # 85 words against an 87-word floor: every stub run failed timing three times
-    # and gave up, which takes the free end-to-end smoke test offline.
+    # Three shapes were tried here and the first two are instructive. Packing
+    # several sentences per beat and STOPPING when the next did not fit turned a
+    # section's one short sentence into a whole short beat. Packing and SKIPPING
+    # instead fixed that and broke something worse: skipping advances the sentence
+    # cursor, so the cursor wrapped and later beats were served sentences earlier
+    # beats had already used — check_beats_develop then found beats 3 and 4 were
+    # 100% words already heard, which is exactly right, because they were.
     #
-    # Aiming at MAX_BEAT_WORDS instead lets each beat fill as far as whole
-    # sentences allow, and the over-budget trim below already handles the other
-    # side. `budget` is still computed because that trim reads the same window.
-    budget = max(1, TARGET_WORDS - len(topic.split()))
-    per_beat = MAX_BEAT_WORDS
-
+    # Taking one sentence per beat cannot produce either fault. Every beat is a
+    # different span of the section, so novelty is structural rather than hoped
+    # for, and the citation is the span the beat was built from rather than one
+    # cycled independently of it.
+    #
+    # It also means the stub can no longer manufacture length. A section without
+    # enough distinct sentences produces a short script and fails timing, and that
+    # failure is the honest report: 4-5 beats that each say something new need a
+    # section with 4-5 things to say. content/css_specificity.md is sized for it;
+    # the thinner sample documents are not, and should fail here.
     beats = [{"speaker": "interviewer", "line": topic,
               "on_screen": _overlay(topic), "visual_ref": "v_question"}]
-    i = 0
     for n in range(1, n_beats + 1):
-        chosen, words, first = [], 0, None
-        # `tries` bounds the scan; `chosen` cannot, now that a sentence which does
-        # not fit is skipped rather than ending the beat.
-        tries = 0
-        while words < per_beat and tries < len(sentences) * 2:
-            s = sentences[i % len(sentences)]
-            i += 1
-            tries += 1
-            if first is None:
-                first = s
-            if chosen and words + len(s.split()) > MAX_BEAT_WORDS:
-                # SKIP, don't stop. Closing the beat here is what made a section's
-                # one short sentence into a whole short beat: "Paging removes the
-                # requirement for contiguity." is 6 words, the next sentence was 20,
-                # 6 + 20 > 22 so the beat ended at 6. Five beats built that way came
-                # to 83 words against an 87-word floor, so every stub run failed
-                # timing three times and gave up. Trying the next sentence instead
-                # lets a short one pair with another short one.
-                continue
-            chosen.append(s)
-            words += len(s.split())
-
-        line = " ".join(" ".join(chosen).split()[:MAX_BEAT_WORDS])
+        source = sentences[(n - 1) % len(sentences)]
+        line = " ".join(source.split()[:MAX_BEAT_WORDS])
         beats.append({"speaker": "student", "line": line,
                       "on_screen": _overlay(line), "visual_ref": f"v_step_{n}",
-                      # Verbatim by construction: the beat is assembled out of the
-                      # section's own sentences, so citing one of them is a real
-                      # citation and check_source_quotes passes honestly rather
-                      # than by being switched off. Cycled through the distinct
-                      # spans so no two beats lean on the same one.
+                      # Verbatim by construction, and now the span the beat was
+                      # actually built from rather than one cycled separately — so
+                      # the citation cannot drift away from the line it supports.
                       "source_quote": spans[(n - 1) % len(spans)]})
 
-    # TOP UP TO THE FLOOR — and read this before deciding it is a cheat.
+    # THE LAST BEAT LANDS THE OBJECTIVE, because _understanding reports one and
+    # check_reaches_objective asks whether the short ENDS on it. Without this the
+    # final beat landed on whatever the sentence cycle reached — section 3.2 ended
+    # on the valid bit while its stated objective was the page-number split,
+    # scoring 17% on the objective. The grader was right; the stub was modelling a
+    # short that stops somewhere other than its own idea.
     #
-    # The 35-50s window needs 87-125 narration words. Every section in the sample
-    # document is 47-78 words, and the beat cap is 22, so there is arithmetically
-    # no way to build an honest 87-word script out of one of them: section 3.3 is
-    # three sentences of 23, 28 and 12 words, which packs to 82 words at best.
+    # THE LAST SPAN, NOT THE FIRST, and that correction matters. The first cut used
+    # sentences[0] — which is also where beat 1 starts, so every stub short shipped
+    # with beats 1 and 3 IDENTICAL. check_beats_develop now fails exactly that, as
+    # it should, and a stub that models the defect a grader exists to catch fails
+    # the offline run on the stub instead of on the thing being tested.
     #
-    # That is a TRUE statement about the material, not a bug in the packer, and in
-    # the real pipeline it is the correct outcome — select.py's depth test now
-    # rejects sections this thin, and a script step that hit the floor by repeating
-    # itself would be caught by check_source_quotes' distinctness rule.
+    # _understanding computes the same `spans` from the same section text, so both
+    # halves agree on which sentence the objective is without sharing state.
     #
-    # The stub is the one place it is not the correct outcome, because the stub is
-    # fake content whose entire job is to exercise plumbing — parse, grade, assemble,
-    # write — for free, with the graders standing in as assertions. A stub that can
-    # never clear the floor takes the free end-to-end run offline permanently, and
-    # then nothing checks the plumbing at all. So it repeats a sentence to reach the
-    # floor, and the repetition is confined to HERE: nothing a model produces gets
-    # this treatment, and the distinctness rule still governs the citations.
-    total = sum(len(b["line"].split()) for b in beats)
-    if total < MIN_WORDS:
-        students = [b for b in beats if b["speaker"] == "student"]
-        while total < MIN_WORDS and students:
-            grew = False
-            for b in students:
-                have = b["line"].split()
-                if len(have) >= MAX_BEAT_WORDS:
-                    continue
-                extra = sentences[i % len(sentences)].split()
-                i += 1
-                room = MAX_BEAT_WORDS - len(have)
-                if not extra[:room]:
-                    continue
-                b["line"] = " ".join(have + extra[:room])
-                total = sum(len(x["line"].split()) for x in beats)
-                grew = True
-                if total >= MIN_WORDS:
-                    break
-            if not grew:
-                break
+    # The source_quote is left as the cycled span: still a verbatim span of the
+    # section, still distinct per beat, and never coupled to the assembled lines.
+    if len(beats) > 1 and spans:
+        landing = " ".join(spans[-1].split()[:MAX_BEAT_WORDS])
+        # Guard for a section so thin that its last span IS its first sentence:
+        # duplicating a beat to satisfy one grader while failing another is not a
+        # trade worth making, so the cycled line stays.
+        if landing not in [b["line"] for b in beats[:-1]]:
+            beats[-1]["line"] = landing
+            beats[-1]["on_screen"] = _overlay(landing)
 
+    # THERE IS NO TOP-UP TO THE LENGTH FLOOR, and there was one — briefly — so
+    # here is why it came out.
+    #
+    # The 35-50s window needs 87-125 spoken words. Every section of
+    # session_18_paging.md is 47-78 words, so the first attempt at this made the
+    # floor by appending cycled sentences to the earlier beats. It worked, in the
+    # sense that timing passed. Then check_beats_develop read the result and found
+    # beats 2, 3 and 4 were 100% words already heard — because that is precisely
+    # what cycling a short section is.
+    #
+    # Both graders were right, and together they say something true: a section with
+    # 66 words of content cannot produce five beats that each add something. No
+    # amount of arranging fixes that, and a stub that pads to satisfy one grader
+    # while tripping another models the defect the graders exist to catch — the
+    # offline run then fails on the stub instead of on the thing being tested.
+    #
+    # So the stub stays honest and the MATERIAL got richer: content/css_specificity.md
+    # has sections written to carry a 35-50s short, and that is what the free
+    # offline run points at. A thin document now fails the length gate here, which
+    # is the correct report — see check_plan_depth, which says the same thing about
+    # the reading before a word is written.
     # Last resort: trim the final beat rather than hand the grader a script we
     # already know is over budget.
     total = sum(len(b["line"].split()) for b in beats)
@@ -222,6 +209,102 @@ def _script(user: str) -> dict:
         beats[-1]["line"] = " ".join(tail[:keep])
 
     return {"short_id": short_id, "question": topic, "beats": beats}
+
+
+def _understanding(user: str) -> dict:
+    """A reading of the section built out of the section's own sentences.
+
+    THE POINT OF DOING IT HONESTLY. This block ends up inside the script prompt, so
+    a stub returning invented prose would be feeding the script stub words that
+    appear nowhere in the document — and the one thing an offline run exists to
+    prove is that grounding works for real rather than by being switched off. Every
+    string here is either a verbatim span of the section or a fixed phrase carrying
+    no claim about it.
+
+    cannot_answer is deliberately EMPTY. It is the field the script step is told to
+    steer away from, so a stub guessing at it would push the offline run off topics
+    the section does cover — a stub inventing a constraint the real pipeline never
+    had, which is the failure mode the module docstring warns about.
+    """
+    body = _find(r"THE SECTION TO READ.*?\n---\n(.*?)\n---", user, re.S) or ""
+    section_id = _find(r"THE SECTION TO READ — \[([^\]]+)\]", user) or ""
+
+    sentences = [s for s in re.split(r"(?<=\.)\s+", " ".join(body.split())) if s.strip()]
+    spans = _spans(sentences) if sentences else []
+
+    # THE SPAN THE SCRIPT ENDS ON — see the matching note in _script, which lands
+    # its final beat on the same one. Both halves derive `spans` from the same
+    # section text, so they agree without sharing state.
+    core_idea = spans[-1] if spans else "what this section explains"
+
+    # A sequence that PASSES check_teaching_sequence, honestly.
+    #
+    # Every `concept` is a span of the section, so the vocabulary check clears on
+    # the section's real words rather than on a grader being lenient. Two steps,
+    # not four, because the grader caps the sequence and a stub that modelled the
+    # rejected shape would fail the offline run on the stub.
+    #
+    # FIRST SPAN THEN LAST, in document order, which is also the order _script
+    # walks: beat 1 is assembled from the opening sentences and the final beat
+    # lands spans[-1]. Building the sequence from core_idea first — as this did
+    # while core_idea was a sentence — put step 1 wherever that sentence happened
+    # to be and produced a plan the stub's own script ran out of order.
+    #
+    # `purpose` and `explanation_goal` are fixed phrases carrying no claim about
+    # the material — the stub is proving the plumbing, and inventing a reason a
+    # step is needed would put words in the document's mouth.
+    sequence = []
+    for i, concept in enumerate(spans[:1] + spans[-1:] if len(spans) > 1 else spans[:1]):
+        sequence.append({
+            "concept": " ".join(concept.split()[:6]),
+            "purpose": f"stub step {i + 1}: establish what the section states here",
+            "explanation_goal": "learner can follow the next step",
+        })
+
+    return {
+        "section_id": section_id,
+        # A span of the section, not a description of it. See the docstring.
+        "core_idea": core_idea,
+        "key_points": spans[:3],
+        # NO HOOK PLAN AT ALL, which is a different claim from "direct" and the
+        # honest one here. `direct` asserts that the concept is this section's best
+        # opening — a judgement a stub is not entitled to make. None says no
+        # decision was reached, which is exactly true, and check_opening_follows_hook
+        # then skips cleanly.
+        #
+        # It also resolves a contradiction the stub cannot write its way out of.
+        # With a plan present, the leads-in rule wants the objective within the
+        # first two beats and check_reaches_objective wants it in the last one; a
+        # real script satisfies both by developing the same idea in new words,
+        # while a stub that only copies whole sentences would have to repeat one —
+        # which check_beats_develop now rejects, correctly. The hook path keeps its
+        # coverage from the frozen eval cases (E037 and friends), which test it far
+        # more precisely than a stub ever did.
+        "hook_plan": None,
+        "teaching_sequence": sequence,
+        "concrete_examples": [],
+        # not_needed, and honestly so: concrete_examples is empty above, because a
+        # stub cannot tell which of a section's nouns is a worked example without
+        # reading it. Claiming "required" would make the stub name something, and
+        # anything it named would be a fabrication — which check_example_plan would
+        # then correctly throw away, so the offline run would be exercising the
+        # quarantine path on every short instead of the normal one.
+        "example_plan": {"need": "not_needed", "example": "",
+                         "supports_step": None, "learner_takeaway": ""},
+        # not_needed for the same reason, and here it is the only honest answer
+        # available: common_confusions is empty above because a stub cannot know
+        # what a learner gets wrong, and a stub that claimed "required" would have
+        # to invent both a misconception and a correction. That is the one thing
+        # this whole field exists to prevent, and check_confusion_plan would throw
+        # it away — so the offline run would exercise the quarantine path on every
+        # short instead of the normal one.
+        "confusion_plan": {"need": "not_needed", "confusion": "",
+                           "relates_to_step": None, "correct_understanding": "",
+                           "learner_takeaway": ""},
+        "common_confusions": [],
+        "cannot_answer": [],
+        "source_evidence": spans[:2],
+    }
 
 
 def _spans(sentences: list[str]) -> list[str]:
@@ -357,39 +440,3 @@ def _visuals(user: str) -> dict:
         out.append({"ref": ref, "spec": f"Stub frame {i + 1}: hero on {cells[i]!r}.",
                     "frame": frame})
     return {"visuals": out}
-
-
-def _understanding(user: str) -> dict:
-    """
-    Understanding built out of the section's own sentences.
-
-    Same principle as _script: read the real text back rather than emitting
-    placeholders, so a stub run exercises understand.evidence_notes() for real
-    instead of proving only that the dict has the right keys.
-    """
-    # Same both-spellings caution as _script: this reaches into a real prompt.
-    section = (_find(r"THE SECTION — this is the authority.*?\n---\n(.*?)\n---", user, re.S)
-               or _find(r"THE SECTION.*?\n---\n(.*?)\n---", user, re.S)
-               or "")
-    section = " ".join(section.split())
-    topic = _find(r"TOPIC THIS SHORT WILL ANSWER:\s*(.+)", user) or "this topic"
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", section) if s.strip()]
-    long_enough = [s for s in sentences if len(s.split()) >= MIN_QUOTE_WORDS]
-
-    return {
-        "core_concept": (sentences[0] if sentences else topic)[:200],
-        "learning_objective": f"what {topic.rstrip('?')} comes down to"[:200],
-        "key_concepts": [s.split(".")[0][:60] for s in sentences[:3]] or ["the concept"],
-        "prerequisites": [],
-        "how_it_works": " ".join(sentences[:2])[:400] or "the section describes it directly",
-        "important_facts": [s[:180] for s in long_enough[:3]] or ["the section states it plainly"],
-        # null, not a placeholder: an invented example is the exact failure the real
-        # prompt forbids, and a stub that fakes one trains nobody's eye for it.
-        "example": None,
-        "misconceptions": [],
-        "can_answer": [topic[:120]],
-        "cannot_answer": [],
-        # Verbatim, so evidence_notes() reports zero drift on a stub run. A stub
-        # that trips its own diagnostics teaches you to ignore them.
-        "source_evidence": long_enough[:3],
-    }

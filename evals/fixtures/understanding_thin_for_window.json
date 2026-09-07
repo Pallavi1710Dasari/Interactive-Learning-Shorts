@@ -1,0 +1,29 @@
+{
+  "understanding": {
+    "section_id": "3.5",
+    "core_idea": "Paging trades external fragmentation for internal fragmentation, wasting on average half a page per process.",
+    "key_points": [
+      "internal fragmentation replaces external"
+    ],
+    "teaching_sequence": [
+      {
+        "concept": "Internal fragmentation",
+        "purpose": "Name what paging introduces in place of external fragmentation",
+        "explanation_goal": "Learner understands the waste sits inside the final page"
+      },
+      {
+        "concept": "Average waste of half a page",
+        "purpose": "Quantify the cost so the trade-off is judgeable",
+        "explanation_goal": "Learner understands why very large pages are not automatically better"
+      }
+    ],
+    "concrete_examples": [],
+    "example_plan": { "need": "not_needed" },
+    "common_confusions": [],
+    "confusion_plan": { "need": "not_needed" },
+    "cannot_answer": [],
+    "source_evidence": [
+      "The average waste is half a page per process, which is why very large page sizes are not automatically better."
+    ]
+  }
+}

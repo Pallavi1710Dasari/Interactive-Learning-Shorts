@@ -1,0 +1,33 @@
+{
+  "short_id": "develops_steps",
+  "question": "What happens on a page fault?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What happens on a page fault?",
+      "on_screen": "What happens on a page fault?",
+      "visual_ref": "v_q"
+    },
+    {
+      "speaker": "student",
+      "line": "When the valid bit is clear the MMU raises a page fault trap to the operating system.",
+      "on_screen": "When the valid bit is clear",
+      "visual_ref": "v_1",
+      "source_quote": "it raises a page\nfault trap to the operating system"
+    },
+    {
+      "speaker": "student",
+      "line": "The OS locates the page on the backing store and issues the disk read.",
+      "on_screen": "The OS locates the page on",
+      "visual_ref": "v_2",
+      "source_quote": "The OS locates the page on the backing"
+    },
+    {
+      "speaker": "student",
+      "line": "It then updates the page table entry and restarts the instruction that faulted.",
+      "on_screen": "It then updates the page table",
+      "visual_ref": "v_3",
+      "source_quote": "restarts the instruction that faulted"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "short_id": "repeat_shipped_recap",
+  "question": "Why do we need the doctype, html, head, and body tags if the head is often left blank?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "Why do we need the doctype, html, head, and body tags if the head is often left blank?",
+      "on_screen": "Why do we need the doctype,",
+      "visual_ref": "v_q"
+    },
+    {
+      "speaker": "student",
+      "line": "This is the basic structure of any HTML document, doctype, html, head, and body, always together.",
+      "on_screen": "This is the basic structure of",
+      "visual_ref": "v_1"
+    },
+    {
+      "speaker": "student",
+      "line": "The doctype line tells the browser this document follows the HTML structure from the start.",
+      "on_screen": "The doctype line tells the browser",
+      "visual_ref": "v_2"
+    },
+    {
+      "speaker": "student",
+      "line": "Inside the html tag, head comes first, then body follows, holding your code right there.",
+      "on_screen": "Inside the html tag, head comes",
+      "visual_ref": "v_3"
+    },
+    {
+      "speaker": "student",
+      "line": "So doctype, html, head, and body together form the structure every document follows, no matter what.",
+      "on_screen": "So doctype, html, head, and body",
+      "visual_ref": "v_4"
+    }
+  ]
+}

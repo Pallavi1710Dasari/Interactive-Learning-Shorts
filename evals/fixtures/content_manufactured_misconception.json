@@ -1,0 +1,59 @@
+{
+  "understanding": {
+    "section_id": "3.3",
+    "core_idea": "A page fault is a trap to the operating system, which loads the page and restarts the instruction that faulted.",
+    "teaching_sequence": [
+      {
+        "concept": "The valid bit is clear",
+        "purpose": "Show what triggers the fault",
+        "explanation_goal": "Learner understands what the MMU detects"
+      },
+      {
+        "concept": "The page fault trap to the operating system",
+        "purpose": "Name what happens",
+        "explanation_goal": "Learner understands the OS is handed control"
+      },
+      {
+        "concept": "Restarting the faulting instruction",
+        "purpose": "Close the loop",
+        "explanation_goal": "Learner understands the program continues"
+      }
+    ],
+    "confusion_plan": {
+      "need": "not_needed"
+    }
+  },
+  "script": {
+    "short_id": "manufactured",
+    "question": "What happens on a page fault?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "What happens on a page fault?",
+        "on_screen": "What happens on a page fault?",
+        "visual_ref": "v_q"
+      },
+      {
+        "speaker": "student",
+        "line": "The MMU reads a page table entry and checks the valid bit.",
+        "on_screen": "The MMU reads a page table",
+        "visual_ref": "v_1",
+        "source_quote": "it raises a page\nfault trap to the operating system"
+      },
+      {
+        "speaker": "student",
+        "line": "A common mistake is thinking the page table is searched linearly.",
+        "on_screen": "A common mistake is thinking the",
+        "visual_ref": "v_2",
+        "source_quote": "The OS locates the page on the backing"
+      },
+      {
+        "speaker": "student",
+        "line": "The OS restarts the instruction that faulted.",
+        "on_screen": "The OS restarts the instruction that",
+        "visual_ref": "v_3",
+        "source_quote": "restarts the instruction that faulted"
+      }
+    ]
+  }
+}

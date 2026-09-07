@@ -125,6 +125,20 @@ Total spoken words across ALL beats: {MIN_WORDS} minimum, {MAX_WORDS} maximum,
 {TARGET_WORDS} is the target — about 45 seconds. Speech runs 150 words per minute,
 so this IS the video length.
 
+DO THE ARITHMETIC BEFORE YOU ANSWER, because the floor is easy to miss by writing
+well. {MIN_WORDS} words is FIVE answer beats of about 19 words each, plus the
+question. Five is therefore the norm here, not the upper option. Four beats only
+reaches the floor if every one of them is 22-24 words — at the cap, not near it.
+
+This is the single most common way a good script gets rejected: four beats of 15
+to 18 words reads tightly, says everything, and comes to about 70 words, which is
+under {MIN_WORDS} and fails. Nothing is wrong with such a draft except that it is
+a 28-second short and this format is {MIN_SECONDS}-{MAX_SECONDS} seconds. If yours
+lands there, DO NOT pad the beats you have — add the beat the plan gives you that
+you left out: the next teaching step, the example, or the correction. Count the
+words of your draft, and if it is short, look at the PLAN for what is missing
+rather than at your sentences for what can be stretched.
+
 THE FLOOR IS NOT A LICENCE TO PAD. This is the failure mode of a wider window and
 it has already happened once in this project: every beat verbatim-cited, every
 grader green, and nothing taught after beat one.

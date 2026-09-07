@@ -1969,6 +1969,45 @@ def check_teaching_sequence(understanding, section_text: str | None = None) -> G
             return GraderResult("teaching_sequence", False, "; ".join(drifted),
                                 {"steps": len(steps), "drifted": drifted})
 
+    # --- DOES IT END ON THE OBJECTIVE ---------------------------------------
+    #
+    # THE PLAN AND THE SCRIPT GRADERS WERE JOINTLY UNSATISFIABLE WITHOUT THIS, and
+    # a real run is what showed it. The reading returned a four-step sequence whose
+    # last step was "Ids beat any number of classes" — true, on the page, and a
+    # DETAIL rather than the core idea. The script then did as it was told:
+    # follows_sequence passed (it accepts the final step OR the objective, so
+    # landing on the step is enough), and check_reaches_objective failed, because
+    # the last beat carried 15% of the objective against a floor of 20%. Three
+    # script attempts, all rejected, none of them the script's fault — the plan
+    # steered it into a wall.
+    #
+    # UNDERSTANDING_SYSTEM already asks for this in words: the sequence "must stay
+    # on core_idea" and "ends ON the objective rather than on a summary of it".
+    # Nothing checked it, so a plan that ignored the instruction shipped with the
+    # authority of a plan.
+    #
+    # Checked with the SAME measure and threshold check_reaches_objective lands
+    # with, deliberately — the two must agree about what "ends on the idea" means,
+    # or quarantining here would still leave scripts failing there.
+    #
+    # Quarantining is also the cheap outcome: this runs on the reply to the one
+    # understanding call, so catching it costs nothing, while missing it costs
+    # three script calls and a topic.
+    objective = (getattr(understanding, "core_idea", "") or "").strip()
+    if objective:
+        final = steps[-1]
+        landing = _grounded_share_of(
+            objective, f"{final.concept} {final.explanation_goal}")
+        if landing < MIN_OBJECTIVE_LANDING:
+            return GraderResult("teaching_sequence", False,
+                f"the sequence ends on a detail, not the idea: its last step is "
+                f"{final.concept!r}, which carries {landing:.0%} of the objective "
+                f"({objective[:70]!r}) against a {MIN_OBJECTIVE_LANDING:.0%} floor. A "
+                f"script that follows this plan faithfully ends somewhere other than "
+                f"the thing the short exists to say, and check_reaches_objective "
+                f"rejects it. Order the steps so the LAST one is the objective.",
+                {"landing": landing, "final_step": final.concept})
+
     return GraderResult("teaching_sequence", True,
         f"{len(steps)} step(s), complete, on the objective, from the section's own concepts",
         {"steps": len(steps)})
@@ -2221,7 +2260,23 @@ MAX_EXAMPLE_DISTANCE = 1
 #: small integer is not.
 _LITERAL_PATTERNS = (
     re.compile(r"`([^`]+)`"),                            # `input()`, `color: blue;`
-    re.compile(r"\b([A-Za-z_][\w-]*\s*[:=]\s*[^\s,.;]+)"),   # font-family: "Roboto"
+    # A DECLARATION, NOT EVERY COLON IN EVERY SENTENCE. The property side must be
+    # hyphenated (font-family, background-size) or an assignment with `=`, because
+    # the bare `word: word` form this used to be matched ordinary prose:
+    #
+    #   "It counts three things separately: id selectors, then classes"  -> 'separately: id'
+    #   "Two things matter here: order and specificity"                  -> 'here: order'
+    #
+    # Both were then reported as invented examples and the script was rejected, on
+    # narration that named nothing concrete at all. A real run lost three script
+    # calls to the first one.
+    #
+    # Single-word CSS properties (color, display, margin) are still caught by the
+    # backtick pattern above, which is how a script ought to be writing them, and
+    # missing an unbackticked one is the right way to be wrong here — the module
+    # already says a false failure costs a real script call.
+    re.compile(r"\b([A-Za-z_][\w-]*-[\w-]*\s*:\s*[^\s,.;]+)"),  # font-family: "Roboto"
+    re.compile(r"\b([A-Za-z_][\w-]*\s*=\s*[^\s,.;]+)"),          # x = 5
     re.compile(r"\b([A-Za-z_][\w.]*\(\))"),              # input(), len()
     # NO TRAILING \b: a word boundary cannot hold after a non-word character, so
     # "40%" — a fabricated statistic, the single most important literal to catch —

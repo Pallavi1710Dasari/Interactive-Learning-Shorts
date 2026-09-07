@@ -15,19 +15,36 @@ WORDS_PER_SECOND = WORDS_PER_MINUTE / 60.0
 
 # The length window, in seconds of speech.
 #
-# Was 30-60. The floor was forcing padding: a question whose honest answer is three
-# short sentences had to be inflated to 75 words to clear it, and the extra beat was
-# always the weakest one — a restatement, or a claim propped up by a citation that
-# did not really support it. Short and clear beats long and padded, and a viewer
-# decides in the first few seconds anyway.
+# READ THE HISTORY BEFORE MOVING THESE. It has gone 30-60 -> 18-45 -> 12-28 -> and
+# now back up to 35-50, and the two cuts were not mistakes: each one fixed a real
+# defect that the raise can bring back.
 #
-# 18s is about 45 words, which is three real sentences. If a topic cannot be
-# answered in that, it is too big for one short and belongs to the select step.
-#: Cut again, from 18-45. At 45 seconds a short is five points long, and five
-#: points is what made these unmemorable — see checks.MAX_ANSWERS. A question and a
-#: two-or-three-part answer is 35-60 words, which is 14 to 24 seconds.
-MIN_SECONDS = 12
-MAX_SECONDS = 28
+# Why it was cut, twice:
+#   30-60 -> 18-45  The floor forced padding. A question whose honest answer is
+#                   three short sentences had to be inflated to 75 words, and the
+#                   extra beat was always the weakest — a restatement, or a claim
+#                   propped up by a citation that did not really support it.
+#   18-45 -> 12-28  At 45 seconds a short was five points long, and five points is
+#                   what made these unmemorable. One idea and its consequence is
+#                   recallable a week later; five lands none of them.
+#
+# Why it is going back up, and why this is not a repeat of the thing that failed:
+# BOTH cuts were fixing the same defect, and it was never length itself — it was
+# length applied to a topic that did not have the content to fill it. A 45-second
+# short built by stretching a three-sentence answer is padding at any window. A
+# 45-second short built on a concept that genuinely carries a mechanism, its
+# consequence, and a worked example is not.
+#
+# So the floor is only honest if the SELECT step is the thing that changed, and it
+# is: select now requires a topic to have that depth in its own section before it
+# may be returned (see skills/select.py, "ENOUGH TO FILL THE WINDOW"). Raising this
+# window WITHOUT that change reproduces the 18-45 failure exactly.
+#
+# What holds the memorability half in place is not the window, it is
+# checks.MAX_ANSWER_WORDS, which stays at 24. More beats, each still one idea —
+# never longer beats. 35s is ~87 words, 50s is ~125, and the target is ~45s / ~112.
+MIN_SECONDS = 35
+MAX_SECONDS = 50
 MAX_OVERLAY_WORDS = 8
 
 
@@ -66,6 +83,21 @@ class Topic(BaseModel):
     # still load. Newly selected topics without one are dropped by select.py.
     answer_quote: Optional[str] = None
 
+    # Which of mechanism / consequence / example / misconception the topic's own
+    # section actually holds — the depth test in select.py's prompt.
+    #
+    # Recorded rather than merely required, because the length window (35-50s) only
+    # works when topics have the substance to fill it, and "did select really check
+    # that?" is otherwise unanswerable after the fact. When a padded short turns up
+    # in review this is the field that says whether selection let a thin topic
+    # through or the script step padded a rich one — two different bugs with two
+    # different fixes.
+    #
+    # Free-form list, not an enum, and optional: older topics.json files predate it
+    # and a model that returns an unexpected label should not fail validation over
+    # a diagnostic.
+    depth: list[str] = Field(default_factory=list)
+
     # How much this question matters, 1-5, against the rubric in select.py.
     #
     # This exists because selection was returning correct, answerable, forgettable
@@ -94,6 +126,77 @@ class TopicList(BaseModel):
         if not 1 <= len(v) <= 12:
             raise ValueError(f"expected 1-12 topics, got {len(v)}")
         return v
+
+
+class SectionUnderstanding(BaseModel):
+    """
+    Output of SKILL 1b — what the section actually teaches, before anything writes.
+
+    THE CONTENT BRAIN, AND WHY IT IS SEPARATE FROM THE WRITER
+    write_script is handed a topic and a section and asked to do two jobs at once:
+    work out what the section teaches, and turn that into interview beats inside a
+    12-28 second budget. A model asked for two things does the answerable one, and
+    the answerable one is "produce four beats that quote this text" — so
+    comprehension happened as a side effect of drafting, was never written down,
+    and could not be inspected, graded or reused across the three retry attempts.
+
+    This model is that comprehension, made explicit and cheap to look at.
+
+    NOTHING HERE IS A SOURCE OF QUOTES. `source_evidence` carries sentences the
+    section really contains, but checks.check_source_quotes deliberately matches a
+    beat against the SECTION and nothing else (see its docstring — four of fifteen
+    shipped shorts scored faithfulness 2/5 when quotes were accepted from anywhere).
+    Feeding this model's prose back in as quotable material would re-open exactly
+    that hole, so every field here is understanding, never citation.
+    """
+
+    #: What this topic is actually teaching, in one sentence.
+    core_concept: str
+
+    #: What the student should understand after watching. One sentence, from the
+    #: learner's side: "why a page table is needed", not "explain page tables".
+    learning_objective: str
+
+    #: The ideas needed to explain the core concept.
+    key_concepts: list[str] = Field(default_factory=list)
+
+    #: What the student needs to know BEFORE this lands. Named from the section's
+    #: own vocabulary; an empty list means the section is self-contained.
+    prerequisites: list[str] = Field(default_factory=list)
+
+    #: The actual mechanism, process or relationship — the part that makes this a
+    #: concept rather than a definition.
+    how_it_works: str
+
+    #: Facts the section supports. Paraphrase is fine and expected; these are for
+    #: the writer to understand, not to copy.
+    important_facts: list[str] = Field(default_factory=list)
+
+    #: An example the SECTION provides. None when it provides none — an invented
+    #: example is the single most likely way this step could poison a script, so
+    #: the field is nullable rather than defaulted to a placeholder.
+    example: Optional[str] = None
+
+    #: Confusions worth steering around, and ONLY when the section itself gives
+    #: grounds for them. Empty is the correct answer for most sections; a list
+    #: padded with generic misconceptions is how a reel ends up arguing with a
+    #: mistake the learner was never going to make.
+    misconceptions: list[str] = Field(default_factory=list)
+
+    #: What this section clearly settles.
+    can_answer: list[str] = Field(default_factory=list)
+
+    #: What it does NOT establish. This is the field with teeth: it is the honest
+    #: boundary the writer has to respect, and it is what makes "answer the
+    #: narrower question the section supports" a decidable instruction rather than
+    #: a hope. It complements skills/select.drop_unsupported rather than replacing
+    #: it — that screen decides whether a topic ships at all, this describes the
+    #: limits of one that already did.
+    cannot_answer: list[str] = Field(default_factory=list)
+
+    #: Sentences or claims from the section that carry the answer. GROUNDING ONLY.
+    #: Not quotable output — see the class docstring.
+    source_evidence: list[str] = Field(default_factory=list)
 
 
 class Beat(BaseModel):
@@ -566,6 +669,20 @@ class ShortUnit(BaseModel):
     visuals: dict[str, Visual]
     audio: Optional[Audio] = None
     eval: Optional[EvalReport] = None
+
+    #: What SKILL 1b understood about the source section before the script existed.
+    #:
+    #: RECORDED SO IT CAN BE READ, on the same terms as vision_scores below. The
+    #: understanding is computed once per short and was otherwise a thing that
+    #: happened inside one process and vanished — which makes "was this reel weak
+    #: because the section is thin, or because the writer wandered?" a question you
+    #: could only answer by paying for the reading again.
+    #:
+    #: Nothing downstream consumes it yet. skills/script.py's prompt is unchanged;
+    #: wiring it in is a separate change so the judge's scores can attribute the
+    #: difference. Optional and None by default, so all 37 units written before this
+    #: field existed still load.
+    understanding: Optional[SectionUnderstanding] = None
     #: What the vision judge scored each frame, kept instead of thrown away.
     #:
     #: RECORDED, NEVER READ BACK. judge_frames already rasterises every frame and

@@ -413,3 +413,19 @@ VOICE_BEAT_GAP = _f("VOICE_BEAT_GAP", 0.45)
 
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+# --------------------------------------------------------------------- theme
+#
+# Which visual theme layout.py draws with, and web/src/styles.css dresses the
+# player in. Two values today:
+#
+#   "paper"  the original — a light card on a green/teal starfield.
+#   "neon"   glowing strokes on black, in the idiom of the animated CS explainers
+#            the reviewer pointed at (bugCoder's stack push/pop short).
+#
+# This is a SWITCH, not a rewrite: both palettes live side by side in
+# layout.THEMES, so `REEL_THEME=paper python -m shorts.redraw` puts every diagram
+# back exactly as it was. Nothing about the narration, timing or voice changes
+# with it — the theme only decides colour, glow and the ground they sit on.
+REEL_THEME = os.getenv("REEL_THEME", "paper").strip().lower()

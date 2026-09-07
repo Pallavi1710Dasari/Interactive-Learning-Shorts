@@ -30,6 +30,7 @@ the model used to have to remember to add. See web/src/AnimatedSvg.tsx.
 import re
 
 from ..schema import Frame, Cell, TableRow, Panel, Sample, Glyph
+from .. import config
 
 VIEW = 1080
 MARGIN = 60
@@ -72,28 +73,98 @@ MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
 # the one thing on the frame that is not the theme colour — amber on blue separates
 # more cleanly than amber on green did, so the emphasis reads better than before
 # rather than worse.
-FILL = "#E4EEFA"     # was #E1F5EE — the light tint behind a "plain" element
-STROKE = "#2A78C2"   # was #1D9E75 — every line, border and arrow
-DEEP = "#12497B"     # was #0F6E56 — hero borders and pictogram strokes
-AMBER = "#F2B14B"
-CORAL = "#E8735A"
-INK = "#2C2C2A"
-MUTED = "#8A8880"
-PAPER = "#F4F5F3"
+#: Two palettes, side by side. Which one is live is config.REEL_THEME, so trying
+#: the new look is `REEL_THEME=neon python -m shorts.redraw` and undoing it is the
+#: same command with `paper` — nothing is destroyed by looking.
+#:
+#: "panel" is new and exists because of a coupling: the code template drew its dark
+#: panel with fill=INK, which is only correct while INK happens to be near-black.
+#: Once a theme wants light type, the panel needs its own token or the snippet
+#: renders as dark text on a light slab.
+#:
+#: "glow" is the bloom's blur radius in user units, 0 for none.
+THEMES: dict[str, dict] = {
+    # Byte-for-byte what shipped, so `paper` reproduces every diagram already on
+    # disk exactly rather than approximately.
+    "paper": {
+        "fill": "#E4EEFA",   # was #E1F5EE — the light tint behind a "plain" element
+        "stroke": "#2A78C2", # was #1D9E75 — every line, border and arrow
+        "deep": "#12497B",   # was #0F6E56 — hero borders and pictogram strokes
+        "amber": "#F2B14B", "coral": "#E8735A",
+        "ink": "#2C2C2A", "muted": "#8A8880", "paper": "#F4F5F3",
+        "panel": "#2C2C2A", "glow": 0.0,
+    },
+    # Glowing outlines on black.
+    #
+    # The reference draws EVERY object as an unfilled outline with a bloom and puts
+    # the only saturated colour inside it — a yellow letter on a black tile. That
+    # is why its frames read at arm's length: one bright thing, everything else a
+    # line. So the fills here are near-black rather than tinted (a light fill has
+    # nothing for a glow to register against) and the role is carried by the
+    # stroke and the ink instead of by the fill.
+    "neon": {
+        "fill": "#0B1020", "stroke": "#3B5BFF", "deep": "#8FA8FF",
+        "amber": "#FFC53D", "coral": "#FF6B4A",
+        "ink": "#E9EEFF", "muted": "#5C6780", "paper": "#080B14",
+        "panel": "#05070E", "glow": 3.0,
+    },
+}
+
+_THEME = THEMES.get(config.REEL_THEME, THEMES["paper"])
+
+FILL   = _THEME["fill"]
+STROKE = _THEME["stroke"]
+DEEP   = _THEME["deep"]
+AMBER  = _THEME["amber"]
+CORAL  = _THEME["coral"]
+INK    = _THEME["ink"]
+MUTED  = _THEME["muted"]
+PAPER  = _THEME["paper"]
+PANEL  = _THEME["panel"]
+
+#: The palette a `preview` frame simulates a RENDERED PAGE with, and deliberately
+#: the same in every theme.
+#:
+#: A preview frame's job is to show what a CSS declaration does to a web page, and
+#: the honest ground for judging `color: blue` is the near-white a page actually
+#: has. Themed, it followed PAPER to near-black, where "blue" is both unreadable
+#: and a lie about what the rule produces — the frame stopped demonstrating the one
+#: thing it exists to demonstrate. So the page keeps its own colours and the reel
+#: theme dresses everything around it.
+PAGE_GROUND = "#F4F5F3"
+PAGE_INK    = "#2C2C2A"
+PAGE_MUTED  = "#8A8880"
+GLOW   = float(_THEME["glow"])
 
 #: fill, stroke, ink for each role.
-ROLE_COLOURS: dict[str, tuple[str, str, str]] = {
-    "plain": (FILL, STROKE, INK),
-    "hero":  (AMBER, DEEP, INK),
-    "lost":  ("#FBE3DE", CORAL, INK),
-    "quiet": (PAPER, MUTED, MUTED),
-}
+#:
+#: Written out per theme rather than derived, because the two themes point with
+#: DIFFERENT channels. On paper the hero is an amber FILL with a dark border. On
+#: neon a bright fill would swallow the letter sitting on it, so the hero keeps the
+#: near-black tile and goes amber in its BORDER and its TYPE — which is exactly
+#: what the reference does to its top-of-stack box.
+if config.REEL_THEME == "neon":
+    ROLE_COLOURS: dict[str, tuple[str, str, str]] = {
+        "plain": (FILL,      STROKE, INK),
+        "hero":  ("#1A1206", AMBER,  AMBER),
+        "lost":  ("#1A0A08", CORAL,  CORAL),
+        "quiet": (PAPER,     MUTED,  MUTED),
+    }
+else:
+    ROLE_COLOURS: dict[str, tuple[str, str, str]] = {
+        "plain": (FILL, STROKE, INK),
+        "hero":  (AMBER, DEEP, INK),
+        "lost":  ("#FBE3DE", CORAL, INK),
+        "quiet": (PAPER, MUTED, MUTED),
+    }
 
 #: Ink for text drawn ON the dark code panel. The role colours above are ink for
 #: text inside a LIGHT box, so reusing them there would print near-black on
 #: near-black. Same roles, inverted ground.
 CODE_INK: dict[str, str] = {
-    "plain": FILL,
+    # On neon, FILL is near-black and the panel is near-black too, so "plain" needs
+    # a real light value here instead of the tint that worked on paper.
+    "plain": "#9FB4FF" if config.REEL_THEME == "neon" else FILL,
     "hero":  AMBER,
     "lost":  CORAL,
     "quiet": MUTED,
@@ -1368,7 +1439,12 @@ def _preview(frame: Frame, enter: int) -> tuple[str, int]:
         # very thing the frame exists to show — the viewer cannot judge a colour
         # against a strong tint. So a sample carrying its own colour sits on paper
         # and states its role through the border alone.
-        card_fill = ground or (PAPER if colour else fill)
+        # True when this sample is standing in for a rendered page — either the
+        # model gave it a ground, or it carries a colour that has to be judged.
+        # Those get the page palette; a pure typography sample keeps the theme's,
+        # because a typeface reads correctly light-on-dark and a colour does not.
+        on_page = bool(ground or colour)
+        card_fill = ground or (PAGE_GROUND if colour else fill)
         card = (f'<rect x="{MARGIN}" y="{y:.0f}" width="{USABLE}" height="{band:.0f}" '
                 f'rx="16" fill="{card_fill}" stroke="{stroke}" stroke-width="'
                 f'{6 if sample.role in ("hero", "lost") else 3}"/>')
@@ -1380,7 +1456,7 @@ def _preview(frame: Frame, enter: int) -> tuple[str, int]:
         lines, fs = fit(text, USABLE - 80, int(room * 0.72), 22, max_lines=1)
         fs = max(20, int(fs * (scales[i] / biggest)))
 
-        style = f'font-size="{fs}" fill="{colour or ink}"'
+        style = f'font-size="{fs}" fill="{colour or (PAGE_INK if on_page else ink)}"'
         stack = _font_stack(sample.font)
         style += f' font-family="{esc(stack)}"' if stack else ""
         style += f' font-weight="{sample.weight}"' if sample.weight else ' font-weight="600"'
@@ -1391,7 +1467,8 @@ def _preview(frame: Frame, enter: int) -> tuple[str, int]:
 
         if sample.label:
             capt, cs = fit(sample.label, USABLE - 80, int(label_h * 0.72), 20, max_lines=1)
-            body += text_block(capt, VIEW / 2, y + band - label_h * 0.42, cs, MUTED, 600)
+            body += text_block(capt, VIEW / 2, y + band - label_h * 0.42, cs,
+                               PAGE_MUTED if on_page else MUTED, 600)
 
         out += group(card + body, enter, "focus" if sample.role == "hero" else None)
         enter += 1
@@ -1539,7 +1616,7 @@ def _code(frame: Frame, enter: int) -> tuple[str, int]:
     text_top = top + chrome_h + pad
 
     chrome = (f'<rect x="{MARGIN}" y="{top:.0f}" width="{USABLE}" height="{height:.0f}" '
-              f'rx="22" fill="{INK}" stroke="{DEEP}" stroke-width="5"/>')
+              f'rx="22" fill="{PANEL}" stroke="{DEEP}" stroke-width="5"/>')
     chrome += (f'<line x1="{MARGIN}" y1="{top + chrome_h:.0f}" '
                f'x2="{MARGIN + USABLE}" y2="{top + chrome_h:.0f}" '
                f'stroke="{MUTED}" stroke-width="2" opacity="0.45"/>')
@@ -1675,6 +1752,26 @@ def render(frame: Frame) -> str:
         f'font-family="Inter, Helvetica, sans-serif">'
     ]
 
+    # The bloom, when the theme asks for one.
+    #
+    # Deliberately NOT a background rect: cropFor() in web/src/AnimatedSvg.tsx zooms
+    # to the bounding box of the ink, so a rect covering the viewBox would make
+    # every frame's bbox the full canvas and silently kill the zoom. The dark ground
+    # is the card's job — `.reel .stageinner` in styles.css, mirrored in
+    # raster.CARD_BACKGROUND.
+    #
+    # One filter on one wrapping <g>, rather than a blurred duplicate of the markup:
+    # duplicating would double every data-enter node and the animator would bind to
+    # both copies. feMerge stacks the blur twice for intensity and then lays the
+    # untouched SourceGraphic over it, so strokes gain a halo while type stays crisp.
+    if GLOW:
+        parts.append(
+            f'<defs><filter id="bloom" x="-25%" y="-25%" width="150%" height="150%">'
+            f'<feGaussianBlur stdDeviation="{GLOW}" result="b"/>'
+            f'<feMerge><feMergeNode in="b"/><feMergeNode in="b"/>'
+            f'<feMergeNode in="SourceGraphic"/></feMerge>'
+            f'</filter></defs><g filter="url(#bloom)">')
+
     enter = 1
     title = band_text(frame.title, TITLE_TOP, TITLE_BOTTOM, 64, 40, INK, 700, enter)
     if title:
@@ -1695,5 +1792,7 @@ def render(frame: Frame) -> str:
     # A frame earns its place by drawing the thing. If an idea needs a sentence to
     # land, the sentence is the voice's job — it is already being said.
 
+    if GLOW:
+        parts.append("</g>")
     parts.append("</svg>")
     return "".join(p for p in parts if p)

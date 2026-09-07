@@ -85,7 +85,14 @@ const DRAW_MS = 520;
 //: The travelling payload — see ferry(). Amber, because it is the one thing on the
 //: frame that is moving and the palette already reserves amber for "look here".
 const TOKEN_R = 13;
-const TOKEN_FILL = "#F2B14B";
+//: Read from the stylesheet rather than frozen here, so a theme switch moves the
+//: dot with the palette. Falls back to the paper amber if the var is absent.
+const TOKEN_FILL_FALLBACK = "#F2B14B";
+function tokenFill(): string {
+  const v = getComputedStyle(document.documentElement)
+    .getPropertyValue("--reel-amber").trim();
+  return v || TOKEN_FILL_FALLBACK;
+}
 //: One crossing. Slow enough to follow with the eye, short enough to repeat two or
 //: three times inside a typical beat so a viewer who looked away still catches one.
 const TRAVEL_MS = 1500;
@@ -94,7 +101,11 @@ const TRAVEL_MS = 1500;
 const TOKEN_SAMPLES = 24;
 
 /** The palette's amber — SVG_SYSTEM reserves it for the element under discussion. */
-const AMBER = /#f2b14b/i;
+//: Every theme's amber, matched together. This is how focus is DETECTED, so a
+//: palette whose amber is missing from this alternation loses its focus animation
+//: silently — no error, the frame just stops emphasising anything. Add the hex here
+//: whenever layout.THEMES gains one.
+const AMBER = /#f2b14b|#ffc53d/i;
 
 export function AnimatedSvg({ svg, beatKey, composition, beatMs }: {
   svg: string;
@@ -344,7 +355,7 @@ function ferry(group: SVGElement, delay: number): Animation[] {
 
     const token = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     token.setAttribute("r", String(TOKEN_R));
-    token.setAttribute("fill", TOKEN_FILL);
+    token.setAttribute("fill", tokenFill());
     token.setAttribute("opacity", "0");
     // Appended to the arrow's own group, so it is removed with the rest of the
     // frame when the next beat replaces innerHTML — and so it inherits nothing

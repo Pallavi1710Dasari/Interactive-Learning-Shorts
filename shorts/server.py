@@ -1233,6 +1233,12 @@ def health():
             # invisible by construction — it approves everything — so the one place
             # it can be noticed is next to the model name it applies to.
             "model_warnings": config.model_warnings(),
+            # The player dresses itself from this: main.tsx puts it on
+            # <html data-theme>, which is what the gated NEON PASS section at the
+            # bottom of styles.css keys off. Server-side so the diagrams (drawn by
+            # layout.py from the same config value) and the chrome around them
+            # cannot disagree about which theme is live.
+            "theme": config.REEL_THEME,
             "units": len(feed.collect()),
             "total": usage.totals()}
 

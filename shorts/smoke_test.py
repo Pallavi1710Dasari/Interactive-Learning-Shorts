@@ -20,7 +20,8 @@ def main():
     print(f"   ok — {[s.section_id for s in sections]}")
 
     print("2. loading a known-good script fixture")
-    # good_page_fault.json is the known-good shape: one question, 4 short answers.
+    # good_page_fault.json is the known-good shape: one question, 5 short answers —
+    # mechanism, then a corrected misconception, then a takeaway.
     data = json.loads((ROOT / "evals/fixtures/good_page_fault.json").read_text())
     script = Script(**data)
     print(f"   ok — {script.word_count} words, {script.estimated_seconds}s estimated")

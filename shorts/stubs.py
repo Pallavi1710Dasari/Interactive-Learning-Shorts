@@ -51,6 +51,8 @@ def fake(model_cls, system: str, user: str):
         return model_cls(**_strategy(user))
     if name == "VisionReport":
         return model_cls(**_vision(user))
+    if name == "SectionUnderstanding":
+        return model_cls(**_understanding(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 
@@ -118,21 +120,45 @@ def _script(user: str) -> dict:
     # when it is short. Built per-beat rather than by dealing a flat list into
     # chunks, because check_dialogue_shape caps a single beat at MAX_ANSWER_WORDS
     # and dealing sentences out blindly produced 44-word beats.
+    # PACK TO THE CAP, don't aim at the average.
+    #
+    # This used to be `budget // n_beats`, an even share of the target — and it
+    # undershot the floor once the window moved to 35-50s. The packing below is
+    # greedy over whole sentences and stops as soon as the NEXT sentence would
+    # cross MAX_BEAT_WORDS, so a beat reliably lands under whatever figure it is
+    # given. Handed 19 it produced 17, and five of those plus a short question is
+    # 85 words against an 87-word floor: every stub run failed timing three times
+    # and gave up, which takes the free end-to-end smoke test offline.
+    #
+    # Aiming at MAX_BEAT_WORDS instead lets each beat fill as far as whole
+    # sentences allow, and the over-budget trim below already handles the other
+    # side. `budget` is still computed because that trim reads the same window.
     budget = max(1, TARGET_WORDS - len(topic.split()))
-    per_beat = min(MAX_BEAT_WORDS, max(8, budget // n_beats))
+    per_beat = MAX_BEAT_WORDS
 
     beats = [{"speaker": "interviewer", "line": topic,
               "on_screen": _overlay(topic), "visual_ref": "v_question"}]
     i = 0
     for n in range(1, n_beats + 1):
         chosen, words, first = [], 0, None
-        while words < per_beat and len(chosen) < len(sentences) + 2:
+        # `tries` bounds the scan; `chosen` cannot, now that a sentence which does
+        # not fit is skipped rather than ending the beat.
+        tries = 0
+        while words < per_beat and tries < len(sentences) * 2:
             s = sentences[i % len(sentences)]
             i += 1
+            tries += 1
             if first is None:
                 first = s
             if chosen and words + len(s.split()) > MAX_BEAT_WORDS:
-                break
+                # SKIP, don't stop. Closing the beat here is what made a section's
+                # one short sentence into a whole short beat: "Paging removes the
+                # requirement for contiguity." is 6 words, the next sentence was 20,
+                # 6 + 20 > 22 so the beat ended at 6. Five beats built that way came
+                # to 83 words against an 87-word floor, so every stub run failed
+                # timing three times and gave up. Trying the next sentence instead
+                # lets a short one pair with another short one.
+                continue
             chosen.append(s)
             words += len(s.split())
 
@@ -145,6 +171,47 @@ def _script(user: str) -> dict:
                       # than by being switched off. Cycled through the distinct
                       # spans so no two beats lean on the same one.
                       "source_quote": spans[(n - 1) % len(spans)]})
+
+    # TOP UP TO THE FLOOR — and read this before deciding it is a cheat.
+    #
+    # The 35-50s window needs 87-125 narration words. Every section in the sample
+    # document is 47-78 words, and the beat cap is 22, so there is arithmetically
+    # no way to build an honest 87-word script out of one of them: section 3.3 is
+    # three sentences of 23, 28 and 12 words, which packs to 82 words at best.
+    #
+    # That is a TRUE statement about the material, not a bug in the packer, and in
+    # the real pipeline it is the correct outcome — select.py's depth test now
+    # rejects sections this thin, and a script step that hit the floor by repeating
+    # itself would be caught by check_source_quotes' distinctness rule.
+    #
+    # The stub is the one place it is not the correct outcome, because the stub is
+    # fake content whose entire job is to exercise plumbing — parse, grade, assemble,
+    # write — for free, with the graders standing in as assertions. A stub that can
+    # never clear the floor takes the free end-to-end run offline permanently, and
+    # then nothing checks the plumbing at all. So it repeats a sentence to reach the
+    # floor, and the repetition is confined to HERE: nothing a model produces gets
+    # this treatment, and the distinctness rule still governs the citations.
+    total = sum(len(b["line"].split()) for b in beats)
+    if total < MIN_WORDS:
+        students = [b for b in beats if b["speaker"] == "student"]
+        while total < MIN_WORDS and students:
+            grew = False
+            for b in students:
+                have = b["line"].split()
+                if len(have) >= MAX_BEAT_WORDS:
+                    continue
+                extra = sentences[i % len(sentences)].split()
+                i += 1
+                room = MAX_BEAT_WORDS - len(have)
+                if not extra[:room]:
+                    continue
+                b["line"] = " ".join(have + extra[:room])
+                total = sum(len(x["line"].split()) for x in beats)
+                grew = True
+                if total >= MIN_WORDS:
+                    break
+            if not grew:
+                break
 
     # Last resort: trim the final beat rather than hand the grader a script we
     # already know is over budget.
@@ -290,3 +357,39 @@ def _visuals(user: str) -> dict:
         out.append({"ref": ref, "spec": f"Stub frame {i + 1}: hero on {cells[i]!r}.",
                     "frame": frame})
     return {"visuals": out}
+
+
+def _understanding(user: str) -> dict:
+    """
+    Understanding built out of the section's own sentences.
+
+    Same principle as _script: read the real text back rather than emitting
+    placeholders, so a stub run exercises understand.evidence_notes() for real
+    instead of proving only that the dict has the right keys.
+    """
+    # Same both-spellings caution as _script: this reaches into a real prompt.
+    section = (_find(r"THE SECTION — this is the authority.*?\n---\n(.*?)\n---", user, re.S)
+               or _find(r"THE SECTION.*?\n---\n(.*?)\n---", user, re.S)
+               or "")
+    section = " ".join(section.split())
+    topic = _find(r"TOPIC THIS SHORT WILL ANSWER:\s*(.+)", user) or "this topic"
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", section) if s.strip()]
+    long_enough = [s for s in sentences if len(s.split()) >= MIN_QUOTE_WORDS]
+
+    return {
+        "core_concept": (sentences[0] if sentences else topic)[:200],
+        "learning_objective": f"what {topic.rstrip('?')} comes down to"[:200],
+        "key_concepts": [s.split(".")[0][:60] for s in sentences[:3]] or ["the concept"],
+        "prerequisites": [],
+        "how_it_works": " ".join(sentences[:2])[:400] or "the section describes it directly",
+        "important_facts": [s[:180] for s in long_enough[:3]] or ["the section states it plainly"],
+        # null, not a placeholder: an invented example is the exact failure the real
+        # prompt forbids, and a stub that fakes one trains nobody's eye for it.
+        "example": None,
+        "misconceptions": [],
+        "can_answer": [topic[:120]],
+        "cannot_answer": [],
+        # Verbatim, so evidence_notes() reports zero drift on a stub run. A stub
+        # that trips its own diagnostics teaches you to ignore them.
+        "source_evidence": long_enough[:3],
+    }

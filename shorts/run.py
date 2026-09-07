@@ -14,6 +14,7 @@ from pathlib import Path
 from .schema import ShortUnit, TopicList
 from .parse import parse_markdown, find_section
 from .skills.select import select_topics
+from .skills.understand import understand, evidence_notes
 from .skills.script import write_script
 from .skills.visuals import design_visuals, render_diagrams
 from .skills.audit import audit
@@ -102,6 +103,35 @@ def _save_rejected(topic, section, attempt: int, script, results) -> Path:
 def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
               document: str | None = None) -> ShortUnit | None:
     print(f"\n=== {topic.id} — {topic.topic[:60]}")
+
+    # SKILL 1b — read the section before writing anything, ONCE.
+    #
+    # Deliberately outside the retry loop below. Nothing about what a section
+    # teaches changes between attempt 1 and attempt 3 — the graders reject wording,
+    # pacing and citation, none of which this answers — so putting it inside the
+    # loop would buy three identical readings of a fixed text at three times the
+    # price. That is the whole reason it is a separate step and not a longer script
+    # prompt.
+    #
+    # Never fatal, on the same terms as plan_strategy: a short with no understanding
+    # is written exactly the way it was written before this step existed. The script
+    # prompt does not consume it yet, so today a failure here costs only the log
+    # line — but the degradation is written now, while the reasoning is in view,
+    # rather than discovered later by a bad minute on the gateway.
+    understanding = None
+    try:
+        understanding = understand(topic, section)
+        print(f"    understood: {understanding.core_concept[:74]}")
+        print(f"      objective: {understanding.learning_objective[:72]}")
+        if understanding.cannot_answer:
+            print(f"      section does NOT establish: "
+                  f"{'; '.join(understanding.cannot_answer)[:70]}")
+        for note in evidence_notes(understanding, section):
+            print(f"      ~ {note}")
+    except Exception as e:
+        print(f"    understanding for {topic.id} unavailable "
+              f"({type(e).__name__}: {str(e)[:90]}) — writing from the section alone")
+
     feedback = None
 
     for attempt in range(1, MAX_SCRIPT_RETRIES + 1):
@@ -138,6 +168,7 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
         estimated_seconds=script.estimated_seconds,
         beats=script.beats,
         visuals=visuals,
+        understanding=understanding,
     )
 
     if do_tts:

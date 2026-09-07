@@ -43,6 +43,7 @@ from pathlib import Path
 # needs — launch, find the page target, evaluate, screenshot. Importing it beats a
 # second copy, and beats adding Playwright for three commands.
 from .video import _chrome, _launch, _free_port, _page_ws, _Devtools
+from . import config
 
 #: The square the judge is shown, in pixels.
 #:
@@ -60,7 +61,13 @@ PNG_WIDTH = 720
 #: The card the drawing sits on in the player — `.reel .stageinner` in
 #: web/src/styles.css. Kept in sync BY HAND, which is a real cost, but the
 #: alternative is booting the whole Vite app to photograph one static frame.
-CARD_BACKGROUND = "linear-gradient(168deg, #FCFBF7 0%, #EFF4F1 100%)"
+#: Per theme, and it MUST track `.reel .stageinner`: the judge grades what it
+#: photographs, so a stale value here means it is grading a surface no viewer sees.
+CARD_BACKGROUNDS = {
+    "paper": "linear-gradient(168deg, #FCFBF7 0%, #EFF4F1 100%)",
+    "neon":  "radial-gradient(120% 90% at 50% 8%, #0C1226 0%, #05070E 62%, #03050A 100%)",
+}
+CARD_BACKGROUND = CARD_BACKGROUNDS.get(config.REEL_THEME, CARD_BACKGROUNDS["paper"])
 
 #: The exact families web/index.html loads. Same URL, so a frame that renders in
 #: the player renders here.

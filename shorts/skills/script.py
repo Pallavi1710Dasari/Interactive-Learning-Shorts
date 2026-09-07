@@ -6,16 +6,23 @@ its quality. Tune it against the eval set, not by vibes.
 from ..schema import Script, Topic, Section, MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND
 from ..llm import ask_json
 
-MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 45
-MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
-TARGET_WORDS = 56
+MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 87
+MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 125
+#: ~45s, the middle of the window rather than its floor. Aiming at the floor is
+#: what made the old 18-45 window pad: the model treated the minimum as the brief.
+TARGET_WORDS = 112
 
 SYSTEM = f"""You write SHORT interview-style video scripts that teach ONE concept.
 
 FORMAT
 Beat 1: the interviewer asks ONE question.
-Beats 2-3: the student answers in 2 SHORT parts. THREE IS THE MAXIMUM.
+Beats 2-6: the student answers in 4 or 5 SHORT parts. FIVE IS THE MAXIMUM.
 Every beat after the first is the student. No follow-up question.
+
+Each answer beat is ONE idea with ONE picture, and stays at or under 24 words.
+That cap does not move. Four or five beats is how this fills 45 seconds — NOT
+four or five longer beats. If a beat needs more than 24 words, it is two beats or
+it is padded.
 
 THE LAST BEAT MUST ANSWER THE QUESTION. THIS IS NOT NEGOTIABLE.
 Read the question again, then read your last beat. If the last beat is the last step
@@ -108,18 +115,45 @@ phone remembers point four, and by the time you have written it you have buried 
 one sentence that mattered under context nobody asked for. If a beat is a
 restatement, a recap, or a "so in summary", DELETE IT.
 
-But do not cut the beat that answers the question in order to hit two. A complete
-three-beat answer beats a tidy two-beat non-answer every time.
+But do not cut the beat that answers the question in order to hit a beat count. A
+complete answer beats a tidy non-answer every time.
 
-BE BRIEF. THIS IS THE HARDEST PART AND THE MOST IMPORTANT.
+LENGTH, AND WHAT IS NOT ALLOWED TO FILL IT
 Total spoken words across ALL beats: {MIN_WORDS} minimum, {MAX_WORDS} maximum,
-{TARGET_WORDS} is the target — about 26 seconds. Speech runs 150 words per minute,
+{TARGET_WORDS} is the target — about 45 seconds. Speech runs 150 words per minute,
 so this IS the video length.
 
-Aim at the target, not the maximum. Two or three tight sentences that a learner
-understands the first time beat six that cover more ground. If you find yourself
-adding a beat to fill time, stop — you are done. But see THE LAST BEAT below: being
-under the target is not a virtue if the question is left unanswered.
+THE FLOOR IS NOT A LICENCE TO PAD. This is the failure mode of a wider window and
+it has already happened once in this project: every beat verbatim-cited, every
+grader green, and nothing taught after beat one. So the extra time is spent on
+exactly three things, and nothing else:
+
+  1. A CONCRETE WORKED EXAMPLE — but only one the SECTION ITSELF contains.
+     If the material gives numbers, a code snippet, an address, a named case, walk
+     the viewer through it: this input, this step, this result. A worked example is
+     the single most effective thing you can add for understanding.
+     IF THE SECTION CONTAINS NO SUCH EXAMPLE, DO NOT INVENT ONE. Made-up values
+     are the top cause of low faithfulness scores here — an invented "'A' = 65" or
+     "GET /index.html" is a fact the learner was never shown, cited to material
+     that does not contain it. No example is strictly better than a fabricated one.
+
+  2. A MISCONCEPTION, NAMED AND CORRECTED — "you might think X, but ...".
+     Pick the thing a learner actually gets wrong, say it plainly, then correct it
+     with what the section says. The X you name does not need to be in the
+     material — it is the wrong idea, not a claim — but THE CORRECTION MUST BE,
+     and the beat's source_quote is the sentence that does the correcting.
+     This is the highest-retention device available: a corrected expectation is
+     remembered far longer than an uncontested statement.
+
+  3. A CLOSING TAKEAWAY — one short line naming the idea so it can be carried away.
+     It may rest on the same sentence an earlier beat used; one repeated citation
+     is allowed for exactly this.
+
+Anything else that lengthens the script is padding. Specifically still banned: a
+restatement, a "so in summary" that adds nothing, context nobody asked for, and a
+beat whose citation does not really support it. If you cannot fill the window with
+the three things above, WRITE IT SHORTER and let the length grader reject it —
+that failure is recoverable and a padded short that passes is not.
 
 What brevity does NOT mean: dropping the part that makes it make sense. A short
 answer still has to be understandable on its own, to someone who has not read the

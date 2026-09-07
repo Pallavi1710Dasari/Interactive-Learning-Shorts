@@ -1054,3 +1054,71 @@ button.rec::before {
 .vlsaved b { font-size: 13px; color: var(--teal-hi); }
 .vlsaved span { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
 .vlsaved button { align-self: flex-start; }
+
+/* ==========================================================================
+   NEON PASS  —  gated, additive, and last in the file on purpose
+   ==========================================================================
+
+   styles.css is a stack of chronological design passes where the last
+   declaration wins (see the section headers above). This one follows that
+   convention rather than fighting it: every rule is scoped under
+   [data-theme="neon"], so with the attribute absent the file behaves exactly as
+   it did before. main.tsx sets the attribute from /api/health, which reads
+   config.REEL_THEME — so `REEL_THEME=paper` reverts the player too, not just the
+   diagrams.
+
+   The look comes from the reference short: objects as glowing outlines floating
+   on black, no card, no tint. The bloom itself is drawn SVG-side, in
+   layout.render() — CSS only supplies the dark ground it needs to register
+   against. */
+
+:root { --reel-amber: #F2B14B; }
+[data-theme="neon"] { --reel-amber: #FFC53D; }
+
+/* The card stops being a card. It keeps its rounded box and shadow so the
+   diagram still reads as a distinct surface, but the surface is now the void the
+   objects glow against. Mirrored BY HAND in shorts/raster.py CARD_BACKGROUNDS —
+   the vision judge photographs that copy, not this one. */
+[data-theme="neon"] .reel .stageinner {
+  background: radial-gradient(120% 90% at 50% 8%, #0C1226 0%, #05070E 62%, #03050A 100%);
+  border: 1px solid rgba(120, 150, 255, 0.14);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.75),
+              inset 0 1px 0 rgba(140, 170, 255, 0.10);
+}
+
+/* The two ambient washes inside the card were tuned to sit under 5% alpha on a
+   near-white ground. On black they read as grey smears, so they go. */
+[data-theme="neon"] .reel .stageinner::before,
+[data-theme="neon"] .reel .stageinner::after { display: none; }
+
+/* Flat black behind everything. The per-short --hue drove a green/teal wash that
+   fights a blue glow, so the hue rotation is dropped here rather than retuned. */
+[data-theme="neon"] .reel .reelbg {
+  background:
+    radial-gradient(130% 80% at 50% -8%, #0A1024 0%, transparent 60%),
+    linear-gradient(170deg, #04060C 0%, #02040A 60%, #000104 100%);
+}
+[data-theme="neon"] .reel .reelbg::before { opacity: 0.18; }
+[data-theme="neon"] .reel.live .reelbg { animation: none; }
+
+/* The WebGL starfield competes with the glow for "the bright thing on screen".
+   Pulled well down rather than removed, so the frame keeps some depth. */
+[data-theme="neon"] .reel canvas { opacity: 0.16; }
+
+/* Captions: same geometry, inverted ground, and one step larger.
+   The size bump is the one change here that is NOT about colour — at
+   clamp(11.5px, 1.75vh, 14px) the narration was hard to read on a phone, and the
+   reel is narrated, so the caption is load-bearing. Geometry is untouched: the
+   height is still computed from --lines/--lh/--pad so the bubble cannot twitch
+   between beats. */
+[data-theme="neon"] .reel .bubble p.flow {
+  font-size: clamp(13px, 2.05vh, 16.5px);
+  background: rgba(4, 7, 16, 0.82);
+  border: 1px solid rgba(120, 150, 255, 0.16);
+  color: #E9EEFF;
+}
+[data-theme="neon"] .reel .bubble p.flow .next { color: rgba(233, 238, 255, 0.32); }
+[data-theme="neon"] .reel .bubble p.flow .now {
+  color: #FFFFFF;
+  text-shadow: 0 0 16px rgba(120, 150, 255, 0.85);
+}

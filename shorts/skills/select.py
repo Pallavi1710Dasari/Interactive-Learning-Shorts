@@ -9,7 +9,7 @@ from ..parse import sections_as_prompt_block
 from ..llm import ask_json
 
 SYSTEM = """You select which questions from a software-engineering course session deserve a
-30-60 second interview-style video short.
+35-50 second interview-style video short.
 
 YOUR JOB IS TO RANK, NOT TO COLLECT
 There are always more answerable questions in a document than there are questions
@@ -94,10 +94,46 @@ that answers the question, copied CHARACTER FOR CHARACTER out of the material.
 Ask only what this document answers. A question that is important in the field but
 unanswered here is still the wrong question for this deck.
 
+ENOUGH TO FILL THE WINDOW — THE DEPTH TEST
+A short runs 35 to 50 seconds, about 87 to 125 spoken words, delivered as four or
+five separate one-idea beats. So a topic is only selectable if ITS OWN SECTION
+holds enough for that many real beats. This test is as important as importance
+itself, and it is new: a topic that passes the rubric above but fails this one
+produces a padded short, which is the worst thing this pipeline makes.
+
+Before returning a topic, check its section for these. The strong ones have three
+or four; a topic with only the first is TOO THIN, however central it sounds:
+
+  a. A MECHANISM — steps, or parts that act on each other. Something with an
+     order to walk through, not a single property to state.
+  b. A CONSEQUENCE — what the mechanism causes, costs, prevents or enables.
+  c. A WORKED EXAMPLE ALREADY IN THE TEXT — numbers, a code snippet, an address,
+     a named case. Weight this heavily: the script step is FORBIDDEN from
+     inventing one, so a section that has none can never produce the most
+     effective beat available. Two topics of equal importance are NOT equal if
+     one has an example in its section and the other does not.
+  d. A CORRECTABLE MISCONCEPTION — something the section states that contradicts
+     what a learner would assume.
+
+Say which of these the section has, in `depth`: any of "mechanism",
+"consequence", "example", "misconception". Return at least two.
+
+A DEFINITION IS THE CLASSIC THIN TOPIC. "What is a data type?" is answered by one
+sentence, and stretching that sentence across five beats is exactly the padding
+this test exists to stop. If the section around it has no mechanism and no
+consequence, drop it — even at importance 5. Prefer a 4 with real depth to a 5
+that is one sentence long.
+
+TWO THIN TOPICS DO NOT MAKE ONE GOOD ONE. Do not merge unrelated questions to
+reach the length. One concept per short still holds.
+
 ALSO REJECT:
 - Incidental detail: an example's specific numbers, an aside, a units convention.
-- Anything needing multi-step derivation, or more than one diagram.
-- Anything not answerable in about 45 seconds of speech (roughly 110 words).
+  (An example is evidence that a topic is rich — it is not itself the topic.)
+- Anything needing multi-step derivation, or more than one diagram per beat.
+- Anything not answerable in about 50 seconds of speech (roughly 125 words).
+- Anything too thin to carry 35 seconds without restating itself — see the depth
+  test above.
 - Anything needing another short to make sense.
 
 Pick the section that CONTAINS the answer, not the one whose title sounds closest.
@@ -109,6 +145,7 @@ Output JSON, ordered by importance, highest first:
 {"topics":[{"id":"snake_case_id","topic":"the question this short answers",
 "concept":"the one idea it is about, a short noun phrase",
 "importance":5,
+"depth":["mechanism","consequence","example"],
 "why_it_matters":"one sentence",
 "source_section_id":"exact id from the doc",
 "answer_quote":"the sentence from that section that answers it, copied verbatim",

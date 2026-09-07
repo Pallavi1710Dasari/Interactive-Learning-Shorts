@@ -65,11 +65,28 @@ def check_overlays(script: Script) -> GraderResult:
 #: Two is now allowed, and often right: a question whose answer is a mechanism plus
 #: its consequence needs exactly two beats, and the third was always the weakest —
 #: a restatement, or a claim propped up by a quote that did not quite support it.
-MIN_ANSWERS = 2
-MAX_ANSWERS = 3
+#: Raised from 2-3 alongside the 35-50s window in schema.py. The count went up;
+#: the SIZE of a beat deliberately did not — see MAX_ANSWER_WORDS below.
+#:
+#: The note this replaces said five points is what made shorts unmemorable, and
+#: that still holds for five points of NEW MECHANISM. What 4-5 buys at the wider
+#: window is not five claims, it is the same two or three claims plus the parts
+#: that make them stick: a worked example, a misconception named and corrected,
+#: and a closing takeaway. Those are not additional ideas competing for the
+#: viewer's memory — they are the same idea, landed three more ways.
+#:
+#: Six is still refused. Past five the short becomes a list again whatever the
+#: beats contain, and that is the failure the cut to 3 was fixing.
+MIN_ANSWERS = 4
+MAX_ANSWERS = 5
 
-#: And each part is shorter: 32 words is two sentences read fast, which is a wall
-#: of text against a single diagram.
+#: UNCHANGED AT 24, AND THIS IS THE LOAD-BEARING CONSTANT OF THE WHOLE RAISE.
+#:
+#: 32 words is two sentences read fast, which is a wall of text against a single
+#: diagram. The window went from 28s to 50s without touching this, which forces
+#: the extra time into MORE BEATS rather than longer ones — every beat stays one
+#: idea with one picture. Raising this to let 4 beats fill 50s would give back
+#: exactly the wall of text that splitting the answer exists to prevent.
 MAX_ANSWER_WORDS = 24
 
 
@@ -82,8 +99,10 @@ def check_dialogue_shape(script: Script) -> GraderResult:
     rope to drift off the source. Splitting the answer gives each idea its own
     visual and keeps every spoken chunk short.
 
-    The upper bound came DOWN from five, which is the more important half of this
-    grader now — see MAX_ANSWERS. Splitting far enough is easy; stopping is not.
+    The upper bound came down from five and has now gone back to five, for a
+    different reason than it first had it — see MAX_ANSWERS. Splitting far enough
+    is easy; stopping is not, and the stop is now enforced by MAX_ANSWER_WORDS
+    holding at 24 rather than by a tight beat count.
     """
     speakers = [b.speaker for b in script.beats]
     if speakers[0] != "interviewer":

@@ -69,13 +69,18 @@ cases:
       one diagram on screen for ~40 seconds, and drifted off the source. So the
       rule is back to a split answer.
 
-      THE FLOOR IS 2, NOT 3, and this expectation was stale against it — the case
-      failed for months asking for the words "at least 3" while check_dialogue_shape
-      said "at least 2". The grader is the one that is right: skills/script.py asks
-      for two or three answer beats and calls three the maximum, and a padded third
-      beat with no object in it is what leaves the design step nothing new to draw.
-      A red eval nobody can act on teaches people to ignore the suite, so it is
-      fixed to the rule that is actually enforced.
+      THE FLOOR IS NOW 4, and this expectation tracks it. The history matters: the
+      floor was 3, then 2, and this case sat red for months asking for "at least 3"
+      while the grader said "at least 2" — a red eval nobody can act on teaches
+      people to ignore the suite. So the number here is deliberately kept identical
+      to what check_dialogue_shape prints, and it moves in the same commit as
+      MIN_ANSWERS every time.
+
+      It reads 4 because the window moved to 35-50s (schema.MIN_SECONDS). The extra
+      beats are NOT extra claims: they are a worked example, a corrected
+      misconception and a closing takeaway, which is what the length is for. The
+      thing keeping this from being the 2019 wall of text is MAX_ANSWER_WORDS
+      holding at 24, not the beat count.
 
       E011 is the success half. Change dialogue_shape and both cases together.
     type: code_grader
@@ -83,13 +88,18 @@ cases:
     fixture: evals/fixtures/single_answer.json
     expect:
       passed: false
-      reason_contains: "at least 2"
+      reason_contains: "at least 4"
 
   - id: E011
-    name: A 3-5 beat answer with short beats is accepted
+    name: A 4-5 beat answer with short beats is accepted
     why: >
       The success half of E005. Without it, the cheapest way to make dialogue_shape
       green is to reject every shape, and the pair is what stops that.
+
+      Its fixture is also the suite's only all-graders-green script, so it doubles
+      as the shape the 35-50s window is supposed to produce: 5 answer beats, none
+      over 24 words, a misconception beat and a takeaway among them, and 4 distinct
+      citations rather than one sentence stretched five ways.
     type: code_grader
     grader: dialogue_shape
     fixture: evals/fixtures/good_page_fault.json
@@ -187,8 +197,14 @@ cases:
       What the 30-second length floor was producing. A question whose honest answer
       is one sentence got inflated to fill the time, and the extra beats restated
       the same sentence — every claim verbatim-cited, every grader green, and
-      nothing taught after beat 1. The floor is now 18s so a short answer is
-      allowed to be short, and this case stops the padding coming back.
+      nothing taught after beat 1.
+
+      THIS CASE MATTERS MORE NOW THAN WHEN IT WAS WRITTEN. It was added when the
+      floor came down to 18s, where a short answer was allowed to be short and the
+      padding pressure was largely off. The floor is now 35s, which puts that
+      pressure back on deliberately — so this grader is once again the main thing
+      standing between a wider window and the defect the wider window used to
+      cause. If it ever goes green by being relaxed, the 35s floor is unsafe.
 
       Whether a citation SUPPORTS its beat is a meaning question and belongs to the
       judge. How many distinct sentences the answer rests on is countable, and it
@@ -399,6 +415,29 @@ cases:
     fixture: evals/fixtures/labels_from_narration.json
     expect:
       passed: true
+
+  - id: E029
+    name: A script at the old 12-28s length is rejected by the wider window
+    why: >
+      THE REGRESSION GUARD FOR THE 35-50s WINDOW. This fixture is the exact script
+      that used to be this suite's known-good example: 66 words, 26.4 seconds,
+      three answer beats. It passed every grader for the whole life of the 12-28s
+      window, which is what makes it the right probe — it is not a contrived
+      failure, it is yesterday's success.
+
+      Its job is to fail. If it ever passes, MIN_SECONDS has drifted back down and
+      every short built since the change is shorter than intended, which is
+      invisible from the output because a 26-second short looks fine on its own.
+
+      Deliberately NOT paired with a success case of its own: E003 already asserts
+      that a correctly-sized script passes timing, and the pair is what stops the
+      cheap fix of making the grader reject everything.
+    type: code_grader
+    grader: timing
+    fixture: evals/fixtures/old_window_length.json
+    expect:
+      passed: false
+      reason_contains: "too short"
 
   # ------------------------------------------------------------------ llm judge
 

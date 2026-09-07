@@ -455,11 +455,39 @@ cd web && npm run dev                                  # live preview of the pla
 
 ## Length: short on purpose
 
-The window is **18–45 seconds**, target ~26s (about 65 words), in `schema.py`. It
-was 30–60, and the floor was actively making shorts worse: a question whose honest
-answer is three sentences had to be inflated to 75 words to clear it, and the extra
-beat was always the weakest — a restatement, or a claim propped up by a citation
-that did not really support it. E016 freezes one of those padded scripts.
+The window is **35–50 seconds**, target ~45s (about 112 words), in `schema.py`,
+delivered as **4–5 answer beats of at most 24 words each**.
+
+It has moved three times — 30–60, then 18–45, then 12–28, now 35–50 — and the two
+cuts were both fixing the same defect: a floor applied to a topic that did not have
+the content to fill it. A question whose honest answer is three sentences had to be
+inflated to clear the floor, and the extra beat was always the weakest — a
+restatement, or a claim propped up by a citation that did not really support it.
+E016 freezes one of those padded scripts.
+
+**What changed to make a wider window safe is `select.py`, not the window.** Select
+now applies a depth test before returning a topic: its section must hold a
+mechanism, a consequence, ideally a worked example already in the text, and a
+correctable misconception, recorded in `Topic.depth`. Raising the floor without
+that reproduces the 18–45 failure exactly.
+
+The extra time buys retention, not extra claims. Three things fill it, and nothing
+else is allowed to: a worked example **taken from the section** (the script step is
+forbidden from inventing one — fabricated values are the top cause of low
+faithfulness verdicts here), a misconception named and corrected, and a one-line
+closing takeaway.
+
+`MAX_ANSWER_WORDS` stays at **24** and is the load-bearing constant of the whole
+raise: the extra seconds become more beats, never longer ones, so every beat is
+still one idea with one picture. E029 is the regression guard — it is the old
+26-second known-good script, and its job is now to fail.
+
+**This needs richer reading material than the sample document.** Every section in
+`content/session_18_paging.md` is 47–78 words, and 35–50 seconds of narration is
+87–125 words. Those sections cannot fill the window honestly, which is the correct
+outcome: select's depth test will drop most of them. `stubs.py` is the one place
+that pads deliberately to reach the floor, because its only job is to exercise
+plumbing for free.
 
 Two graders keep the pressure off:
 
@@ -470,8 +498,9 @@ Two graders keep the pressure off:
   under. `write_script` gets the whole document so it can answer instead of refuse,
   and this is what stops it wandering onto adjacent material (E017/E018).
 
-If a topic genuinely cannot be answered in 45 seconds it is too big for one short,
-and the fix belongs in `select.py`, not in the length window.
+If a topic genuinely cannot be answered in 50 seconds it is too big for one short
+— and if it cannot fill 35, it is too thin for one. Both fixes belong in
+`select.py`, not in the length window.
 
 ## Which model runs where
 

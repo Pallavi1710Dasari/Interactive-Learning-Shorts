@@ -6,6 +6,7 @@ that crashes tells you nothing; a grader that returns passed=False with a reason
 tells you what to fix.
 """
 import html, re
+from math import ceil
 from dataclasses import dataclass, field
 from .schema import (
     Script, ShortUnit, MIN_SECONDS, MAX_SECONDS,
@@ -1008,6 +1009,15 @@ def _prose_words(label: str) -> list[str]:
 #: up in the frame's labels.
 MAX_NARRATION_ECHO = 0.6
 
+#: What share of a short's frames have to be different PICTURES, for
+#: check_frames_progress. 0.6 = three of five, four of six.
+#:
+#: Not 1.0: two beats legitimately sharing a picture is a held composition, and the
+#: honest way to write it (one visual_ref across both beats) is already collapsed
+#: before this counts. Not 0.5 either — half is exactly the alternating shape this
+#: is meant to catch, so the threshold has to sit above it.
+MIN_PROGRESS_SHARE = 0.6
+
 
 def _frame_labels(frame) -> list[str]:
     """Every word a frame puts on screen, EXCEPT its code lines and its title."""
@@ -1075,53 +1085,104 @@ def _is_subsequence(small: list, big: list) -> bool:
     return all(any(x == y for y in it) for x in small)
 
 
-def check_frames_vary_template(unit: ShortUnit) -> GraderResult:
+def check_frames_progress(unit: ShortUnit) -> GraderResult:
     """
-    A short may not be built from a single template.
+    Across a short, does the COMPOSITION move through different states?
 
     THE COMPLAINT THIS EXISTS FOR: "for a theory topic it giving the same visual for
-    all the points so it looks not good and repetitive". Measured across the 32 units
-    in output/, SIX were one template end to end — four `code` panels in a row, four
-    `table` frames in a row, three `icons` rows in a row — and every one of them
-    passed every design grader there was.
+    all the points so it looks not good and repetitive". Six of the 32 units in
+    output/ were one shape end to end and every one of them passed every design
+    grader there was.
 
-    WHY THIS IS A SEPARATE GRADER AND NOT PART OF frames_develop. That one asks
-    whether each transition changes the picture, which is a question about PAIRS. A
-    short can pass it pair by pair and still be four variations on one layout, because
-    "the table gained a row" is a change and four tables is still four tables. This
-    asks the question about the WHOLE short, which is the level the complaint lives
-    at: the viewer is not comparing beat 3 to beat 2, they are watching one shape for
-    fifteen seconds.
+    THIS REPLACES check_frames_vary_template, WHICH MEASURED THE WRONG THING.
+    That grader answered the complaint by counting distinct TEMPLATES and failing a
+    short built from one. Template count is a proxy for repetitiveness and it is a
+    bad one in both directions:
 
-    Deliberately the loosest rule that catches the complaint: TWO distinct templates
-    is enough to pass. The point is not to force variety for its own sake — a short
-    that genuinely wants two code frames and a diagram should pass, and does. It is
-    to reject the degenerate case where the model picked one layout and never
-    reconsidered. `layout.py` ships ten templates; `icons` alone was 34% of every
-    frame drawn, and `preview` and `stat` were under 3% each.
+      * It failed a short that is genuinely good. The reel this was rewritten for
+        holds ONE two-column `compare` scaffold under a constant title and replaces
+        what is in the columns on every beat — Target element, then Scoreboard, then
+        the three score components, then the two actual scores, then the winner lit
+        and the loser dimmed. Five `compare` frames, five different pictures, one
+        idea developed. The old grader called that "one layout repeated".
+      * It would pass a short that is genuinely bad. Four `icons` rows and one
+        `stat` card is two templates and still four rows of pictograms.
 
-    Held to shorts with three or more distinct frames. Two frames of the same
-    template is a held picture, which frames_develop already reasons about properly.
+    A persistent scaffold whose contents change is not repetition — it is how a
+    diagram teaches a process, a comparison or a data structure, and it is what the
+    educational reels this project is modelled on actually do. So the question asked
+    here is the one the complaint is really about: HOW MANY DIFFERENT PICTURES DOES
+    THE VIEWER SEE, whatever template they are drawn in.
+
+    TEMPLATE IS DELIBERATELY NOT CONSULTED. Changing template is neither necessary
+    nor sufficient for visual storytelling, and rewarding it produced shorts that
+    switched layout to satisfy a counter while saying the same thing twice.
+
+    WHAT THIS DOES NOT DO IS DUPLICATE frames_develop, and the division matters
+    because two graders measuring one thing is how thresholds drift apart. That one
+    is about PAIRS — does each transition change the picture. This is about the
+    WHOLE SHORT — how many distinct pictures there are in total. A short can pass
+    pair by pair and still cycle between two states; it can fail one pair and still
+    take the viewer somewhere over five beats.
+
+    Held to shorts with three or more distinct frames: two frames of one picture is
+    a held composition, which frames_develop reasons about properly.
     """
     refs: list[str] = []
     for beat in unit.beats:
         if not refs or refs[-1] != beat.visual_ref:
             refs.append(beat.visual_ref)
-    templates = [unit.visuals[r].frame.template for r in refs
-                 if r in unit.visuals and unit.visuals[r].frame is not None]
-    if len(templates) < 3:
-        return GraderResult("frames_vary_template", True,
-                            f"{len(templates)} frame(s) — too few to call repetitive")
-    distinct = sorted(set(templates))
-    if len(distinct) < 2:
-        return GraderResult(
-            "frames_vary_template", False,
-            f"all {len(templates)} frames use the same template ({distinct[0]}) — "
-            f"the short is one layout repeated, which reads as the same visual on "
-            f"every beat. Give at least one beat a different kind of picture.")
-    return GraderResult("frames_vary_template", True,
-                        f"{len(distinct)} templates across {len(templates)} frames "
-                        f"({', '.join(distinct)})")
+    frames = [unit.visuals[r].frame for r in refs
+              if r in unit.visuals and unit.visuals[r].frame is not None]
+    if len(frames) < 3:
+        return GraderResult("frames_progress", True,
+                            f"{len(frames)} frame(s) — too few to call repetitive")
+
+    # WHAT THE VIEWER SEES, and the content half is separated from the accent half
+    # on purpose. A frame is what it DRAWS (its labels and pictograms) plus where
+    # the accent sits. Two frames with the same labels and a different accent are
+    # the same picture with the highlight moved — which is a real thing a beat may
+    # do, and is not a new picture.
+    contents = [(f.template, tuple(_frame_labels(f)), tuple(g.icon for g in f.glyphs))
+                for f in frames]
+    states = [(c, _roles(f)) for c, f in zip(contents, frames)]
+
+    distinct_content = len(set(contents))
+    distinct_states = len(set(states))
+
+    if distinct_content < 2:
+        return GraderResult("frames_progress", False,
+            f"all {len(frames)} frames draw the same thing "
+            f"({frames[0].template}: {', '.join(_frame_labels(frames[0])[:4]) or 'no labels'})"
+            f" — only the accent moves, so the viewer reads the whole picture in the "
+            f"first two seconds and then watches a highlight slide over it for the "
+            f"rest of the short. Change what is DRAWN between beats: replace a "
+            f"label, swap the elements, show the next state of the thing.",
+            {"frames": len(frames), "distinct_content": distinct_content,
+             "distinct_states": distinct_states})
+
+    # More than one picture, but not many: a composition that alternates between two
+    # states across five beats is still a short with two pictures in it.
+    #
+    # MIN_PROGRESS_SHARE of the frames, rather than a flat count, because the defect
+    # scales with length — two pictures across three frames is a build, two across
+    # six is a loop.
+    needed = max(2, ceil(len(frames) * MIN_PROGRESS_SHARE))
+    if distinct_content < needed:
+        return GraderResult("frames_progress", False,
+            f"{len(frames)} frames but only {distinct_content} different picture(s) — "
+            f"the composition cycles rather than develops, so beats share a picture "
+            f"with a beat the viewer has already seen. At this length it needs at "
+            f"least {needed}.",
+            {"frames": len(frames), "distinct_content": distinct_content,
+             "distinct_states": distinct_states})
+
+    return GraderResult("frames_progress", True,
+        f"{distinct_content} different picture(s) across {len(frames)} frames"
+        + (f", {distinct_states} counting the accent" if distinct_states > distinct_content else "")
+        + f" ({len(set(f.template for f in frames))} template(s), which is not what is measured)",
+        {"frames": len(frames), "distinct_content": distinct_content,
+         "distinct_states": distinct_states})
 
 
 def check_frames_are_visual(unit: ShortUnit) -> GraderResult:
@@ -1175,15 +1236,45 @@ def check_frames_are_visual(unit: ShortUnit) -> GraderResult:
 
         # Does the frame reproduce what is being said? Content words only, so
         # "the", "a", "of" cannot carry a frame over the threshold on their own.
+        #
+        # LITERALS ARE EXCLUDED FROM THE COMPARISON, and that is the difference
+        # between this grader's defect and its opposite. What it exists to catch is
+        # a frame that prints the SENTENCE:
+        #
+        #   label: "Contiguous allocation forces one unbroken block per process"
+        #
+        # What it was also catching is a worked-example frame doing its job. From a
+        # real reel, the beat "So `#nav .item a` counts to 1,1,1, while
+        # `.item .link a` counts to 0,2,1" against a frame whose columns are headed
+        # `#nav .item a` and `.item .link a` and whose cells read 1 ID, 1 Class,
+        # 1 Type / 0 IDs, 2 Classes, 1 Type. 86% echo, and every shared word is a
+        # selector or a number — the exact literals the picture has to show for the
+        # example to be worked at all. Drawing them is not reciting the sentence;
+        # it is the only way to draw that sentence's subject.
+        #
+        # So the echo is measured on the PROSE the beat uses to frame its literals.
+        # A frame that also prints "counts to" and "while" is still caught, because
+        # those are prose. skills/visuals.py is told the same thing in words.
         drawn = set(_stems(" ".join(labels)))
         for line in spoken.get(ref, []):
-            said = set(_stems(line))
+            literal_stems: set[str] = set()
+            for span in _literals(line):
+                literal_stems |= set(_stems(span))
+            # And a NUMERAL is never prose, whether or not _literals caught it as a
+            # span. Its digit pattern deliberately needs three characters, so "36px"
+            # is a literal and the "1,1,1" in "counts to 1,1,1" is three separate
+            # one-character stems that survive into the prose set — where they then
+            # match the 1 ID / 1 Class / 1 Type the frame has to draw. Any stem
+            # carrying a digit comes out.
+            said = {t for t in (set(_stems(line)) - literal_stems)
+                    if not any(ch.isdigit() for ch in t)}
             if len(said) < 4:
                 continue
             share = len(said & drawn) / len(said)
             if share > MAX_NARRATION_ECHO:
-                echoes.append(f"{ref}: {share:.0%} of the spoken line is printed in the "
-                              f"frame — draw the subject, not the sentence")
+                echoes.append(f"{ref}: {share:.0%} of the spoken line's PROSE is printed "
+                              f"in the frame — draw the subject, not the sentence "
+                              f"(literals the beat names are not counted)")
                 break
 
     # A "stat" FRAME WHOSE VALUE IS NOT A VALUE IS A WORD ON A CARD.
@@ -1471,11 +1562,34 @@ def check_frames_develop(unit: ShortUnit) -> GraderResult:
     if returns:
         return GraderResult("frames_develop", False, "; ".join(returns[:2]),
                             {"problems": returns})
-    if roles_only:
+    # A MOVED ACCENT MAY BE A MINORITY OF THE TRANSITIONS, NOT MOST OF THEM.
+    #
+    # This used to fail on ANY roles-only transition, and that was too strict for a
+    # reason worth writing down. The reel this was loosened for holds a two-column
+    # `compare` scaffold and replaces its contents on every beat; its LAST
+    # transition keeps the two scores on screen and re-roles them — the winning
+    # column to hero, the losing one to lost, the tied rows to quiet. That is the
+    # climax of the short. Nothing new is drawn because nothing new is needed: the
+    # picture has been assembled and the final beat delivers the verdict ON it, and
+    # dimming the loser is the verdict. Failing that is failing the payoff.
+    #
+    # But the shape this grader was written for is still a defect, and it is a
+    # MAJORITY shape: "same code panel, accent moved, then one real picture at the
+    # end" opens on a static slide for two thirds of the video. So the rule is
+    # proportional rather than absolute.
+    #
+    # A THIRD, and the arithmetic is what picks it rather than roundness:
+    #   2 transitions, 1 roles-only  -> 3 > 2, FAILS. Half a short is not a payoff.
+    #   3 transitions, 1 roles-only  -> 3 = 3, passes. Two real changes carry it.
+    #   4 transitions, 1 roles-only  -> 3 < 4, passes. The reel above.
+    #   3 transitions, 2 roles-only  -> 6 > 3, FAILS. The shape complained about.
+    if roles_only * 3 > total:
         return GraderResult("frames_develop", False,
                             f"{roles_only} of {total} frame transition(s) only move the "
                             f"accent on the same picture — the viewer sees one static "
-                            f"slide with a highlight sliding over it")
+                            f"slide with a highlight sliding over it. One such beat is "
+                            f"allowed as a payoff on an assembled picture; this many is "
+                            f"the short standing still.")
     # EVERY transition an append means the whole short is one composition revealed
     # in pieces — nothing is ever replaced, so beat 1 already showed the shape. One
     # append among real changes is a legitimate build and is not failed here.
@@ -3600,7 +3714,7 @@ SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_r
 #: Unit graders that need only the unit.
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_svg_quality, check_frames_are_visual, check_frames_develop,
-                  check_frames_vary_template, check_frames_match_strategy,
+                  check_frames_progress, check_frames_match_strategy,
                   check_one_hero_per_frame,
                   check_samples_differ, check_code_frames_quote_source,
                   check_icons_are_pictures, check_diagram_matches_narration]

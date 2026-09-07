@@ -1,0 +1,249 @@
+{
+  "short_id": "scaffold_progresses",
+  "session_id": "eval",
+  "source_section_id": "4.1",
+  "question": "When two CSS rules conflict, how does the browser pick the winner?",
+  "estimated_seconds": 30.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "When two CSS rules conflict, how does the browser pick the winner?",
+      "on_screen": "Which rule wins?",
+      "visual_ref": "d_intro"
+    },
+    {
+      "speaker": "student",
+      "line": "It scores each selector's specificity rather than taking the last rule.",
+      "on_screen": "Step 1",
+      "visual_ref": "d_score",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    },
+    {
+      "speaker": "student",
+      "line": "The score has three parts, counted separately.",
+      "on_screen": "Step 2",
+      "visual_ref": "d_parts",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    },
+    {
+      "speaker": "student",
+      "line": "One counts to 1,1,1 while the other counts to 0,2,1.",
+      "on_screen": "Step 3",
+      "visual_ref": "d_scores",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    },
+    {
+      "speaker": "student",
+      "line": "Comparing left to right, the first difference decides the winner.",
+      "on_screen": "Step 4",
+      "visual_ref": "d_verdict",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    }
+  ],
+  "visuals": {
+    "d_intro": {
+      "ref": "d_intro",
+      "type": "diagram",
+      "spec": "stub spec for d_intro",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "Target element",
+                "role": "hero"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "Target element",
+                "role": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "d_score": {
+      "ref": "d_score",
+      "type": "diagram",
+      "spec": "stub spec for d_score",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "Scoreboard",
+                "role": "hero"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "Scoreboard",
+                "role": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "d_parts": {
+      "ref": "d_parts",
+      "type": "diagram",
+      "spec": "stub spec for d_parts",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "IDs",
+                "role": "hero"
+              },
+              {
+                "label": "Classes",
+                "role": "plain"
+              },
+              {
+                "label": "Types",
+                "role": "plain"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "IDs",
+                "role": "plain"
+              },
+              {
+                "label": "Classes",
+                "role": "plain"
+              },
+              {
+                "label": "Types",
+                "role": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "d_scores": {
+      "ref": "d_scores",
+      "type": "diagram",
+      "spec": "stub spec for d_scores",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "1 ID",
+                "role": "hero"
+              },
+              {
+                "label": "1 Class",
+                "role": "plain"
+              },
+              {
+                "label": "1 Type",
+                "role": "plain"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "0 IDs",
+                "role": "hero"
+              },
+              {
+                "label": "2 Classes",
+                "role": "plain"
+              },
+              {
+                "label": "1 Type",
+                "role": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "d_verdict": {
+      "ref": "d_verdict",
+      "type": "diagram",
+      "spec": "stub spec for d_verdict",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "hero",
+            "items": [
+              {
+                "label": "1 ID",
+                "role": "hero"
+              },
+              {
+                "label": "1 Class",
+                "role": "quiet"
+              },
+              {
+                "label": "1 Type",
+                "role": "quiet"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "lost",
+            "items": [
+              {
+                "label": "0 IDs",
+                "role": "lost"
+              },
+              {
+                "label": "2 Classes",
+                "role": "quiet"
+              },
+              {
+                "label": "1 Type",
+                "role": "quiet"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "status": "draft"
+}

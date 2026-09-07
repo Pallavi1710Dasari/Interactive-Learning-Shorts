@@ -38,6 +38,7 @@ GRADERS = {
 #: failed one. A grader with no case behind it drifts back to advisory.
 UNIT_GRADERS = {
     "frames_develop":     checks.check_frames_develop,
+    "frames_progress":    checks.check_frames_progress,
     "frames_are_visual":  checks.check_frames_are_visual,
     "icons_are_pictures": checks.check_icons_are_pictures,
     "samples_differ":     checks.check_samples_differ,

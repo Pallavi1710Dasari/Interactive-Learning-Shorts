@@ -86,8 +86,16 @@ def _design_problems(unit: ShortUnit) -> list[str]:
     a unit whose document has been deleted is judged on what is checkable.
     """
     section = _section_for(unit)
+    # THE SAME LIST skills/visuals.py retries on, and it has to stay the same list.
+    # It was missing one_hero_per_frame and frames_match_strategy, so `--redesign`
+    # reported "frames already pass" for a unit whose accent was on every element of
+    # a group — a failure the generator itself would have retried. A repair pass
+    # that judges by a weaker standard than the generator cannot repair what the
+    # generator now rejects.
     results = [checks.check_frames_are_visual(unit), checks.check_frames_develop(unit),
-               checks.check_frames_vary_template(unit),
+               checks.check_frames_progress(unit),
+               checks.check_frames_match_strategy(unit),
+               checks.check_one_hero_per_frame(unit),
                checks.check_samples_differ(unit), checks.check_svg_quality(unit),
                checks.check_icons_are_pictures(unit)]
     if section is not None:

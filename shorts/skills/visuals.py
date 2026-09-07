@@ -561,10 +561,26 @@ as a mapping it becomes three left boxes pointing at two right boxes, which clai
 a correspondence that does not exist and contradicts the very sentence being spoken.
 Whenever a column would contain both a whole and its own parts, you wanted "split".
 
-ROLES ARE HOW YOU POINT, AND THERE IS EXACTLY ONE HERO
+ROLES ARE HOW YOU POINT: ONE HERO PER GROUP, AND NEVER THE WHOLE GROUP
 Every cell, box and row takes a role, and the role decides its colour:
-  "hero"   the ONE thing this beat is about. Exactly one per frame, never two.
+  "hero"   the thing this beat is about — ONE per group of elements laid out
+           together: one per row of cells, one per column, one per card's items.
            This is the element the viewer's eye is sent to.
+
+           ONE PER GROUP, NOT ONE PER FRAME, and the difference matters for any
+           two-sided picture. A `mapping` or `compare` frame makes a claim ACROSS
+           its two columns — "page 1 lives in frame 9", "this selector outscores
+           that one" — and a claim with two ends needs both ends lit. Lighting one
+           draws an arrow from a highlighted box to an unremarkable one.
+
+           WHAT IS NEVER RIGHT IS LIGHTING EVERYTHING IN A GROUP. An accent on
+           every element is an accent on nothing: there is no contrast left for the
+           eye to find, so the frame reads as uniformly loud, which is the same
+           defect as having no accent at all in brighter paint. If a beat is about
+           all three parts of something equally, the parts are "plain" and the
+           TITLE carries the point — or the beat wants three frames, one part lit
+           in each. A frame with six boxes and six heroes is the commonest way this
+           goes wrong, and it is rejected.
   "plain"  present and relevant, but not what is being said right now.
   "lost"   something wasted, rejected, invalid or unusable. Used sparingly.
   "quiet"  context the viewer should not read yet.
@@ -572,17 +588,53 @@ Moving the hero is how a SINGLE frame directs attention. It is NOT how a short i
 built, and reading it that way is what produced the defect this brief spends most of
 its length warning about.
 
-DO NOT keep the same template and the same cells across the beats of a short. Four
-beats of one template is one slide shown four times, however the accent moves on it,
-and it is rejected by a grader that counts the distinct templates in your answer.
-A short of three or more frames MUST use at least two different templates.
+WHAT MUST CHANGE BETWEEN BEATS IS THE PICTURE, NOT THE TEMPLATE
+Nothing counts your templates. An earlier version of this brief demanded at least
+two different ones per short and a grader enforced it; both were wrong, because
+template count is not what repetitiveness is made of. A short can change layout on
+every beat and say the same thing three times, and a short can hold ONE layout for
+five beats and be the best kind of teaching picture there is.
 
-The "one composition that builds" rule is about the SUBJECT, not the shape: every
-frame is a picture of the same idea, and the pictures are allowed — expected — to be
-different kinds of picture. Showing the effect in a "preview" and then the rule that
-caused it in a "code" frame is one explanation in two pictures. Showing the same
-"icons" row four times with one more pictogram each time is not; the viewer has read
-the whole composition during beat one.
+KEEPING ONE SCAFFOLD AND CHANGING WHAT IS IN IT IS ENCOURAGED. It is how a process,
+a comparison and a data structure are actually taught:
+
+  a `compare` frame headed with two selectors, whose columns hold "Target element",
+  then "Scoreboard", then the three score components, then the two real scores,
+  and finally the winner lit with the loser dimmed
+    -> five frames, one template, five different pictures, one idea developed.
+
+  a stack drawn the same way in every beat, with a box arriving, then another, then
+  the top one leaving
+    -> the same, for a data structure.
+
+What IS rejected is a picture the viewer has already read:
+
+  the same "icons" row four times with one more pictogram each time — the whole
+  composition was legible during beat one and beats 2-4 add a box to it
+  the same code panel with the highlight on line 3, then line 2, then line 3 again
+    -> nothing is drawn that was not on screen already; only the accent moves
+
+So the test to apply to your own answer is not "did I vary the layout" but "if I
+took the accents away, would beat 4 look different from beat 2". Change what is
+DRAWN: replace a label, swap the elements, show the next state of the thing. One
+beat MAY be a re-role of the picture before it when that is the payoff — the verdict
+delivered on a composition already assembled — but only one, and not the opening.
+
+BUT THE SCAFFOLD DOES NOT OUTRANK THE BEAT'S OWN CLAIM, and this is where holding
+one layout goes wrong. Each beat carries a `relationship`, and the table above says
+which templates can carry it. That mapping WINS. A beat whose claim is a structure
+— "the score has three parts" — is a structure however convenient it would be to
+keep the two columns up, and forcing it into `compare` produces the frame this
+brief warns about twice over: two columns of three identical boxes, every one of
+them accented because no single one is what the beat is about.
+
+Two symptoms tell you a scaffold is being forced onto the wrong claim, and both
+are checked:
+  * you cannot pick ONE hero in a group, so you mark them all;
+  * the frame comes out the same as the frame before it with the labels reworded.
+If either happens, the beat wanted a different KIND of picture. Give it one — the
+short does not stop being a developing composition because one of its beats is a
+row of three parts rather than two columns.
 
 KEEP THE LABELS SHORT — 14 CHARACTERS OR FEWER
 The renderer will shrink a long label, wrap it to two lines, and finally truncate
@@ -778,7 +830,7 @@ def _design_graders(section: Section | None = None):
     warning printed after the short is written.
     """
     from .. import checks
-    graders = [checks.check_frames_develop, checks.check_frames_vary_template,
+    graders = [checks.check_frames_develop, checks.check_frames_progress,
                checks.check_frames_are_visual,
                checks.check_icons_are_pictures, checks.check_samples_differ,
                # Both new, both free, both acting on things the brief already

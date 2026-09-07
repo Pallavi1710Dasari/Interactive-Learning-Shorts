@@ -1,0 +1,127 @@
+{
+  "short_id": "frame_prints_the_sentence",
+  "session_id": "eval",
+  "source_section_id": "3.1",
+  "question": "Why does an operating system use paging instead of contiguous allocation?",
+  "estimated_seconds": 30.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "Why does an operating system use paging instead of contiguous allocation?",
+      "on_screen": "Which rule wins?",
+      "visual_ref": "d_one"
+    },
+    {
+      "speaker": "student",
+      "line": "Contiguous allocation forces every process to occupy one unbroken block.",
+      "on_screen": "Step 1",
+      "visual_ref": "d_two",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    },
+    {
+      "speaker": "student",
+      "line": "Paging removes that requirement for contiguity entirely.",
+      "on_screen": "Step 2",
+      "visual_ref": "d_three",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    },
+    {
+      "speaker": "student",
+      "line": "So any page may be placed in any free frame.",
+      "on_screen": "Step 3",
+      "visual_ref": "d_four",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    }
+  ],
+  "visuals": {
+    "d_one": {
+      "ref": "d_one",
+      "type": "diagram",
+      "spec": "stub spec for d_one",
+      "frame": {
+        "template": "bar",
+        "title": "Why paging exists",
+        "cells": [
+          {
+            "label": "Contiguous allocation",
+            "role": "hero"
+          },
+          {
+            "label": "Unbroken block",
+            "role": "plain"
+          }
+        ]
+      }
+    },
+    "d_two": {
+      "ref": "d_two",
+      "type": "diagram",
+      "spec": "stub spec for d_two",
+      "frame": {
+        "template": "bar",
+        "title": "Why paging exists",
+        "cells": [
+          {
+            "label": "allocation forces",
+            "role": "hero"
+          },
+          {
+            "label": "every process",
+            "role": "plain"
+          },
+          {
+            "label": "occupy unbroken",
+            "role": "plain"
+          },
+          {
+            "label": "block memory",
+            "role": "plain"
+          }
+        ]
+      }
+    },
+    "d_three": {
+      "ref": "d_three",
+      "type": "diagram",
+      "spec": "stub spec for d_three",
+      "frame": {
+        "template": "bar",
+        "title": "Why paging exists",
+        "cells": [
+          {
+            "label": "Paging removes",
+            "role": "hero"
+          },
+          {
+            "label": "requirement",
+            "role": "plain"
+          },
+          {
+            "label": "contiguity",
+            "role": "plain"
+          }
+        ]
+      }
+    },
+    "d_four": {
+      "ref": "d_four",
+      "type": "diagram",
+      "spec": "stub spec for d_four",
+      "frame": {
+        "template": "bar",
+        "title": "Why paging exists",
+        "cells": [
+          {
+            "label": "Any page",
+            "role": "hero"
+          },
+          {
+            "label": "Any free frame",
+            "role": "plain"
+          }
+        ]
+      }
+    }
+  },
+  "status": "draft"
+}

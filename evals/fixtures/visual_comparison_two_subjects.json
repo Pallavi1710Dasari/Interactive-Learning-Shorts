@@ -1,0 +1,179 @@
+{
+  "short_id": "comparison_two_subjects",
+  "session_id": "eval",
+  "source_section_id": "4.1",
+  "question": "How do the two selectors' specificity scores compare?",
+  "estimated_seconds": 30.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "How do the two selectors' specificity scores compare?",
+      "on_screen": "Which rule wins?",
+      "visual_ref": "d_intro"
+    },
+    {
+      "speaker": "student",
+      "line": "One selector brings an id and the other brings none.",
+      "on_screen": "Step 1",
+      "visual_ref": "d_both",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    },
+    {
+      "speaker": "student",
+      "line": "The first difference decides, so the id wins.",
+      "on_screen": "Step 2",
+      "visual_ref": "d_rule",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    },
+    {
+      "speaker": "student",
+      "line": "Extra classes never outrank a single id.",
+      "on_screen": "Step 3",
+      "visual_ref": "d_result",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    }
+  ],
+  "visuals": {
+    "d_intro": {
+      "ref": "d_intro",
+      "type": "diagram",
+      "spec": "stub spec for d_intro",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "1 ID",
+                "role": "hero"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "0 IDs",
+                "role": "hero"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "d_both": {
+      "ref": "d_both",
+      "type": "diagram",
+      "spec": "stub spec for d_both",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "1 ID",
+                "role": "hero"
+              },
+              {
+                "label": "1 Class",
+                "role": "plain"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "plain",
+            "items": [
+              {
+                "label": "0 IDs",
+                "role": "hero"
+              },
+              {
+                "label": "2 Classes",
+                "role": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "d_rule": {
+      "ref": "d_rule",
+      "type": "diagram",
+      "spec": "stub spec for d_rule",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "hero",
+            "items": [
+              {
+                "label": "1 ID",
+                "role": "hero"
+              },
+              {
+                "label": "1 Class",
+                "role": "quiet"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "lost",
+            "items": [
+              {
+                "label": "0 IDs",
+                "role": "lost"
+              },
+              {
+                "label": "2 Classes",
+                "role": "quiet"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "d_result": {
+      "ref": "d_result",
+      "type": "diagram",
+      "spec": "stub spec for d_result",
+      "frame": {
+        "template": "compare",
+        "title": "Which rule wins?",
+        "panels": [
+          {
+            "title": "#nav .item a",
+            "role": "hero",
+            "items": [
+              {
+                "label": "Wins",
+                "role": "hero"
+              }
+            ]
+          },
+          {
+            "title": ".item .link a",
+            "role": "lost",
+            "items": [
+              {
+                "label": "Loses",
+                "role": "lost"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "status": "draft"
+}

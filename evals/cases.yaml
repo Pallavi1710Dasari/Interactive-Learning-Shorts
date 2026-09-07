@@ -862,6 +862,115 @@ cases:
       passed: true
 
 
+  # -------------------------------------------------- visual progression
+  #
+  # These replace the coverage check_frames_vary_template never had, and they
+  # exist because that grader was measuring the wrong thing. It answered "is this
+  # short repetitive?" by counting distinct TEMPLATES, which fails a persistent
+  # scaffold whose contents change every beat — the shape a process, a comparison
+  # and a data structure are actually taught in — and passes four rows of
+  # pictograms as long as one card among them is a different layout.
+  #
+  # The rule these freeze is the one that matters: the same template with real
+  # state changes is good, the same template with a sliding accent is not, and a
+  # different template is not by itself worth anything.
+
+  - id: E054
+    name: One scaffold whose contents change every beat is visual progression
+    why: >
+      The case the rewrite exists for, taken from a real rendered reel. Five
+      `compare` frames under one constant title, the two columns holding "Target
+      element", then "Scoreboard", then the three score components, then the two
+      real scores, then the winner lit and the loser dimmed. One template, five
+      different pictures, one idea developed — and the old template-counting
+      grader called it "one layout repeated".
+    type: unit_grader
+    grader: frames_progress
+    fixture: evals/fixtures/visual_scaffold_progresses.json
+    expect:
+      passed: true
+
+  - id: E055
+    name: One scaffold with only the accent moving is not
+    why: >
+      The failure half, and the reason E054 cannot be satisfied by disabling the
+      check. Same template, same three labels in every frame, only which one is
+      amber changes. A viewer reads the whole picture in two seconds and then
+      watches a highlight slide over it — the original complaint, word for word.
+      Template count cannot tell this apart from E054; drawn content can.
+    type: unit_grader
+    grader: frames_progress
+    fixture: evals/fixtures/visual_scaffold_static.json
+    expect:
+      passed: false
+      reason_contains: "only the accent moves"
+
+  - id: E056
+    name: A payoff beat that re-roles an assembled picture is allowed
+    why: >
+      frames_develop used to fail ANY transition that only moved the accent. The
+      last beat of E054's fixture keeps both scores on screen and re-roles them —
+      winner to hero, loser to lost, tied rows to quiet. That is the climax, and
+      nothing new is drawn because nothing new is needed.
+
+      The rule is now proportional: one such transition in three or more is a
+      payoff, two in three is a short standing still. E019 holds the failure side.
+    type: unit_grader
+    grader: frames_develop
+    fixture: evals/fixtures/visual_scaffold_progresses.json
+    expect:
+      passed: true
+
+  - id: E057
+    name: A genuine two-subject comparison keeps both subjects lit
+    why: >
+      one_hero_per_frame counts heroes WITHIN each group, not per frame, so a claim
+      that spans two columns can light both of its ends — "this selector brings an
+      id and that one brings none" is one claim needing two accents, and dimming
+      either end draws an arrow from a highlighted box to an unremarkable one.
+
+      Frozen because it is the case a well-meaning tightening breaks. E025 holds
+      the real defect this grader is for, which is a group where EVERY element is
+      hero — six boxes all amber, an accent on everything and so on nothing.
+    type: unit_grader
+    grader: one_hero_per_frame
+    fixture: evals/fixtures/visual_comparison_two_subjects.json
+    expect:
+      passed: true
+
+  - id: E058
+    name: A worked-example frame may print the literals its beat names
+    why: >
+      frames_are_visual measures how much of a spoken line is reproduced in the
+      frame, and it was counting the wrong words. The beat "So `#nav .item a`
+      counts to 1,1,1, while `.item .link a` counts to 0,2,1" against a frame whose
+      columns are those two selectors and whose cells are those two scores echoed
+      86% — and every shared word was a selector or a numeral, which is precisely
+      what the picture must show for the example to be worked at all.
+
+      The echo is now measured on the PROSE only. Literals and numerals are the
+      subject, not the sentence.
+    type: unit_grader
+    grader: frames_are_visual
+    fixture: evals/fixtures/visual_worked_example_literals.json
+    expect:
+      passed: true
+
+  - id: E059
+    name: A frame that prints the sentence's prose is still rejected
+    why: >
+      The failure half of E058, and the defect the grader was written for: labels
+      like "allocation forces", "every process", "occupy unbroken" — the spoken
+      line chopped into boxes. No literals involved, so excluding literals cannot
+      rescue it. If this ever passes, the prose exclusion has been widened into a
+      hole.
+    type: unit_grader
+    grader: frames_are_visual
+    fixture: evals/fixtures/visual_frame_prints_sentence.json
+    expect:
+      passed: false
+      reason_contains: "PROSE is printed"
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

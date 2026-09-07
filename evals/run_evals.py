@@ -241,7 +241,59 @@ def run_judge_case(case: dict, sections) -> tuple[bool, str]:
     return True, f"faithfulness={report.faithfulness} clarity={report.clarity} pace={report.pace}"
 
 
+def _run_strategy_case(case: dict, sections) -> tuple[bool, str]:
+    """Does the strategy step still classify this beat's claim correctly?
+
+    `relationship` is the field the whole visual chain hangs off: it decides which
+    templates check_frames_match_strategy will accept, so a mislabel is not a
+    cosmetic error — it makes a correct drawing fail a grader. A comparison labelled
+    `process` sent a two-column score frame to be redrawn as a flow three times.
+
+    One real call, so it is gated behind --judge like every other golden case.
+    """
+    from shorts.skills.strategy import plan_strategy
+
+    script = load_script(case["fixture"])
+    # The case names its own document, because the beat under test need not come
+    # from the suite's default source_doc — this one is CSS, the default is paging.
+    own = case.get("input")
+    doc_sections = parse_markdown(ROOT / own) if own else sections
+    sid = case.get("section_id")
+    section = find_section(doc_sections, sid) if sid else None
+    strategy = plan_strategy(script, section)
+    by_ref = strategy.by_ref()
+
+    # A LIST OF ACCEPTABLE LABELS IS ALLOWED, and it is not laziness. Some beats
+    # have two honest readings — "the OS locates the page, selects a frame, issues
+    # the read" is a process if you look at the ordering and data_movement if you
+    # look at the page travelling from disk into the frame, and both draw a
+    # teachable picture. Pinning such a beat to one label freezes a coin toss and
+    # the case goes red on a correct answer. Where a case cares about a boundary
+    # rather than a value, it lists the labels that respect it.
+    problems, seen = [], {}
+    for ref, want in (case["expect"].get("relationship_by_ref") or {}).items():
+        got = getattr(by_ref.get(ref), "relationship", None)
+        seen[ref] = got
+        allowed = want if isinstance(want, list) else [want]
+        if got not in allowed:
+            problems.append(f"{ref}: expected {' or '.join(allowed)}, got {got!r}")
+
+    if problems:
+        return False, "; ".join(problems)
+    return True, ", ".join(f"{r}={g}" for r, g in seen.items())
+
+
 def run_golden_case(case: dict, sections) -> tuple[bool, str]:
+    """A real call to one skill, checked against a frozen expectation.
+
+    DISPATCHES ON case["step"], which the schema always carried and this ignored —
+    every golden case ran `select` whatever its step said, so a golden case for any
+    other skill silently tested selection instead. E010 is the only one that
+    predates the dispatch and it says `select`, so nothing changes for it.
+    """
+    if case.get("step") == "strategy":
+        return _run_strategy_case(case, sections)
+
     from shorts.skills.select import select_topics
     result = select_topics(sections)
     exp = case["expect"]

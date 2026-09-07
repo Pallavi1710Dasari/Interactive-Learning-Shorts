@@ -1,0 +1,26 @@
+{
+  "short_id": "page_fault_path",
+  "question": "What does the operating system do when a page fault is raised?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What does the operating system do when a page fault is raised?",
+      "on_screen": "Handling a page fault",
+      "visual_ref": "q_fault"
+    },
+    {
+      "speaker": "student",
+      "line": "The operating system locates that page on the backing store, selects a free frame, and issues the disk read.",
+      "on_screen": "Locate, select, read",
+      "visual_ref": "d_handler_steps",
+      "source_quote": "The OS locates the page on the backing store, selects a free frame, issues the disk read"
+    },
+    {
+      "speaker": "student",
+      "line": "It then updates the page table entry and restarts the instruction that faulted.",
+      "on_screen": "Update, then restart",
+      "visual_ref": "d_restart",
+      "source_quote": "updates the page table entry, and restarts the instruction that faulted"
+    }
+  ]
+}

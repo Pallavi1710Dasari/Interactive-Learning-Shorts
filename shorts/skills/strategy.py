@@ -120,6 +120,28 @@ For each beat, in order, you write down five things.
     cause_effect with the arrow left out. Read the beat again and ask whether
     anything HAPPENS in it. If something happens, it is not structure.
 
+    COUNT THE SUBJECTS BEFORE YOU PICK "process". The warning above pushes away
+    from structure and it must not push you into process by default, which is the
+    mistake it has actually caused:
+
+      BEAT  "So `#nav .item a` counts to 1,1,1, while `.item .link a` counts to
+             0,2,1."
+      BAD   process — because "counts" is a verb, so something happens
+      GOOD  comparison — there are TWO subjects and neither goes first
+
+    process needs ONE subject moving through steps that have an ORDER, where step 2
+    cannot happen before step 1. If you cannot say what would break by running the
+    steps backwards, it is not a process.
+
+    comparison is TWO subjects held side by side and weighed. Each side may well
+    contain a verb — scoring, counting, waiting, growing — and that does not make
+    it a process; it makes it two things doing the same thing differently. The tell
+    is the word "while", "whereas", "but", or "and the other", and the fact that
+    swapping which side you describe first changes nothing.
+
+    So: one subject with an order -> process. Two subjects weighed -> comparison,
+    however much happens inside each of them.
+
 `must_see` — the objects on the screen and what is true between them.
     Written as things, not as sentences to print. This is the field the whole step
     exists for, and there is one test for it:

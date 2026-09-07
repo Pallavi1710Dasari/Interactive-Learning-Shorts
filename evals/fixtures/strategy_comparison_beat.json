@@ -1,0 +1,33 @@
+{
+  "short_id": "specificity_scoring",
+  "question": "When two CSS rules conflict, how does the browser pick the winner?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "When two CSS rules conflict, how does the browser pick the winner?",
+      "on_screen": "Which rule wins?",
+      "visual_ref": "q_conflict"
+    },
+    {
+      "speaker": "student",
+      "line": "It's not about which rule was written last — the browser scores each selector's specificity and the higher score wins.",
+      "on_screen": "Score, not order",
+      "visual_ref": "d_score_not_order",
+      "source_quote": "It first scores each selector for specificity, and the higher score wins regardless of order."
+    },
+    {
+      "speaker": "student",
+      "line": "So `#nav .item a` counts to 1,1,1, while `.item .link a` counts to 0,2,1.",
+      "on_screen": "1,1,1 vs 0,2,1",
+      "visual_ref": "d_worked_scores",
+      "source_quote": "A selector written `#nav .item a` therefore scores 1 id, 1 class and 1 type, which is conventionally written 1,1,1."
+    },
+    {
+      "speaker": "student",
+      "line": "Compare left to right: the first difference decides, so 1,0,0 beats 0,2,1.",
+      "on_screen": "First difference wins",
+      "visual_ref": "d_left_to_right",
+      "source_quote": "The components are compared left to right and the first difference decides the winner"
+    }
+  ]
+}

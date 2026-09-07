@@ -971,6 +971,72 @@ cases:
       passed: false
       reason_contains: "PROSE is printed"
 
+  - id: E060
+    name: A two-subject scoring beat is classified comparison, not process
+    why: >
+      THE MISLABEL THIS FREEZES, caught on a real run. The strategy step labelled
+      "So `#nav .item a` counts to 1,1,1, while `.item .link a` counts to 0,2,1"
+      as a `process`, on the strength of the verb "counts" — two subjects weighed
+      against each other, called a sequence of events.
+
+      It is not a cosmetic error. `relationship` decides which templates
+      check_frames_match_strategy will accept, so the mislabel made a CORRECT
+      drawing fail a grader: the two-column score frame was told to be redrawn as
+      one of cause_effect / code / flow / icons, and the redesign loop spent its
+      attempts on it.
+
+      The cause was a push in the prompt rather than an absent rule. It warns that
+      `structure` is the lazy default and to ask "does anything HAPPEN in it" —
+      which is right, and which shoves any beat containing a verb toward process.
+      The boundary is now stated: one subject with an order is a process, two
+      subjects weighed is a comparison however much happens inside each.
+
+      Costs one strategy call, so it runs under --judge with the other golden
+      cases. E061 is the guard against the fix over-reaching; it is a separate case
+      because the obvious second assertion here turned out to be wrong. Beat 2 —
+      "It's not about which rule was written last, the browser scores specificity"
+      — was expected to stay cause_effect and came back comparison, and on reading
+      it that is right: "not X but Y" weighs two deciding rules against each other,
+      which is what comparison means. A guard has to be a beat that is
+      unambiguously not a comparison, so it moved to its own fixture.
+    type: golden
+    step: strategy
+    input: content/css_specificity.md
+    section_id: "4.1"
+    fixture: evals/fixtures/strategy_comparison_beat.json
+    expect:
+      relationship_by_ref:
+        d_worked_scores: comparison
+
+  - id: E061
+    name: An ordered handler is still classified process, not comparison
+    why: >
+      The guard on E060's fix. Widening what counts as a comparison could pull
+      genuinely sequential beats across, and that would break the same grader in
+      the other direction — a process drawn as two columns cannot show an order.
+
+      One subject, the operating system, moving through steps that cannot be
+      reordered: you cannot issue the disk read before selecting the frame, which
+      is the test the prompt now names.
+
+      IT ACCEPTS TWO LABELS ON PURPOSE. Asserting `process` alone failed, and on
+      `data_movement` — which is the better reading, not a worse one: the page
+      travels from the backing store into a frame, and a picture of that arrow
+      teaches more than a numbered list. Both are sequential and neither is a
+      comparison, which is the only thing this case is guarding. Pinning it to one
+      would have frozen a coin toss between two correct answers.
+
+      If this ever comes back `comparison`, E060's boundary has been widened into
+      a hole.
+    type: golden
+    step: strategy
+    input: content/session_18_paging.md
+    section_id: "3.3"
+    fixture: evals/fixtures/strategy_process_beat.json
+    expect:
+      relationship_by_ref:
+        d_handler_steps: [process, data_movement]
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

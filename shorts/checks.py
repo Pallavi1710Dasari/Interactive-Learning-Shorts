@@ -1969,45 +1969,24 @@ def check_teaching_sequence(understanding, section_text: str | None = None) -> G
             return GraderResult("teaching_sequence", False, "; ".join(drifted),
                                 {"steps": len(steps), "drifted": drifted})
 
-    # --- DOES IT END ON THE OBJECTIVE ---------------------------------------
+    # NO LANDING CHECK HERE, AND IT WAS TRIED. Read this before adding one.
     #
-    # THE PLAN AND THE SCRIPT GRADERS WERE JOINTLY UNSATISFIABLE WITHOUT THIS, and
-    # a real run is what showed it. The reading returned a four-step sequence whose
-    # last step was "Ids beat any number of classes" — true, on the page, and a
-    # DETAIL rather than the core idea. The script then did as it was told:
-    # follows_sequence passed (it accepts the final step OR the objective, so
-    # landing on the step is enough), and check_reaches_objective failed, because
-    # the last beat carried 15% of the objective against a floor of 20%. Three
-    # script attempts, all rejected, none of them the script's fault — the plan
-    # steered it into a wall.
+    # A real run returned a four-step sequence whose last step was a detail, the
+    # script followed it, and check_reaches_objective failed. The obvious fix was
+    # to reject such a sequence here, so the plan could not steer the script into a
+    # wall — and it made things WORSE, measurably, on the next run.
     #
-    # UNDERSTANDING_SYSTEM already asks for this in words: the sequence "must stay
-    # on core_idea" and "ends ON the objective rather than on a summary of it".
-    # Nothing checked it, so a plan that ignored the instruction shipped with the
-    # authority of a plan.
+    # Two reasons. The threshold is a cliff: the sequence that got quarantined
+    # carried 19% of the objective in its final step against a 20% floor, which is
+    # a coin-toss difference for a plan that was otherwise good. And quarantining
+    # is the wrong lever anyway — dropping the sequence removes the SPINE, so the
+    # script then has no plan at all and ends wherever its last sentence lands. The
+    # failure it was supposed to prevent got more likely, not less.
     #
-    # Checked with the SAME measure and threshold check_reaches_objective lands
-    # with, deliberately — the two must agree about what "ends on the idea" means,
-    # or quarantining here would still leave scripts failing there.
-    #
-    # Quarantining is also the cheap outcome: this runs on the reply to the one
-    # understanding call, so catching it costs nothing, while missing it costs
-    # three script calls and a topic.
-    objective = (getattr(understanding, "core_idea", "") or "").strip()
-    if objective:
-        final = steps[-1]
-        landing = _grounded_share_of(
-            objective, f"{final.concept} {final.explanation_goal}")
-        if landing < MIN_OBJECTIVE_LANDING:
-            return GraderResult("teaching_sequence", False,
-                f"the sequence ends on a detail, not the idea: its last step is "
-                f"{final.concept!r}, which carries {landing:.0%} of the objective "
-                f"({objective[:70]!r}) against a {MIN_OBJECTIVE_LANDING:.0%} floor. A "
-                f"script that follows this plan faithfully ends somewhere other than "
-                f"the thing the short exists to say, and check_reaches_objective "
-                f"rejects it. Order the steps so the LAST one is the objective.",
-                {"landing": landing, "final_step": final.concept})
-
+    # Landing the objective is the SCRIPT's job, and skills/script.py now says so
+    # outright: the final beat must carry the idea, and follows_sequence explicitly
+    # permits ending on the objective instead of on the final planned step. The
+    # plan orders the explanation; the script decides where to stop.
     return GraderResult("teaching_sequence", True,
         f"{len(steps)} step(s), complete, on the objective, from the section's own concepts",
         {"steps": len(steps)})
@@ -2244,6 +2223,23 @@ def check_follows_teaching_sequence(script: Script, understanding=None,
 #: load-bearing word is often three letters — "valid bit", "the i bit", "36px".
 MIN_EXAMPLE_USE = 0.6
 
+#: And "examples are short" above has to be ENFORCED, because a real run showed it
+#: is an assumption rather than a fact. The reading returned this as its example:
+#:
+#:   "A selector written `#nav .item a` therefore scores 1 id, 1 class and 1 type,
+#:    which is conventionally written 1,1,1."
+#:
+#: — the whole sentence, not the literal inside it. MIN_EXAMPLE_USE then wanted 60%
+#: of a twenty-word sentence's stems inside a single beat that is capped at
+#: MAX_ANSWER_WORDS and also has its own point to make. No script could satisfy
+#: that, so uses_example failed every attempt on a plan that was otherwise right.
+#:
+#: Half a beat is the cap: the beat needs the other half for the sentence that
+#: frames the example. Over it, check_example_plan drops the plan rather than
+#: handing the writer an instruction it cannot carry out — the script then explains
+#: in general terms, which is a worse short but a shippable one.
+MAX_EXAMPLE_WORDS = MAX_ANSWER_WORDS // 2
+
 #: How far from its own teaching step an example may land. 1 = the beat carrying
 #: that step, or either neighbour. An example exists to make one idea concrete; two
 #: beats away it is decoration, and the learner has already moved on.
@@ -2361,6 +2357,22 @@ def check_example_plan(understanding, section_text: str | None = None) -> Grader
         return GraderResult("example_plan", False,
             f"marked {need} with no learner_takeaway — nobody decided what the "
             f"example is for", {"need": need})
+
+    # USABLE INSIDE ONE BEAT, or it is not a usable plan — see MAX_EXAMPLE_WORDS.
+    # Last of the checks deliberately: a too-long example is the least serious
+    # fault here (the example is real and on the page, it was just handed over
+    # wrapped in its sentence), so everything that indicates a fabrication gets to
+    # report first.
+    n = len(example.split())
+    if n > MAX_EXAMPLE_WORDS:
+        return GraderResult("example_plan", False,
+            f"the example is {n} words — {example[:60]!r} — which is the sentence "
+            f"around the example rather than the example. A beat is at most "
+            f"{MAX_ANSWER_WORDS} words and has its own point to make, so this "
+            f"cannot be used inside one and check_uses_planned_example would reject "
+            f"every script that tried. Name the literal itself, under "
+            f"{MAX_EXAMPLE_WORDS} words.",
+            {"need": need, "words": n, "example": example[:60]})
 
     return GraderResult("example_plan", True,
         f"{need} example {example[:40]!r}, grounded in the section",
@@ -3126,13 +3138,57 @@ def check_reaches_objective(script: Script, understanding=None) -> GraderResult:
             f"explain the idea itself.",
             {"coverage": coverage, "objective": objective[:80]})
 
+    # LANDING, with one alternative: the plan's own final step.
+    #
+    # THE FALSE POSITIVE THIS FIXES, measured on a real run. The short below passed
+    # every other grader at 29.6s and was rejected here at 17%:
+    #
+    #   Q  "When two CSS rules conflict, how does the browser pick a winner?"
+    #   1  "It scores each selector's specificity, and the higher score wins no
+    #       matter which rule was read last."
+    #   2  "The score counts three things separately: ids, then classes and
+    #       attributes, then types."
+    #   3  "`#nav .item a` scores 1,1,1, while `.item .link a` scores 0,2,1."
+    #   4  "Comparing left to right, that id makes 1,0,0 beat 0,2,1 — so extra
+    #       classes never outrank an id."
+    #
+    # Beat 4 is the CONSEQUENCE, and the script brief demands exactly that: for a
+    # "How..." question it says "the last beat is the RESULT of the process". The
+    # script obeyed its brief and this rejected it, because a concrete result does
+    # not echo the vocabulary of an abstract objective sentence. check_beats_develop
+    # names "a consequence of it" as a legitimate thing for a later beat to
+    # contribute, so the grader set disagreed with itself.
+    #
+    # What this check cannot tell apart is a DETAIL from a CONSEQUENCE. follows_sequence
+    # can, because the plan says where the explanation ends — and it PASSED on that
+    # short, landing on the final planned step. So the final step is accepted as an
+    # alternative here too, exactly as it is there and for the same reason.
+    #
+    # THE UNCONDITIONAL GUARANTEE IS KEPT WHERE IT WAS NEEDED. This grader exists
+    # because follows_sequence does not run when the sequence was quarantined; with
+    # no sequence there is no alternative to fall back on and the objective is
+    # required, which is the case the strictness was written for.
     landing = _grounded_share_of(objective, answers[-1].line)
     if landing < MIN_OBJECTIVE_LANDING:
-        return GraderResult("reaches_objective", False,
-            f"the last beat has almost nothing of the objective in it ({landing:.0%}) — the "
-            f"short explains its way toward {objective[:70]!r} and then ends on a detail. "
-            f"Make the final beat land the idea.",
-            {"coverage": coverage, "landing": landing})
+        steps = list(getattr(understanding, "teaching_sequence", None) or [])
+        landed_on_plan = False
+        if steps:
+            final = steps[-1]
+            landed_on_plan = _grounded_share_of(
+                f"{final.concept} {final.explanation_goal}",
+                answers[-1].line) >= MIN_OBJECTIVE_LANDING
+        if not landed_on_plan:
+            return GraderResult("reaches_objective", False,
+                f"the last beat has almost nothing of the objective in it ({landing:.0%}) "
+                f"and does not land the final planned step either — the short explains "
+                f"its way toward {objective[:70]!r} and then ends on a detail. Make the "
+                f"final beat land the idea, or the result the plan ends on.",
+                {"coverage": coverage, "landing": landing})
+        return GraderResult("reaches_objective", True,
+            f"the answer reaches the objective ({coverage:.0%}) and ends on the final "
+            f"planned step ({steps[-1].concept!r}) rather than on the objective's own "
+            f"words — allowed, the plan says that is where the explanation ends",
+            {"coverage": coverage, "landing": landing, "via": "final_step"})
 
     return GraderResult("reaches_objective", True,
         f"the answer reaches the objective ({coverage:.0%}) and ends on it ({landing:.0%})",
@@ -3386,14 +3442,26 @@ def check_beats_develop(script: Script) -> GraderResult:
         {"offenders": offenders})
 
 
-#: How many depth signals a plan needs to be worth a 35-50 second short.
+#: THE PLAN MUST BE ABLE TO FILL THE BEATS, and that is arithmetic rather than a
+#: score — which is what this used to be, and why it was wrong twice over.
 #:
-#: Two, not three, and not one. One is met by almost any section that parses — a
-#: three-step sequence is not hard to produce for a definition. Three would demand
-#: an example AND a misconception from nearly every section, and the readings are
-#: explicit that "not_needed" is the ordinary answer for both, so a floor of three
-#: would flag the sections those fields were written to describe honestly.
-MIN_DEPTH_SIGNALS = 2
+#: It counted four booleans (>=3 steps, an example, a misconception, >=3 key
+#: points) and failed below two of them. That number was picked for an 87-word
+#: floor, and when the floor came down to 62 it started flagging the very shape the
+#: 25-30s band exists to allow. Worse, it never asked the question that actually
+#: matters: check_dialogue_shape requires MIN_ANSWERS answer beats, each one idea,
+#: and none of them allowed to restate another. So a plan is deep enough exactly
+#: when it holds MIN_ANSWERS things to say.
+#:
+#: What can fill a beat: a teaching step, a worked example the reading says to use,
+#: a misconception it says to correct. Nothing else — key_points are a description
+#: of the same steps, which is why counting them separately was double-counting.
+#:
+#: Three steps and nothing else is therefore NOT enough, and that is not a
+#: contradiction of the 25-30s band: a three-thing plan asked for four beats has to
+#: pad the fourth, and the band admits short shorts, not padded ones. The fix for
+#: such a topic is select's gate, not a longer script.
+MIN_PLAN_MATERIAL = MIN_ANSWERS
 
 
 def check_plan_depth(understanding, section_text: str | None = None) -> GraderResult:
@@ -3443,29 +3511,28 @@ def check_plan_depth(understanding, section_text: str | None = None) -> GraderRe
     def _wants(plan) -> bool:
         return getattr(plan, "need", None) in ("required", "helpful")
 
-    points = list(getattr(understanding, "key_points", None) or [])
-    signals = {
-        "sequence": len(steps) >= 3,
-        "example": _wants(getattr(understanding, "example_plan", None)),
-        "misconception": _wants(getattr(understanding, "confusion_plan", None)),
-        "key_points": len(points) >= 3,
-    }
-    have = [k for k, v in signals.items() if v]
+    example = _wants(getattr(understanding, "example_plan", None))
+    confusion = _wants(getattr(understanding, "confusion_plan", None))
+    material = len(steps) + int(example) + int(confusion)
+    made_of = (f"{len(steps)} teaching step(s)"
+               + (" + a worked example" if example else "")
+               + (" + a misconception to correct" if confusion else ""))
 
-    if len(have) < MIN_DEPTH_SIGNALS:
+    if material < MIN_PLAN_MATERIAL:
         return GraderResult("plan_depth", False,
-            f"thin for a {MIN_SECONDS}-{MAX_SECONDS}s short: only "
-            f"{len(have)} depth signal(s) ({', '.join(have) or 'none'}) from "
-            f"{len(steps)} teaching step(s), "
-            f"example={getattr(getattr(understanding, 'example_plan', None), 'need', 'none')}, "
-            f"misconception={getattr(getattr(understanding, 'confusion_plan', None), 'need', 'none')}"
-            f". The beats would have to be filled by restating — this topic belongs "
-            f"to a shorter format, or to select's gate",
-            {"signals": signals, "conclusive": True})
+            f"thin for a {MIN_SECONDS}-{MAX_SECONDS}s short: the plan holds "
+            f"{material} thing(s) to say ({made_of}) and the script owes "
+            f"{MIN_PLAN_MATERIAL} beats, each one idea and none allowed to restate "
+            f"another. The spare beat has nothing to be about, so it would be filled "
+            f"by restating — which check_beats_develop then rejects. This topic wants "
+            f"a shorter format, or select's gate",
+            {"material": material, "steps": len(steps), "example": example,
+             "misconception": confusion, "conclusive": True})
 
     return GraderResult("plan_depth", True,
-        f"{len(have)} depth signal(s): {', '.join(have)}",
-        {"signals": signals, "conclusive": True})
+        f"{material} thing(s) to say for {MIN_PLAN_MATERIAL} beat(s): {made_of}",
+        {"material": material, "steps": len(steps), "example": example,
+         "misconception": confusion, "conclusive": True})
 
 
 def check_question_grounded(script: Script, source_text: str) -> GraderResult:

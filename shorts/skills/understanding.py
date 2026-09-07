@@ -171,8 +171,17 @@ example_plan — whether THIS short should be built on a worked example, and whi
   pipeline exists to prevent.
 
   When it is "required" or "helpful", also give:
-    example            the thing itself, copied from the section EXACTLY as written
-                       — normally one of your own concrete_examples. Not a tidied
+    example            THE LITERAL, NOT THE SENTENCE AROUND IT. A few words: the
+                       selector, the value, the number, the line of code —
+                       `#nav .item a` and 1,1,1, not "A selector written
+                       `#nav .item a` therefore scores 1 id, 1 class and 1 type,
+                       which is conventionally written 1,1,1." The writing step has
+                       to fit this INSIDE one beat of at most 24 words alongside
+                       its own sentence, so a full sentence handed over here cannot
+                       be used and the plan is thrown away. Keep it under about ten
+                       words.
+                       Copied from the section EXACTLY as written — normally one of
+                       your own concrete_examples. Not a tidied
                        version, not a generalisation ("a font name" instead of
                        font-family: "Roboto"), and never one you know from
                        elsewhere. It is checked against the section, and a plan

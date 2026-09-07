@@ -10,9 +10,17 @@ from .. import revision
 
 MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 87
 MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 125
-#: ~45s, the middle of the window rather than its floor. Aiming at the floor is
-#: what made the old 18-45 window pad: the model treated the minimum as the brief.
-TARGET_WORDS = 112
+#: THERE IS DELIBERATELY NO SINGLE TARGET IN THE BRIEF ANY MORE.
+#:
+#: This was 56, then 112, and both were wrong in the same way: a figure in the
+#: prompt is read as the length to reach, so the model writes to the number rather
+#: than to the concept. At 112 (the 35-50s maximum) that meant padding pressure on
+#: every short; at 56 it meant stopping early on a rich one.
+#:
+#: The brief now states BANDS and lets the concept pick one — see LENGTH below.
+#: This constant survives only as the midpoint other modules may want, and nothing
+#: in the prompt tells the model to aim at it.
+TARGET_WORDS = (MIN_WORDS + MAX_WORDS) // 2   # 87
 
 SYSTEM = f"""You write SHORT interview-style video scripts that teach ONE concept.
 
@@ -120,28 +128,41 @@ restatement, a recap, or a "so in summary", DELETE IT.
 But do not cut the beat that answers the question in order to hit a beat count. A
 complete answer beats a tidy non-answer every time.
 
-LENGTH, AND WHAT IS NOT ALLOWED TO FILL IT
-Total spoken words across ALL beats: {MIN_WORDS} minimum, {MAX_WORDS} maximum,
-{TARGET_WORDS} is the target — about 45 seconds. Speech runs 150 words per minute,
-so this IS the video length.
+LENGTH — THE CONCEPT DECIDES, NOT A TARGET
+Total spoken words across ALL beats: {MIN_WORDS} minimum, {MAX_WORDS} maximum.
+Speech runs 150 words per minute, so this IS the video length.
 
-DO THE ARITHMETIC BEFORE YOU ANSWER, because the floor is easy to miss by writing
-well. {MIN_WORDS} words is FIVE answer beats of about 19 words each, plus the
-question. Five is therefore the norm here, not the upper option. Four beats only
-reaches the floor if every one of them is 22-24 words — at the cap, not near it.
+THERE IS NO NUMBER TO HIT INSIDE THAT RANGE. The window is wide because concepts
+differ, and where a short lands says something true about its concept:
 
-This is the single most common way a good script gets rejected: four beats of 15
-to 18 words reads tightly, says everything, and comes to about 70 words, which is
-under {MIN_WORDS} and fails. Nothing is wrong with such a draft except that it is
-a 28-second short and this format is {MIN_SECONDS}-{MAX_SECONDS} seconds. If yours
-lands there, DO NOT pad the beats you have — add the beat the plan gives you that
-you left out: the next teaching step, the example, or the correction. Count the
-words of your draft, and if it is short, look at the PLAN for what is missing
-rather than at your sentences for what can be stretched.
+  {MIN_WORDS}-75 words   ~25-30s  A concise but complete concept. The idea, how it
+                       works, and what follows from it — with nothing left out and
+                       nothing added. THIS IS A FINISHED SHORT, NOT A SHORT ONE.
+  75-95 words   ~30-38s  The normal case: a mechanism and its consequence, walked
+                       through step by step.
+  95-{MAX_WORDS} words  ~38-45s  A richer concept — one whose section also gives you a
+                       worked example to walk through, or a misconception worth
+                       correcting, or both.
 
-THE FLOOR IS NOT A LICENCE TO PAD. This is the failure mode of a wider window and
-it has already happened once in this project: every beat verbatim-cited, every
-grader green, and nothing taught after beat one.
+Read the plan, write what the concept needs, and let it land where it lands. Do
+not check your word count against the top of the range and go looking for
+something to add: that is the padding this brief spends most of its length
+forbidding, and it has been the defect in three of the four length settings this
+format has had.
+
+BEING AT THE BOTTOM OF THE RANGE IS NOT A FAULT TO FIX. A four-beat answer of
+15-18 words a beat comes to about 70 words, and that is a normal, good, finished
+short — it reads tightly and says everything. It is explicitly allowed. If you
+find yourself wanting a fifth beat only because four felt short, you have found
+the padding instinct, not a missing beat.
+
+THE ONLY REASON TO ADD A BEAT IS THAT THE PLAN HAS SOMETHING IN IT YOU HAVE NOT
+SAID — the next teaching step, the example it told you to use, the misconception
+it told you to correct. If the plan is fully delivered in four beats, you are
+done. If it is fully delivered in four beats and you are under {MIN_WORDS} words,
+you are still done — say so by writing it, and let the length gate reject it.
+That is a topic too thin for the format, and the fix belongs to select, not to
+your sentences.
 
 WHAT THE EXTRA TIME IS FOR IS NOT YOUR DECISION — IT IS IN THE PLAN.
 The CONTENT UNDERSTANDING below carries a teaching_sequence, an example decision
@@ -153,6 +174,19 @@ for. A worked example is the most effective thing a short can contain and a
 corrected expectation is the most memorable — which is exactly why the decision
 to use one is made by the step that read the section, not by the step under
 pressure to fill 45 seconds.
+
+THE LAST BEAT MUST CARRY THE IDEA ITSELF. This is measured, not a matter of feel:
+the final beat is checked for how much of the objective's own vocabulary it
+contains, and a beat that lands on a supporting detail instead fails it — which
+has been the single most common reason a real run was rejected.
+
+Normally the plan does this for you, because a well-ordered teaching_sequence ends
+ON the objective. When it does not — when the last planned step is a detail rather
+than the idea — END ON THE IDEA ANYWAY. That is allowed and expected: the sequence
+check accepts a short that lands on the objective instead of on the final step. The
+plan orders the explanation; you decide where to stop.
+
+What this is NOT is a licence to add a summarising beat after the explanation:
 
 THERE IS NO CLOSING TAKEAWAY BEAT. DO NOT ADD ONE. This is the one instruction
 here most likely to feel wrong, so here is the evidence: the last thing a viewer

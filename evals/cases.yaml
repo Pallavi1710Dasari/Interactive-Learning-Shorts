@@ -803,31 +803,63 @@ cases:
       passed: true
 
   - id: E049
-    name: A script at the old 12-28s length is rejected by the wider window
+    name: A concise but complete 29-second short ships
     why: >
-      THE REGRESSION GUARD FOR THE 35-50s WINDOW. This fixture is the exact script
-      that used to be this suite's known-good example: 66 words, 26.4 seconds,
-      three answer beats. It passed every grader for the whole life of the 12-28s
-      window, which is what makes it the right probe — it is not a contrived
-      failure, it is yesterday's success.
+      THE CASE THAT RECORDS WHY THE FLOOR CAME DOWN, and it is deliberately the
+      inversion of what stood here before. This slot used to hold a 26.4-second
+      script asserted to FAIL, as the regression guard for a 35-50s window.
 
-      Its job is to fail. If it ever passes, MIN_SECONDS has drifted back down and
-      every short built since the change is shorter than intended, which is
-      invisible from the output because a 26-second short looks fine on its own.
+      That window was wrong, and it was measurement that showed it rather than
+      argument. Four real runs against a document written specifically to be rich
+      enough for 45 seconds produced scripts of 67, 77 and 71 words — mean 28.7
+      seconds — most of them passing every other grader. One opened by correcting
+      the misconception, scored both of the section's real selectors verbatim, and
+      landed the consequence. It was a good short whose only fault was being 28
+      seconds long.
 
-      Deliberately NOT paired with a success case of its own: E003 already asserts
-      that a correctly-sized script passes timing, and the pair is what stops the
-      cheap fix of making the grader reject everything.
+      So the fixture here is a real 29-second short and its job is to PASS every
+      grader: four beats, one idea each, four distinct citations, 90% grounded,
+      nothing restated. If it ever fails on length, the floor has crept back up and
+      the format has started rejecting finished work again.
 
-      Numbered E049, not E029: the content-understanding block below claimed
-      E029-E048 on the other branch and both cases are wanted, so this one
-      moved rather than either being dropped.
+      Its partner is E045, not a failure case of its own: E045 holds a padded
+      32-second short and rejects it on REPETITION. Together they say the thing
+      this window change rests on — length is not what tells a good short from a
+      padded one, and the graders that do tell them apart are unchanged.
     type: code_grader
     grader: timing
-    fixture: evals/fixtures/old_window_length.json
+    fixture: evals/fixtures/concise_but_complete.json
     expect:
-      passed: false
-      reason_contains: "too short"
+      passed: true
+
+  - id: E052
+    name: The concise short is concise, not padded
+    why: >
+      The other half of E049, and the reason it is a separate case. Passing timing
+      only proves the 29-second short is allowed; this proves it deserves to be —
+      no beat restates another, so its brevity is economy rather than a short
+      script with the padding removed.
+
+      Without this pair, the cheap way to satisfy E049 is to lower the floor and
+      let anything short through.
+    type: code_grader
+    grader: no_repetition
+    fixture: evals/fixtures/concise_but_complete.json
+    expect:
+      passed: true
+
+  - id: E053
+    name: A four-beat answer at the bottom of the range keeps its shape
+    why: >
+      The third assertion on the same fixture, because "short" must not become a
+      licence to drop beats. MIN_ANSWERS is unchanged at 4 — the window moved, the
+      structure did not — so a 29-second short still owes four one-idea beats, and
+      this fails if someone tries to make the floor reachable by allowing three.
+    type: code_grader
+    grader: dialogue_shape
+    fixture: evals/fixtures/concise_but_complete.json
+    expect:
+      passed: true
 
 
   # ------------------------------------------------------------------ llm judge

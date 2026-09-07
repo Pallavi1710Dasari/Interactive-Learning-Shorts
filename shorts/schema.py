@@ -15,36 +15,50 @@ WORDS_PER_SECOND = WORDS_PER_MINUTE / 60.0
 
 # The length window, in seconds of speech.
 #
-# READ THE HISTORY BEFORE MOVING THESE. It has gone 30-60 -> 18-45 -> 12-28 -> and
-# now back up to 35-50, and the two cuts were not mistakes: each one fixed a real
-# defect that the raise can bring back.
+# 25-50 -> ... -> 35-50 -> 25-45, and this is the FOURTH setting. Read the history
+# before moving it a fifth time, because the previous four each had a reason and
+# only the last one has evidence.
 #
-# Why it was cut, twice:
-#   30-60 -> 18-45  The floor forced padding. A question whose honest answer is
-#                   three short sentences had to be inflated to 75 words, and the
-#                   extra beat was always the weakest — a restatement, or a claim
-#                   propped up by a citation that did not really support it.
-#   18-45 -> 12-28  At 45 seconds a short was five points long, and five points is
-#                   what made these unmemorable. One idea and its consequence is
-#                   recallable a week later; five lands none of them.
+#   30-60   The floor forced padding. A question whose honest answer is three
+#           sentences had to be inflated, and the extra beat was always the
+#           weakest — a restatement, or a claim propped up by a citation that did
+#           not really support it.
+#   18-45   Cut for the same defect, one level down.
+#   12-28   Cut again on memorability: at 45s a short was five points long, and
+#           five points is what made these unmemorable.
+#   35-50   Raised on the theory that length was never the problem — that a
+#           45-second short is only padded when the TOPIC could not fill it, and
+#           that a real depth gate in select plus an understanding-driven plan
+#           would make the length honest.
+#   25-45   THE THEORY WAS HALF RIGHT AND THE FLOOR WAS STILL WRONG.
 #
-# Why it is going back up, and why this is not a repeat of the thing that failed:
-# BOTH cuts were fixing the same defect, and it was never length itself — it was
-# length applied to a topic that did not have the content to fill it. A 45-second
-# short built by stretching a three-sentence answer is padding at any window. A
-# 45-second short built on a concept that genuinely carries a mechanism, its
-# consequence, and a worked example is not.
+# What settled it was measurement, not argument. Four real runs against
+# content/css_specificity.md — a document written specifically to be rich enough
+# for 45 seconds — produced scripts of 67, 77 and 71 words: mean 71.7 words, 28.7
+# seconds, against an 87-word floor. Most attempts passed every other grader. One
+# of them opened by correcting the misconception, scored both of the section's real
+# selectors verbatim, and landed the consequence. It was a good short and the only
+# thing wrong with it was that it was 28 seconds.
 #
-# So the floor is only honest if the SELECT step is the thing that changed, and it
-# is: select now requires a topic to have that depth in its own section before it
-# may be returned (see skills/select.py, "ENOUGH TO FILL THE WINDOW"). Raising this
-# window WITHOUT that change reproduces the 18-45 failure exactly.
+# So the natural length of a source-grounded, one-idea-per-beat explanation of a
+# single concept is around 28-30 seconds, and three separate settings of this
+# window have now produced that number. The floor is 25s to admit it.
 #
-# What holds the memorability half in place is not the window, it is
-# checks.MAX_ANSWER_WORDS, which stays at 24. More beats, each still one idea —
-# never longer beats. 35s is ~87 words, 50s is ~125, and the target is ~45s / ~112.
-MIN_SECONDS = 35
-MAX_SECONDS = 50
+# WHAT THE WINDOW IS NOT: a target. 25-45 is wide because the concept decides,
+# and skills/script.py states the bands rather than a figure to hit —
+#   25-30s  concise but complete
+#   30-38s  a normal mechanism-and-consequence explanation
+#   38-45s  a richer concept, with a grounded example and/or a misconception
+# A short at the bottom of that range is not a short that fell short.
+#
+# The two things holding quality in place are NOT the floor, and both stay: every
+# beat is still one idea (checks.MAX_ANSWER_WORDS = 24) and no beat may restate an
+# earlier one (checks.check_beats_develop). Those reject a padded 40-second short,
+# which is what the floor was being asked to do and could not.
+#
+# 25s is ~62 words, 45s is ~112.
+MIN_SECONDS = 25
+MAX_SECONDS = 45
 MAX_OVERLAY_WORDS = 8
 
 

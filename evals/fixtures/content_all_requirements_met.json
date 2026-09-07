@@ -1,0 +1,79 @@
+{
+  "understanding": {
+    "section_id": "3.2",
+    "core_idea": "A logical address is split into a page number and an offset, and the page table turns the page number into the frame number that forms the physical address.",
+    "teaching_sequence": [
+      {
+        "concept": "Page number and offset",
+        "purpose": "Establish the two parts of a logical address",
+        "explanation_goal": "Learner understands which part identifies the page"
+      },
+      {
+        "concept": "Page table lookup",
+        "purpose": "Show how the page number is translated",
+        "explanation_goal": "Learner understands that the page number maps to a frame number"
+      },
+      {
+        "concept": "Frame number concatenated with the offset",
+        "purpose": "Complete the translation",
+        "explanation_goal": "Learner understands how the physical address is formed"
+      }
+    ],
+    "key_points": [
+      "the two parts of a logical address",
+      "the page table lookup"
+    ],
+    "concrete_examples": [
+      "valid bit"
+    ],
+    "example_plan": {
+      "need": "required",
+      "example": "valid bit",
+      "supports_step": 2,
+      "learner_takeaway": "that an entry can say the page is not resident"
+    },
+    "confusion_plan": {
+      "need": "not_needed"
+    },
+    "hook_plan": {
+      "kind": "direct"
+    },
+    "source_evidence": [
+      "A logical address is split into a page number and an offset.",
+      "The hardware concatenates the frame number with the offset to form the physical address."
+    ]
+  },
+  "script": {
+    "short_id": "all_met",
+    "question": "How does a logical address become a physical address?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "How does a logical address become a physical address?",
+        "on_screen": "How does a logical address become",
+        "visual_ref": "v_q"
+      },
+      {
+        "speaker": "student",
+        "line": "A logical address splits into a page number and an offset.",
+        "on_screen": "A logical address splits into a",
+        "visual_ref": "v_1",
+        "source_quote": "A logical address is split into a page number and an offset."
+      },
+      {
+        "speaker": "student",
+        "line": "The page number indexes the page table, and each entry carries a valid bit.",
+        "on_screen": "The page number indexes the page",
+        "visual_ref": "v_2",
+        "source_quote": "Each page table entry also carries a valid bit indicating whether the page is currently resident in physical memory."
+      },
+      {
+        "speaker": "student",
+        "line": "The hardware joins that frame number with the offset to form the physical address.",
+        "on_screen": "The hardware joins that frame number",
+        "visual_ref": "v_3",
+        "source_quote": "The hardware concatenates the frame number with the offset to form the physical address."
+      }
+    ]
+  }
+}

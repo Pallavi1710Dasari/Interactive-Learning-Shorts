@@ -1,0 +1,66 @@
+{
+  "understanding": {
+    "section_id": "3.3",
+    "core_idea": "A page fault is a trap to the operating system, which loads the page and restarts the instruction that faulted.",
+    "teaching_sequence": [
+      {
+        "concept": "The valid bit is clear",
+        "purpose": "Show what triggers the fault",
+        "explanation_goal": "Learner understands what the MMU detects"
+      },
+      {
+        "concept": "The page fault trap to the operating system",
+        "purpose": "Name what happens",
+        "explanation_goal": "Learner understands the OS is handed control"
+      },
+      {
+        "concept": "Restarting the faulting instruction",
+        "purpose": "Close the loop",
+        "explanation_goal": "Learner understands the program continues"
+      }
+    ],
+    "common_confusions": [
+      "that a page fault means the program has crashed"
+    ],
+    "confusion_plan": {
+      "need": "required",
+      "confusion": "that a page fault means the program has crashed",
+      "relates_to_step": 2,
+      "correct_understanding": "it raises a page fault trap to the operating system, and the OS restarts the instruction that faulted",
+      "learner_takeaway": "that a page fault is normal handling, not a failure"
+    }
+  },
+  "script": {
+    "short_id": "confusion_as_fact",
+    "question": "What happens on a page fault?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "What happens on a page fault?",
+        "on_screen": "What happens on a page fault?",
+        "visual_ref": "v_q"
+      },
+      {
+        "speaker": "student",
+        "line": "When the valid bit is clear the MMU raises a trap.",
+        "on_screen": "When the valid bit is clear",
+        "visual_ref": "v_1",
+        "source_quote": "it raises a page\nfault trap to the operating system"
+      },
+      {
+        "speaker": "student",
+        "line": "The program has crashed at that point, so nothing more runs.",
+        "on_screen": "The program has crashed at that",
+        "visual_ref": "v_2",
+        "source_quote": "The faulting process is blocked for the duration of the disk I/O."
+      },
+      {
+        "speaker": "student",
+        "line": "The operating system restarts the instruction that faulted.",
+        "on_screen": "The operating system restarts the instruction",
+        "visual_ref": "v_3",
+        "source_quote": "restarts the instruction that faulted"
+      }
+    ]
+  }
+}

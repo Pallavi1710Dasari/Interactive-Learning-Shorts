@@ -131,6 +131,24 @@ def _i(key: str, default: int) -> int:
 #: second build it costs.
 REPAIR_FAILED_SHORTS = os.getenv("REPAIR_FAILED_SHORTS", "0").strip().lower() in ("1", "true", "yes")
 
+#: Score a drafted script with the LLM judge DURING REVIEW, not only at finalize.
+#:
+#: WHY THIS IS WORTH A CALL. The deterministic graders answer "is this well
+#: formed" — the right length, cited, in order, not repeating itself, reaching its
+#: objective. They cannot answer "is this true", because that means holding a claim
+#: and a source side by side, which is the one job in this pipeline that needs a
+#: model. So a reviewer looking at eight green chips is being told the script is
+#: WELL BUILT, and reading that as WELL BUILT AND CORRECT is the obvious mistake to
+#: make. The judge already existed and already knew the answer; it just ran after
+#: the human had approved, which is the wrong side of the decision.
+#:
+#: WHAT IT COSTS. One judge call per drafted script, and only for scripts that pass
+#: the free graders first — there is nothing to ask about a script already known to
+#: be broken. That is roughly a cent a short on top of the draft.
+#:
+#: Set JUDGE_AT_REVIEW=0 to go back to judging only at finalize.
+JUDGE_AT_REVIEW = os.getenv("JUDGE_AT_REVIEW", "1").strip().lower() in ("1", "true", "yes")
+
 #: Whether the supportability screen makes its one model call. On by default.
 #:
 #: The free half of the screen always runs; this only governs the batched model call
@@ -344,8 +362,23 @@ def _f_late(key: str, default: float) -> float:
 #
 # Lives in its own virtualenv because it pins torch and transformers — see
 # shorts/chatterbox_worker.py for why, and CHATTERBOX_PYTHON for where.
+#: WHERE THE INTERPRETER LIVES DEPENDS ON THE OS, and hardcoding the POSIX layout
+#: made this unusable on Windows. A venv puts its interpreter in bin/python on
+#: Linux and macOS and in Scripts\python.exe on Windows — so the default pointed at
+#: a path that can never exist there, and the voice tab reported "Chatterbox is not
+#: installed" even after someone had installed it correctly.
+_VENV_BIN = ("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")
 CHATTERBOX_PYTHON = os.getenv(
-    "CHATTERBOX_PYTHON", str(ROOT / "venv-chatterbox" / "bin" / "python")).strip()
+    "CHATTERBOX_PYTHON", str(ROOT.joinpath("venv-chatterbox", *_VENV_BIN))).strip()
+
+#: The install line to show when it is missing, in the shell the reader is actually
+#: using. Four places print this instruction and they were four copies of the POSIX
+#: one; a Windows user following it verbatim gets "no such file or directory" from
+#: `venv-chatterbox/bin/pip` and no clue why.
+CHATTERBOX_INSTALL_HINT = (
+    r"python -m venv venv-chatterbox && venv-chatterbox\Scripts\pip install chatterbox-tts"
+    if os.name == "nt" else
+    "python3 -m venv venv-chatterbox && venv-chatterbox/bin/pip install chatterbox-tts")
 #: Voices chosen in the UI, which outrank the environment.
 #:
 #: A reference clip is picked by LISTENING, so it is chosen in the app rather than

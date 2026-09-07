@@ -1,0 +1,39 @@
+{
+  "understanding": {
+    "section_id": "3.1",
+    "core_idea": "Paging removes the requirement for contiguity, so scattered free frames become usable and external fragmentation disappears."
+  },
+  "script": {
+    "short_id": "misses_objective",
+    "question": "What does contiguous allocation require of memory?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "What does contiguous allocation require of memory?",
+        "on_screen": "What does contiguous allocation require of",
+        "visual_ref": "v_q"
+      },
+      {
+        "speaker": "student",
+        "line": "Contiguous allocation forces every process to occupy one unbroken block.",
+        "on_screen": "Contiguous allocation forces every process to",
+        "visual_ref": "v_1",
+        "source_quote": "Contiguous allocation forces every process to occupy one unbroken block of"
+      },
+      {
+        "speaker": "student",
+        "line": "Physical memory is divided into fixed-size frames of one size.",
+        "on_screen": "Physical memory is divided into fixed-size",
+        "visual_ref": "v_2",
+        "source_quote": "Physical memory is divided into fixed-size frames"
+      },
+      {
+        "speaker": "student",
+        "line": "The logical address space is divided into pages of that same size.",
+        "on_screen": "The logical address space is divided",
+        "visual_ref": "v_3",
+        "source_quote": "the logical address space is divided into pages of the same size"
+      }
+    ]
+  }
+}

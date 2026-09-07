@@ -15,9 +15,10 @@ from .schema import ShortUnit, TopicList
 from .parse import parse_markdown, find_section
 from .skills.select import select_topics
 from .skills.script import write_script
+from .skills.understanding import understanding_for
 from .skills.visuals import design_visuals, render_diagrams
 from .skills.audit import audit
-from . import checks, config
+from . import checks, config, revision
 
 MAX_SCRIPT_RETRIES = 3
 
@@ -104,9 +105,21 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
     print(f"\n=== {topic.id} — {topic.topic[:60]}")
     feedback = None
 
+    # READ THE SECTION ONCE, OUTSIDE THE LOOP. The retry below re-runs write_script
+    # with a grader's complaint attached, and what the section teaches has not
+    # changed between attempts — so re-reading it would buy a second opinion on a
+    # settled question at the price of another call. Cached per section too, so a
+    # deck with several shorts filed under one section pays for one reading.
+    # None when the reading failed; write_script then behaves exactly as before.
+    understanding = understanding_for(section, document=document)
+
     for attempt in range(1, MAX_SCRIPT_RETRIES + 1):
-        script = write_script(topic, section, feedback, document=document)
-        results = checks.run_script_graders(script, section.text, doc_text=document)
+        script = write_script(topic, section, feedback, document=document,
+                              understanding=understanding)
+        # The SAME understanding that wrote the script grades it. Both sides of the
+        # loop read one object, so a retry is judged against the plan it was shown.
+        results = checks.run_script_graders(script, section.text, doc_text=document,
+                                            understanding=understanding)
         for r in results:
             print(f"    {r}")
 
@@ -115,7 +128,10 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
 
         # Every failed attempt is frozen, including the last one before we give up.
         saved = _save_rejected(topic, section, attempt, script, results)
-        feedback = "\n".join(f"- {r.name}: {r.reason}" for r in results if not r.passed)
+        # Grouped by revision area, correctness first, with the parts that already
+        # work named as things to keep. Same results, same retry count — see
+        # shorts/revision.py for why the flat list was costing attempts.
+        feedback = revision.feedback_for(results)
         print(f"    retry {attempt}/{MAX_SCRIPT_RETRIES} — froze attempt to rejected/{saved.name}")
     else:
         print(f"    GIVING UP on {topic.id} after {MAX_SCRIPT_RETRIES} attempts")

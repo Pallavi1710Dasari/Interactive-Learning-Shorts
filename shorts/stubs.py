@@ -51,6 +51,8 @@ def fake(model_cls, system: str, user: str):
         return model_cls(**_strategy(user))
     if name == "VisionReport":
         return model_cls(**_vision(user))
+    if name == "SectionUnderstanding":
+        return model_cls(**_understanding(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 
@@ -146,6 +148,33 @@ def _script(user: str) -> dict:
                       # spans so no two beats lean on the same one.
                       "source_quote": spans[(n - 1) % len(spans)]})
 
+    # THE LAST BEAT LANDS THE OBJECTIVE, because _understanding reports one and
+    # check_reaches_objective asks whether the short ENDS on it. Without this the
+    # final beat landed on whatever the sentence cycle reached — section 3.2 ended
+    # on the valid bit while its stated objective was the page-number split,
+    # scoring 17% on the objective. The grader was right; the stub was modelling a
+    # short that stops somewhere other than its own idea.
+    #
+    # THE LAST SPAN, NOT THE FIRST, and that correction matters. The first cut used
+    # sentences[0] — which is also where beat 1 starts, so every stub short shipped
+    # with beats 1 and 3 IDENTICAL. check_beats_develop now fails exactly that, as
+    # it should, and a stub that models the defect a grader exists to catch fails
+    # the offline run on the stub instead of on the thing being tested.
+    #
+    # _understanding computes the same `spans` from the same section text, so both
+    # halves agree on which sentence the objective is without sharing state.
+    #
+    # The source_quote is left as the cycled span: still a verbatim span of the
+    # section, still distinct per beat, and never coupled to the assembled lines.
+    if len(beats) > 1 and spans:
+        landing = " ".join(spans[-1].split()[:MAX_BEAT_WORDS])
+        # Guard for a section so thin that its last span IS its first sentence:
+        # duplicating a beat to satisfy one grader while failing another is not a
+        # trade worth making, so the cycled line stays.
+        if landing not in [b["line"] for b in beats[:-1]]:
+            beats[-1]["line"] = landing
+            beats[-1]["on_screen"] = _overlay(landing)
+
     # Last resort: trim the final beat rather than hand the grader a script we
     # already know is over budget.
     total = sum(len(b["line"].split()) for b in beats)
@@ -155,6 +184,102 @@ def _script(user: str) -> dict:
         beats[-1]["line"] = " ".join(tail[:keep])
 
     return {"short_id": short_id, "question": topic, "beats": beats}
+
+
+def _understanding(user: str) -> dict:
+    """A reading of the section built out of the section's own sentences.
+
+    THE POINT OF DOING IT HONESTLY. This block ends up inside the script prompt, so
+    a stub returning invented prose would be feeding the script stub words that
+    appear nowhere in the document — and the one thing an offline run exists to
+    prove is that grounding works for real rather than by being switched off. Every
+    string here is either a verbatim span of the section or a fixed phrase carrying
+    no claim about it.
+
+    cannot_answer is deliberately EMPTY. It is the field the script step is told to
+    steer away from, so a stub guessing at it would push the offline run off topics
+    the section does cover — a stub inventing a constraint the real pipeline never
+    had, which is the failure mode the module docstring warns about.
+    """
+    body = _find(r"THE SECTION TO READ.*?\n---\n(.*?)\n---", user, re.S) or ""
+    section_id = _find(r"THE SECTION TO READ — \[([^\]]+)\]", user) or ""
+
+    sentences = [s for s in re.split(r"(?<=\.)\s+", " ".join(body.split())) if s.strip()]
+    spans = _spans(sentences) if sentences else []
+
+    # THE SPAN THE SCRIPT ENDS ON — see the matching note in _script, which lands
+    # its final beat on the same one. Both halves derive `spans` from the same
+    # section text, so they agree without sharing state.
+    core_idea = spans[-1] if spans else "what this section explains"
+
+    # A sequence that PASSES check_teaching_sequence, honestly.
+    #
+    # Every `concept` is a span of the section, so the vocabulary check clears on
+    # the section's real words rather than on a grader being lenient. Two steps,
+    # not four, because the grader caps the sequence and a stub that modelled the
+    # rejected shape would fail the offline run on the stub.
+    #
+    # FIRST SPAN THEN LAST, in document order, which is also the order _script
+    # walks: beat 1 is assembled from the opening sentences and the final beat
+    # lands spans[-1]. Building the sequence from core_idea first — as this did
+    # while core_idea was a sentence — put step 1 wherever that sentence happened
+    # to be and produced a plan the stub's own script ran out of order.
+    #
+    # `purpose` and `explanation_goal` are fixed phrases carrying no claim about
+    # the material — the stub is proving the plumbing, and inventing a reason a
+    # step is needed would put words in the document's mouth.
+    sequence = []
+    for i, concept in enumerate(spans[:1] + spans[-1:] if len(spans) > 1 else spans[:1]):
+        sequence.append({
+            "concept": " ".join(concept.split()[:6]),
+            "purpose": f"stub step {i + 1}: establish what the section states here",
+            "explanation_goal": "learner can follow the next step",
+        })
+
+    return {
+        "section_id": section_id,
+        # A span of the section, not a description of it. See the docstring.
+        "core_idea": core_idea,
+        "key_points": spans[:3],
+        # NO HOOK PLAN AT ALL, which is a different claim from "direct" and the
+        # honest one here. `direct` asserts that the concept is this section's best
+        # opening — a judgement a stub is not entitled to make. None says no
+        # decision was reached, which is exactly true, and check_opening_follows_hook
+        # then skips cleanly.
+        #
+        # It also resolves a contradiction the stub cannot write its way out of.
+        # With a plan present, the leads-in rule wants the objective within the
+        # first two beats and check_reaches_objective wants it in the last one; a
+        # real script satisfies both by developing the same idea in new words,
+        # while a stub that only copies whole sentences would have to repeat one —
+        # which check_beats_develop now rejects, correctly. The hook path keeps its
+        # coverage from the frozen eval cases (E037 and friends), which test it far
+        # more precisely than a stub ever did.
+        "hook_plan": None,
+        "teaching_sequence": sequence,
+        "concrete_examples": [],
+        # not_needed, and honestly so: concrete_examples is empty above, because a
+        # stub cannot tell which of a section's nouns is a worked example without
+        # reading it. Claiming "required" would make the stub name something, and
+        # anything it named would be a fabrication — which check_example_plan would
+        # then correctly throw away, so the offline run would be exercising the
+        # quarantine path on every short instead of the normal one.
+        "example_plan": {"need": "not_needed", "example": "",
+                         "supports_step": None, "learner_takeaway": ""},
+        # not_needed for the same reason, and here it is the only honest answer
+        # available: common_confusions is empty above because a stub cannot know
+        # what a learner gets wrong, and a stub that claimed "required" would have
+        # to invent both a misconception and a correction. That is the one thing
+        # this whole field exists to prevent, and check_confusion_plan would throw
+        # it away — so the offline run would exercise the quarantine path on every
+        # short instead of the normal one.
+        "confusion_plan": {"need": "not_needed", "confusion": "",
+                           "relates_to_step": None, "correct_understanding": "",
+                           "learner_takeaway": ""},
+        "common_confusions": [],
+        "cannot_answer": [],
+        "source_evidence": spans[:2],
+    }
 
 
 def _spans(sentences: list[str]) -> list[str]:

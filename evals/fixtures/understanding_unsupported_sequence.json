@@ -1,0 +1,33 @@
+{
+  "understanding": {
+    "section_id": "3.2",
+    "core_idea": "A logical address is split into a page number and an offset, and the page table turns the page number into the frame number that forms the physical address.",
+    "key_points": [
+      "the two parts of a logical address",
+      "the page table lookup"
+    ],
+    "teaching_sequence": [
+      {
+        "concept": "Page number and offset",
+        "purpose": "Establish the two parts of a logical address",
+        "explanation_goal": "Learner understands which part identifies the page"
+      },
+      {
+        "concept": "Page table lookup",
+        "purpose": "Show how the page number is translated",
+        "explanation_goal": "Learner understands that the page number maps to a frame number"
+      },
+      {
+        "concept": "TLB shootdown across cores",
+        "purpose": "Explain multiprocessor invalidation",
+        "explanation_goal": "Learner understands cross-core coherence"
+      }
+    ],
+    "concrete_examples": [
+      "valid bit"
+    ],
+    "source_evidence": [
+      "A logical address is split into a page number and an offset."
+    ]
+  }
+}

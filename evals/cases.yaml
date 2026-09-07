@@ -400,6 +400,353 @@ cases:
     expect:
       passed: true
 
+
+  # ------------------------------------------------------- content understanding
+  #
+  # Steps 3-10 added a planning step in front of the script and six graders behind
+  # it, and none of them could be run from here: the harness loaded a Script and
+  # nothing else, so every check that decides whether a short TEACHES was invisible
+  # to CI. These cases close that, and they follow the same rule as everything
+  # above — the graders are imported from shorts/checks.py, never reimplemented.
+  #
+  # Each fixture pairs an understanding with the script written from it, because a
+  # script is only wrong RELATIVE to the plan it was handed.
+
+  - id: E029
+    name: A teaching sequence that leaves its own section is rejected
+    why: >
+      The quarantine that protects everything downstream. The reading is asked for
+      a teaching order and a familiar topic has a familiar order in the model's
+      head — one that is not this section's. A step naming TLB shootdown on a
+      section about address translation would be handed to the script step as a
+      plan to follow, with the authority of a plan.
+    type: understanding_grader
+    grader: teaching_sequence
+    section_id: "3.2"
+    fixture: evals/fixtures/understanding_unsupported_sequence.json
+    expect:
+      passed: false
+      reason_contains: "not in the section's vocabulary"
+
+  - id: E030
+    name: A faithful script that never reaches the core idea is rejected
+    why: >
+      The veto, and the reason step 9 exists. Every beat here is cited verbatim to
+      its own section, the length is right, the shape is right — and the short
+      explains what contiguous allocation REQUIRES and never that paging makes the
+      scattered memory usable. Every technical grader passes it. A short can be
+      correct in every particular and teach nothing.
+    type: content_grader
+    grader: reaches_objective
+    section_id: "3.1"
+    fixture: evals/fixtures/content_misses_objective.json
+    expect:
+      passed: false
+      reason_contains: "covers only"
+
+  - id: E031
+    name: The learning outcome fails on the objective alone
+    why: >
+      The same fixture read at the outcome level. This pins WHICH requirement broke,
+      so a future change that fails this short for a different reason — grounding,
+      say — is caught as a regression rather than passing as a green FAIL.
+    type: content_grader
+    grader: learning_outcome
+    section_id: "3.1"
+    fixture: evals/fixtures/content_misses_objective.json
+    expect:
+      passed: false
+      reason_contains: "does not yet teach"
+      requirements:
+        objective_reached: false
+        teaching_sequence_covered: true
+        required_example_satisfied: true
+        required_confusion_satisfied: true
+
+  - id: E032
+    name: Planned concepts explained in reverse order are rejected
+    why: >
+      The order IS the plan. Every beat here is true, cited, and on the section;
+      they are simply in the wrong sequence, so the viewer is shown the physical
+      address being formed before being told an address has two parts. Coverage
+      alone would pass this, which is why the order rule is separate.
+    type: content_grader
+    grader: follows_sequence
+    section_id: "3.2"
+    fixture: evals/fixtures/content_wrong_teaching_order.json
+    expect:
+      passed: false
+      reason_contains: "out of order"
+
+  - id: E033
+    name: A required worked example that never appears is rejected
+    why: >
+      "required" means the idea does not land without the worked case. The example
+      was the first thing dropped whenever the beats got tight, because before the
+      plan existed it was advisory — a bag of nouns with nothing saying whether
+      this short is one where the example IS the explanation.
+    type: content_grader
+    grader: uses_example
+    section_id: "3.2"
+    fixture: evals/fixtures/content_example_missing.json
+    expect:
+      passed: false
+      reason_contains: "never uses the required example"
+
+  - id: E034
+    name: A required example used far from its own step is rejected
+    why: >
+      The half that is easy to miss. The example is present, copied correctly, and
+      three beats away from the idea it exists to make concrete — which is
+      decoration. A presence check alone would pass this.
+    type: content_grader
+    grader: uses_example
+    section_id: "3.2"
+    fixture: evals/fixtures/content_example_misplaced.json
+    expect:
+      passed: false
+      reason_contains: "belongs to step 2"
+
+  - id: E035
+    name: A misconception spoken as fact is rejected
+    why: >
+      The worst outcome the pipeline can produce: the short says the wrong thing
+      in the student's voice and corrects it in the NEXT beat, by which time the
+      viewer has heard it. Beat 3 here is correct, and that is exactly why this
+      case is frozen — a neighbour-window check passed it, and a viewer would not.
+    type: content_grader
+    grader: handles_confusion
+    section_id: "3.3"
+    fixture: evals/fixtures/content_confusion_as_fact.json
+    expect:
+      passed: false
+      reason_contains: "as if it were true"
+
+  - id: E036
+    name: A manufactured common mistake under not_needed is rejected
+    why: >
+      The brief says a question aimed at a misconception is the best kind, so a
+      list of confusions reads as an instruction to find one. That is how a short
+      acquires a "common mistake" beat about a mistake nobody makes — warning a
+      viewer off an error they were never going to commit, with the beat that
+      should have explained the thing.
+    type: content_grader
+    grader: handles_confusion
+    section_id: "3.3"
+    fixture: evals/fixtures/content_manufactured_misconception.json
+    expect:
+      passed: false
+      reason_contains: "opens a misconception"
+
+  - id: E037
+    name: A grounded hook that hands over to nothing is rejected
+    why: >
+      The hook is real, on the page, and well aimed — and the answer then restates
+      the constraint instead of resolving it, so the opening is a disconnected
+      introduction. Grounding alone cannot catch this: every word is in the section.
+    type: content_grader
+    grader: opening_hook
+    section_id: "3.1"
+    fixture: evals/fixtures/content_hook_strays.json
+    expect:
+      passed: false
+      reason_contains: "never hands over to the objective"
+
+  - id: E038
+    name: Quarantined plans skip cleanly instead of failing the short
+    why: >
+      The rule that keeps the whole planning layer safe to fail. When a plan is
+      dropped by its own validator the script step gets no guidance for it — and
+      absent guidance must never be read as evidence against the script. If this
+      case ever fails, a quarantine has started rejecting good shorts, which is
+      worse than the bad plan it was protecting against.
+    type: content_grader
+    grader: follows_sequence
+    section_id: "3.1"
+    fixture: evals/fixtures/content_quarantined_plans.json
+    expect:
+      passed: true
+      skipped: true
+      reason_contains: "skipped"
+
+  - id: E039
+    name: A quarantined understanding still passes the learning outcome
+    why: >
+      E038 at the outcome level. Four requirements are unavailable and the veto
+      still runs — a short with no surviving plan is judged on whether it reaches
+      its objective, and nothing else.
+    type: content_grader
+    grader: learning_outcome
+    section_id: "3.1"
+    fixture: evals/fixtures/content_quarantined_plans.json
+    expect:
+      passed: true
+      reason_contains: "not applicable"
+      requirements:
+        objective_reached: true
+
+  - id: E040
+    name: A short meeting every learning requirement passes
+    why: >
+      The positive control for the whole content layer, and the case that stops the
+      cheap fix. Every grader added in steps 5-9 can be made green by tightening it
+      until it rejects everything; this short is what the pipeline is TRYING to
+      produce, and it has to survive all of them at once.
+    type: content_grader
+    grader: learning_outcome
+    section_id: "3.2"
+    fixture: evals/fixtures/content_all_requirements_met.json
+    expect:
+      passed: true
+      requirements:
+        objective_reached: true
+        teaching_sequence_covered: true
+        required_example_satisfied: true
+        required_confusion_satisfied: true
+        opening_leads_into_learning: true
+        source_grounding_satisfied: true
+
+  - id: E041
+    name: A revision brief fixes one area and preserves the rest
+    why: >
+      Retries used to chase each other around the script: an attempt fixed the
+      cited beat and rewrote the opening that was already working, and the next
+      attempt failed on the opening. The brief has to name the survivors as things
+      to keep. This freezes both halves — only `example` under Fix, and everything
+      that really passed under Preserve.
+    type: revision
+    section_id: "3.2"
+    fixture: evals/fixtures/content_example_missing.json
+    expect:
+      fix_areas: ["example"]
+      preserve_areas: ["grounding", "teaching_flow", "opening", "confusion", "other"]
+      block_contains:
+        - "WHAT IS WRONG"
+        - "WHAT TO FIX"
+        - "WHAT TO PRESERVE"
+        - "Keep WHAT THEY DO"
+      block_excludes:
+        - "learning_outcome"
+        - "exact wording"
+        - "word-for-word"
+
+  - id: E042
+    name: A revision brief never names a plan that was quarantined
+    why: >
+      Naming the missing plan would invite the script step to reconstruct it, which
+      is the invention the quarantine existed to prevent. Absent guidance is silent
+      guidance: the short is re-written with what survived and told nothing about
+      what did not.
+    type: revision
+    section_id: "3.1"
+    fixture: evals/fixtures/content_quarantined_plans.json
+    expect:
+      fix_areas: []
+      block_excludes:
+        - "uses_example"
+        - "handles_confusion"
+        - "opening_hook"
+
+
+  # --------------------------------------------------------- beats that go nowhere
+  #
+  # Found in shipped output, not in a fixture someone imagined. Every grader in
+  # this file asked about ONE beat, so a script could say the same thing twice and
+  # score 13 out of 13 — and check_source_quotes made it worse by demanding a
+  # DISTINCT citation per beat, which the model satisfies by pointing at a new
+  # sentence while saying the old thing.
+  #
+  # The three PASS cases matter as much as the three FAIL ones: the cheap way to
+  # make this grader green is to fail any beat that reuses a noun, which would
+  # reject every honest explanation of a single idea.
+
+  - id: E043
+    name: A beat that repeats an earlier one word for word is rejected
+    why: >
+      The floor. Nothing in the pipeline noticed an exact duplicate answer beat —
+      not the graders, not the API, not the review UI — because every check was
+      per-beat and the two beats carried different source quotes. This is also the
+      shape the offline stub generated for a while, which is how it was found.
+    type: code_grader
+    grader: no_repetition
+    fixture: evals/fixtures/repeat_exact_narration.json
+    expect:
+      passed: false
+      reason_contains: "restates beat 1"
+
+  - id: E044
+    name: The same explanation in different words is rejected
+    why: >
+      The real shape of the defect. An exact duplicate is easy; what the model
+      actually produces is the same claim reworded — "paging removes the
+      requirement for contiguity" then "paging drops the contiguity requirement".
+      Both cite different sentences, both are true, and the second teaches nobody
+      anything. This case is why the grader measures NOVELTY rather than string
+      similarity.
+    type: code_grader
+    grader: no_repetition
+    fixture: evals/fixtures/repeat_reworded.json
+    expect:
+      passed: false
+      reason_contains: "restates beat 2"
+
+  - id: E045
+    name: The shipped recap beat is rejected
+    why: >
+      The actual bug, frozen from output/html_doc_basic_structure.json exactly as
+      the pipeline produced it. Beat 4 is beat 1 with the words moved — the "so in
+      summary" beat the script brief explicitly says to delete — and it spent a
+      quarter of the video. It passed all thirteen graders.
+    type: code_grader
+    grader: no_repetition
+    fixture: evals/fixtures/repeat_shipped_recap.json
+    expect:
+      passed: false
+      reason_contains: "restates beat 1"
+
+  - id: E046
+    name: Shared technical vocabulary is not mistaken for repetition
+    why: >
+      The case that stops the cheap fix. "Page number", "frame" and "offset" recur
+      through this answer because the subject recurs, and every beat advances the
+      translation by one step. A similarity check fails this; a novelty check
+      passes it. Without this case the grader would be tightened until it rejected
+      every faithful explanation of one mechanism.
+    type: code_grader
+    grader: no_repetition
+    fixture: evals/fixtures/develops_shared_vocabulary.json
+    expect:
+      passed: true
+
+  - id: E047
+    name: A conclusion that lands the payoff is not repetition
+    why: >
+      The last beat is SUPPOSED to reuse the short's vocabulary — check_reaches_
+      objective requires it to land the core idea, and the brief requires it to
+      answer the question. What makes it a real beat rather than a recap is that it
+      adds the consequence: the gaps become usable and the fragmentation
+      disappears. Two graders pull in opposite directions here and this case pins
+      the line between them.
+    type: code_grader
+    grader: no_repetition
+    fixture: evals/fixtures/develops_conclusion.json
+    expect:
+      passed: true
+
+  - id: E048
+    name: Two adjacent teaching steps about one process both survive
+    why: >
+      Consecutive steps of a mechanism share their subject by construction — every
+      beat here is about the page fault, the OS and the page table. They are three
+      distinct events in one sequence, and a grader that cannot tell "the next step
+      of this process" from "the previous step again" would make the teaching
+      sequence unimplementable.
+    type: code_grader
+    grader: no_repetition
+    fixture: evals/fixtures/develops_adjacent_steps.json
+    expect:
+      passed: true
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

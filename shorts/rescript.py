@@ -37,7 +37,7 @@ result is an improvement.
 import argparse, json, sys
 from pathlib import Path
 
-from . import checks, config, feed
+from . import checks, config, feed, revision
 from .redraw import _section_for, _units
 from .schema import Script, ShortUnit, Topic
 
@@ -84,6 +84,7 @@ def _needs_work(unit: ShortUnit, section) -> bool:
 def rescript(path: Path, write: bool = True) -> tuple[str, bool]:
     """Rewrite one unit. Returns (message, changed)."""
     from .skills.script import write_script
+    from .skills.understanding import understanding_for
     from .skills.visuals import design_visuals
     from .skills.audit import judge_script
 
@@ -116,21 +117,27 @@ beat 1 ask the narrower one.""")
     # failure forward — the same loop run.py and server.py use.
     fixed = None
     fb = feedback
+    # Read once, outside the loop, like every other retry loop in the project. A
+    # unit is being rewritten because its beats drifted off the section, so what
+    # the section does and does not answer is the useful thing to have in hand.
+    understanding = understanding_for(section)
     for attempt in range(1, MAX_SCRIPT_ATTEMPTS + 1):
         try:
             candidate = write_script(topic=topic, section=section, feedback=fb,
-                                    current=current)
+                                    current=current, understanding=understanding)
         except Exception as e:
             return f"script call failed: {type(e).__name__}: {e}", False
-        results = checks.run_script_graders(candidate, section.text)
+        results = checks.run_script_graders(candidate, section.text,
+                                            understanding=understanding)
         if checks.all_passed(results):
             fixed = candidate
             break
         failures = [f"{r.name}: {r.reason}" for r in results if not r.passed]
         print(f"    script {attempt}/{MAX_SCRIPT_ATTEMPTS} for {unit.short_id}: "
               + "; ".join(f[:110] for f in failures[:2]))
-        fb = feedback + "\n\nYour last attempt also broke these:\n" + \
-             "\n".join(f"  - {f}" for f in failures)
+        # The rewrite instruction stays on top as the prefix — it is why this unit
+        # is being re-scripted at all — and the routed block follows it.
+        fb = revision.feedback_for(results, prefix=feedback)
     if fixed is None:
         return (f"no script passed the graders in {MAX_SCRIPT_ATTEMPTS} attempts — the "
                 f"section probably cannot answer this question; drop the topic or "

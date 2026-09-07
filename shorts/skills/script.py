@@ -3,8 +3,10 @@
 This is the highest-leverage prompt in the project. Everything downstream inherits
 its quality. Tune it against the eval set, not by vibes.
 """
-from ..schema import Script, Topic, Section, MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND
+from ..schema import (Script, Topic, Section, SectionUnderstanding,
+                      MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND)
 from ..llm import ask_json
+from .. import revision
 
 MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 45
 MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
@@ -202,6 +204,156 @@ this subject for the length of this task.
 - Never contradict the material, and never "correct" it.
 - Padding with outside knowledge is the worst failure mode in this project.
 
+CONTENT UNDERSTANDING — WHAT TO EXPLAIN. NOT SOMETHING YOU MAY QUOTE.
+Some runs hand you a CONTENT UNDERSTANDING block above the section. An earlier step
+read the same section and worked out what it teaches: the one idea, the order the
+points have to build in, the section's own concrete examples, what a learner gets
+wrong, and what the section does NOT answer.
+
+Use it, and use it for exactly one thing: deciding WHAT to say and in WHAT ORDER.
+It is the reason a script stops being the section's sentences in the section's
+order. Aim beat 1 at a listed confusion. Name one of the listed concrete examples.
+
+"THE OPENING" DECIDES BEAT 1. WRITE THE SENTENCE; DO NOT RE-DECIDE THE APPROACH.
+When that block appears it says how this short starts, chosen with the section in
+view. It gives you the SUBSTANCE of beat 1 — you still write the question, in the
+8-to-16 words THE QUESTION asks for.
+
+  QUESTION  Ask the planned question, in a learner's words.
+  PROBLEM   Beat 1 puts the difficulty in front of the viewer, and the answer beats
+            resolve it. The problem is the section's, not one you thought of.
+  SURPRISE  Beat 1 aims at the thing that will not be predicted. It has to be a
+            real surprise the section states — if it needs a claim the section
+            does not make to be surprising, it is not one.
+  DIRECT    No hook. Ask plainly about the thing and start explaining in beat 2.
+            This is a decision, not a gap: do NOT manufacture a stake, a scenario
+            or a "have you ever wondered" to warm the viewer up. For a definition
+            or a plain mechanism the concept IS the strongest opening, and seconds
+            spent warming up are seconds the explanation does not get.
+
+THE HOOK IS ONE BEAT AND IT IS SHORT. This whole short is 12 to 28 seconds. An
+opening that takes two sentences to set a scene has eaten the explanation. Beat 1
+hooks and beat 2 is already teaching — the first answer beat must land on the idea
+itself, not on more setup.
+
+NO MANUFACTURED INTEREST, EVER, under any of the four. No invented statistic,
+scenario, stake or comparison, and none of this language: "you won't believe",
+"most people get this wrong", "nobody tells you", "the secret to", "this changes
+everything", "X% of developers". It promises what the material does not contain,
+it is the clearest possible signal that a short is padding, and it is checked and
+rejected. An honest undramatic opening beats a dishonest exciting one every time.
+
+AND THE HOOK MUST ARRIVE SOMEWHERE. It hands over to the concept named in the
+block — normally the one idea. A hook that is interesting and then goes somewhere
+else has spent the viewer's attention on a different short.
+
+"HOW TO BUILD THE EXPLANATION" IS THE SPINE OF YOUR ANSWER BEATS.
+When that block is present it gives the order a beginner needs, and each step says
+why it is there and what the learner should have at the end of it. Follow it:
+  * Take the steps in the order given. The order is the point — it was chosen for
+    this concept, and step 2 usually cannot be understood before step 1.
+  * ONE STEP PER BEAT is the normal mapping, and the step's `learner ends up` is
+    what that beat has to deliver. If a step is small enough to share a beat with
+    the next one, merge them — you have 2 or 3 answer beats and the sequence may
+    have more steps than that.
+  * The LAST step is where the answer lands, so the last beat delivers it. That is
+    the same rule as THE LAST BEAT MUST ANSWER THE QUESTION above, and the sequence
+    is telling you which sentence that is.
+  * A step you cannot support from the section is a step you DROP, and you make
+    beat 1 ask the narrower question the remaining steps answer. Do not keep a step
+    alive by inventing a sentence for it.
+The sequence is a plan for explaining, never wording. Do not read a step's fields
+aloud: "purpose" and "learner ends up" are notes to you about why a beat exists,
+and a beat that narrates its own purpose is the "so in summary" beat this brief
+already deletes.
+
+"THE EXAMPLE" IS A DECISION THAT HAS ALREADY BEEN MADE. FOLLOW IT.
+When that block appears it says whether this short is built on a worked case, and
+BE CONCRETE above tells you why one matters. It has three forms:
+
+  REQUIRED   The idea does not land without it. Work the named example into an
+             answer beat — the beat that carries the step it belongs to, or the one
+             beside it. This is not "mention it in passing": the beat should show
+             the example DOING the thing, so a learner sees the takeaway named in
+             the block rather than hearing a noun go by.
+  HELPFUL    Use it if the beats have room. If using it would cost you the beat
+             that answers the question, leave it out — brevity wins, and nothing
+             fails for its absence.
+  NOT NEEDED The section shows nothing concrete worth building on, and this is a
+             verdict, not an oversight. Explain it in general terms. DO NOT reach
+             for an example you know from outside, DO NOT make up a value, a
+             number, a file name or a line of code to sound specific, and do not
+             treat a general answer as second-best. Here it is the right answer.
+
+Copy the named example from the section EXACTLY — the real selector, the real
+value, the real figure, character for character. Do not tidy it, do not generalise
+it into a placeholder, and do not substitute one you find neater. An invented
+literal is caught and the script is rejected.
+
+NONE OF THIS RELAXES THE SOURCE RULES. The example still has to be found in THE
+SECTION, the beat that uses it still needs its own source_quote copied from THE
+SECTION, and the example block is guidance like the rest of the CONTENT
+UNDERSTANDING — it is not a citation and may not be quoted as one.
+
+"THE MISCONCEPTION" IS ALSO ALREADY DECIDED. DO NOT SECOND-GUESS IT.
+This brief says a question aimed at a misconception is the best kind, and that is
+still true — but WHICH misconception, or whether there is one at all, is not your
+call. The block says:
+
+  REQUIRED   The section exists partly to correct this. Clear it up INSIDE the
+             explanation, at the step it belongs to — the beat that explains the
+             idea is the beat that says what it is not. Do not give it a beat of
+             its own; a two-beat answer cannot afford one, and a correction
+             wedged between two steps interrupts the very explanation it is
+             supposed to sharpen.
+  HELPFUL    Clarify it only if it costs you nothing. If making room means losing
+             the beat that answers the question, drop the clarification — nothing
+             fails for its absence.
+  NONE TO CORRECT  There is nothing here worth correcting, and that is a finding,
+             not a gap. Do NOT invent a belief so you have something to fix, do
+             NOT open with "a common mistake is..." or "you might think...", and do
+             NOT add a myth-busting beat. Just explain the idea.
+
+AND THE RULE THAT OVERRIDES ALL THREE: NEVER STATE THE WRONG BELIEF ON ITS OWN.
+A viewer hears sentences, not intentions. A beat that says the mistaken thing and
+leaves it hanging has taught it — the next beat correcting it arrives after the
+damage. So the error and the truth go in the SAME breath:
+
+  BAD   "A page fault means the program has crashed."
+        "Actually the OS just loads the page and carries on."
+        ^ Beat 1 is a false sentence, said in the video, in the student's voice.
+  GOOD  "A page fault is not a crash — it is a trap that tells the OS to load the
+         missing page."
+        ^ One beat. The belief and its correction are inseparable.
+
+THE SECTION IS THE ONLY AUTHORITY FOR THE CORRECTION. What is "actually true" is
+what THIS SECTION says is true, not what you know. The correction still needs its
+own source_quote copied from the section like every other claim, and if you cannot
+find the sentence behind it, do not make the correction.
+
+Now the part that matters more, because getting it wrong is worse than not having
+the block at all:
+
+- IT IS NOT A SOURCE. Every word of it is GENERATED TEXT — including the lines
+  under "WHERE THAT CAME FROM", which are grounding information telling you where a
+  point came from. They are NOT a pre-approved citation list.
+- NEVER copy anything out of the CONTENT UNDERSTANDING block into a source_quote.
+  Quotes are copied from THE SECTION and are checked against THE SECTION by exact
+  match. A quote that exists only in the understanding block will not be found and
+  the script is rejected. Even where the understanding quotes the section
+  correctly, go and copy the sentence out of the section itself.
+- IT CANNOT LICENSE A FACT THE SECTION DOES NOT STATE. If it points at something
+  and you cannot find the sentence for it in the section, DROP IT. Never invent
+  around it, never fill in the step it skipped. The section wins over the
+  understanding every single time, and so does saying less.
+- "WHAT THIS SECTION DOES NOT ANSWER" is a list of places to STAY OUT OF. Do not
+  ask about them in beat 1, and do not drift into them in an answer beat. They are
+  named precisely because they are what this section is most likely to be padded
+  with — they sound like they belong and they are not on the page.
+
+If there is no CONTENT UNDERSTANDING block, nothing changes: read the section and
+write the script.
+
 WHERE TO LOOK — THE SECTION, AND ONLY THE SECTION
 You are given the FULL reading material plus the ONE section this short is filed
 under. They are not two sources. They have two different jobs:
@@ -269,7 +421,8 @@ carry source_quote:
 
 
 def write_script(topic: Topic, section: Section, feedback: str | None = None,
-                 current: Script | None = None, document: str | None = None) -> Script:
+                 current: Script | None = None, document: str | None = None,
+                 understanding: SectionUnderstanding | None = None) -> Script:
     """
     Write one script.
 
@@ -284,10 +437,57 @@ def write_script(topic: Topic, section: Section, feedback: str | None = None,
     card. The escape hatch is now the NARROWER QUESTION instead, which the brief
     spells out — answer what the section supports and rewrite beat 1 to match. That
     keeps the short honest and still never refuses.
+
+    `understanding` is skills/understanding.understand()'s reading of the SAME
+    section, and it is OPTIONAL in the strong sense: every call site that predates
+    it still works, and a caller that omits it gets byte-identical behaviour to
+    before, because the block is only added to the prompt when one is passed and
+    its brief is non-empty.
+
+    It is GUIDANCE — what to explain, in what order, aimed at which confusion, and
+    which of the section's own examples to name. It is NOT evidence. It is generated
+    text, no part of it may be copied into a source_quote, and check_source_quotes
+    still matches every quote against the section alone, so a script that leans on
+    the understanding instead of the section fails exactly as it did before. The
+    brief says all of that to the model too, under CONTENT UNDERSTANDING.
+
+    PASS THE SAME ONE ON EVERY RETRY. The three-attempt loops in run.py, server.py
+    and rescript.py read the section once, before the loop, and hand the result to
+    each attempt — a grader complaining about beat 3 has not changed what the
+    section teaches, so re-reading it would buy a second opinion on a settled
+    question at the price of another call.
     """
     user = f"""TOPIC: {topic.topic}
 WHY IT MATTERS: {topic.why_it_matters}
 SHORT_ID: {topic.id}
+"""
+
+    # THE SELECTION STEP'S OWN EVIDENCE, kept distinct from anything generated.
+    #
+    # select.py already made the model prove this question is answerable by copying
+    # the sentence that answers it out of the material, and drop_unanswerable
+    # verified that span really occurs there. That is the one piece of REAL text
+    # attached to a topic, and the CONTENT UNDERSTANDING block below must never be
+    # read as a replacement for it: one is a verbatim span of the material, the
+    # other is a model's description of it.
+    #
+    # It is offered as a starting point, not as a pre-cleared citation. It is
+    # matched against the WHOLE document in select.drop_unanswerable — deliberately,
+    # see the note there — so it can legitimately come from a neighbouring section,
+    # and check_source_quotes matches against THIS section alone. Telling the model
+    # it may quote this blind would manufacture exactly the cross-section citation
+    # this brief exists to stamp out, hence the instruction to go and find it.
+    if topic.answer_quote:
+        user += f"""
+THE SENTENCE THE SELECTION STEP FOUND THAT ANSWERS THIS — real, copied from the material
+{topic.answer_quote}
+
+This is a verbatim span of the reading material, not generated text, and it is the
+best clue you have about what the answer is. Look for it in THE SECTION below. If
+it is there, it is the natural anchor for your first answer beat and you may copy
+it out of the section as that beat's source_quote. If it is NOT in the section, it
+came from elsewhere in the document: use it to understand what is being asked, and
+then answer from the section's own sentences instead.
 """
 
     if document:
@@ -298,6 +498,32 @@ an example, a number or a code line from it. Every source_quote is matched again
 the section below and nothing else.
 =============================================================
 {document}
+=============================================================
+"""
+
+    # BETWEEN THE CONTEXT AND THE SOURCE, in that order and on purpose. The full
+    # material is context, this is guidance, and the section is the only thing a
+    # claim may come from — so the section is what the model reads LAST, directly
+    # above the instruction to write. Putting the understanding after the section
+    # would leave a block of generated prose as the final thing in view at the
+    # moment the model starts choosing sentences to quote.
+    #
+    # `as_brief()` returns "" when the reading came back empty. An empty heading
+    # with nothing under it reads to a model as "there is nothing to explain here",
+    # which is a claim nobody made, so in that case the prompt is left exactly as it
+    # was before this step existed.
+    if understanding is not None:
+        brief = understanding.as_brief()
+        if brief:
+            user += f"""
+CONTENT UNDERSTANDING — GUIDANCE ONLY. NOT A SOURCE OF CLAIMS. NEVER QUOTE IT.
+An earlier step read the section below and worked out what it teaches. Use it to
+decide WHAT to explain and in WHAT ORDER, and nothing else. Every word of it is
+generated: it cannot support a claim the section does not state, and no part of it
+may be copied into a source_quote — those are copied out of THE SECTION and are
+matched against THE SECTION.
+=============================================================
+{brief}
 =============================================================
 """
 
@@ -324,8 +550,24 @@ do not mention the material."""
         user += (f"\n\nTHE CURRENT SCRIPT YOU ARE EDITING:\n{beats}\n\n"
                  "Keep everything not mentioned below exactly as it is.")
 
+    # TWO SHAPES OF FEEDBACK, and the difference is who wrote it.
+    #
+    # A routed block from revision.route() already carries its own headings — what
+    # is wrong, what to fix, what to preserve — and wrapping that in "WHAT MUST
+    # CHANGE" would bury a three-section brief under a header that contradicts its
+    # third section. It goes in verbatim.
+    #
+    # Everything else is still a plain string: a human reviewer's note from
+    # /api/regenerate, the judge's problems in _rejudge_after_fix. Those keep the
+    # wrapper they have always had, so no existing caller changes behaviour.
+    #
+    # Either way this only exists on a RETRY. The first-generation prompt is
+    # untouched — feedback is None on attempt 1 and none of this renders.
     if feedback:
-        user += f"\n\nWHAT MUST CHANGE:\n{feedback}\nFix exactly this and try again."
+        if revision.MARKER in feedback:
+            user += f"\n\n{feedback}"
+        else:
+            user += f"\n\nWHAT MUST CHANGE:\n{feedback}\nFix exactly this and try again."
 
     # 2000 was too tight: a script plus a verbatim quote per beat is a longer
     # payload than a script alone, and a truncated response comes back with no

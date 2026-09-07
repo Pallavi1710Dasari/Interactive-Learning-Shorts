@@ -1,0 +1,56 @@
+{
+  "understanding": {
+    "section_id": "3.2",
+    "core_idea": "A logical address is split into a page number and an offset, and the page table turns the page number into the frame number that forms the physical address.",
+    "teaching_sequence": [
+      {
+        "concept": "Page number and offset",
+        "purpose": "Establish the two parts of a logical address",
+        "explanation_goal": "Learner understands which part identifies the page"
+      },
+      {
+        "concept": "Page table lookup",
+        "purpose": "Show how the page number is translated",
+        "explanation_goal": "Learner understands that the page number maps to a frame number"
+      },
+      {
+        "concept": "Frame number concatenated with the offset",
+        "purpose": "Complete the translation",
+        "explanation_goal": "Learner understands how the physical address is formed"
+      }
+    ]
+  },
+  "script": {
+    "short_id": "wrong_order",
+    "question": "How does a logical address become a physical address?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "How does a logical address become a physical address?",
+        "on_screen": "How does a logical address become",
+        "visual_ref": "v_q"
+      },
+      {
+        "speaker": "student",
+        "line": "The hardware concatenates the frame number with the offset to form the physical address.",
+        "on_screen": "The hardware concatenates the frame number",
+        "visual_ref": "v_1",
+        "source_quote": "The hardware concatenates the frame number with the offset to form the physical address."
+      },
+      {
+        "speaker": "student",
+        "line": "The page number indexes the page table, which stores that frame number.",
+        "on_screen": "The page number indexes the page",
+        "visual_ref": "v_2",
+        "source_quote": "The page number indexes the page table, which stores the frame number holding that page."
+      },
+      {
+        "speaker": "student",
+        "line": "A logical address is split into a page number and an offset.",
+        "on_screen": "A logical address is split into",
+        "visual_ref": "v_3",
+        "source_quote": "A logical address is split into a page number and an offset."
+      }
+    ]
+  }
+}

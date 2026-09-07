@@ -96,6 +96,456 @@ class TopicList(BaseModel):
         return v
 
 
+class TeachingStep(BaseModel):
+    """One step of the order a beginner has to meet the idea in.
+
+    THE THREE FIELDS ARE THREE DIFFERENT QUESTIONS and collapsing any two of them
+    is what makes a "teaching order" decorative:
+
+        concept           WHAT is introduced here
+        purpose           WHY this step has to exist at all
+        explanation_goal  WHAT THE LEARNER CAN DO once it has landed
+
+    `purpose` is the one that does the work. A list of concepts in an order is just
+    a list — it does not say whether step 2 could be dropped, or why step 1 has to
+    come first. "Establish the two parts of a virtual address" says the later steps
+    are unreadable without it, and that is a claim a human can disagree with, which
+    is the whole point (the same reason skills/strategy.py asks for `must_see`
+    rather than a template name).
+
+    All three are REQUIRED and none may be blank. This is the schema's own job —
+    "can this be represented" — unlike the quality bar in checks.py, which asks
+    whether the sequence is any good. A step missing its purpose is not a weak
+    step, it is not a step, and a blank string sails past a plain `str` annotation.
+    """
+    concept: str
+    purpose: str
+    explanation_goal: str
+
+    @field_validator("concept", "purpose", "explanation_goal")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        # Rejected rather than defaulted, so ask_json's retry shows the model the
+        # field it left empty instead of the pipeline carrying a hollow step
+        # forward into the script brief.
+        if not v or not v.strip():
+            raise ValueError("must not be empty — every teaching step needs all "
+                             "three of concept, purpose and explanation_goal")
+        return v.strip()
+
+
+class ExamplePlan(BaseModel):
+    """Whether this short needs a concrete example, and which one.
+
+    WHY A DECISION AND NOT A LIST. concrete_examples already carried the section's
+    own concrete things, and the script brief already asked for one to be named —
+    and both are advisory, so the example was the first thing dropped whenever the
+    beats got tight. It reads as optional information because that is exactly what
+    it was: a bag of nouns with nothing saying whether this particular short is one
+    where a worked case IS the explanation, or one where naming a value would be
+    decoration. Those are different shorts and nothing in the pipeline told them
+    apart.
+
+    So this field makes it a decision with a reason attached, in the same shape as
+    everything else the understanding produces: what to use, which step it belongs
+    to, and what the learner is supposed to see in it.
+
+    NOT NEEDED IS A FIRST-CLASS ANSWER, and it is the one that keeps this honest.
+    Plenty of sections state a relationship and show nothing — a definition, a
+    contrast, a rule. Forcing an example there produces an invented one, which is
+    the worst failure mode this project has. `not_needed` is how the reading says
+    "there is nothing concrete here" without lying, and the script brief is told to
+    take it at its word rather than reach for something plausible.
+    """
+
+    #: required   the idea does not land without the worked case; the example IS
+    #:            the explanation, not an illustration of it
+    #: helpful    the example makes it concrete and should be used if the beats
+    #:            have room — its absence is not a defect
+    #: not_needed the section shows nothing concrete worth naming. DO NOT INVENT ONE.
+    need: Literal["required", "helpful", "not_needed"] = "not_needed"
+
+    #: The example itself, copied from the section — normally one of
+    #: concrete_examples. Never a tidied-up or generalised version of it, and never
+    #: one the reading brought from outside: checks.check_example_plan verifies this
+    #: string really occurs in the section, and the plan is dropped when it does not.
+    example: str = ""
+
+    #: Which teaching_sequence step this example belongs to, 1-based, so the script
+    #: puts it where it does its work. An example landing three beats away from the
+    #: idea it makes concrete is a decoration.
+    supports_step: Optional[int] = None
+
+    #: What the learner should be able to see BECAUSE of the example. The test of a
+    #: real example rather than a mention: if this is empty, nobody decided what it
+    #: was for.
+    learner_takeaway: str = ""
+
+
+class ConfusionPlan(BaseModel):
+    """Whether this short should correct a learner's wrong belief, and which one.
+
+    WHY A DECISION AND NOT A LIST, the same argument as ExamplePlan and for a worse
+    symptom. common_confusions listed what a learner tends to get wrong, and the
+    script brief says a question aimed at a misconception is the best kind — so the
+    list read as an instruction to find one. That is how a short acquires a "common
+    mistake" beat about a mistake nobody makes: the misconception is generated to
+    satisfy the shape, and a viewer is warned off an error they were never going to
+    commit, using a beat that could have explained the thing.
+
+    Correcting a misconception is powerful and it is not free. It costs a beat out
+    of two or three, and it plants the wrong belief in the viewer's head in order
+    to knock it down — which is a bad trade unless the belief was already there.
+    So this decides whether this particular short is one of those, and `not_needed`
+    is the ordinary answer rather than the disappointing one.
+
+    THE CORRECTION IS THE PART THAT MUST BE ON THE PAGE. A misconception is by
+    definition something the section does NOT say, so `confusion` cannot be
+    required to appear in it — only to be about it. `correct_understanding` is the
+    opposite: it is a claim being taught, so it is checked against the section like
+    any other claim, and a plan whose correction is not supported there is dropped.
+    """
+
+    #: required   the section exists partly to correct this, and a viewer who keeps
+    #:            believing it has not understood the section
+    #: helpful    clarifying it sharpens the explanation, but the short works
+    #:            without spending a beat on it
+    #: not_needed introduce no misconception. The ordinary answer.
+    need: Literal["required", "helpful", "not_needed"] = "not_needed"
+
+    #: What the learner wrongly believes, in their terms. NOT quoted from the
+    #: section — it is the thing the section contradicts — but it must be ABOUT the
+    #: section: checks.check_confusion_plan requires its vocabulary to be the
+    #: section's, which is what stops a misconception arriving from outside.
+    confusion: str = ""
+
+    #: Which teaching_sequence step the clarification belongs beside, 1-based. A
+    #: correction dropped in somewhere else interrupts the explanation instead of
+    #: sharpening it.
+    relates_to_step: Optional[int] = None
+
+    #: What is actually true, supported by THIS section. Verified against the
+    #: section text, because this is a claim the short will teach.
+    correct_understanding: str = ""
+
+    #: What the learner should hold once the confusion is cleared. Empty means
+    #: nobody decided what correcting it was for, and the plan is dropped.
+    learner_takeaway: str = ""
+
+
+class HookPlan(BaseModel):
+    """How this short should OPEN, decided from the section rather than from habit.
+
+    WHY THIS IS A DECISION TOO. Beat 1 is the interviewer's question and it is the
+    thing a viewer decides on, so it attracts every bad instinct in short-form
+    video: the manufactured stake, the invented statistic, the "most people get
+    this wrong" that nothing supports. The brief already forbids that in prose, and
+    prose is not a constraint — the fix is to decide the opening where the section
+    is in view, and to have a `direct` option so "just say what it is" is a
+    choice on the list rather than a failure to think of something better.
+
+    THE FOUR OPENINGS, and the section decides which:
+
+      question   a question the section genuinely answers. The default instinct,
+                 and right often enough, but not automatically.
+      problem    a difficulty the section establishes, which the idea then
+                 resolves. Strongest when the section is structured that way —
+                 3.1 sets up external fragmentation before paging solves it.
+      surprise   a fact or relationship the section states that a learner would not
+                 predict. Only when the surprise is genuinely on the page; a
+                 surprise the reading manufactured is a lie in the first sentence.
+      direct     no hook. Name the thing and start explaining. This is a NORMAL
+                 answer, not a shrug — for a definition or a plain mechanism the
+                 concept itself is the clearest possible opening, and a hook bolted
+                 onto it costs seconds the explanation needed.
+
+    EVERY FORM IS GROUNDED. A hook is the first thing said, in the student's own
+    voice, and an ungrounded one poisons the short before it starts — see
+    checks.check_hook_plan, which verifies problem and surprise against the section
+    as claims, and requires a question's subject to be the section's.
+    """
+
+    #: Which of the four openings this short takes.
+    kind: Literal["question", "problem", "surprise", "direct"] = "direct"
+
+    #: The hook itself, as an idea rather than as wording — the script writes the
+    #: sentence. Empty for `direct`.
+    hook: str = ""
+
+    #: Why a learner should care: what the hook makes them want to understand. The
+    #: test of a hook that works rather than one that merely opens.
+    why_it_matters: str = ""
+
+    #: The concept the hook hands over to — normally core_idea, or the first
+    #: teaching step. This is what stops a hook being interesting and irrelevant:
+    #: it has to arrive somewhere, and checks.check_hook_plan verifies that
+    #: somewhere is the objective rather than a neighbouring topic.
+    leads_into: str = ""
+
+
+class SectionUnderstanding(BaseModel):
+    """What one section actually teaches, worked out before anything writes.
+
+    WHY THIS IS ITS OWN STEP
+    write_script was handed a topic and a wall of prose and asked to do two jobs in
+    one call: work out what the section is really teaching, and write a three-beat
+    interview about it. A model asked for two things at once does the answerable
+    one — "produce four JSON beats each with a verbatim quote" is a shape it can
+    fill, and "what is the single idea here, and what would a learner predict
+    wrongly" is not. So the comprehension happened as a side effect of drafting,
+    and the beats came out as sentences lifted in document order.
+
+    THIS IS GUIDANCE, NOT EVIDENCE. Every field here is GENERATED TEXT, including
+    source_evidence. It says what to explain and how to explain it. It is never a
+    citation: the section remains the only legal source of a claim, and every
+    source_quote is still matched against the section alone by
+    checks.check_source_quotes.
+
+    Every field defaults, so a partial answer from the model still validates and a
+    unit written before this existed still loads.
+    """
+
+    #: Which section this is a reading of. Carried so a cached understanding can
+    #: never be shown against the wrong section.
+    section_id: str = ""
+
+    #: The one thing this section teaches, in a sentence.
+    core_idea: str = ""
+
+    #: How the short opens, and what the opening hands over to.
+    #:
+    #: None means no decision was made (older data, or a plan dropped by
+    #: checks.check_hook_plan) and the script writes beat 1 the way it always did.
+    #: A `direct` plan is a decision — it says the concept IS the opening. See
+    #: HookPlan.
+    hook_plan: Optional[HookPlan] = None
+
+    #: What has to be said for that idea to land, in TEACHING order — not in the
+    #: order the document happens to present it in.
+    key_points: list[str] = Field(default_factory=list)
+
+    #: The smallest sequence of steps a beginner has to be walked through to reach
+    #: core_idea, each one saying what it introduces, why it is needed, and what
+    #: the learner understands afterwards.
+    #:
+    #: HOW THIS DIFFERS FROM key_points, since they overlap and the difference is
+    #: the reason both exist. key_points is a checklist: the things that have to get
+    #: said. It has an order, and nothing in it explains the order — so a script
+    #: could cover every point and still open on step 3, which is exactly the defect
+    #: the script brief spends two pages on. A teaching sequence carries the REASON
+    #: for the order in `purpose`, which is what makes it usable as a spine for the
+    #: beats rather than as a tick-list.
+    #:
+    #: NO FIXED TEMPLATE. This is deliberately not hook -> problem -> explanation ->
+    #: takeaway, or any other house shape. A comparison is taught by putting both
+    #: sides up at once, a process by walking it, a definition by naming the thing
+    #: and then distinguishing it — and a step that exists because the template has
+    #: a slot for it is padding with a label on. The model picks the order the
+    #: concept demands; checks.check_teaching_sequence then verifies it is short,
+    #: complete, on the objective, and built from concepts the section supports.
+    #:
+    #: Defaults empty, like every field here: understandings cached or written
+    #: before this field existed must still load, and as_brief() renders exactly
+    #: what it rendered before when the list is empty.
+    teaching_sequence: list[TeachingStep] = Field(default_factory=list)
+
+    #: The section's own concrete things, named: a selector, a value, a number, a
+    #: line of code. This is what stops a script being all generalities.
+    concrete_examples: list[str] = Field(default_factory=list)
+
+    #: Which of those examples this short should actually use, and how badly.
+    #:
+    #: concrete_examples says what is AVAILABLE; this says what to DO about it. The
+    #: split matters because a section can show three values of which one is the
+    #: explanation and two are incidental, and a list cannot say which. See
+    #: ExamplePlan.
+    #:
+    #: Optional, and None is not the same as not_needed: None means no decision was
+    #: made (an older understanding, or a plan dropped by
+    #: checks.check_example_plan), and the script step is then given no example
+    #: guidance at all — exactly the behaviour it had before this field existed.
+    #: not_needed is a decision, and it actively tells the script not to invent one.
+    example_plan: Optional[ExamplePlan] = None
+
+    #: What a learner predicts wrongly here. A question aimed at one of these is
+    #: worth watching; a question aimed at a definition usually is not.
+    common_confusions: list[str] = Field(default_factory=list)
+
+    #: Which of those, if any, this short should actually take on.
+    #:
+    #: Same relationship as concrete_examples to example_plan: the list is what
+    #: EXISTS, this is the decision. None means no decision was made (older data, or
+    #: a plan dropped by checks.check_confusion_plan) and the script step gets no
+    #: confusion guidance at all; not_needed is a decision, and it tells the script
+    #: not to manufacture one. See ConfusionPlan.
+    confusion_plan: Optional[ConfusionPlan] = None
+
+    #: Questions this section does NOT answer. The script step is told to stay off
+    #: them, because they are exactly where a thin section gets padded from — a
+    #: beat that drifts here is one the section was never going to support.
+    cannot_answer: list[str] = Field(default_factory=list)
+
+    #: Spans copied out of the section, as grounding for the points above.
+    #:
+    #: GROUNDING INFORMATION ONLY, and this is the field most likely to be misused.
+    #: It is not a pre-approved quote list. The model that copied these may have
+    #: tidied or mistyped one, so a beat still has to find its own sentence in the
+    #: section and still gets checked against the section. Read it as "here is
+    #: where this point came from", never as "here is your citation".
+    source_evidence: list[str] = Field(default_factory=list)
+
+    def as_brief(self) -> str:
+        """The understanding as the block of text the script step is given.
+
+        Sections with nothing in them are omitted rather than printed empty: a
+        heading followed by no bullets reads to a model as "there are none of
+        these", which is a claim this step has not made.
+
+        Returns "" when the model gave back nothing usable, which is the signal
+        write_script uses to leave its prompt exactly as it was.
+        """
+        lines: list[str] = []
+        if self.core_idea:
+            lines += [f"THE ONE IDEA: {self.core_idea}", ""]
+
+        # THE OPENING, before the sequence, because the brief is read in the order
+        # the short is delivered: beat 1 is the hook and the answer beats are the
+        # sequence. A hook printed after the plan it introduces reads as an
+        # afterthought, which is how it gets treated.
+        hook = self.hook_plan
+        if hook is not None:
+            if hook.kind == "direct":
+                lines += [
+                    "THE OPENING — DIRECT. No hook.",
+                    "  The concept is its own best opening here. Beat 1 asks plainly about",
+                    "  the thing and the answer starts explaining immediately. Do not",
+                    "  manufacture a stake, a scenario, or a surprise to warm the viewer up",
+                    "  — there are seconds in this short and the explanation needs them.",
+                    "",
+                ]
+            elif hook.hook:
+                lines.append(f"THE OPENING — {hook.kind.upper()}:")
+                lines.append(f"  open on:          {hook.hook}")
+                if hook.why_it_matters:
+                    lines.append(f"  why they care:    {hook.why_it_matters}")
+                if hook.leads_into:
+                    lines.append(f"  hands over to:    {hook.leads_into}")
+                lines.append("  This is the SUBSTANCE of beat 1, not its wording — write the")
+                lines.append("  question yourself. It comes from the section, so it may not be")
+                lines.append("  sharpened with anything the section does not say.")
+                lines.append("")
+
+        # THE SEQUENCE COMES NEXT, directly under the idea it builds to, because it
+        # is the spine the beats are meant to follow. Everything below it —
+        # examples, confusions, evidence — is material to hang on that spine.
+        if self.teaching_sequence:
+            lines.append("HOW TO BUILD THE EXPLANATION — the order a beginner needs:")
+            for i, step in enumerate(self.teaching_sequence, 1):
+                lines.append(f"  step {i}: {step.concept}")
+                lines.append(f"    why it is needed:   {step.purpose}")
+                lines.append(f"    learner ends up:    {step.explanation_goal}")
+            lines.append("")
+
+        if self.key_points:
+            # TWO HEADINGS FOR ONE FIELD, chosen by whether a sequence is present.
+            #
+            # key_points is itself "in teaching order", so printing it under that
+            # name directly beneath a teaching sequence hands the model two
+            # orderings and no way to tell which one governs — and the one with the
+            # reasons attached is the one that should. When there is no sequence
+            # (older data, or a reading whose sequence was quarantined) the heading
+            # is the original, so those briefs render exactly as they always did.
+            lines.append("SUPPORTING POINTS FROM THE SECTION:" if self.teaching_sequence
+                         else "WHAT HAS TO BE EXPLAINED, in teaching order:")
+            lines += [f"  {i}. {p}" for i, p in enumerate(self.key_points, 1)]
+            lines.append("")
+        if self.concrete_examples:
+            lines.append("THE SECTION'S OWN CONCRETE THINGS — name one of these:")
+            lines += [f"  - {e}" for e in self.concrete_examples]
+            lines.append("")
+
+        # THE DECISION, printed after the list it is a decision about. A verdict
+        # above its own evidence reads as a heading; below it, it reads as the
+        # conclusion — and this block is meant to override the "name one of these"
+        # invitation directly above it, including by saying not to.
+        plan = self.example_plan
+        if plan is not None:
+            if plan.need == "not_needed":
+                lines += [
+                    "THE EXAMPLE — NOT NEEDED.",
+                    "  This section shows nothing concrete worth building the answer on.",
+                    "  Explain it without a worked case. DO NOT INVENT AN EXAMPLE, do not",
+                    "  reach for a familiar one from outside, and do not make up a value to",
+                    "  look specific. A clear general answer is correct here.",
+                    "",
+                ]
+            elif plan.example:
+                label = ("REQUIRED — the idea does not land without it"
+                         if plan.need == "required"
+                         else "HELPFUL — use it if the beats have room")
+                lines.append(f"THE EXAMPLE — {label}:")
+                lines.append(f"  use exactly:      {plan.example}")
+                if plan.supports_step:
+                    step = None
+                    if 1 <= plan.supports_step <= len(self.teaching_sequence):
+                        step = self.teaching_sequence[plan.supports_step - 1]
+                    lines.append(f"  belongs to:       step {plan.supports_step}"
+                                 + (f" ({step.concept})" if step else ""))
+                if plan.learner_takeaway:
+                    lines.append(f"  so the learner sees: {plan.learner_takeaway}")
+                lines.append("  Copy it from the section exactly as written. Do not tidy it,")
+                lines.append("  generalise it, or swap in one you find neater.")
+                lines.append("")
+        if self.common_confusions:
+            lines.append("WHAT A LEARNER GETS WRONG HERE:")
+            lines += [f"  - {c}" for c in self.common_confusions]
+            lines.append("")
+
+        # The verdict under its own evidence, exactly as with the example plan, and
+        # for the sharper reason: the list above reads as an invitation, and this
+        # block is usually there to decline it.
+        cplan = self.confusion_plan
+        if cplan is not None:
+            if cplan.need == "not_needed":
+                lines += [
+                    "THE MISCONCEPTION — NONE TO CORRECT.",
+                    "  Do not introduce one. Do not open with what people get wrong, do not",
+                    "  add a 'common mistake' beat, and do not invent a belief in order to",
+                    "  knock it down — that plants an error the viewer did not have and",
+                    "  spends a beat doing it. Just explain the idea.",
+                    "",
+                ]
+            elif cplan.confusion:
+                label = ("REQUIRED — the section exists partly to correct this"
+                         if cplan.need == "required"
+                         else "HELPFUL — clarify it only if it costs you nothing")
+                lines.append(f"THE MISCONCEPTION — {label}:")
+                lines.append(f"  learners believe:  {cplan.confusion}")
+                if cplan.correct_understanding:
+                    lines.append(f"  the section says:  {cplan.correct_understanding}")
+                if cplan.relates_to_step:
+                    step = None
+                    if 1 <= cplan.relates_to_step <= len(self.teaching_sequence):
+                        step = self.teaching_sequence[cplan.relates_to_step - 1]
+                    lines.append(f"  clarify at:        step {cplan.relates_to_step}"
+                                 + (f" ({step.concept})" if step else ""))
+                if cplan.learner_takeaway:
+                    lines.append(f"  so the learner:    {cplan.learner_takeaway}")
+                lines.append("  Correct it inside the explanation, not as an aside. NEVER state")
+                lines.append("  the wrong belief on its own — it is only ever said in the same")
+                lines.append("  breath as what is actually true.")
+                lines.append("")
+        if self.cannot_answer:
+            lines.append("WHAT THIS SECTION DOES NOT ANSWER — stay out of these:")
+            lines += [f"  - {c}" for c in self.cannot_answer]
+            lines.append("")
+        if self.source_evidence:
+            lines.append("WHERE THAT CAME FROM — grounding only, NOT a citation list:")
+            lines += [f"  - {q}" for q in self.source_evidence]
+            lines.append("")
+        return "\n".join(lines).rstrip()
+
+
 class Beat(BaseModel):
     """One spoken line plus what the viewer sees while it plays.
 

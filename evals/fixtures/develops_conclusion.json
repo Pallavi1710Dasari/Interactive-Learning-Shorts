@@ -1,0 +1,33 @@
+{
+  "short_id": "develops_conclusion",
+  "question": "Why does an OS use paging instead of contiguous allocation?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "Why does an OS use paging instead of contiguous allocation?",
+      "on_screen": "Why does an OS use paging",
+      "visual_ref": "v_q"
+    },
+    {
+      "speaker": "student",
+      "line": "Contiguous allocation needs one unbroken block, so free memory ends up as unusable gaps.",
+      "on_screen": "Contiguous allocation needs one unbroken block,",
+      "visual_ref": "v_1",
+      "source_quote": "Contiguous allocation forces every process to occupy one unbroken block of"
+    },
+    {
+      "speaker": "student",
+      "line": "Paging splits memory into fixed-size frames, and any page can go in any free frame.",
+      "on_screen": "Paging splits memory into fixed-size frames,",
+      "visual_ref": "v_2",
+      "source_quote": "Physical memory is divided into fixed-size frames"
+    },
+    {
+      "speaker": "student",
+      "line": "So those scattered gaps become usable and external fragmentation disappears, which is why paging wins.",
+      "on_screen": "So those scattered gaps become usable",
+      "visual_ref": "v_3",
+      "source_quote": "Over time this produces external fragmentation: enough total"
+    }
+  ]
+}

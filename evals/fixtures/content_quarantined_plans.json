@@ -1,0 +1,43 @@
+{
+  "understanding": {
+    "section_id": "3.1",
+    "core_idea": "Paging removes the requirement for contiguity, so scattered free frames become usable and external fragmentation disappears.",
+    "teaching_sequence": [],
+    "example_plan": null,
+    "confusion_plan": null,
+    "hook_plan": null
+  },
+  "script": {
+    "short_id": "quarantined",
+    "question": "Enough free memory exists, but no single block is large enough. Why?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "Enough free memory exists, but no single block is large enough. Why?",
+        "on_screen": "Enough free memory exists, but no",
+        "visual_ref": "v_q"
+      },
+      {
+        "speaker": "student",
+        "line": "Contiguous allocation forces every process to occupy one unbroken block.",
+        "on_screen": "Contiguous allocation forces every process to",
+        "visual_ref": "v_1",
+        "source_quote": "Contiguous allocation forces every process to occupy one unbroken block of"
+      },
+      {
+        "speaker": "student",
+        "line": "That leaves external fragmentation, so no single block is large enough.",
+        "on_screen": "That leaves external fragmentation, so no",
+        "visual_ref": "v_2",
+        "source_quote": "Over time this produces external fragmentation: enough total"
+      },
+      {
+        "speaker": "student",
+        "line": "Paging removes the requirement for contiguity, so any page fits any free frame.",
+        "on_screen": "Paging removes the requirement for contiguity,",
+        "visual_ref": "v_3",
+        "source_quote": "Any page may be placed in any free frame."
+      }
+    ]
+  }
+}

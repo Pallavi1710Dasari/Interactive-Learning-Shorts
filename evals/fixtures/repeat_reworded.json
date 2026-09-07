@@ -1,0 +1,33 @@
+{
+  "short_id": "repeat_reworded",
+  "question": "Why does paging exist?",
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "Why does paging exist?",
+      "on_screen": "Why does paging exist?",
+      "visual_ref": "v_q"
+    },
+    {
+      "speaker": "student",
+      "line": "Contiguous allocation forces every process into one unbroken block of memory.",
+      "on_screen": "Contiguous allocation forces every process into",
+      "visual_ref": "v_1",
+      "source_quote": "Contiguous allocation forces every process to occupy one unbroken block of"
+    },
+    {
+      "speaker": "student",
+      "line": "Paging removes the requirement for contiguity so any page fits any free frame.",
+      "on_screen": "Paging removes the requirement for contiguity",
+      "visual_ref": "v_2",
+      "source_quote": "Paging removes the requirement for contiguity."
+    },
+    {
+      "speaker": "student",
+      "line": "So paging drops the contiguity requirement, letting any page sit in any free frame.",
+      "on_screen": "So paging drops the contiguity requirement,",
+      "visual_ref": "v_3",
+      "source_quote": "Any page may be placed in any free frame."
+    }
+  ]
+}

@@ -104,6 +104,17 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
               document: str | None = None) -> ShortUnit | None:
     print(f"\n=== {topic.id} — {topic.topic[:60]}")
 
+    # FREE AND FIRST. Does the section have enough distinct sentences to cite,
+    # whatever it turns out to teach? Answerable from the raw text with no model
+    # call, so it runs before the understanding call below spends the first of what
+    # would otherwise be four paid calls (one reading, three script attempts) on a
+    # section that was never going to satisfy check_source_quotes' distinctness
+    # rule. See checks.check_section_richness for the real case that motivated it.
+    richness = checks.check_section_richness(section.text)
+    if not richness.passed:
+        print(f"    skipping {topic.id} — {richness.reason}")
+        return None
+
     # SKILL 1b — read the section before writing anything, ONCE.
     #
     # Deliberately outside the retry loop below. Nothing about what a section

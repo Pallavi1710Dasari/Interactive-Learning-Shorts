@@ -53,11 +53,59 @@ MIN_PHRASE_WORDS = 4
 _THINKING = re.compile(rf"^(so|but|instead|and so|which means)\b", re.I)
 
 
+#: Tag names whose letters do not read as an English word on their own. A voice
+#: sees no difference between "img" the tag and "img" any other string of letters,
+#: so it is read literally — "im-g" or worse — instead of expanded to what a
+#: person actually calls the thing. Only entries that would otherwise mislead;
+#: "table", "form", "section" and the like already read correctly as themselves.
+_TAG_WORDS = {
+    "img": "image", "a": "anchor", "li": "list item", "ul": "unordered list",
+    "ol": "ordered list", "br": "line break", "hr": "horizontal rule",
+    "h1": "heading one", "h2": "heading two", "h3": "heading three",
+    "h4": "heading four", "h5": "heading five", "h6": "heading six",
+    "dl": "description list", "dt": "description term", "dd": "description detail",
+    "th": "table header cell", "td": "table cell", "tr": "table row",
+    "thead": "table head", "tbody": "table body", "nav": "navigation",
+}
+
+
+def _speak_tags(text: str) -> str:
+    """
+    An HTML/XML tag read as the phrase a person would say it, not as punctuation.
+
+    THE BUG THIS FIXES. _strip_markup's own docstring has claimed since it was
+    written that "angle-bracket tags are for the eye, not the ear" — and the
+    function never actually touched an angle bracket. A shipped beat's `line` was
+    "Notice there's no separate `</img>` anywhere", which after backtick-stripping
+    and the generic notation table still read "there's no separate </img>
+    anywhere" going INTO the TTS call, and a second beat's `<img src="IMAGE_URL" />`
+    came out "img src equals "IMAGE_URL" />" — the SPOKEN table's `=` -> "equals"
+    rule fired on the attribute before anything had removed the tag around it.
+
+    So this runs FIRST, before the generic SPOKEN substitutions: an attribute's `=`
+    can only get turned into "equals" by that later pass if the whole tag survives
+    to reach it, and this consumes the tag — brackets, attributes and all — as one
+    unit instead. Attributes are dropped from speech entirely rather than read out
+    ("the image tag", not "the image tag with source equals the url") — the exact
+    attributes are what `on_screen` and the diagram are for, per the brief in
+    script.py, and reading `src="IMAGE_URL"` aloud teaches a viewer nothing a
+    picture of the tag would not show better.
+    """
+    text = re.sub(r"</(\w+)>",
+                 lambda m: f"the closing {_TAG_WORDS.get(m.group(1).lower(), m.group(1).lower())} tag",
+                 text)
+    text = re.sub(r"<(\w+)[^<>]*/?>",
+                 lambda m: f"the {_TAG_WORDS.get(m.group(1).lower(), m.group(1).lower())} tag",
+                 text)
+    return text
+
+
 def _strip_markup(text: str) -> str:
     """Backticks, asterisks and angle-bracket tags are for the eye, not the ear."""
     text = re.sub(r"`([^`]*)`", r"\1", text)
     text = re.sub(r"\*\*([^*]*)\*\*", r"\1", text)
     text = re.sub(r"\*([^*]*)\*", r"\1", text)
+    text = _speak_tags(text)
     return text
 
 

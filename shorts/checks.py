@@ -2049,6 +2049,112 @@ MAX_TEACHING_STEPS = MAX_ANSWERS + 1
 MIN_CONCEPT_OVERLAP = 0.5
 
 
+def _citable_spans(section_text: str) -> list[str]:
+    """
+    Distinct verbatim spans of a section that could honestly support ONE beat's
+    citation — counted the same way check_source_quotes decides a citation is real
+    enough to try, but computed from the raw section text, with no model call.
+
+    THE GAP THIS CLOSES. check_plan_depth asks whether the READING found enough
+    conceptual signal (a teaching sequence, an example, a misconception), and nothing
+    asks whether the SECTION ITSELF has enough actual sentences to cite that many
+    times. The two can disagree: understand() read a 30-word section — two bullet
+    points and a code fence, "HTML elements like `<img />` are called void elements
+    because they don't require an end tag" is the only real sentence in it — as a
+    3-step teaching sequence plus a required example, which is TRUE as a reading of
+    the concept and says nothing about whether the section has four distinct
+    sentences to cite. It does not: it has one sentence and one code line, and
+    check_source_quotes needs `MIN_ANSWERS - 1` = 3 distinct citations. The script
+    that came back cited that one sentence in two beats and invented prose to fill
+    the rest, and grounding, source_quotes, reaches_objective and learning_outcome
+    all failed on the same real section — three paid script attempts and a paid
+    understanding call spent on material that could never have satisfied the
+    citation rule, which this checks for a fraction of a cent and zero model calls.
+
+    Fenced code blocks are pulled out and split into lines first, because a code
+    citation is exempt from the word floor (see check_source_quotes / _is_code_quote)
+    and a section's most citable content is often its code rather than its prose —
+    exactly the case here, where the fence is the second span this finds.
+    """
+    fenced = re.findall(r"```.*?```", section_text, flags=re.S)
+    prose = re.sub(r"```.*?```", " ", section_text, flags=re.S)
+
+    # Split on blank lines too, not just sentence punctuation: bullet-note material
+    # like this section separates its points with a blank line rather than a full
+    # stop ("* **HTML Image Element Syntax**:" has no terminal punctuation at all),
+    # and without this a heading-style bullet ran on into the next one as a single
+    # messy "sentence" in the diagnostic message, even though the span COUNT it
+    # produced was already correct.
+    paragraphs = re.split(r"\n\s*\n", prose)
+    sentences = [s for para in paragraphs
+                for s in re.split(r"(?<=[.!?])\s+", " ".join(para.split()))
+                if s.strip()]
+    # A COMPLETE SENTENCE OR A LINE OF CODE, NOT ANY FOUR-WORD FRAGMENT. This is
+    # deliberately STRICTER than check_source_quotes' own letter, which accepts any
+    # >=MIN_QUOTE_WORDS verbatim substring whether or not it ends in punctuation —
+    # verified directly: it accepts "* **HTML Image Element Syntax**:" as a valid
+    # citation, because it is four real words copied from the section. That is
+    # correct as a citation-verbatim check and wrong as a measure of whether the
+    # section has something to SAY: a heading fragment supports no claim, and no
+    # well-written beat would rest on one. Requiring a real sentence or a code line
+    # is a closer proxy for "can this be honestly cited" than the grader's own
+    # floor is, even though it means this and check_source_quotes can disagree at
+    # the margin — better to warn early on a borderline section than to pass one
+    # that only clears the letter of the rule.
+    spans = [s for s in sentences if _is_whole_sentence(s) or _is_code_quote(s)]
+
+    for block in fenced:
+        for line in block.strip("`").splitlines():
+            line = line.strip()
+            if line and line.lower() not in ("html", "css", "js", "python",
+                                             "javascript", "json", "bash", "sh"):
+                if _is_code_quote(line):
+                    spans.append(line)
+
+    # Deduplicated by flattened text: the same sentence quoted by two different
+    # spans (a heading repeating a body sentence, say) is one piece of evidence,
+    # not two, and counting it twice would understate how thin the section is.
+    seen, out = set(), []
+    for span in spans:
+        key = _flatten(span)
+        if key and key not in seen:
+            seen.add(key)
+            out.append(span)
+    return out
+
+
+def check_section_richness(section_text: str, min_answers: int = MIN_ANSWERS) -> GraderResult:
+    """
+    Before anything is written or even read: does this section have enough
+    DISTINCT SENTENCES to cite, whatever it turns out to teach?
+
+    Free and instant — string splitting on the raw section text, no model call —
+    which is the point: it is meant to run before understanding_for and before
+    write_script, so a section that cannot possibly satisfy check_source_quotes'
+    distinctness rule is never handed to either. See _citable_spans for the real
+    example that motivated this.
+
+    Deliberately NOT a substitute for check_plan_depth. That one asks whether the
+    CONCEPT is rich enough to fill 4-5 beats without restating; this asks whether
+    the TEXT has enough sentences to cite that many times honestly. A section can
+    pass one and fail the other, and both are real ways a script goes wrong.
+    """
+    needed = max(1, min_answers - 1)
+    spans = _citable_spans(section_text)
+    if len(spans) < needed:
+        shown = "; ".join(f'{s[:60]!r}' for s in spans[:3]) or "none"
+        return GraderResult("section_richness", False,
+            f"only {len(spans)} distinct citable sentence(s) in this section "
+            f"({shown}), need {needed} for a {min_answers}-beat script. Every beat "
+            f"needs its own supporting sentence or this becomes one idea stretched "
+            f"across several beats — merge this section with a neighbouring one, or "
+            f"add explanatory prose to it, before generating a short from it.",
+            {"spans": len(spans), "needed": needed})
+    return GraderResult("section_richness", True,
+        f"{len(spans)} distinct citable sentence(s), needs {needed}",
+        {"spans": len(spans), "needed": needed})
+
+
 def check_teaching_sequence(understanding, section_text: str | None = None) -> GraderResult:
     """
     Is this teaching sequence usable as the spine of a short?

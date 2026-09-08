@@ -286,6 +286,38 @@ is a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTE
 - The beat's `line` must say what the quote says, in simpler words. If you cannot
   find a quote that carries the claim, YOU MAY NOT MAKE THE CLAIM.
 
+HOW TO TALK ABOUT CODE, A TAG OR ANY SYNTAX
+The `line` field is SPOKEN ALOUD by a text-to-speech voice. Two failures come from
+forgetting that, and both have shipped:
+
+1. NARRATING SYNTAX INSTEAD OF EXPLAINING IT. A beat that walks through a snippet
+   character by character — "open angle bracket, i, m, g" or "const, space, s,
+   equals, 2" — is reading, not teaching, and it is exactly the note this brief
+   exists to fix: a viewer who wanted the CONCEPT gets a transcription of the
+   syntax instead.
+     BAD   "You write `const s = 2`, with const, then a space, then s, then an
+            equals sign, then 2."
+     GOOD  "Writing `const` fixes that value for good — try to reassign it and
+            the code refuses to run."
+   Say what the code DOES or what it MEANS, the way you would explain it to
+   someone who cannot see the screen, not what characters make it up. The exact
+   characters are what `on_screen` and the diagram are for.
+
+2. LITERAL SYNTAX IN A SPOKEN SENTENCE, WHICH A VOICE CANNOT READ RIGHT. A shipped
+   line said `<img>` needs no `</img>` — spoken aloud, "img" comes out as a
+   mispronounced syllable, not the word "image", because a voice reads letters it
+   does not recognise as a word literally rather than expanding them. The same
+   thing happens to any tag or identifier that is not itself a pronounceable word:
+   `<a>`, `<li>`, `<br>`, `href`, `id`.
+     BAD   "Notice there's no separate `</img>` anywhere."
+     GOOD  "Notice there's no separate closing tag at all."
+   So: in `line`, refer to a tag or attribute by what a person would actually SAY
+   ("the image tag", "the anchor tag", "a closing tag"), never by writing its
+   punctuation-bearing syntax inline. The exact syntax still belongs in
+   `source_quote` (which is read by a grader, not a voice) and belongs on screen —
+   `on_screen` and the frame the visual step draws may show `<img />` character for
+   character. Keep the literal form there and the spoken sense in `line`.
+
 This is the order of work, and it is not optional: find the quote, then say it
 simply. Writing the line first and hunting for a quote afterwards is how wrong
 answers get made.

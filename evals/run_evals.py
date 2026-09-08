@@ -326,6 +326,42 @@ def _run_visuals_case(case: dict, sections) -> tuple[bool, str]:
     return True, shown
 
 
+def _run_section_richness_case(case: dict, sections) -> tuple[bool, str]:
+    """Free, no model call: does the named section have enough real sentences?
+
+    A case may point `input` at its own document — the exact material a real
+    generation failed on — or omit it to use the suite's default source_doc, the
+    way other code_grader cases do via source_for().
+    """
+    own = case.get("input")
+    doc_sections = parse_markdown(ROOT / own) if own else sections
+    section = find_section(doc_sections, case["section_id"])
+    result = checks.check_section_richness(section.text)
+    return _check_expectations(result, case["expect"])
+
+
+def _run_speech_case(case: dict, sections) -> tuple[bool, str]:
+    """Free, no model call: what does speech.for_speech() actually send to TTS?
+
+    Regression cases for shorts/speech.py's tag-to-phrase conversion, which had
+    been dead code since it was written — _strip_markup's docstring claimed
+    "angle-bracket tags are for the eye, not the ear" and the function never
+    touched an angle bracket, so `<img />` and `</img>` were sent to the TTS
+    provider character for character.
+    """
+    from shorts import speech
+    got = speech.for_speech(case["input"])
+    exp = case["expect"]
+
+    for needle in (exp.get("must_contain") or []):
+        if needle.lower() not in got.lower():
+            return False, f"expected {needle!r} in output; got {got!r}"
+    for needle in (exp.get("must_not_contain") or []):
+        if needle.lower() in got.lower():
+            return False, f"{needle!r} leaked into speech; got {got!r}"
+    return True, got
+
+
 def run_golden_case(case: dict, sections) -> tuple[bool, str]:
     """A real call to one skill, checked against a frozen expectation.
 
@@ -338,6 +374,10 @@ def run_golden_case(case: dict, sections) -> tuple[bool, str]:
         return _run_strategy_case(case, sections)
     if case.get("step") == "visuals":
         return _run_visuals_case(case, sections)
+    if case.get("step") == "section_richness":
+        return _run_section_richness_case(case, sections)
+    if case.get("step") == "speech":
+        return _run_speech_case(case, sections)
 
     from shorts.skills.select import select_topics
     result = select_topics(sections)
@@ -374,7 +414,14 @@ def main():
 
     for case in cases:
         kind = case["type"]
-        if kind in ("llm_judge", "golden") and not args.judge:
+        # "golden" is gated behind --judge because most golden cases make a real
+        # model call (select, strategy, visuals). step "section_richness" is the
+        # one exception: it is a free, deterministic check on raw section text,
+        # and gating it behind --judge would mean the cheapest, most-run-in-
+        # anger check in the suite only gets exercised on the rare occasions
+        # someone pays for the paid cases too.
+        free_golden = kind == "golden" and case.get("step") in ("section_richness", "speech")
+        if kind in ("llm_judge", "golden") and not args.judge and not free_golden:
             print(f"{DIM}  ·  {case['id']:6} {case['name'][:52]:52} skipped (needs --judge){RESET}")
             skipped += 1
             continue

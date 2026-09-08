@@ -1179,6 +1179,103 @@ cases:
     expect:
       template_includes: [state]
 
+  - id: E068
+    name: A bullet-note section too thin to cite is caught before any model call
+    why: >
+      THE REAL BUG THIS FIXES, frozen from what actually shipped. A user uploaded
+      slide-note material and generated a short for "html_images_syntax_and_void_
+      elements" — two bullet points and a code fence, one real sentence: "HTML
+      elements like `<img />` are called void elements because they don't require
+      an end tag." check_plan_depth PASSED this section (the understanding step
+      read a 3-step teaching sequence plus a required example off it, which is a
+      true reading of the CONCEPT), and the section still could not supply
+      `MIN_ANSWERS - 1` = 3 distinct citations, because it does not have three
+      real sentences. Three paid script attempts came back failing source_quotes,
+      grounding, reaches_objective and learning_outcome, all for the same reason,
+      and nothing had checked for it up front.
+
+      This is the free, deterministic half check_plan_depth is not: it counts
+      real sentences and code lines in the raw section text, no model call, and
+      it is checked BEFORE understanding_for is spent — /api/scripts, /api/script
+      and run.build_one all gate on it now, so a section shaped like this one
+      costs nothing rather than four calls that were always going to fail.
+    type: golden
+    step: section_richness
+    input: evals/fixtures/img_void_element_material.md
+    section_id: "html_images_syntax_and_void_elements"
+    expect:
+      passed: false
+      reason_contains: "distinct citable sentence"
+
+  - id: E069
+    name: A section with enough real sentences passes the same check
+    why: >
+      The success half of E068. Without it the cheap way to satisfy the check is
+      to reject every section, and the pair is what stops that — section 3.3 of
+      the paging material has three real sentences and passes.
+    type: golden
+    step: section_richness
+    section_id: "3.3"
+    expect:
+      passed: true
+
+  - id: E070
+    name: A closing HTML tag is spoken as a word, not read as punctuation
+    why: >
+      THE REAL BUG, frozen from a shipped line. "Notice there's no separate
+      `</img>` anywhere" went into the TTS call as literal "</img>" — angle
+      brackets, slash and all — because _strip_markup's docstring had claimed
+      since it was written that "angle-bracket tags are for the eye, not the
+      ear" while the function never touched an angle bracket. A voice reading
+      "</img>" character for character is the pronunciation bug the reviewer
+      heard.
+
+      Fixed by actually implementing what the docstring always promised: a tag is
+      now expanded to the phrase a person would say — "img" specifically becomes
+      "image", because its letters do not read as an English word on their own.
+    type: golden
+    step: speech
+    input: "Notice there's no separate `</img>` anywhere."
+    expect:
+      must_contain: ["closing image tag"]
+      must_not_contain: ["</img>", "<img", "/>"]
+
+  - id: E071
+    name: An attribute is not read aloud from a self-closing tag
+    why: >
+      The other half of the same shipped bug. "You write it as
+      `<img src="IMAGE_URL" />`" came out of for_speech as literal
+      '<img src equals "IMAGE_URL" />' — the generic \s*=\s* -> " equals " rule
+      fired on the attribute BEFORE anything had removed the tag around it, since
+      the tag-to-phrase step did not exist yet.
+
+      Attributes are dropped from speech entirely rather than narrated: the tag
+      collapses to "the image tag" and the exact attribute is left for on_screen
+      and the diagram, which is what a viewer actually needs to see it. This case
+      is the regression guard for the ORDER the fix depends on — tag conversion
+      must run before the generic notation table, or "equals" leaks back in.
+    type: golden
+    step: speech
+    input: 'You write it as `<img src="IMAGE_URL" />`, with the source inside the tag itself.'
+    expect:
+      must_contain: ["the image tag"]
+      must_not_contain: ["equals", "img src", "/>"]
+
+  - id: E072
+    name: Ordinary prose with no markup passes through unchanged
+    why: >
+      The success half of E070/E071, and the reason the fix touches _strip_markup
+      rather than replacing it. Most beats have no code or tags in them at all,
+      and the cheap way to satisfy the two cases above is to over-match and start
+      eating ordinary angle brackets or words — this is the case that would catch
+      it. "A stack only allows two moves" contains no markup and must survive
+      exactly as written.
+    type: golden
+    step: speech
+    input: "A stack only allows two moves: push adds an item on top, pop removes the item on top."
+    expect:
+      must_contain: ["A stack only allows two moves"]
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

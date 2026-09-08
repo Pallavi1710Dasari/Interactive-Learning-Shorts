@@ -289,6 +289,10 @@ def make_script(body: ScriptIn):
     except KeyError as e:
         raise HTTPException(422, str(e))
 
+    richness = checks.check_section_richness(section.text)
+    if not richness.passed:
+        raise HTTPException(422, richness.reason)
+
     cursor = usage.mark()
     doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
     feedback, attempts = None, []
@@ -348,6 +352,22 @@ def make_scripts(body: ScriptsIn):
             section = find_section(sections, topic.source_section_id)
         except KeyError as e:
             return {"topic": topic.model_dump(), "error": str(e)}
+
+        # FREE, BEFORE ANYTHING PAID. A section that came back as three bullet
+        # points and a code fence — "HTML elements like `<img />` are called void
+        # elements because they don't require an end tag" was its only real
+        # sentence — was handed to understanding_for and then to write_script three
+        # times, and every attempt failed source_quotes, grounding and
+        # reaches_objective the same way: not enough distinct sentences to cite,
+        # so beats reused the one real sentence and invented prose to fill the
+        # rest. That was fully predictable from the section text alone, with no
+        # model call, so it is checked here first and reported the way a KeyError
+        # already is — as a per-card error the reviewer can read and act on
+        # (merge the section with a neighbour, or add prose to the source) instead
+        # of a checklist of red x's with no diagnosis attached.
+        richness = checks.check_section_richness(section.text)
+        if not richness.passed:
+            return {"topic": topic.model_dump(), "error": richness.reason}
 
         # Before the loop, and shared across the whole batch by section — several
         # topics filed under one section wait on one reading rather than each

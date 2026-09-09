@@ -659,6 +659,45 @@ class Cell(BaseModel):
     role: Role = "plain"
 
 
+class Node(BaseModel):
+    """One box in a Graph: a service, a step, an idea — anything with connections."""
+    label: str = ""
+    role: Role = "plain"
+
+
+class Branch(BaseModel):
+    """One direct connection from the root to one other node.
+
+    THE EDGE HAS ITS OWN LABEL, and this is the field the shape exists for: "calls",
+    "depends on", "BOOK", "owns" — the CONNECTION is frequently the fact being
+    taught ("A depends on B" is a claim about the arrow, not about A or B alone),
+    and every existing template draws boxes without ever letting an edge speak.
+    """
+    node: Node = Field(default_factory=Node)
+    #: What the connection MEANS, read at its midpoint. Empty is a valid answer —
+    #: not every connection needs naming, and a label invented to fill the field
+    #: is worse than none.
+    edge_label: str = ""
+
+
+class Graph(BaseModel):
+    """One root and up to a handful of direct connections — dependencies, a
+    service calling several others, a concept related to several things at once.
+
+    DELIBERATELY NOT A GENERAL GRAPH. One level deep, one root, no cycles, no
+    edges between two branches. General graph layout — arbitrary nodes, arbitrary
+    edges, a real layout algorithm to avoid crossings — is a much bigger, open-
+    ended problem, and most real explanations do not need it: "the OS depends on
+    the driver and the scheduler", "this function calls three others", "a class
+    implements two interfaces" are all ONE thing and what it connects to, which is
+    exactly what this draws. A concept that genuinely has edges between its
+    children, or two levels of depth, does not fit this template — say so rather
+    than forcing it in.
+    """
+    root: Node = Field(default_factory=Node)
+    branches: list[Branch] = Field(default_factory=list)
+
+
 class Slot(BaseModel):
     """One position in a Store — occupied or empty, and possibly in motion.
 
@@ -892,7 +931,7 @@ class Frame(BaseModel):
     #: output/ still load and can be re-rendered.
     template: Literal["bar", "mapping", "split", "flow", "table", "stat",
                       "code", "compare", "preview", "icons",
-                      "hierarchy", "cause_effect", "state", "takeaway"]
+                      "hierarchy", "cause_effect", "state", "graph", "takeaway"]
     title: str = ""
     #: LEGACY, and no longer drawn. This was "the one supporting line under the
     #: diagram", and what the model actually put in it was the sentence being
@@ -966,6 +1005,10 @@ class Frame(BaseModel):
     #: in the Frame that can express a thing HAPPENING rather than a thing being
     #: named, so it is what a process or a state change should be drawn with.
     store: Optional[Store] = None
+
+    #: The `graph` template's root and its direct connections. See Graph: one
+    #: root, up to a handful of children, no cycles, one level deep.
+    graph: Optional[Graph] = None
 
     #: cause_effect — the thing that makes something happen, and what happens.
     #:

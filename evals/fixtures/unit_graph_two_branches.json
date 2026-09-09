@@ -1,0 +1,28 @@
+{
+  "short_id": "graph_probe",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "What does the kernel depend on?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "What does the kernel depend on?", "on_screen": "Kernel deps", "visual_ref": "r"},
+    {"speaker": "student", "line": "It depends on the scheduler and the driver.", "on_screen": "Two dependencies", "visual_ref": "r", "source_quote": "the kernel depends on the scheduler and the driver"}
+  ],
+  "visuals": {
+    "r": {
+      "ref": "r", "type": "diagram", "spec": "graph probe",
+      "frame": {
+        "template": "graph",
+        "title": "What the kernel depends on",
+        "graph": {
+          "root": {"label": "OS Kernel", "role": "plain"},
+          "branches": [
+            {"node": {"label": "Scheduler", "role": "hero"}, "edge_label": "depends on"},
+            {"node": {"label": "Driver", "role": "lost"}, "edge_label": "depends on"}
+          ]
+        }
+      }
+    }
+  },
+  "status": "draft"
+}

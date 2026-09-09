@@ -1,0 +1,9 @@
+{
+  "template": "bar",
+  "title": "All plain",
+  "cells": [
+    {"label": "X", "role": "plain"},
+    {"label": "Y", "role": "plain"},
+    {"label": "Z", "role": "plain"}
+  ]
+}

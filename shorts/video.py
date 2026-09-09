@@ -250,8 +250,38 @@ def _server_is_up(base: str) -> bool:
 DEFAULT_WORKERS = 3
 
 
+def _bg_scale_for(workers: int) -> float:
+    """
+    ThreeStage's depth-layer pixel ratio during capture, sized to how many of
+    these run at once.
+
+    The layer was already halved for a single capturing instance (see its own
+    comment), and that budget assumed ONE of them on the machine — DEFAULT_WORKERS
+    runs several concurrently, each software-rasterising its own full copy.
+
+    NOT the fix for a beat that once photographed as an empty card, in case a
+    future reader goes looking here for that: this layer was a live suspect while
+    that bug was being chased (it's the dominant per-frame cost even at 0.5, and
+    workers=3 reproduced the bug while workers=1 didn't), but forcing this scale
+    all the way down did not clear it, and it turned out to be a genuine,
+    concurrency-independent bug in arrivalOrder() (see AnimatedSvg.tsx) — a
+    data-role="base" element was consuming a real arrival step it never animates
+    into, delaying every element that DOES animate by one step's worth of time.
+    Fixed there. This function stays because giving several concurrent instances
+    less each to rasterise is still a plain efficiency win, independent of that.
+
+    Software rasterisation cost scales with pixel count, so with area, so with the
+    scale squared: to keep N concurrent instances' COMBINED cost near what one
+    instance at 0.5 already runs at, solve N*(s/0.5)^2 = 1 for s. One worker keeps
+    the original 0.5; more workers each get a smaller share.
+    """
+    if workers <= 1:
+        return 0.5
+    return round(0.5 / (workers ** 0.5), 3)
+
+
 def _capture_slice(chrome: str, base: str, short_id: str, outdir: Path,
-                   indices: list[int], fps: int, on_frame) -> None:
+                   indices: list[int], fps: int, on_frame, bg_scale: float = 0.5) -> None:
     """Photograph one worker's share of the frames. Owns its own browser."""
     port = _free_port()
     profile = outdir / f"profile-{port}"
@@ -268,7 +298,7 @@ def _capture_slice(chrome: str, base: str, short_id: str, outdir: Path,
         dev.send("Emulation.setDeviceMetricsOverride",
                  {"width": WIDTH, "height": HEIGHT, "deviceScaleFactor": 1,
                   "mobile": False})
-        url = f"{base}/#capture/{short_id}"
+        url = f"{base}/#capture/{short_id}?bgscale={bg_scale}"
         dev.send("Page.navigate", {"url": url})
 
         deadline = time.monotonic() + 45
@@ -378,10 +408,11 @@ def render(short_id: str, force: bool = False,
                 if progress and (done % fps == 0 or done == frames):
                     progress(done, frames)
 
+        bg_scale = _bg_scale_for(workers)
         errors: list[BaseException] = []
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = [pool.submit(_capture_slice, chrome, base, short_id,
-                                   tmpdir, part, fps, tick)
+                                   tmpdir, part, fps, tick, bg_scale)
                        for part in slices if part]
             for f in futures:
                 try:

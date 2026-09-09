@@ -29,7 +29,7 @@ the model used to have to remember to add. See web/src/AnimatedSvg.tsx.
 """
 import re
 
-from ..schema import Frame, Cell, TableRow, Panel, Sample, Glyph, Slot, Store
+from ..schema import Frame, Cell, TableRow, Panel, Sample, Glyph, Slot, Store, Node, Branch, Graph
 from .. import config
 
 VIEW = 1080
@@ -1963,18 +1963,229 @@ def _state(frame: Frame, enter: int) -> tuple[str, int]:
     return out, enter
 
 
+
+#: The most children a root may fan out to. Past this the branches are narrower
+#: than their own labels and the shape stops reading as "one thing and what it
+#: connects to" — it starts reading as a crowd.
+MAX_BRANCHES = 4
+
+
+def _graph(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    One root, its direct connections, and what each connection MEANS.
+
+    THE GAP THIS FILLS. `cause_effect` draws one arrow between two things.
+    `hierarchy` draws levels, one inside another. Neither can draw "the kernel
+    depends on the scheduler AND the driver" — a root with several distinct
+    things connected to it, each connection its own fact. Before this, that
+    concept had to be flattened into a `bar` of unconnected boxes or an `icons`
+    row, and the relationship itself — the thing the beat is usually actually
+    about — went undrawn, leaving only the things it connects.
+
+    THE ROOT SITS ABOVE, BRANCHES FAN OUT BELOW, one edge per branch, the edge's
+    own label at its midpoint. Each branch's role colours its own box; the edge
+    to it is drawn in the same colour, so "this dependency is the one the beat
+    is about" is one fact stated once, not a box lit with an unlit line leading
+    to it.
+    """
+    graph = frame.graph or Graph()
+    branches = list(graph.branches or [])[:MAX_BRANCHES]
+
+    root_w, root_h = 320, 110
+    root_x = VIEW / 2 - root_w / 2
+    root_y = BODY_TOP + 20
+
+    n = len(branches)
+    # RESPONSIVE TO n, not fixed. A fixed 260px branch at four branches needs
+    # 4*260 + 3*36 = 1148px of row — past USABLE (960) and past the 1080 canvas
+    # itself, so the fourth branch ran off the edge of the frame. Capped the same
+    # way _state's slot width is: shrink the branch, and shrink the gap between
+    # branches, before ever letting the row exceed what the canvas actually has.
+    gap = 36 if n <= 3 else 24
+    branch_w = min(260.0, (USABLE - max(0, n - 1) * gap) / max(1, n))
+    branch_h = 100
+    row_y = BODY_BOTTOM - branch_h - 40
+    row_w = n * branch_w + max(0, n - 1) * gap
+    row_x0 = VIEW / 2 - row_w / 2
+
+    out = ""
+
+    # --- the edges, drawn BEFORE the boxes so a box's border sits on top of the
+    # line rather than the line appearing to pierce it -----------------------
+    edge_body = ""
+    for i, br in enumerate(branches):
+        bx = row_x0 + i * (branch_w + gap)
+        bx_mid = bx + branch_w / 2
+        _, stroke, _ = ROLE_COLOURS[br.node.role]
+        edge_body += (f'<line x1="{VIEW / 2:.0f}" y1="{root_y + root_h:.0f}" '
+                      f'x2="{bx_mid:.0f}" y2="{row_y:.0f}" '
+                      f'stroke="{stroke}" stroke-width="5"/>')
+        if br.edge_label:
+            # ANCHORED OVER THE BRANCH'S OWN COLUMN, not at the geometric midpoint
+            # of root-to-branch. The midpoint compresses toward the centre as
+            # branches fan out — measured directly: with three branches the three
+            # midpoints landed 148px apart while each label plate was ~176px wide,
+            # so adjacent labels overlapped into unreadable run-on text ("depends
+            # or depends on"). Branch COLUMNS never overlap (branch_w + gap
+            # already keeps them apart), so a label anchored to its own branch's
+            # x-position is guaranteed clear of its neighbours by the same margin
+            # the boxes themselves have.
+            mx, my = bx_mid, row_y - 34
+            lines, size = fit(br.edge_label, branch_w - 16, 24, 16, max_lines=1)
+            tw = max(len(lines[0]) * size * 0.56, 30) if lines else 30
+            edge_body += (f'<rect x="{mx - tw / 2 - 8:.0f}" y="{my - size * 0.7:.0f}" '
+                          f'width="{tw + 16:.0f}" height="{size * 1.4:.0f}" rx="6" '
+                          f'fill="{PAPER}"/>')
+            edge_body += text_block(lines, mx, my + size * 0.35, size, MUTED, 600)
+    # "flow", NOT "base". An edge here is a RELATIONSHIP being asserted — "the
+    # kernel depends on the scheduler" — the same kind of claim cause_effect's
+    # arrow makes, and cause_effect's arrow gets the marching-dash animation for
+    # exactly that reason: nothing is being carried, so ferry()'s traveling token
+    # would be a picture of transport this beat is not making. march()'s dashes
+    # say "this connection is live" without claiming an object moved along it.
+    #
+    # This was "base" (no animation at all) when the template first shipped,
+    # which was a real gap: every OTHER template that draws a relationship —
+    # flow's descent, cause_effect's arrow, icons' transport arrows — already had
+    # a motion cue, and graph's edges were the one connector in the whole
+    # renderer that never moved at all.
+    out += group(edge_body, enter, "flow")
+    enter += 1
+
+    # --- the root -------------------------------------------------------------
+    out += group(box(root_x, root_y, root_w, root_h, graph.root.role, rx=16)
+                 + label_in_box(graph.root.label, root_x, root_y, root_w, root_h,
+                                graph.root.role, hi=40, lo=24),
+                 enter, "focus" if graph.root.role == "hero" else None)
+    enter += 1
+
+    # --- the branches -----------------------------------------------------
+    for i, br in enumerate(branches):
+        bx = row_x0 + i * (branch_w + gap)
+        out += group(box(bx, row_y, branch_w, branch_h, br.node.role, rx=14)
+                     + label_in_box(br.node.label, bx, row_y, branch_w, branch_h,
+                                    br.node.role, hi=34, lo=20),
+                     enter, "focus" if br.node.role == "hero" else None)
+        enter += 1
+
+    return out, enter
+
 _TEMPLATES = {
     "bar": _bar, "mapping": _mapping, "split": _split, "flow": _flow,
     "table": _table, "stat": _stat, "code": _code, "compare": _compare,
     "preview": _preview, "icons": _icons,
     "hierarchy": _hierarchy, "cause_effect": _cause_effect,
-    "state": _state,
+    "state": _state, "graph": _graph,
     # LEGACY. Not offered to the model any more — a frame whose whole content is a
     # sentence is the "visuals are just text" complaint in its purest form, and it
     # was landing on EVERY short because the brief made it the last beat's job.
     # Kept only so the units already in output/ still re-render.
     "takeaway": _takeaway,
 }
+
+
+#: What each role means, said the way a student would say it — not the internal
+#: name. Matches the vocabulary the docstrings already use ("the ONE thing this
+#: beat is about", "wasted, rejected, invalid or unusable", "context the viewer
+#: should not read yet") so the legend and the code agree about what a colour means.
+_ROLE_WORDS = {"hero": "Focus", "lost": "Invalid", "quiet": "Not yet", "plain": "Context"}
+
+#: Every place a Cell-shaped role can appear, scanned the same way
+#: checks.check_one_hero_per_frame groups them — kept as a SEPARATE list rather
+#: than imported, because layout.py must not import checks.py: the renderer has to
+#: work even when the grading module does not, and a rendering concern (what
+#: colours does this frame actually use) should not create a dependency on a
+#: grading one.
+def _roles_present(frame: Frame) -> list[str]:
+    """
+    Which roles this frame actually uses, in a stable order — hero, lost, quiet,
+    plain — for the legend.
+
+    THE THRESHOLD FOR SHOWING ANYTHING AT ALL lives at the call site, not here:
+    this just answers "what is present". A frame using only one role has nothing
+    for a key to decode — the whole point of a legend is telling two colours
+    apart — so single-role and no-role frames render no legend, which is most of
+    what keeps this from becoming chrome on every frame regardless of whether it
+    helps.
+    """
+    seen: set[str] = set()
+    for coll in (frame.cells, frame.left, frame.right, frame.parts, frame.steps,
+                frame.code_lines, frame.samples, frame.glyphs, frame.levels):
+        seen.update(c.role for c in coll)
+    seen.update(r.role for r in frame.rows)
+    for panel in frame.panels:
+        seen.add(panel.role)
+        seen.update(i.role for i in panel.items)
+    if frame.cause is not None:
+        seen.add(frame.cause.role)
+    if frame.effect is not None:
+        seen.add(frame.effect.role)
+    if frame.store is not None:
+        # Empty slots carry "plain" by construction but draw as a dashed outline
+        # with no fill — a viewer cannot see "plain" ON an empty place, only on an
+        # occupied one, so an empty slot is not evidence that "plain" is a colour
+        # in play on THIS frame.
+        seen.update(sl.role for sl in frame.store.slots if sl.label)
+    return [r for r in ("hero", "lost", "quiet", "plain") if r in seen]
+
+
+def _legend(frame: Frame) -> str:
+    """
+    A small, persistent colour key: which colour means what, ON SCREEN, so a
+    viewer who missed a sentence of narration can still read the picture.
+
+    ONLY WHEN THERE IS SOMETHING TO DECODE. Two or more distinct roles in one
+    frame is a real visual distinction being drawn — hero-vs-plain, hero-vs-lost —
+    and that is exactly the case a colour convention helps with. A frame using one
+    role throughout has nothing to key, so the legend does not appear: adding one
+    anyway would be exactly the "chrome that does not improve understanding" this
+    was scoped to avoid.
+    """
+    roles = _roles_present(frame)
+    if len(roles) < 2:
+        return ""
+
+    chip_w, chip_h, gap, swatch = 168, 44, 16, 22
+    total_w = len(roles) * chip_w + (len(roles) - 1) * gap
+    x0 = VIEW / 2 - total_w / 2
+    y = NOTE_TOP + 14
+
+    out = ""
+    for i, role in enumerate(roles):
+        fill, stroke, _ = ROLE_COLOURS[role]
+        cx = x0 + i * (chip_w + gap)
+        out += (f'<rect x="{cx:.0f}" y="{y:.0f}" width="{swatch}" height="{swatch}" '
+                f'rx="6" fill="{fill}" stroke="{stroke}" stroke-width="3"/>')
+        out += text_block([_ROLE_WORDS[role]], cx + swatch + 10, y + swatch / 2 + 8,
+                          26, MUTED, 600, anchor="start")
+    return f'<g data-role="base">{out}</g>'
+
+
+def _phase_chip(frame: Frame) -> str:
+    """
+    Names the OPERATION a `state` frame is showing — arriving or leaving — so a
+    viewer can tell what is happening to the container without narration.
+
+    ONLY FOR `state`, AND ONLY WHEN SOMETHING IS MOVING. A container with every
+    slot resting is just a picture of a structure; there is no operation to name,
+    and frame.title (drawn above every frame already) is doing that job. The word
+    is read off Slot.state directly — "arriving" / "leaving" — rather than a
+    domain word like "push" or "pop", because Store is not only a stack: the same
+    two states describe a page arriving in a memory frame or a value leaving a
+    queue, and a stack-specific word would be wrong on those.
+    """
+    if frame.template != "state" or frame.store is None:
+        return ""
+    moving = next((s.state for s in frame.store.slots if s.state != "resting"), None)
+    if moving is None:
+        return ""
+    word = moving.upper()
+    w = 22 * (len(word) + 4)
+    x, y = VIEW / 2 - w / 2, NOTE_TOP - 56
+    return (f'<g data-role="base"><rect x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" '
+            f'height="40" rx="20" fill="{PAPER}" stroke="{MUTED}" stroke-width="2" '
+            f'opacity="0.9"/>'
+            f'{text_block([word], VIEW / 2, y + 27, 24, MUTED, 700)}</g>')
 
 
 def render(frame: Frame) -> str:
@@ -2032,5 +2243,13 @@ def render(frame: Frame) -> str:
 
     if GLOW:
         parts.append("</g>")
+
+    # OUTSIDE the bloom group, deliberately: this is UI chrome reporting on the
+    # picture, not part of the picture, and should read as a crisp label rather
+    # than glow like the diagram it is keying. Both are no-ops when they have
+    # nothing to say — see their own docstrings for the threshold each uses.
+    parts.append(_phase_chip(frame))
+    parts.append(_legend(frame))
+
     parts.append("</svg>")
     return "".join(p for p in parts if p)

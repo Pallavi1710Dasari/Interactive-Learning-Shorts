@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 
 /**
  * A generated diagram, drawn on screen instead of appearing finished.
@@ -120,7 +120,28 @@ export function AnimatedSvg({ svg, beatKey, composition, beatMs }: {
   // Measured once per short, not once per beat. See cropFor().
   const crop = useMemo(() => cropFor(composition), [composition]);
 
-  useEffect(() => {
+  // LAYOUT, NOT PASSIVE — this used to be useEffect. CaptureStage freezes every
+  // animation on the page one requestAnimationFrame after this component is
+  // supposed to have run (see its own comment on why two rAFs), which is a bet
+  // that a PASSIVE effect here has already fired by then. React makes no such
+  // guarantee — passive effects are scheduled separately from layout effects and
+  // can in principle land on a later tick than an ancestor's rAF. A
+  // useLayoutEffect commits synchronously with the rest of the tree, before the
+  // browser paints and therefore before CaptureStage's rAF can even run, so the
+  // Animation objects below are guaranteed to exist by the time anything goes
+  // looking for them — a scheduling guarantee instead of a timing hope.
+  //
+  // This was investigated as the cause of a beat that once photographed as an
+  // empty card (title and diagram invisible, only the base-role legend showing),
+  // on the theory that three concurrent capture workers were slow enough to lose
+  // that race. They weren't, in the end: --workers 1 reproduced the exact same
+  // blank window, which ruled out timing entirely and pointed at arrivalOrder()
+  // below instead (see its own comment) — a data-role="base" element was
+  // consuming a real arrival step it never animates into, and every element that
+  // DOES animate was delayed by one step's worth of time waiting for it. That is
+  // what was actually fixed. This effect stays useLayoutEffect anyway: the
+  // scheduling gap above is real even though it was not this bug's cause.
+  useLayoutEffect(() => {
     const wrap = host.current;
     if (!wrap) return;
 
@@ -221,10 +242,21 @@ function arrivalOrder(root: SVGSVGElement, cap: number = MAX_STEPS): SVGElement[
       else byStep.set(n, [el]);
     }
     // Anything untagged in a tagged frame arrives first: it is the backdrop the
-    // tagged elements are being placed onto.
+    // tagged elements are being placed onto. EXCEPT a data-role="base" group —
+    // the legend/phase-chip layout.render() adds outside the bloom filter — which
+    // is untagged for a different reason: it was already on screen, so the main
+    // loop below never calls enter() on it at all (see the `base` check there).
+    // Counting it here anyway bought it a real arrival STEP it does nothing
+    // with, which pushed every element that actually animates one whole gap
+    // later than intended — on a two-step frame (title, then one content group)
+    // that meant the title sat invisible for the frame's first ~1.3s and the
+    // content for ~2.6s of a beat with no legend-less counterpart to compare
+    // against, which is what "the whole card is blank" turned out to be: not a
+    // capture-timing race (--workers 1 reproduced it exactly the same), but this
+    // component quietly budgeting a build step for a step that was never taken.
     const untagged = Array.from(root.children).filter(
       (c): c is SVGElement => c instanceof SVGElement && !c.hasAttribute("data-enter")
-        && !c.querySelector("[data-enter]"),
+        && !c.querySelector("[data-enter]") && c.dataset.role !== "base",
     );
     let ordered = [...byStep.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
     if (untagged.length) ordered = [untagged, ...ordered];

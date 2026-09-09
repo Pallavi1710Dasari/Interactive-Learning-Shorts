@@ -96,6 +96,7 @@ def _design_problems(unit: ShortUnit) -> list[str]:
                checks.check_frames_progress(unit),
                checks.check_frames_match_strategy(unit),
                checks.check_one_hero_per_frame(unit),
+               checks.check_template_data_present(unit),
                checks.check_samples_differ(unit), checks.check_svg_quality(unit),
                checks.check_icons_are_pictures(unit)]
     if section is not None:

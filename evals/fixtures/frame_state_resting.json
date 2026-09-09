@@ -1,0 +1,14 @@
+{
+  "template": "state",
+  "title": "Steady state",
+  "store": {
+    "label": "Stack",
+    "orientation": "vertical",
+    "pointer": "top = 1",
+    "pointer_at": 1,
+    "slots": [
+      {"label": "A", "role": "plain", "state": "resting"},
+      {"label": "B", "role": "hero", "state": "resting"}
+    ]
+  }
+}

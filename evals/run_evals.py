@@ -362,6 +362,31 @@ def _run_speech_case(case: dict, sections) -> tuple[bool, str]:
     return True, got
 
 
+def _run_legend_case(case: dict, sections) -> tuple[bool, str]:
+    """Free, no model call: does layout.render() emit the legend / phase chip
+    this Frame should (or should not) get?
+
+    Regression cases for the on-screen colour key and the arriving/leaving phase
+    word added to render() — both are meant to appear only when they decode an
+    actual ambiguity (2+ distinct roles in play; a slot actually in motion), not
+    on every frame regardless of content.
+    """
+    from shorts.schema import Frame
+    from shorts.skills import layout
+
+    frame = Frame(**json.loads((ROOT / case["fixture"]).read_text(encoding="utf-8")))
+    svg = layout.render(frame)
+    exp = case["expect"]
+
+    for needle in (exp.get("must_contain") or []):
+        if needle not in svg:
+            return False, f"expected {needle!r} in rendered SVG; not found"
+    for needle in (exp.get("must_not_contain") or []):
+        if needle in svg:
+            return False, f"{needle!r} should not appear; frame has nothing to key"
+    return True, "ok"
+
+
 def run_golden_case(case: dict, sections) -> tuple[bool, str]:
     """A real call to one skill, checked against a frozen expectation.
 
@@ -378,6 +403,8 @@ def run_golden_case(case: dict, sections) -> tuple[bool, str]:
         return _run_section_richness_case(case, sections)
     if case.get("step") == "speech":
         return _run_speech_case(case, sections)
+    if case.get("step") == "legend":
+        return _run_legend_case(case, sections)
 
     from shorts.skills.select import select_topics
     result = select_topics(sections)
@@ -420,7 +447,7 @@ def main():
         # and gating it behind --judge would mean the cheapest, most-run-in-
         # anger check in the suite only gets exercised on the rare occasions
         # someone pays for the paid cases too.
-        free_golden = kind == "golden" and case.get("step") in ("section_richness", "speech")
+        free_golden = kind == "golden" and case.get("step") in ("section_richness", "speech", "legend")
         if kind in ("llm_judge", "golden") and not args.judge and not free_golden:
             print(f"{DIM}  ·  {case['id']:6} {case['name'][:52]:52} skipped (needs --judge){RESET}")
             skipped += 1

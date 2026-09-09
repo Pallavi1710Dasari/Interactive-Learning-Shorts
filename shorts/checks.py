@@ -186,6 +186,14 @@ _SUFFIXES = (
     ("ions", ""), ("ion", ""),
     ("ings", ""), ("ing", ""),
     ("ies", "y"), ("ied", "y"),
+    # "failure"/"fail" is the real case this was missing: the suffix table had no
+    # rule for it, so "failure" fell through to the generic e-strip below and
+    # stemmed to "failur" — five of six letters, but _grounded's prefix-match
+    # requires BOTH sides to be >=5 characters, and "fail" is four. Confirmed on a
+    # real script: it said "fail at any step" and check_follows_teaching_sequence
+    # reported "failure" as never mentioned, because "failur" vs "fail" never
+    # cleared the length floor to be compared at all.
+    ("ure", ""),
     ("es", ""), ("ed", ""), ("ly", ""), ("s", ""),
 )
 
@@ -882,6 +890,33 @@ def literal_vocabulary(source_text: str) -> set[str]:
     return set(_stems(re.sub(r"[^\w]+", " ", f"{fenced} {inline}")))
 
 
+def _chrome_vocabulary() -> set[str]:
+    """
+    Stems of the fixed words render()'s own UI chrome prints — the legend and the
+    arriving/leaving phase chip — so this grader never mistakes them for diagram
+    content that ought to be grounded in the narration.
+
+    THE BUG THIS FIXES. This grader reads every <text> element straight out of the
+    rendered SVG string, with no idea which of them came from the Frame's own
+    schema (a Cell's label, say) and which are chrome render() adds on top — so
+    "Focus" and "Context" from the legend, and "ARRIVING" from the phase chip,
+    showed up as label words with nothing to ground them, on EVERY frame the
+    legend or phase chip appears on. A real run flagged 43% of one frame's labels
+    as foreign, and every one of the foreign words was the legend, not the
+    diagram.
+
+    Imported from layout.py rather than duplicated, so the two cannot drift apart
+    — if _ROLE_WORDS ever gains a role or the phase chip's vocabulary changes,
+    this follows it automatically instead of silently falling out of date.
+    """
+    from .skills.layout import _ROLE_WORDS
+    words = set(_ROLE_WORDS.values()) | {"arriving", "leaving"}
+    out: set[str] = set()
+    for phrase in words:
+        out |= set(_stems(phrase))
+    return out
+
+
 def check_diagram_matches_narration(unit: ShortUnit,
                                     source_text: str | None = None) -> GraderResult:
     """
@@ -911,7 +946,8 @@ def check_diagram_matches_narration(unit: ShortUnit,
         + " " + " ".join(b.on_screen for b in unit.beats)
         + " " + " ".join(b.source_quote or "" for b in unit.beats)
         + " " + unit.question
-    )) | {_stem(w) for w in _DIAGRAM_SCAFFOLD} | literal_vocabulary(source_text or "")
+    )) | {_stem(w) for w in _DIAGRAM_SCAFFOLD} | literal_vocabulary(source_text or "") \
+        | _chrome_vocabulary()
     # The visual SPEC is deliberately NOT in here. It comes from the same model
     # chain as the drawing, so a frame that faithfully renders a spec which itself
     # wandered off the narration would score perfectly — which is the exact defect
@@ -1041,6 +1077,12 @@ def _frame_labels(frame) -> list[str]:
     if frame.store is not None:
         out.extend(slot.label for slot in frame.store.slots)
         out.extend(filter(None, [frame.store.label, frame.store.pointer]))
+    if frame.graph is not None:
+        out.append(frame.graph.root.label)
+        for br in frame.graph.branches:
+            out.append(br.node.label)
+            if br.edge_label:
+                out.append(br.edge_label)
     out.extend(filter(None, [frame.cells_title, frame.left_title, frame.right_title,
                              frame.value, frame.caption, frame.note]))
     return [str(x) for x in out if str(x).strip()]
@@ -1195,6 +1237,48 @@ def check_frames_progress(unit: ShortUnit) -> GraderResult:
         + f" ({len(set(f.template for f in frames))} template(s), which is not what is measured)",
         {"frames": len(frames), "distinct_content": distinct_content,
          "distinct_states": distinct_states})
+
+
+def check_template_data_present(unit: ShortUnit) -> GraderResult:
+    """
+    A frame whose template needs a specific structured field actually has one.
+
+    THE FAILURE THIS CATCHES, found on the first real generation with `graph`:
+    the design step chose template="graph" for every frame of a dependency
+    explanation, and `frame.graph` was None on all five — the model picked the
+    right ENUM value without also filling the field it names. Both fields are
+    `Optional[...] = None`, so a JSON reply that simply omits the key validates
+    cleanly and silently defaults to empty; nothing raised, nothing warned. The
+    renderer then falls back to an empty container (`frame.store or Store()`,
+    `frame.graph or Graph()`), so every such frame drew the same blank shape, and
+    the FIRST symptom anyone saw was two graders later: frames_develop reporting
+    the frames as byte-identical, with no way to tell "the model drew nothing"
+    from "the model genuinely repeated itself".
+
+    So this checks the one thing that actually went wrong, directly, rather than
+    waiting for its downstream symptom. Free — it reads the Frame, no model call.
+    """
+    empty: list[str] = []
+    for ref, visual in (unit.visuals or {}).items():
+        frame = visual.frame
+        if frame is None:
+            continue
+        if frame.template == "state":
+            if frame.store is None or not frame.store.slots:
+                empty.append(f"{ref}: template is \'state\' but store has no slots")
+        elif frame.template == "graph":
+            if frame.graph is None or (
+                    not frame.graph.root.label and not frame.graph.branches):
+                empty.append(f"{ref}: template is \'graph\' but graph has no "
+                             f"root and no branches")
+    if empty:
+        return GraderResult("template_data_present", False,
+            "; ".join(empty[:3]) +
+            ". Choosing this template is not enough — fill the field it names, "
+            "or the frame renders as an empty container/graph with nothing in it.",
+            {"empty": empty})
+    return GraderResult("template_data_present", True,
+                        "every state/graph frame has real content")
 
 
 def check_frames_are_visual(unit: ShortUnit) -> GraderResult:
@@ -1656,6 +1740,12 @@ def _roles(frame) -> tuple:
         # now leaving HAS changed what the viewer sees, and _roles is what
         # frames_develop compares when the labels are equal.
         tuple((sl.role, sl.state) for sl in (frame.store.slots if frame.store else ())),
+        # A graph's root and its branches — same reasoning as a store's slots:
+        # which node is lit is part of the picture, so two frames differing only
+        # in which branch is the hero are different pictures, not the same one
+        # with an accent moved.
+        ((frame.graph.root.role,) if frame.graph else ())
+        + tuple(br.node.role for br in (frame.graph.branches if frame.graph else ())),
     )
 
 
@@ -1832,18 +1922,46 @@ _RELATIONSHIP_TEMPLATES = {
     # slot is reachable and the ones below it are not" is one container with one
     # slot in hero and the rest in quiet, both on screen, no cut in between. A
     # `compare` frame would draw the same stack twice to say it.
-    "comparison":    {"compare", "preview", "table", "code", "state"},
+    #
+    # "graph" for the same reason: "the driver can fail and the scheduler still
+    # works" is a comparison between two branches of ONE dependency graph, not two
+    # unrelated things — reusing the graph already on screen and marking one
+    # branch hero, the other lost, is the SAME persistent-scaffold principle
+    # `state` earns its place for, and switching to a fresh `compare` panel here
+    # would break the composition the beats before it built.
+    "comparison":    {"compare", "preview", "table", "code", "state", "graph"},
     # Rule 8: the thing that moves, where it starts, where it lands. A `state`
     # frame draws exactly that when the destination is a place in a container.
-    "data_movement": {"state", "icons", "mapping", "flow", "cause_effect"},
+    # `graph` when there are SEVERAL distinct destinations from one source — data
+    # fanning out to more than one place, which "cause_effect" (one arrow) and
+    # "state" (one container) cannot show at once.
+    "data_movement": {"state", "icons", "mapping", "flow", "cause_effect", "graph"},
     # Rule 9: spatial hierarchy. A row of peers is the thing being rejected.
-    "hierarchy":     {"hierarchy", "split", "code"},
+    # `graph` too: a root with children IS a (shallow) hierarchy, and it is the
+    # right shape whenever the children are DISTINCT NAMED THINGS rather than
+    # nested levels — "the OS depends on the scheduler and the driver" is a graph,
+    # "level 1 contains level 2 contains level 3" is `hierarchy` itself.
+    "hierarchy":     {"hierarchy", "split", "code", "graph"},
     # Rule 10: cause and effect both on screen, direction drawn.
     "cause_effect":  {"cause_effect", "flow", "compare", "code"},
     # `state` earns a place here for the STILL case: a container with its slots and
     # its index, nothing moving, is a picture of how the thing is arranged.
+    #
+    # `flow` earns its place for the same reason as `state`: some structures ARE a
+    # chain, and a chain's static arrangement — link, link, link — is honestly
+    # drawn top-to-bottom with connectors, which is what `flow` does whether or
+    # not anything is depicted as moving between beats. Found on a real short: the
+    # strategist called the opening beat of a promise-chain explanation
+    # "structure" (it introduces the shape, nothing has happened yet) while the
+    # design step drew it as `flow` (a chain is inherently sequential) — both
+    # readings are honest, and the mismatch was the allow-list being narrower than
+    # the two correct answers it was choosing between.
+    #
+    # `graph` for the same reason again: one root with several named parts IS a
+    # structure — "the kernel is made of the scheduler, the driver and the
+    # filesystem" is one thing and what it is composed of, not a process.
     "structure":     {"split", "bar", "table", "mapping", "code", "hierarchy",
-                      "icons", "state"},
+                      "icons", "state", "flow", "graph"},
     "effect":        {"preview", "code", "compare"},
     "quantity":      {"stat", "bar", "table"},
 }
@@ -1954,6 +2072,14 @@ def check_one_hero_per_frame(unit: ShortUnit) -> GraderResult:
             # unaccented elements when in fact both of its items are lit.
             ("slots", [sl.role for sl in (frame.store.slots if frame.store else ())
                        if sl.label]),
+            # Root and branches together, one group — a graph makes ONE claim
+            # about how its parts relate, and that claim can legitimately need
+            # two lit ends (the root AND the one branch its beat is about), the
+            # same reasoning check_one_hero_per_frame already applies to a
+            # mapping's two columns.
+            ("graph nodes",
+             ([frame.graph.root.role] if frame.graph else [])
+             + [br.node.role for br in (frame.graph.branches if frame.graph else ())]),
         ]
         for i, panel in enumerate(frame.panels, 1):
             collections.append((f"panel {i} items", [c.role for c in panel.items]))
@@ -2049,6 +2175,62 @@ MAX_TEACHING_STEPS = MAX_ANSWERS + 1
 MIN_CONCEPT_OVERLAP = 0.5
 
 
+#: A GFM table's OWN separator row — dashes and colons between pipes, nothing
+#: else — matched by content rather than position, so it is found the same way
+#: whether the table has two columns or six, spaces around the dashes or not.
+_TABLE_SEPARATOR = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
+
+
+def _table_rows(text: str) -> tuple[list[str], str]:
+    """
+    Pull every markdown table out of `text`, returning its DATA rows as candidate
+    citable spans — never the header, never the `---` separator — plus the text
+    with those table lines removed, so the paragraph splitter below never has to
+    look at one.
+
+    WHY THIS EXISTS. A table is one of the most natural shapes for exactly the
+    content this checker exists to protect — a step trace, a before/after
+    comparison, a lookup of cases to outcomes — and before this, one had no
+    reliable representation here at all. Fed through the prose path instead: a
+    table has no sentence-ending punctuation, so a header and its separator glue
+    into one line that _is_whole_sentence always refuses; and the separator row's
+    own dashes (`---`) happen to satisfy _is_code_quote's "looks like code"
+    pattern, so a four-row reduce() trace registered as ONE misleading span —
+    not because any row said anything, but because a run of dashes looks like
+    the `--` operator. A table walking through four real steps read as one fact,
+    or as the WRONG fact (a separator row, mistaken for content).
+
+    A table is recognised by its separator, not its own syntax alone — a line
+    that starts a table has a `|`, and the line right after it matches
+    _TABLE_SEPARATOR — so a table missing conventional leading/trailing pipes is
+    still found, and a stray `|` in ordinary prose (which never has a dashes-only
+    line right after it) is not mistaken for one.
+    """
+    lines = text.splitlines()
+    keep = [True] * len(lines)
+    rows: list[str] = []
+    i = 0
+    while i < len(lines) - 1:
+        if "|" in lines[i] and _TABLE_SEPARATOR.match(lines[i + 1]):
+            keep[i] = keep[i + 1] = False          # the header, then its separator
+            j = i + 2
+            while j < len(lines) and "|" in lines[j] and not _TABLE_SEPARATOR.match(lines[j]):
+                keep[j] = False
+                cells = [c.strip() for c in lines[j].strip().strip("|").split("|")]
+                content = _flatten(" ".join(cells))
+                # At least two real cells, or a lone `| note |` row is a stray pipe
+                # in prose rather than tabular data, and enough flattened text to
+                # clear the same bar _is_code_quote holds a bare quote to.
+                if sum(1 for c in cells if c) >= 2 and len(content) >= MIN_QUOTE_CHARS:
+                    rows.append(lines[j].strip())
+                j += 1
+            i = j
+        else:
+            i += 1
+    remaining = "\n".join(line for line, kept in zip(lines, keep) if kept)
+    return rows, remaining
+
+
 def _citable_spans(section_text: str) -> list[str]:
     """
     Distinct verbatim spans of a section that could honestly support ONE beat's
@@ -2074,10 +2256,12 @@ def _citable_spans(section_text: str) -> list[str]:
     Fenced code blocks are pulled out and split into lines first, because a code
     citation is exempt from the word floor (see check_source_quotes / _is_code_quote)
     and a section's most citable content is often its code rather than its prose —
-    exactly the case here, where the fence is the second span this finds.
+    exactly the case here, where the fence is the second span this finds. Markdown
+    tables are pulled out the same way, for the same reason — see _table_rows.
     """
     fenced = re.findall(r"```.*?```", section_text, flags=re.S)
     prose = re.sub(r"```.*?```", " ", section_text, flags=re.S)
+    table_rows, prose = _table_rows(prose)
 
     # Split on blank lines too, not just sentence punctuation: bullet-note material
     # like this section separates its points with a blank line rather than a full
@@ -2110,6 +2294,8 @@ def _citable_spans(section_text: str) -> list[str]:
                                              "javascript", "json", "bash", "sh"):
                 if _is_code_quote(line):
                     spans.append(line)
+
+    spans.extend(table_rows)
 
     # Deduplicated by flattened text: the same sentence quoted by two different
     # spans (a heading repeating a body sentence, say) is one piece of evidence,
@@ -2446,10 +2632,28 @@ def check_follows_teaching_sequence(script: Script, understanding=None,
             {"inversions": inversions})
 
     # --- FOCUS --------------------------------------------------------------
+    #
+    # THE QUESTION'S OWN WORDS COUNT TOO, and this is scoped narrowly to FOCUS
+    # alone — COVERAGE and ORDER above stay read against student beats only,
+    # because those ask whether the ANSWER walks the plan, which is specifically
+    # about the speaker who is supposed to be doing that walking.
+    #
+    # FOCUS asks a different question: is this SHORT about its objective at all. A
+    # viewer hears the interviewer's question immediately before the answer, and a
+    # word the question already put in play does not need to be repeated to be
+    # understood — "How does a promise CHAIN move..." then an answer that walks
+    # the mechanism without saying "chain" again has not gone anywhere else, the
+    # topic was set one breath earlier. Scoring that against student beats alone
+    # measured a stricter question than the one this check is supposed to ask.
+    question_stems = set()
+    if script.beats and script.beats[0].speaker == "interviewer":
+        question_stems = set(_stems(script.beats[0].line))
+    focus_stems = all_stems | question_stems
+
     objective = {s: w for s, w in _stems(getattr(understanding, "core_idea", "") or "").items()
                  if len(s) > 3}
     if objective:
-        hit = [s for s in objective if _grounded(s, all_stems)]
+        hit = [s for s in objective if _grounded(s, focus_stems)]
         focus = len(hit) / len(objective)
         if focus < MIN_OBJECTIVE_FOCUS:
             absent = sorted(objective[s] for s in objective if s not in hit)
@@ -3883,7 +4087,7 @@ SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_r
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_svg_quality, check_frames_are_visual, check_frames_develop,
                   check_frames_progress, check_frames_match_strategy,
-                  check_one_hero_per_frame,
+                  check_one_hero_per_frame, check_template_data_present,
                   check_samples_differ, check_code_frames_quote_source,
                   check_icons_are_pictures, check_diagram_matches_narration]
 

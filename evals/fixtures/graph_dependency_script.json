@@ -1,0 +1,10 @@
+{
+  "short_id": "kernel_dependencies",
+  "question": "What does the operating system kernel actually depend on?",
+  "beats": [
+    {"speaker": "interviewer", "line": "What does the operating system kernel actually depend on?", "on_screen": "Kernel dependencies", "visual_ref": "q"},
+    {"speaker": "student", "line": "The kernel depends on the scheduler to decide which process runs next.", "on_screen": "Depends on scheduler", "visual_ref": "a", "source_quote": "it depends on the scheduler to decide which process runs next"},
+    {"speaker": "student", "line": "It also depends on the device driver layer to move bytes to and from hardware.", "on_screen": "Depends on drivers", "visual_ref": "b", "source_quote": "it depends on the device driver layer to actually move bytes to and from hardware"},
+    {"speaker": "student", "line": "These two dependencies are independent of each other, not of the kernel.", "on_screen": "Independent of each other", "visual_ref": "c", "source_quote": "the two dependencies do not depend on each other, only on the kernel that calls them"}
+  ]
+}

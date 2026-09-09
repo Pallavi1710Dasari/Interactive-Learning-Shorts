@@ -1,0 +1,63 @@
+{
+  "understanding": {
+    "section_id": "how_promise_chaining_works",
+    "core_idea": "Promise chaining lets you run multiple asynchronous steps in sequence, where each step passes control to the next and a single .catch() handles failure anywhere in the chain.",
+    "teaching_sequence": [
+      {
+        "concept": "First promise",
+        "purpose": "Establish the first async check",
+        "explanation_goal": "Learner sees one promise doing one check"
+      },
+      {
+        "concept": "then hands off",
+        "purpose": "Show how .then() returns the next promise",
+        "explanation_goal": "Learner sees the chain link"
+      },
+      {
+        "concept": "Second promise",
+        "purpose": "Show the pattern repeating",
+        "explanation_goal": "Learner sees the same shape twice"
+      }
+    ]
+  },
+  "script": {
+    "short_id": "promise_chaining_concrete",
+    "question": "How does a promise chain move from one step to the next?",
+    "beats": [
+      {
+        "speaker": "interviewer",
+        "line": "How does a promise chain move from one step to the next?",
+        "on_screen": "Promise chain",
+        "visual_ref": "q"
+      },
+      {
+        "speaker": "student",
+        "line": "First promise checks the username \u2014 it's just one promise doing one check.",
+        "on_screen": "One check",
+        "visual_ref": "a",
+        "source_quote": "First promise checks the username"
+      },
+      {
+        "speaker": "student",
+        "line": "If that succeeds, `.then()` runs and hands off by returning the second promise.",
+        "on_screen": "Hands off",
+        "visual_ref": "b",
+        "source_quote": "If successful, `.then()` runs and returns the second promise"
+      },
+      {
+        "speaker": "student",
+        "line": "That second promise checks the password, the same success-then-next pattern repeating.",
+        "on_screen": "Pattern repeats",
+        "visual_ref": "c",
+        "source_quote": "Second promise checks the password"
+      },
+      {
+        "speaker": "student",
+        "line": "Keep succeeding and the final `.then()` runs \u2014 but fail at any step, and one shared `.catch()` catches it.",
+        "on_screen": "Shared catch",
+        "visual_ref": "d",
+        "source_quote": "If ANY step fails, `.catch()` runs"
+      }
+    ]
+  }
+}

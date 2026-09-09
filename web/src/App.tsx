@@ -27,7 +27,11 @@ export default function App() {
 function useCaptureRoute(): string | null {
   const [route] = useState(() => {
     const [head, id] = location.hash.replace(/^#/, "").split("/");
-    return head === "capture" && id ? decodeURIComponent(id) : null;
+    // The id carries its own query string — `?bgscale=` for ThreeStage, read
+    // straight off location.hash where it is set — so split that off here rather
+    // than handing "shortid?bgscale=0.3" to the feed lookup as a literal id.
+    const bare = id ? id.split("?")[0] : id;
+    return head === "capture" && bare ? decodeURIComponent(bare) : null;
   });
   return route;
 }

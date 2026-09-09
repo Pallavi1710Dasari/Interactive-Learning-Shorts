@@ -1276,6 +1276,186 @@ cases:
     expect:
       must_contain: ["A stack only allows two moves"]
 
+  - id: E073
+    name: A frame in motion gets an ARRIVING/LEAVING phase chip and a colour key
+    why: >
+      THE FEATURE THIS FREEZES. A viewer who misses a sentence of narration could
+      not previously tell what a `state` frame was doing to its container, or what
+      the amber-vs-blue boxes meant, without the voice. render() now emits both:
+      a small phase word read straight off Slot.state ("arriving"/"leaving" — not
+      a domain word like "push", because Store also covers a queue or a page
+      table, where "push" would be wrong), and a colour-key row naming every
+      distinct role actually in play (Focus = hero, Context = plain here).
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_state_arriving.json
+    expect:
+      must_contain: ["ARRIVING", "Focus", "Context"]
+
+  - id: E074
+    name: A steady-state frame gets the legend but no phase chip
+    why: >
+      The guard against over-triggering the phase word. All slots here are
+      resting — nothing is arriving or leaving — so there is no operation to
+      name, and frame.title already says what the picture is. The legend still
+      appears, because two roles (hero, plain) are still genuinely in play and
+      still need a key.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_state_resting.json
+    expect:
+      must_contain: ["Focus"]
+      must_not_contain: ["ARRIVING", "LEAVING"]
+
+  - id: E075
+    name: A single-role frame gets no legend at all
+    why: >
+      THE "AVOID UNNECESSARY CHROME" GUARD. Every cell in this bar frame is
+      "plain" — there is no colour distinction being drawn, so a key would
+      decode nothing. If this ever starts emitting a legend, the threshold in
+      _roles_present / _legend has been loosened into exactly the chrome the
+      task was scoped to avoid.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_bar_single_role.json
+    expect:
+      must_not_contain: ["Focus", "Context", "Invalid", "Not yet"]
+
+  - id: E076
+    name: A concrete answer is not failed for not repeating the objective's abstract words
+    why: >
+      THE REAL BUG, frozen from a shipped generation. The objective read "Promise
+      chaining lets you run multiple asynchronous steps in sequence... a single
+      .catch() handles failure anywhere in the chain." The answer walked a concrete
+      worked example instead — a username check, then a password check, then a
+      shared catch — which is exactly what the brief's own BE CONCRETE instruction
+      asks for, and it does not reuse the objective's own abstract words
+      (asynchronous, chaining, sequence, handles, multiple, passes, control) to say
+      it. follows_sequence's FOCUS check failed it at 25% against a 30% floor.
+
+      Two real defects, both fixed:
+        1. A stemming bug. "failure" stemmed to "failur" (no rule stripped "-ure"),
+           and _grounded's prefix-match requires both sides >=5 characters, so
+           "fail" (4 chars, from "fail at any step") could never match it however
+           related the words are.
+        2. FOCUS scored only the student's beats, so "chain" — sitting right there
+           in the INTERVIEWER'S QUESTION, one breath before the answer — did not
+           count as vocabulary the short had established. A viewer does not need
+           the answer to repeat a word the question just said.
+      This fixture is the real content, reconstructed from the two real fixes
+      above rather than loosened past them.
+    type: content_grader
+    grader: follows_sequence
+    fixture: evals/fixtures/content_concrete_answer_not_penalized.json
+    expect:
+      passed: true
+
+
+  # ------------------------------------------------------ node/connection graph
+  #
+  # The `graph` template, added because neither `cause_effect` (one arrow) nor
+  # `state` (one container) nor `hierarchy` (nested levels) can draw "one root and
+  # several distinct named connections" — a dependency fan-out, a service calling
+  # several others. Deliberately narrow: one root, one level, no cycles, no edges
+  # between two children.
+
+  - id: E078
+    name: A graph's root and branches are visible to the label/role graders
+    why: >
+      Wiring test. _frame_labels, _roles and one_hero_per_frame's collections all
+      had to learn about Graph the same way they learned about Store in Part 2 —
+      a frame whose only content is a root and its branches would otherwise look
+      empty to every grader that reads a frame through these functions.
+    type: unit_grader
+    grader: one_hero_per_frame
+    fixture: evals/fixtures/unit_graph_two_branches.json
+    expect:
+      passed: true
+
+  - id: E079
+    name: A graph with only plain roles gets no legend
+    why: >
+      THE "AVOID UNNECESSARY CHROME" GUARD, for the new template. One branch, one
+      root, both "plain" — nothing is being pointed at, so there is nothing for a
+      colour key to decode. If this ever emits a legend, _roles_present has
+      stopped correctly reading Graph's roles the way it reads a Store's.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_graph_all_plain.json
+    expect:
+      must_not_contain: ["Focus", "Context", "Invalid", "Not yet"]
+
+  - id: E080
+    name: A dependency fan-out is drawn as a graph, not a bar of unconnected boxes
+    why: >
+      The behavioural half. Before this template existed, "the kernel depends on
+      the scheduler and the driver" had nowhere to go but a `bar` of three
+      unconnected boxes or an `icons` row — the RELATIONSHIP itself, which is
+      usually what the beat is actually about, went undrawn. Section 6.1 of the
+      fixture material (reused from the code-vs-concept eval doc) is written as a
+      one-root, two-dependency shape; this asserts the design step reaches for
+      "graph" now that it exists.
+
+      Section 7.1 of the fixture material is written as exactly this shape: one
+      root (the kernel) with two named, independent dependencies (the scheduler,
+      the driver layer) — no container, no sequence, no single cause with one
+      effect. Costs a strategy and a design call, so it runs under --judge.
+    type: golden
+    step: visuals
+    input: evals/fixtures/graph_dependency_material.md
+    section_id: "7.1"
+    fixture: evals/fixtures/graph_dependency_script.json
+    expect:
+      template_includes: [graph]
+
+  - id: E081
+    name: A markdown table's data rows count as citable facts
+    why: >
+      THE REAL BUG THIS FIXES. A user generating a reel for "how does reduce()
+      combine array elements into a single value using an accumulator?" hit
+      exactly E068's failure mode on material that was not actually thin: one
+      real sentence of prose plus a four-row step trace (array state and
+      accumulator value after each call) walked through as a markdown table.
+      _citable_spans had no notion of a table at all before this — a table has
+      no sentence-ending punctuation, so its header and separator glued into one
+      line with none, and that line's own `---` separator happened to satisfy
+      _is_code_quote's "looks like code" pattern (`--` reads as an operator). So
+      a four-fact trace registered as ONE span, and the wrong one: a separator
+      row, not a single row of actual data.
+
+      This fixture is that section, reconstructed: a real intro sentence plus
+      the four-step reduce() trace as a proper GFM table. _table_rows now reads
+      each data row as its own fact and drops the header and separator before
+      the sentence-splitter ever sees them, so the section correctly reads as
+      six distinct citable spans (the intro sentence, the example sentence, and
+      four table rows) rather than one.
+    type: golden
+    step: section_richness
+    input: evals/fixtures/reduce_accumulator_material.md
+    section_id: "how_does_reduce_combine_array_elements_i"
+    expect:
+      passed: true
+
+  - id: E082
+    name: A table's header and separator rows are never counted as facts on their own
+    why: >
+      The failure half of E081. Without this, the cheap way to make a table
+      "count" is to treat every line of it as a span — header and separator
+      included — which would let a table with real STRUCTURE but no real DATA
+      (or, as here, data too sparse to cite) pass richness on the strength of
+      its own scaffolding. This section has one genuine sentence and a table
+      whose only data row ("x", "y") flattens to two characters, under
+      MIN_QUOTE_CHARS — so it must still fail with only one real span, proving
+      the header and the `|---|---|` separator were not silently counted as
+      two more.
+    type: golden
+    step: section_richness
+    input: evals/fixtures/sparse_table_material.md
+    section_id: "a_table_whose_data_rows_are_too_sparse_t"
+    expect:
+      passed: false
+      reason_contains: "distinct citable sentence"
+
   # ------------------------------------------------------------------ llm judge
 
   - id: E008

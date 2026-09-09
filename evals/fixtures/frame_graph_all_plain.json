@@ -1,0 +1,10 @@
+{
+  "template": "graph",
+  "title": "Every branch plain",
+  "graph": {
+    "root": {"label": "Service A", "role": "plain"},
+    "branches": [
+      {"node": {"label": "Service B", "role": "plain"}, "edge_label": "calls"}
+    ]
+  }
+}

@@ -1105,14 +1105,31 @@ button.rec::before {
    Pulled well down rather than removed, so the frame keeps some depth. */
 [data-theme="neon"] .reel canvas { opacity: 0.16; }
 
-/* Captions: same geometry, inverted ground, and one step larger.
+/* Captions: same geometry, inverted ground, and MUCH larger than the first pass.
    The size bump is the one change here that is NOT about colour — at
-   clamp(11.5px, 1.75vh, 14px) the narration was hard to read on a phone, and the
-   reel is narrated, so the caption is load-bearing. Geometry is untouched: the
-   height is still computed from --lines/--lh/--pad so the bubble cannot twitch
-   between beats. */
+   clamp(13px, 2.05vh, 16.5px) the narration was still small against reference
+   reels the reviewer sent (large bold word-by-word captions filling a real share
+   of the frame), and it measurably was: the finished video is captured at a fixed
+   1080x1920 (shorts/video.py), so `vh` there resolves against 1920px and 2.05vh
+   is ~39px — well past the 16.5px cap, which means the cap, not the vh term, was
+   the number actually shown in every rendered reel. Raised to a cap a viewer can
+   read at arm's length without leaning in, and weighted bolder to match.
+   Geometry is untouched: the height is still computed from --lines/--lh/--pad, so
+   the bubble cannot twitch between beats — it grows in `em`, which tracks the
+   larger font automatically, and still fits well inside the gap between the
+   stage's bottom edge (26% from the bottom) and the bubble's own position (8%
+   from the bottom) at this size. */
+/* Dialled back from a first pass that overcorrected: clamp(20px, 3.6vh, 32px) at
+   750 weight read as too heavy and too large once seen rendered — the caption
+   started competing with the diagram for attention instead of supporting it. The
+   binding number is still the CAP, not the vh term, for the reason noted above
+   (1080x1920 capture makes 3.6vh ~69px, so whatever the cap is IS the shown
+   size) — moved to 24px, which is 45% smaller than the first pass and still 45%
+   larger than the original 16.5px this was raised from. Weight down to 700:
+   still clearly bold, not a slab. */
 [data-theme="neon"] .reel .bubble p.flow {
-  font-size: clamp(13px, 2.05vh, 16.5px);
+  font-size: clamp(16px, 2.6vh, 24px);
+  font-weight: 700;
   background: rgba(4, 7, 16, 0.82);
   border: 1px solid rgba(120, 150, 255, 0.16);
   color: #E9EEFF;

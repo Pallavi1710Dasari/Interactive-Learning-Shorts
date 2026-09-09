@@ -65,8 +65,25 @@ export function ThreeStage({ hue, active, speaking, beat }: {
     // 0.38 opacity behind a diagram card; a half-scale buffer stretched back up is
     // indistinguishable from the full one, and it quarters the fill cost. The
     // player still gets full resolution.
+    //
+    // SCALED DOWN FURTHER WHEN SEVERAL CAPTURE WORKERS RUN AT ONCE. shorts/video.py
+    // launches DEFAULT_WORKERS headless Chrome instances in parallel, each
+    // software-rasterising its own copy of this layer, so the aggregate cost is
+    // the per-worker cost times however many run together. This was investigated
+    // as the cause of a beat that once photographed as an empty card — it was the
+    // dominant per-frame cost and a real live suspect — but forcing this scale
+    // down did not clear that bug (nor did --workers 1, in the end: the bug was
+    // concurrency-independent, see AnimatedSvg.tsx's arrivalOrder() for the actual
+    // cause and fix). This scaling stays anyway: giving several concurrent
+    // instances less each to rasterise is a plain efficiency win on its own
+    // terms. video.py passes ?bgscale=<n> sized to its own worker count (see
+    // _bg_scale_for); a bare load with no query keeps the 0.5 this was tuned at.
     const capturing = !!(window as unknown as Record<string, unknown>).__captureMode;
-    renderer.setPixelRatio(capturing ? 0.5 : Math.min(window.devicePixelRatio, 2));
+    const bgParam = new URLSearchParams(location.hash.split("?")[1] ?? "").get("bgscale");
+    const bgScale = bgParam ? Number(bgParam) : 0.5;
+    renderer.setPixelRatio(
+      capturing ? (Number.isFinite(bgScale) && bgScale > 0 ? bgScale : 0.5)
+                : Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
     renderer.setClearAlpha(0);
     mount.appendChild(renderer.domElement);

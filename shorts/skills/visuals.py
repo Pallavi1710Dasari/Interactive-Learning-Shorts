@@ -105,12 +105,19 @@ because the strategy is what the rendered frame is graded against afterwards.
                     page into a free frame, a value into a slot), otherwise "icons"
                     with arrows=true, or "mapping". Rule 8: the thing that moves,
                     where it starts, where it lands, and the path between.
-  hierarchy      -> "hierarchy". Rule 9: levels stacked, or boxes inside boxes, so
-                    the structure is in the ARRANGEMENT. A hierarchy drawn as a
-                    flat row is a hierarchy the viewer cannot see.
+  hierarchy      -> "hierarchy" for NESTED LEVELS (boxes inside boxes, so the
+                    structure is in the arrangement — a hierarchy drawn as a flat
+                    row is a hierarchy the viewer cannot see). "graph" for a root
+                    and its DISTINCT NAMED CHILDREN, one level, no nesting — "the
+                    kernel depends on the scheduler and the driver" is a graph,
+                    not levels.
   cause_effect   -> "cause_effect". Rule 10: the cause and the effect both on
-                    screen with the direction between them drawn.
-  structure      -> "split", "bar", or "table".
+                    screen with the direction between them drawn. "graph" when
+                    ONE cause has SEVERAL distinct effects — cause_effect is one
+                    arrow and cannot show that at once.
+  structure      -> "split", "bar", "table", or "graph" when the structure is a
+                    root and several named parts rather than a division into
+                    fields.
   effect         -> "preview". Rule 3 at its strongest: the picture IS the answer.
   quantity       -> "stat".
 
@@ -142,6 +149,26 @@ notice with the sound off. Moving the accent is allowed as PART of a change; it 
 never the whole change. Two consecutive frames that differ ONLY in which element is
 the hero are rejected — give those two beats the SAME visual_ref instead, which
 holds one picture still and is honest about doing so, or find the second picture.
+
+THAT RULE IS ABOUT THE SEQUENCE. THIS ONE IS ABOUT EACH FRAME ON ITS OWN, and it is
+a different question: cover the caption, mute the narration, and look at ONE frame
+by itself. Can a viewer tell what CLAIM it is making from the shape alone — which
+thing is emphasised, what moved, what is connected to what, what is missing or
+broken — or does the claim live entirely in the label text?
+
+  BAD   A `bar` of three boxes reading "Push 1", "Push 2", "Push 3" — muted, this
+        is three identical rectangles. The claim ("items arrive in this order")
+        is carried entirely by the words, and the shape says nothing without them.
+  GOOD  A `state` frame: an item outside the container, an arrow into an empty
+        slot, the index one position further along. Muted, a viewer can still
+        see something is entering something. The label ("Push C") NAMES what the
+        shape already shows; it does not do the showing.
+
+This is the test to run on your own answer before you finalise it, and it applies
+to every template, not only "state": does the ROLE assignment, the ARRANGEMENT, or
+the MOTION already make the point, with the label reduced to naming what is
+already visible? If removing every label would leave a viewer with no idea what
+the frame claims, the frame is a sentence in a box, whatever template drew it.
 
 A COSMETIC LABEL EDIT IS NOT A CHANGE. This is the loophole, and a real short went
 through it:
@@ -431,6 +458,50 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
              states of it. That is a developing composition and it is what
              frames_progress rewards.
 
+  "graph"    ONE ROOT and its DIRECT CONNECTIONS, each connection carrying its own
+             label. The shape for "the kernel depends on the scheduler and the
+             driver", "this function calls two others", "a class implements two
+             interfaces" — one thing, and what it connects to, where the
+             CONNECTION itself is frequently the fact being taught, not just the
+             things at either end.
+
+             CHOOSING THIS TEMPLATE NAME AND LEAVING `graph` EMPTY DRAWS NOTHING.
+             Unlike a Cell-based template, where `template: "bar"` and a filled
+             `cells` list are one act, `template` and `graph` are two separate
+             fields here, and a reply that sets one without the other still
+             validates — there is no error, the frame just renders an empty box
+             with no root and no branches. If you write `"template": "graph"`,
+             the SAME response MUST carry a `graph` object with a real `root.label`
+             and at least one `branches` entry, in the same breath.
+
+             NOT A GENERAL GRAPH. One root, one level, no edges between two
+             children, no cycles. A concept with two levels of depth, or edges
+             between the children themselves, does not fit here — use "hierarchy"
+             for nested levels, or split it across beats instead of forcing it in.
+
+             Fill `graph`:
+               root          the one thing every connection is FROM. `label` a
+                             short name, `role` "hero" when the root itself is
+                             what this beat is about.
+               branches      up to four. Each is a `node` (the thing connected TO
+                             — label, role) and an `edge_label`: what the
+                             connection MEANS — "depends on", "calls", "BOOK". An
+                             edge with no real name gets an empty edge_label
+                             rather than an invented one.
+
+             ROLE ON THE NODE COLOURS ITS OWN EDGE TOO. Give a branch "hero" when
+             ITS connection is what the beat is about — the edge to it is drawn in
+             the same colour, so "this is the dependency we mean" is one fact
+             stated once. "lost" for a connection that is broken, invalid, or does
+             not hold: "but MAKE fails if the tool errors" is the ACTIONS branch in
+             "lost", not a separate frame explaining the failure in words.
+
+             ACROSS BEATS, KEEP THE ROOT AND CHANGE WHICH BRANCH IS LIT, or ADD A
+             BRANCH. Beat 1: root alone, no branches yet. Beat 2: one branch
+             arrives, hero. Beat 3: a second branch arrives, the first goes
+             "plain". That is a developing composition, the same principle "state"
+             uses for a container.
+
   "code"     A code or markup snippet on a dark editor panel, one line lit. RIGHT
              WHEN THE CODE IS THE LEARNING OBJECTIVE — its syntax, its structure or
              what it does when it runs.
@@ -461,6 +532,20 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
              them. The most literally pictorial shape here, and the right answer
              whenever the beat is about THINGS and what passes between them: a
              browser reading a file, a CPU reaching memory, a page being painted.
+
+             NOT FOR A NUMBERED SEQUENCE, even when each step involves a concrete
+             thing. A real short walked "first promise checks the username, then
+             .then() hands off to the second promise, which checks the password,
+             then a shared .catch() catches any failure" as THREE separate "icons"
+             frames — a different pictogram each beat, no sense that beat 2
+             continues beat 1 rather than starting over. A username and a
+             password are things, so "icons" looked right; but the beat is a STEP
+             in an ordered process, and that is "flow"'s job, not this one's.
+             The test: does the beat say "then", "next", or name a step number?
+             If the concept is steps in order, use "flow" and let step 2's box
+             carry step 1's forward — see "flow" below. Reach for "icons" only
+             when nothing in the beat is about sequence at all: a set of things
+             that coexist, not a chain of things that happen one after another.
              -> glyphs: 2 to 4, each {icon, label, role}. `icon` MUST be one of:
 __ICON_LIST__
                 Anything else draws a plain box, so pick from the list.
@@ -965,7 +1050,14 @@ def _design_graders(section: Section | None = None):
                # no focus" has been in the brief from the start; this is the first
                # thing to act on it.
                checks.check_frames_match_strategy,
-               checks.check_one_hero_per_frame]
+               checks.check_one_hero_per_frame,
+               # Catches the failure that motivated it directly: a frame whose
+               # template names a structured field (Store, Graph) that was left
+               # empty renders as a blank container, and every prior grader here
+               # sees that only as a symptom two steps downstream — frames that
+               # look byte-identical, with no way to tell "nothing was drawn"
+               # from "the same thing was drawn twice on purpose".
+               checks.check_template_data_present]
     if section is not None:
         graders.append(lambda u: checks.check_code_frames_quote_source(u, section.text))
     return graders

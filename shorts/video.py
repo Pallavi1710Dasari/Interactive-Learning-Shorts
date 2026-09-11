@@ -77,15 +77,32 @@ FRAME_TIMEOUT = 30.0
 
 _CHROME_NAMES = ("google-chrome", "chromium", "chromium-browser", "google-chrome-stable")
 
+#: Windows has neither of those on PATH by default — Chrome and Edge (also
+#: Chromium, same DevTools protocol) install here instead. Checked after PATH so
+#: an explicit `google-chrome` on PATH still wins.
+_CHROME_WINDOWS_PATHS = (
+    r"%ProgramFiles%\Google\Chrome\Application\chrome.exe",
+    r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe",
+    r"%LocalAppData%\Google\Chrome\Application\chrome.exe",
+    r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe",
+    r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe",
+)
+
 
 def _chrome() -> str:
+    if os.getenv("CHROME_PATH"):
+        return os.environ["CHROME_PATH"]
     for name in _CHROME_NAMES:
         found = shutil.which(name)
         if found:
             return found
+    for template in _CHROME_WINDOWS_PATHS:
+        candidate = Path(os.path.expandvars(template))
+        if candidate.exists():
+            return str(candidate)
     raise RuntimeError(
         "no Chromium found for capturing frames — install one of "
-        + ", ".join(_CHROME_NAMES))
+        + ", ".join(_CHROME_NAMES) + ", or set CHROME_PATH")
 
 
 def _ffmpeg() -> str:

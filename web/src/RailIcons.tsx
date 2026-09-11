@@ -12,25 +12,13 @@
  *
  * These are. One 24x24 grid, one 1.9 stroke, round caps, `currentColor` — so the
  * whole rail inherits one colour, one weight and one optical size, and a state
- * change is a fill, not a different picture. `filled` is what the like and save
- * buttons toggle: the same outline, solid, so the shape never moves when it
- * activates.
+ * change is a fill, not a different picture.
  */
-type IconProps = { filled?: boolean };
-
 const S = {
   width: 24, height: 24, viewBox: "0 0 24 24",
   fill: "none", stroke: "currentColor",
   strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const,
 };
-
-export function HeartIcon({ filled }: IconProps) {
-  return (
-    <svg {...S} fill={filled ? "currentColor" : "none"} aria-hidden="true">
-      <path d="M12 20s-7.2-4.4-9.1-8.4A5 5 0 0 1 12 6.1a5 5 0 0 1 9.1 5.5C19.2 15.6 12 20 12 20Z" />
-    </svg>
-  );
-}
 
 /** "This confused me" — a speech bubble, because it is a note back to the author. */
 export function CommentIcon() {
@@ -39,25 +27,6 @@ export function CommentIcon() {
       <path d="M20 12.5a7.5 7.5 0 0 1-10.9 6.7L4 20.5l1.4-4.7A7.5 7.5 0 1 1 20 12.5Z" />
       <path d="M9.6 10.2a2.4 2.4 0 1 1 3.3 2.2c-.6.3-.9.8-.9 1.4v.3" />
       <path d="M12 17.1h.01" />
-    </svg>
-  );
-}
-
-export function ShareIcon() {
-  return (
-    <svg {...S} aria-hidden="true">
-      <path d="M8.6 13.1 15.4 17M15.4 7 8.6 10.9" />
-      <circle cx="18" cy="5.4" r="2.6" />
-      <circle cx="6" cy="12" r="2.6" />
-      <circle cx="18" cy="18.6" r="2.6" />
-    </svg>
-  );
-}
-
-export function SaveIcon({ filled }: IconProps) {
-  return (
-    <svg {...S} fill={filled ? "currentColor" : "none"} aria-hidden="true">
-      <path d="M6.5 3.8h11a1 1 0 0 1 1 1v15.4l-6.5-4-6.5 4V4.8a1 1 0 0 1 1-1Z" />
     </svg>
   );
 }

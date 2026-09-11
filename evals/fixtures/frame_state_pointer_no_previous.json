@@ -1,0 +1,15 @@
+{
+  "template": "state",
+  "title": "top, settled",
+  "store": {
+    "label": "Stack",
+    "orientation": "vertical",
+    "pointer": "top",
+    "pointer_at": 2,
+    "slots": [
+      {"label": "A", "role": "plain", "state": "resting"},
+      {"label": "B", "role": "plain", "state": "resting"},
+      {"label": "C", "role": "hero", "state": "resting"}
+    ]
+  }
+}

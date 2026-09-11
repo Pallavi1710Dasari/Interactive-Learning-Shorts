@@ -1,0 +1,46 @@
+{
+  "topic": {
+    "id": "important_overrides_inline",
+    "topic": "Why does a declaration marked !important override even an inline style?",
+    "why_it_matters": "Learners assume an inline style always wins, and !important is the one thing that beats it.",
+    "source_section_id": "4.2",
+    "difficulty": "medium",
+    "answer_quote": "Above even that sits a declaration marked !important, which wins against everything including an inline style, and is compared only against other important declarations.",
+    "importance": 4,
+    "concept": "the important flag overriding inline styles"
+  },
+  "understanding": {
+    "section_id": "4.2",
+    "core_idea": "When two selectors tie in specificity, the browser breaks the tie by document order and applies whichever rule was written last.",
+    "key_points": [
+      "specificity is compared first; only an exact tie falls through to order",
+      "a rule written later in the same stylesheet beats an earlier, equally specific one"
+    ],
+    "teaching_sequence": [
+      {
+        "concept": "Equal specificity scores",
+        "purpose": "Establish that two selectors can score identically",
+        "explanation_goal": "Learner accepts that specificity alone does not always decide"
+      },
+      {
+        "concept": "Document order as the tiebreaker",
+        "purpose": "Name what settles a tie once specificity cannot",
+        "explanation_goal": "Learner can predict which of two equally specific rules wins"
+      }
+    ],
+    "concrete_examples": [
+      ".card .title and .panel .title both score 0,2,0"
+    ],
+    "example_plan": { "need": "helpful", "example": ".card .title and .panel .title both score 0,2,0", "supports_step": 1, "learner_takeaway": "sees two different selectors land on the same score" },
+    "common_confusions": [
+      "assuming the more recently WRITTEN selector always wins, rather than only when scores tie"
+    ],
+    "confusion_plan": { "need": "not_needed" },
+    "cannot_answer": [
+      "how !important changes this ordering"
+    ],
+    "source_evidence": [
+      "When the scores are equal the browser falls back to document order and applies whichever rule it read last, which means the position of the rule in the stylesheet matters only after a tie."
+    ]
+  }
+}

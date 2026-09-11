@@ -1,0 +1,9 @@
+{
+  "template": "flow",
+  "title": "What happens on a page fault",
+  "steps": [
+    {"label": "TLB miss", "role": "plain"},
+    {"label": "Page table walk", "role": "plain"},
+    {"label": "Fault handler", "role": "hero"}
+  ]
+}

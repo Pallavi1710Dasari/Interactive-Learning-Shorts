@@ -157,6 +157,39 @@ JUDGE_AT_REVIEW = os.getenv("JUDGE_AT_REVIEW", "1").strip().lower() in ("1", "tr
 #: out at the judge, after the diagrams are drawn and paid for.
 SCREEN_QUESTIONS = os.getenv("SCREEN_QUESTIONS", "1").strip().lower() not in ("0", "false", "no")
 
+#: How many times review.regenerate may call the LLM to refine ONE candidate
+#: question, before it refuses and the human has to approve or reject what
+#: they have. THE LOOP PROTECTION Step 3 was asked for: without a cap, a
+#: reviewer who keeps disliking the wording could keep spending regeneration
+#: calls indefinitely on a single question that was never going to satisfy
+#: them, which is the same unbounded-retry failure MAX_SCRIPT_RETRIES already
+#: guards against one stage later. Configurable because "how many tries is
+#: reasonable" is a judgement call, not a fact this file can derive.
+MAX_QUESTION_REGENERATIONS = int(os.getenv("MAX_QUESTION_REGENERATIONS", "3"))
+
+#: The same loop protection, one stage later, for
+#: review.regenerate_teaching_approach — a SEPARATE counter and a SEPARATE
+#: limit from MAX_QUESTION_REGENERATIONS above, on purpose. A reviewer
+#: unhappy with the TEACHING DEVICE ("code is not necessary for this
+#: concept") is a different complaint from one unhappy with the QUESTION's
+#: own wording, and the two budgets must not share a counter — see
+#: schema.TeachingApproachRegenerationAttempt's own note on why the two
+#: regeneration flows are kept logically separate.
+MAX_TEACHING_APPROACH_REGENERATIONS = int(
+    os.getenv("MAX_TEACHING_APPROACH_REGENERATIONS", "3"))
+
+#: THE SAME LOOP PROTECTION, ONE STAGE LATER STILL, for
+#: review.regenerate_visual_plan — a SEPARATE counter and a SEPARATE limit
+#: from both MAX_QUESTION_REGENERATIONS and
+#: MAX_TEACHING_APPROACH_REGENERATIONS above, for the same reason those two
+#: are kept apart from each other: a reviewer unhappy with the VISUAL PLAN
+#: ("beat 2 shows code, that was never the approach") is a different
+#: complaint from one about the question's wording or the teaching device,
+#: and the three budgets must not share a counter — see
+#: schema.VisualStrategyRegenerationAttempt's own note.
+MAX_VISUAL_PLAN_REGENERATIONS = int(
+    os.getenv("MAX_VISUAL_PLAN_REGENERATIONS", "3"))
+
 #: How many times the visual step may redesign a short's frames before giving up.
 #:
 #: MEASURED, NOT GUESSED: across 44 shorts this pipeline spent 266 visual_spec calls
@@ -457,8 +490,16 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 #   "neon"   glowing strokes on black, in the idiom of the animated CS explainers
 #            the reviewer pointed at (bugCoder's stack push/pop short).
 #
+# DEFAULT IS NOW "neon". Compared side by side on a real rendered frame, "paper"
+# reads as a soft, filled, pastel flashcard — solid light-blue boxes on cream —
+# and "neon" reads as the professional technical-explainer look this project is
+# aiming for: dark ground, glowing outlines, no fill doing the work a shape and
+# a line should. Same composition, same shapes, same everything decided
+# upstream — this is a rendering-only change, and the one the reviewer's own
+# reference was pointing at before the switch ever existed.
+#
 # This is a SWITCH, not a rewrite: both palettes live side by side in
 # layout.THEMES, so `REEL_THEME=paper python -m shorts.redraw` puts every diagram
 # back exactly as it was. Nothing about the narration, timing or voice changes
 # with it — the theme only decides colour, glow and the ground they sit on.
-REEL_THEME = os.getenv("REEL_THEME", "paper").strip().lower()
+REEL_THEME = os.getenv("REEL_THEME", "neon").strip().lower()

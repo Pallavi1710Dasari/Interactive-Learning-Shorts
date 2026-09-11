@@ -1,0 +1,91 @@
+{
+  "short_id": "vision_fragmented_sequence",
+  "session_id": "eval",
+  "source_section_id": "3.2",
+  "question": "Why does an OS use paging instead of contiguous allocation?",
+  "estimated_seconds": 24.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "Why does an OS use paging instead of contiguous allocation?",
+      "on_screen": "Paging vs contiguous",
+      "visual_ref": "f_contiguous"
+    },
+    {
+      "speaker": "student",
+      "line": "Contiguous allocation needs one unbroken block, so free memory ends up as unusable gaps.",
+      "on_screen": "Unusable gaps",
+      "visual_ref": "f_typeface",
+      "source_quote": "Contiguous allocation requires a single unbroken block of memory."
+    },
+    {
+      "speaker": "student",
+      "line": "Paging splits memory into fixed-size frames, and any page can go in any free frame.",
+      "on_screen": "Any page, any frame",
+      "visual_ref": "f_rating",
+      "source_quote": "Paging splits memory into fixed-size frames."
+    },
+    {
+      "speaker": "student",
+      "line": "So those scattered gaps become usable and external fragmentation disappears.",
+      "on_screen": "Gaps become usable",
+      "visual_ref": "f_pointer",
+      "source_quote": "External fragmentation disappears once any page can go in any frame."
+    }
+  ],
+  "visuals": {
+    "f_contiguous": {
+      "ref": "f_contiguous",
+      "type": "diagram",
+      "spec": "one unbroken block with gaps around it",
+      "frame": {
+        "template": "bar",
+        "title": "One unbroken block",
+        "cells": [
+          {"label": "Used", "role": "plain"},
+          {"label": "Gap", "role": "plain"},
+          {"label": "Used", "role": "hero"},
+          {"label": "Gap", "role": "plain"}
+        ]
+      }
+    },
+    "f_typeface": {
+      "ref": "f_typeface",
+      "type": "diagram",
+      "spec": "a font pairing, unrelated to memory",
+      "frame": {
+        "template": "preview",
+        "title": "Choosing a typeface",
+        "samples": [
+          {"text": "Tourism", "label": "Roboto", "font": "sans-serif", "scale": 3},
+          {"text": "Tourism", "label": "Georgia", "font": "serif", "scale": 3}
+        ]
+      }
+    },
+    "f_rating": {
+      "ref": "f_rating",
+      "type": "diagram",
+      "spec": "an app store rating breakdown, unrelated to memory",
+      "frame": {
+        "template": "stat",
+        "title": "Average rating",
+        "value": "4.6",
+        "caption": "out of 5 stars"
+      }
+    },
+    "f_pointer": {
+      "ref": "f_pointer",
+      "type": "diagram",
+      "spec": "an unrelated icon pair",
+      "frame": {
+        "template": "icons",
+        "title": "Weather today",
+        "glyphs": [
+          {"icon": "sun", "label": "Sunny", "role": "hero"},
+          {"icon": "cloud", "label": "Cloudy", "role": "plain"}
+        ]
+      }
+    }
+  },
+  "status": "draft"
+}

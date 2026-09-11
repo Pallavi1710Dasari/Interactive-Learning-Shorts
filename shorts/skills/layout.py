@@ -27,10 +27,12 @@ The renderers also emit the animation tags the player drives (data-enter for
 arrival order, data-role="focus" on the hero, data-role="flow" on arrows), which
 the model used to have to remember to add. See web/src/AnimatedSvg.tsx.
 """
-import re
+import base64, re
+from pathlib import Path
 
 from ..schema import Frame, Cell, TableRow, Panel, Sample, Glyph, Slot, Store, Node, Branch, Graph
 from .. import config
+from . import photos
 
 VIEW = 1080
 MARGIN = 60
@@ -293,24 +295,54 @@ def text_block(lines: list[str], cx: float, cy: float, size: int, fill: str = IN
 
 def label_in_box(label: str, x: float, y: float, w: float, h: float,
                  role: str, hi: int = 44, lo: int = 24) -> str:
-    """A label fitted to the inside of its own box, with real padding."""
+    """A label fitted to the inside of its own box, with real padding.
+
+    TRIES fit_unbroken FIRST, matching the convention _icons already follows
+    for its own glyph labels — see fit_unbroken's own docstring for why: this
+    call site did not, and it shipped a real, measured defect. A `state`
+    frame's arriving/leaving item box is sized to the slot it is entering or
+    leaving (see _state), which for a five-bucket row is narrow enough that
+    "value" — five characters, an entirely ordinary label — hard-split into
+    "valu" / "e" rather than either shrinking further or wrapping whole. Only
+    fall back to fit()'s hard-split-and-truncate when NOTHING fits unbroken
+    even at `lo`, which stays the correct last resort for a genuinely long
+    word in a genuinely small box.
+    """
     if not label:
         return ""
     _, _, ink = ROLE_COLOURS[role]
     pad = 14
-    lines, size = fit(label, w - 2 * pad, hi, lo, max_lines=2)
+    fitted = fit_unbroken(label, w - 2 * pad, hi, lo, max_lines=2)
+    lines, size = fitted if fitted else fit(label, w - 2 * pad, hi, lo, max_lines=2)
     # Two lines need 2.36 x size of height; drop to one and shrink if they do not fit.
     if len(lines) == 2 and 2.36 * size > h - 8:
-        lines, size = fit(label, w - 2 * pad, min(hi, int((h - 8) / 1.2)), lo, max_lines=1)
+        smaller_hi = min(hi, int((h - 8) / 1.2))
+        fitted = fit_unbroken(label, w - 2 * pad, smaller_hi, lo, max_lines=1)
+        lines, size = fitted if fitted else fit(label, w - 2 * pad, smaller_hi, lo, max_lines=1)
     return text_block(lines, x + w / 2, y + h / 2, size, ink, 700)
 
 
 def box(x: float, y: float, w: float, h: float, role: str, rx: int = 14,
         dashed: bool = False) -> str:
+    """
+    A role-coloured rectangle — the single shape every Cell-based template
+    draws its boxes with.
+
+    THE BORDER NOW DOUBLES FOR HERO AND LOST, MATCHING EVERY OTHER ROLE SIGNAL
+    IN THIS FILE. Before this it was a flat 5 regardless of role, so a `bar`,
+    `split`, `table`, `hierarchy`, `cause_effect`, `graph` or `state` box
+    carried its emphasis in fill colour alone — while _render_panel's own card
+    border already went 4 -> 9 for hero/lost, and _photo_glyph's border already
+    doubled its stroke-width for a hero photo. One convention, applied in two
+    places and missing from the busiest one: every plain box in the renderer.
+    Hero and lost now get the same heavier border those two already use, so
+    the accent reads the same way whichever template drew it.
+    """
     fill, stroke, _ = ROLE_COLOURS[role]
     dash = ' stroke-dasharray="12 10"' if dashed else ""
+    weight = 9 if role in ("hero", "lost") else 5
     return (f'<rect x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{h:.0f}" rx="{rx}" '
-            f'fill="{fill}" stroke="{stroke}" stroke-width="5"{dash}/>')
+            f'fill="{fill}" stroke="{stroke}" stroke-width="{weight}"{dash}/>')
 
 
 def arrow(x1: float, y1: float, x2: float, y2: float, role: str = "flow") -> str:
@@ -343,7 +375,8 @@ def group(body: str, enter: int, role: str | None = None) -> str:
 
 
 def band_text(text: str | None, top: float, bottom: float, hi: int, lo: int,
-              fill: str = INK, weight: int = 600, enter: int = 1) -> str:
+              fill: str = INK, weight: int = 600, enter: int = 1,
+              accent: bool = False) -> str:
     """
     Text filling a reserved band, and nothing else may be drawn in that band.
 
@@ -351,12 +384,31 @@ def band_text(text: str | None, top: float, bottom: float, hi: int, lo: int,
     not fit inside its box goes into a band that holds exactly one label. There is
     no "place it in the gap" path anywhere in this file, which is why there is no
     label-over-box failure to grade.
+
+    `accent`, FOR THE TITLE ONLY. Rendered side by side, a hero box beat the
+    title for attention every time it was checked — a hero is a filled amber
+    shape with a heavy border, and even a bold title on plain white reads as
+    secondary next to one, because colour and area are what the eye finds
+    first, not point size alone. So the title gets the one thing that competes
+    on the same terms: the same amber a hero box already carries, as a short
+    rule above the words. A rule, never a filled shape, because the title is
+    not a second hero — it is the frame's other fixed point, the question the
+    hero answers, and it needs to read as that without competing to BE the
+    hero.
     """
     if not text:
         return ""
     height = bottom - top
     lines, size = fit(text, USABLE, hi, lo, max_lines=max(1, int(height / (hi * 1.2))))
-    return group(text_block(lines, VIEW / 2, (top + bottom) / 2, size, fill, weight), enter)
+    if not lines:
+        return ""
+    body = text_block(lines, VIEW / 2, (top + bottom) / 2, size, fill, weight)
+    if accent:
+        rule_y = top + 20
+        body = (f'<line x1="{VIEW / 2 - 70:.0f}" y1="{rule_y:.0f}" '
+                f'x2="{VIEW / 2 + 70:.0f}" y2="{rule_y:.0f}" stroke="{AMBER}" '
+                f'stroke-width="6" stroke-linecap="round"/>') + body
+    return group(body, enter)
 
 
 # --------------------------------------------------------------- the templates
@@ -503,30 +555,136 @@ def _split(frame: Frame, enter: int) -> tuple[str, int]:
     return out, enter + 1
 
 
+#: The terminator's radius. Deliberately smaller than any step box and drawn as
+#: a circle rather than a rectangle, so it reads as a different KIND of mark —
+#: not one more node, a stop — even before its slash or its label are seen.
+TERMINATOR_R = 30
+
+
+def _terminator(cx: float, cy: float, label: str, enter: int) -> tuple[str, int]:
+    """
+    A drawn "no more" — a circle with a slash through it — not another box.
+
+    WHY THIS AND NOT A FIFTH STEP. A `flow` chain that simply runs out of boxes
+    after its last one is indistinguishable from "the artist stopped drawing",
+    which is exactly how a fixed-size array's last cell and a linked list's own
+    null terminator rendered identically before this existed — even though a
+    linked list's last node genuinely points at nothing, and that absence is a
+    real state, not an unstated one. Store.pointer_at already makes this same
+    argument for an empty stack (-1 is drawn, not omitted); this is the same
+    argument for a chain's end.
+
+    A circle-with-a-slash rather than a dashed box, because a `state` frame
+    ALREADY draws an empty place as a dashed rectangle (see _state's "quiet"
+    empty-slot code) to mean "room here, nothing arrived yet" — reusing that
+    mark for "nothing more can ever arrive" would say the opposite of what a
+    terminator means with the same shape a viewer just learned differently.
+    """
+    r = TERMINATOR_R
+    slash = (f'<line x1="{cx - r * 0.65:.0f}" y1="{cy + r * 0.65:.0f}" '
+             f'x2="{cx + r * 0.65:.0f}" y2="{cy - r * 0.65:.0f}" '
+             f'stroke="{STROKE}" stroke-width="6" stroke-linecap="round"/>')
+    circle = (f'<circle cx="{cx:.0f}" cy="{cy:.0f}" r="{r:.0f}" fill="none" '
+              f'stroke="{STROKE}" stroke-width="6"/>')
+    body = circle + slash
+    if label:
+        lines, size = fit(label, r * 4, 30, 20, max_lines=1)
+        body += text_block(lines, cx, cy + r + size * 1.1, size, MUTED, 600)
+    return group(body, enter), enter + 1
+
+
 def _flow(frame: Frame, enter: int) -> tuple[str, int]:
-    """Steps top to bottom with arrows. A page fault, a request path."""
+    """
+    Separate, distinct steps connected by a drawn arrow — top to bottom by
+    default, or left to right, and optionally ending on a drawn terminator.
+
+    WHY THIS SHAPE IS THE LINKED-LIST ANSWER AND `state` IS NOT. `state` draws
+    ONE physical container with contiguous slots — a stack, an array — because
+    that is what those concepts actually ARE: one place, cut into positions,
+    and the pipeline sample already draws a full array as an unbroken bordered
+    row of cells. A linked list is a different claim: each node genuinely lives
+    somewhere else, and only a pointer relates it to the next one. Drawing it
+    as slots in one bordered row says "these are one contiguous thing", which
+    is exactly what a linked list denies — an array and a linked list rendering
+    as visually identical boxes-with-different-text was the measured complaint.
+
+    `flow` already drew SEPARATE boxes with a real gap and a real arrow between
+    them, which is most of the shape a chain needs. It was missing two things,
+    both added here rather than as a new template, because the underlying claim
+    — distinct things connected in order by a drawn arrow — is the same claim
+    either way: a horizontal run (flow_orientation) for a chain that is usually
+    drawn growing sideways rather than falling down the screen, which is a
+    transposition of the same box-and-arrow arithmetic and not new geometry; and
+    a drawn end (flow_terminator, see _terminator above) for the state a
+    sequence with no more steps actually has.
+    """
     steps = (frame.steps or [Cell()])[:MAX_STEPS]
     n = len(steps)
-    width = 640
-    x = (VIEW - width) / 2
+    horizontal = frame.flow_orientation == "horizontal"
+    terminator = frame.flow_terminator
+
+    # THE TERMINATOR'S BAND IS RESERVED UP FRONT, exactly like every other band
+    # in this file — it is carved out of the same space the steps divide,
+    # rather than appended after, so it can never collide with the last step
+    # or run off the canvas the way an afterthought would.
     gap = 58
-    avail = BODY_BOTTOM - BODY_TOP
-    h = min(150, (avail - (n - 1) * gap) / n)
-    total = n * h + (n - 1) * gap
-    top = BODY_TOP + (avail - total) / 2
+    term_gap = gap if terminator else 0
+    term_size = 2 * TERMINATOR_R if terminator else 0
+
+    if horizontal:
+        height = 190.0
+        avail = USABLE
+        width = min(230.0, (avail - (n - 1) * gap - term_gap - term_size) / n)
+        total = n * width + (n - 1) * gap + term_gap + term_size
+        left = MARGIN + (avail - total) / 2
+        top = (BODY_TOP + BODY_BOTTOM) / 2 - height / 2
+    else:
+        width = 640.0
+        left = (VIEW - width) / 2
+        avail = BODY_BOTTOM - BODY_TOP
+        height = min(150.0, (avail - (n - 1) * gap - term_gap - term_size) / n)
+        total = n * height + (n - 1) * gap + term_gap + term_size
+        top = BODY_TOP + (avail - total) / 2
 
     out = ""
+    bx = by = 0.0
     for i, step in enumerate(steps):
-        y = top + i * (h + gap)
-        out += group(box(x, y, width, h, step.role)
-                     + label_in_box(step.label, x, y, width, h, step.role, hi=46, lo=26),
+        bx, by = (left + i * (width + gap), top) if horizontal else (left, top + i * (height + gap))
+        out += group(box(bx, by, width, height, step.role)
+                     + label_in_box(step.label, bx, by, width, height, step.role,
+                                    hi=46, lo=26),
                      enter, "focus" if step.role == "hero" else None)
         enter += 1
         if i < n - 1:
             # The arrow sits in the gap and nothing else is ever placed there.
-            out += group(arrow(VIEW / 2, y + h + 10, VIEW / 2, y + h + gap - 6, role=""),
-                         enter, "flow")
+            if horizontal:
+                mid = by + height / 2
+                out += group(arrow(bx + width + 10, mid, bx + width + gap - 6, mid, role=""),
+                             enter, "flow")
+            else:
+                mid = VIEW / 2
+                out += group(arrow(mid, by + height + 10, mid, by + height + gap - 6, role=""),
+                             enter, "flow")
             enter += 1
+
+    if terminator:
+        # THE ARROW INTO IT IS DRAWN LIKE EVERY OTHER ARROW IN THE CHAIN — the
+        # terminator is a real thing the last step points AT, not decoration
+        # bolted on beside it.
+        if horizontal:
+            mid = by + height / 2
+            tcx, tcy = bx + width + gap + TERMINATOR_R, mid
+            out += group(arrow(bx + width + 10, mid, tcx - TERMINATOR_R - 6, mid, role=""),
+                         enter, "flow")
+        else:
+            mid = VIEW / 2
+            tcx, tcy = mid, by + height + gap + TERMINATOR_R
+            out += group(arrow(mid, by + height + 10, mid, tcy - TERMINATOR_R - 6, role=""),
+                         enter, "flow")
+        enter += 1
+        term_body, enter = _terminator(tcx, tcy, terminator, enter)
+        out += term_body
+
     return out, enter
 
 
@@ -1214,6 +1372,54 @@ OFFERED_ICONS = sorted(set(PICTOGRAMS) - {"box"})
 #: else — see check_icons_are_pictures.
 LITERAL_ICONS = {"text", "box"}
 
+#: File-extension -> MIME, for the handful of raster formats photos.photo_for can
+#: ever hand back (see photos._COMMONS_FILES — every entry today is a .jpg).
+#: Unlisted extensions fall back to jpeg rather than raising, since a wrong MIME
+#: label on a real photo is a cosmetic defect and a KeyError here would take down
+#: the whole frame over one glyph.
+_PHOTO_MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+               ".png": "image/png", ".webp": "image/webp"}
+
+
+def _photo_glyph(cx: float, top: float, size: float, role: str, border: str,
+                  uid: int, asset: "photos.PhotoAsset") -> str:
+    """
+    A real photo, clipped into the exact square a pictogram would have filled.
+
+    Embedded as a base64 data URI rather than a remote <image href> pointing
+    straight at Commons, because every consumer of this SVG string is offline
+    by the time it sees it:
+    AnimatedSvg.tsx drops it straight into innerHTML with no separate fetch, and
+    video.py's render step rasterises frames from that same markup through a
+    headless browser with no guarantee Commons is reachable at render time (and
+    every reason to want it not to be, on a redraw of something already built).
+    A remote URL would go blank in both places the instant there is no network;
+    a data URI cannot, because the bytes are already inside the string.
+
+    THE BORDER CARRIES HERO EMPHASIS INSTEAD OF THE FILL, because every other
+    role signal in this file works by recolouring a shape this one can't
+    recolour — a photograph's pixels are what they are. Vector pictograms mark
+    their hero by giving it BOTH a different outline colour (DEEP instead of
+    STROKE) and an amber accent fill inside it; a photo can take the first but
+    not the second, so the width doubles too, the same move _takeaway() already
+    uses (an amber rule at stroke-width 9 instead of the usual 5) to make an
+    accent read even where a fill can't carry it.
+    """
+    data = base64.b64encode(Path(asset.path).read_bytes()).decode("ascii")
+    mime = _PHOTO_MIME.get(Path(asset.path).suffix.lower(), "image/jpeg")
+    x, rx = cx - size / 2, size * 0.08
+    clip_id = f"photoclip{uid}"
+    stroke_w = size * 0.05 if role == "hero" else size * 0.022
+    return (
+        f'<clipPath id="{clip_id}"><rect x="{x:.1f}" y="{top:.1f}" '
+        f'width="{size:.1f}" height="{size:.1f}" rx="{rx:.1f}"/></clipPath>'
+        f'<image href="data:{mime};base64,{data}" x="{x:.1f}" y="{top:.1f}" '
+        f'width="{size:.1f}" height="{size:.1f}" '
+        f'preserveAspectRatio="xMidYMid slice" clip-path="url(#{clip_id})"/>'
+        f'<rect x="{x:.1f}" y="{top:.1f}" width="{size:.1f}" height="{size:.1f}" '
+        f'rx="{rx:.1f}" fill="none" stroke="{border}" stroke-width="{stroke_w:.1f}"/>'
+    )
+
 
 def _icons(frame: Frame, enter: int) -> tuple[str, int]:
     """
@@ -1261,8 +1467,19 @@ def _icons(frame: Frame, enter: int) -> tuple[str, int]:
         line, accent = (DEEP, AMBER) if glyph.role == "hero" else \
                        (CORAL, CORAL) if glyph.role == "lost" else \
                        (MUTED, MUTED) if glyph.role == "quiet" else (STROKE, FILL)
-        draw = PICTOGRAMS.get(glyph.icon, _pict_box)
-        body = draw(cx - size / 2, top, size, line, accent)
+        # A real photo of the object beats a drawing of it — see photos.py — but
+        # only for the handful of subjects that ARE physical objects with a real,
+        # curated photo behind them. Every other icon (and any of these five with
+        # no network reachable right now) draws exactly as it always has: this
+        # must degrade to the vector pictogram, never fail the frame, because a
+        # unit gets redrawn from disk with no network access as a matter of course.
+        photo = photos.photo_for(glyph.icon)
+        if photo is not None:
+            border = accent if glyph.role != "plain" else line
+            body = _photo_glyph(cx, top, size, glyph.role, border, i, photo)
+        else:
+            draw = PICTOGRAMS.get(glyph.icon, _pict_box)
+            body = draw(cx - size / 2, top, size, line, accent)
         if glyph.label:
             # fit_unbroken FIRST, and this was a real defect the vision judge
             # caught by reading the rendered frame: a four-glyph row gives each
@@ -1665,6 +1882,51 @@ def _code(frame: Frame, enter: int) -> tuple[str, int]:
     return out, enter
 
 
+def _render_panel(x: float, top: float, card_w: float, height: float,
+                  panel: Panel, enter: int) -> tuple[str, int]:
+    """
+    One titled card with its small stack of items, at a caller-given box.
+
+    PULLED OUT OF `_compare`, which used to draw this inline once per side. The
+    `analogy` template borrows this exact drawing for its own RIGHT panel — the
+    section's own mechanism, beside the borrowed photo on the left — and a second,
+    independently-typed copy of "how does a Panel look on screen" is exactly how
+    two templates quietly grow two different ideas of what the same field means.
+    """
+    _, stroke, _ = ROLE_COLOURS[panel.role]
+    # A hero or lost card is stated by its border, so it needs to be heavy
+    # enough to read at phone size against a plain one.
+    weight = 9 if panel.role in ("hero", "lost") else 4
+    title_h, ipad = 78, 20
+    card = (f'<rect x="{x:.0f}" y="{top}" width="{card_w:.0f}" height="{height}" '
+            f'rx="20" fill="{PAPER}" stroke="{stroke}" stroke-width="{weight}"/>')
+    titled, size = fit(panel.title, card_w - 2 * ipad, 42, 26, max_lines=2)
+    card += text_block(titled, x + card_w / 2, top + title_h / 2 + 4, size, stroke, 700)
+    card += (f'<line x1="{x + ipad:.0f}" y1="{top + title_h:.0f}" '
+             f'x2="{x + card_w - ipad:.0f}" y2="{top + title_h:.0f}" '
+             f'stroke="{stroke}" stroke-width="3" opacity="0.45"/>')
+    out = group(card, enter, "focus" if panel.role == "hero" else None)
+    enter += 1
+
+    items = panel.items[:MAX_PANEL_ITEMS]
+    if not items:
+        return out, enter
+    gap = 18
+    area = height - title_h - 2 * ipad
+    item_h = min(120, (area - (len(items) - 1) * gap) / len(items))
+    total = len(items) * item_h + (len(items) - 1) * gap
+    iy = top + title_h + ipad + (area - total) / 2
+    iw = card_w - 2 * ipad
+    for item in items:
+        out += group(box(x + ipad, iy, iw, item_h, item.role, rx=12)
+                     + label_in_box(item.label, x + ipad, iy, iw, item_h,
+                                    item.role, hi=38, lo=20),
+                     enter, "focus" if item.role == "hero" else None)
+        enter += 1
+        iy += item_h + gap
+    return out, enter
+
+
 def _compare(frame: Frame, enter: int) -> tuple[str, int]:
     """
     Two worlds side by side, each a bounded card with its own small stack inside.
@@ -1688,41 +1950,90 @@ def _compare(frame: Frame, enter: int) -> tuple[str, int]:
     gutter = 40 if n > 1 else 0
     card_w = (USABLE - (n - 1) * gutter) / n
     top, height = BODY_TOP, BODY_BOTTOM - BODY_TOP
-    title_h, ipad = 78, 20
 
     out = ""
     for j, panel in enumerate(panels):
         x = MARGIN + j * (card_w + gutter)
-        _, stroke, _ = ROLE_COLOURS[panel.role]
-        # A hero or lost card is stated by its border, so it needs to be heavy
-        # enough to read at phone size against a plain one.
-        weight = 9 if panel.role in ("hero", "lost") else 4
-        card = (f'<rect x="{x:.0f}" y="{top}" width="{card_w:.0f}" height="{height}" '
-                f'rx="20" fill="{PAPER}" stroke="{stroke}" stroke-width="{weight}"/>')
-        titled, size = fit(panel.title, card_w - 2 * ipad, 42, 26, max_lines=2)
-        card += text_block(titled, x + card_w / 2, top + title_h / 2 + 4, size, stroke, 700)
-        card += (f'<line x1="{x + ipad:.0f}" y1="{top + title_h:.0f}" '
-                 f'x2="{x + card_w - ipad:.0f}" y2="{top + title_h:.0f}" '
-                 f'stroke="{stroke}" stroke-width="3" opacity="0.45"/>')
-        out += group(card, enter, "focus" if panel.role == "hero" else None)
+        body, enter = _render_panel(x, top, card_w, height, panel, enter)
+        out += body
+    return out, enter
+
+
+def _analogy(frame: Frame, enter: int) -> tuple[str, int]:
+    """
+    A real-world analogy beside the actual mechanism: a photo on the left, the
+    section's own structure on the right.
+
+    THE GAP THIS FILLS. Tallied across 262 frames in 64 real units, icons +
+    compare + bar were 48.5% of every frame this pipeline had ever drawn — a
+    stack, a queue, a cache and a TCP handshake all converge on the same two or
+    three shapes because a container concept with no dedicated template lands
+    on whichever of those is nearest. `state` already draws the container
+    itself; this template exists for the OTHER half of how these concepts get
+    taught — a physical thing a learner already understands, borrowed to make
+    the abstract one concrete, beside the real structure so the borrowing is
+    never mistaken for the whole answer.
+
+    LEFT IS ILLUSTRATION, RIGHT IS THE LESSON, and the two halves are drawn by
+    completely different rules because of it. The right panel is exactly
+    `_render_panel` — the same titled card `compare` uses, held to the same
+    grounding rule as every other label in this file. The left panel is a real
+    photograph (see skills/photos.py) with a stated-analogy caption under it,
+    and NEITHER is checked against the narration the way the right panel is:
+    a real photo of a plate stack needs no citation to depict a plate stack
+    correctly, the same principle already covers the five hardware photos in
+    `icons`.
+
+    DEGRADES TO A PLAIN BOX, NEVER TO A CRASH. `analogy_subject` may name a
+    subject with no curated photo, or the network may simply be unreachable —
+    a unit gets re-rendered from disk with no network access as a matter of
+    course — and in either case this draws `_pict_box` captioned with
+    whatever text is available, exactly the fallback an unknown `Glyph.icon`
+    already gets in `_icons`.
+    """
+    gutter = 40
+    card_w = (USABLE - gutter) / 2
+    top, height = BODY_TOP, BODY_BOTTOM - BODY_TOP
+    left_x, right_x = MARGIN, MARGIN + card_w + gutter
+    ipad = 20
+
+    out = ""
+    card = (f'<rect x="{left_x:.0f}" y="{top}" width="{card_w:.0f}" height="{height}" '
+            f'rx="20" fill="{PAPER}" stroke="{STROKE}" stroke-width="4"/>')
+    out += group(card, enter)
+    enter += 1
+
+    # The caption reserves its own band FIRST, same discipline as every other
+    # template in this file (rule 2 of the module docstring): bands are carved
+    # up front so the photo below never has to guess how much room is left.
+    label = (frame.analogy_caption or frame.analogy_subject or "").strip()
+    lines: list[str] = []
+    label_size = 28
+    label_h = 0.0
+    if label:
+        lines, label_size = fit(label, card_w - 2 * ipad, 32, 22, max_lines=3)
+        label_h = len(lines) * label_size * 1.18 + 30
+
+    cx = left_x + card_w / 2
+    photo_top = top + ipad
+    size = max(60.0, min(card_w - 2 * ipad, height - 2 * ipad - label_h))
+
+    asset = photos.analogy_photo_for(frame.analogy_subject or "")
+    if asset is not None:
+        body = _photo_glyph(cx, photo_top, size, "plain", STROKE, enter, asset)
+    else:
+        body = _pict_box(cx - size / 2, photo_top, size, STROKE, FILL)
+    out += group(body, enter)
+    enter += 1
+
+    if lines:
+        out += group(text_block(lines, cx, photo_top + size + label_h / 2 + 6,
+                                label_size, MUTED, 600), enter)
         enter += 1
 
-        items = panel.items[:MAX_PANEL_ITEMS]
-        if not items:
-            continue
-        gap = 18
-        area = height - title_h - 2 * ipad
-        item_h = min(120, (area - (len(items) - 1) * gap) / len(items))
-        total = len(items) * item_h + (len(items) - 1) * gap
-        iy = top + title_h + ipad + (area - total) / 2
-        iw = card_w - 2 * ipad
-        for item in items:
-            out += group(box(x + ipad, iy, iw, item_h, item.role, rx=12)
-                         + label_in_box(item.label, x + ipad, iy, iw, item_h,
-                                        item.role, hi=38, lo=20),
-                         enter, "focus" if item.role == "hero" else None)
-            enter += 1
-            iy += item_h + gap
+    panel = frame.analogy_technical or Panel(title=frame.title or "", items=frame.cells)
+    body, enter = _render_panel(right_x, top, card_w, height, panel, enter)
+    out += body
     return out, enter
 
 
@@ -1869,25 +2180,56 @@ def _state(frame: Frame, enter: int) -> tuple[str, int]:
         at = store.pointer_at
         if at is None:
             at = n - 1
-        shown = max(-1, min(at, n - 1))
+
+        def pointer_axis(raw: int) -> float:
+            """The one coordinate the pointer sits at — y for a vertical store,
+            x for a horizontal one — computed identically for the LIVE index
+            and for a REMEMBERED one (see pointer_at_previous below), so the two
+            produce numbers from the same arithmetic and can be subtracted into
+            a real screen-space delta rather than two independently-clamped
+            guesses that happen to be close.
+            """
+            s = max(-1, min(raw, n - 1))
+            if vertical:
+                if s < 0:
+                    return base_y + slot_h * 0.45
+                _, y = slot_xy(s)
+                return y + slot_h / 2
+            if s < 0:
+                return x0 - slot_w * 0.45
+            x, _ = slot_xy(s)
+            return x + slot_w / 2
+
+        cur = pointer_axis(at)
+
+        # RETARGETING — see Store.pointer_at_previous. The pointer's arrow+label
+        # group is drawn at its CURRENT position exactly as it always was; the
+        # only addition is data-slide carrying it back to where it WAS, so
+        # web/src/AnimatedSvg.tsx's existing slide() animates the disconnect and
+        # reconnect for free. THIS IS REUSE, NOT A NEW PRIMITIVE: slide() already
+        # animates any element from an offset into its drawn position, and a
+        # pointer moving from one slot to another is exactly a translation —
+        # nothing about it needs to grow, shrink, or redraw along a new path the
+        # way a retargeted arrow's own SHAFT would if its length had to change,
+        # which is the only case that would have justified writing a second
+        # animation function.
+        slide_attr = ""
+        prev_at = store.pointer_at_previous
+        if prev_at is not None and max(-1, min(prev_at, n - 1)) != max(-1, min(at, n - 1)):
+            delta = pointer_axis(prev_at) - cur
+            slide_attr = (f' data-slide="0,{delta:.0f}"' if vertical
+                         else f' data-slide="{delta:.0f},0"')
+
         if vertical:
-            if shown < 0:
-                py = base_y + slot_h * 0.45
-            else:
-                px_unused, py = slot_xy(shown)
-                py = py + slot_h / 2
+            py = cur
             tip_x = x0 - pad - 16
-            out += group(
-                arrow(tip_x - 74, py, tip_x, py, "focus")
-                + text_block([store.pointer], tip_x - 78 - 4, py - 4, 32, AMBER, 700,
-                             anchor="end"),
-                enter, "focus")
+            out += (f'<g data-enter="{enter}" data-role="focus"{slide_attr}>'
+                    + arrow(tip_x - 74, py, tip_x, py, "focus")
+                    + text_block([store.pointer], tip_x - 78 - 4, py - 4, 32, AMBER, 700,
+                                 anchor="end")
+                    + "</g>")
         else:
-            if shown < 0:
-                px = x0 - slot_w * 0.45
-            else:
-                px, py_unused = slot_xy(shown)
-                px = px + slot_w / 2
+            px = cur
             # UNDER the row, for the same reason the label moved: the lane above a
             # horizontal store is where a page arrives, and an index drawn into it
             # collides with the thing it is supposed to be pointing at.
@@ -1895,10 +2237,10 @@ def _state(frame: Frame, enter: int) -> tuple[str, int]:
             # were sharing the same 60px of strip and the shaft ran through the
             # word ("Physica|l frames").
             tip_y = base_y + slot_h + pad + 58
-            out += group(
-                arrow(px, tip_y + 60, px, tip_y, "focus")
-                + text_block([store.pointer], px, tip_y + 100, 32, AMBER, 700),
-                enter, "focus")
+            out += (f'<g data-enter="{enter}" data-role="focus"{slide_attr}>'
+                    + arrow(px, tip_y + 60, px, tip_y, "focus")
+                    + text_block([store.pointer], px, tip_y + 100, 32, AMBER, 700)
+                    + "</g>")
         enter += 1
 
     # --- whatever is moving -------------------------------------------------
@@ -1997,11 +2339,17 @@ def _graph(frame: Frame, enter: int) -> tuple[str, int]:
 
     n = len(branches)
     # RESPONSIVE TO n, not fixed. A fixed 260px branch at four branches needs
-    # 4*260 + 3*36 = 1148px of row — past USABLE (960) and past the 1080 canvas
+    # 4*260 + 3*40 = 1160px of row — past USABLE (960) and past the 1080 canvas
     # itself, so the fourth branch ran off the edge of the frame. Capped the same
     # way _state's slot width is: shrink the branch, and shrink the gap between
     # branches, before ever letting the row exceed what the canvas actually has.
-    gap = 36 if n <= 3 else 24
+    #
+    # 40, not some other number, BELOW THE SHRINK THRESHOLD — the same gap
+    # `_icons` uses for a row of boxes, so two templates that both draw
+    # "boxes across the row" read as the same row rather than two slightly
+    # different spacings with no reason for the difference. Only past three
+    # branches, where the row would overflow, does it give way to 24.
+    gap = 40 if n <= 3 else 24
     branch_w = min(260.0, (USABLE - max(0, n - 1) * gap) / max(1, n))
     branch_h = 100
     row_y = BODY_BOTTOM - branch_h - 40
@@ -2075,7 +2423,7 @@ _TEMPLATES = {
     "table": _table, "stat": _stat, "code": _code, "compare": _compare,
     "preview": _preview, "icons": _icons,
     "hierarchy": _hierarchy, "cause_effect": _cause_effect,
-    "state": _state, "graph": _graph,
+    "state": _state, "graph": _graph, "analogy": _analogy,
     # LEGACY. Not offered to the model any more — a frame whose whole content is a
     # sentence is the "visuals are just text" complaint in its purest form, and it
     # was landing on EVERY short because the brief made it the last beat's job.
@@ -2088,7 +2436,13 @@ _TEMPLATES = {
 #: name. Matches the vocabulary the docstrings already use ("the ONE thing this
 #: beat is about", "wasted, rejected, invalid or unusable", "context the viewer
 #: should not read yet") so the legend and the code agree about what a colour means.
-_ROLE_WORDS = {"hero": "Focus", "lost": "Invalid", "quiet": "Not yet", "plain": "Context"}
+#: "quiet" now covers two senses in the prompt (see visuals.py) — a step not
+#: yet reached, and a place a claim explicitly excludes ("no other bucket is
+#: ever inspected") — and the legend has one label for both, since the
+#: renderer has no way to know which sense a given frame meant. "Inactive"
+#: reads correctly either way; "Not yet" (the old label) was wrong for the
+#: second sense, which is exactly the case the hash-table fix above added.
+_ROLE_WORDS = {"hero": "Focus", "lost": "Invalid", "quiet": "Inactive", "plain": "Context"}
 
 #: Every place a Cell-shaped role can appear, scanned the same way
 #: checks.check_one_hero_per_frame groups them — kept as a SEPARATE list rather
@@ -2116,6 +2470,12 @@ def _roles_present(frame: Frame) -> list[str]:
     for panel in frame.panels:
         seen.add(panel.role)
         seen.update(i.role for i in panel.items)
+    # analogy's RIGHT panel is a Panel too, drawn by the exact same
+    # _render_panel `compare` uses — the LEFT side (a photo) carries no role at
+    # all, so it has nothing for a legend to key.
+    if frame.analogy_technical is not None:
+        seen.add(frame.analogy_technical.role)
+        seen.update(i.role for i in frame.analogy_technical.items)
     if frame.cause is not None:
         seen.add(frame.cause.role)
     if frame.effect is not None:
@@ -2222,7 +2582,11 @@ def render(frame: Frame) -> str:
             f'</filter></defs><g filter="url(#bloom)">')
 
     enter = 1
-    title = band_text(frame.title, TITLE_TOP, TITLE_BOTTOM, 64, 40, INK, 700, enter)
+    # 72/800, not 64/700 — see band_text's `accent` docstring for the measured
+    # reason: a hero box out-weighs even a bold 64px title on colour and area
+    # alone, so the title needed more than "bold" to read as primary.
+    title = band_text(frame.title, TITLE_TOP, TITLE_BOTTOM, 72, 40, INK, 800, enter,
+                      accent=True)
     if title:
         parts.append(title)
         enter += 1

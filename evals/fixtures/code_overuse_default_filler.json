@@ -1,0 +1,97 @@
+{
+  "short_id": "code_overuse_default_filler",
+  "session_id": "eval",
+  "source_section_id": "4.2",
+  "question": "When two CSS rules tie on specificity, which one actually wins?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "When two CSS rules tie on specificity, which one actually wins?",
+      "on_screen": "A specificity tie",
+      "visual_ref": "q_tie"
+    },
+    {
+      "speaker": "student",
+      "line": "The two rules carry equal weight, so specificity alone cannot decide between them.",
+      "on_screen": "Equal weight",
+      "visual_ref": "d_tied",
+      "source_quote": "Two selectors of equal specificity are tied."
+    },
+    {
+      "speaker": "student",
+      "line": "The browser falls back to document order, and whichever rule was written last applies.",
+      "on_screen": "Later rule wins",
+      "visual_ref": "d_order",
+      "source_quote": "When specificity ties, the rule that appears later in the document wins."
+    }
+  ],
+  "visuals": {
+    "q_tie": {
+      "ref": "q_tie",
+      "type": "diagram",
+      "spec": "the two competing rules",
+      "frame": {
+        "template": "code",
+        "title": "Two rules on one element",
+        "code_lines": [
+          {"label": ".nav a { color: blue; }", "role": "plain"},
+          {"label": "#main a { color: blue; }", "role": "plain"}
+        ],
+        "code_caption": "style.css"
+      },
+      "strategy": {
+        "ref": "q_tie",
+        "concept": "two rules of equal specificity target the same element",
+        "relationship": "comparison",
+        "must_see": "two rules side by side, both landing on the same element, neither one heavier than the other",
+        "changes_from_previous": "",
+        "focus": "the tied pair"
+      }
+    },
+    "d_tied": {
+      "ref": "d_tied",
+      "type": "diagram",
+      "spec": "the tie itself",
+      "frame": {
+        "template": "code",
+        "title": "Neither rule outweighs the other",
+        "code_lines": [
+          {"label": ".nav a { color: blue; }", "role": "plain"},
+          {"label": "#main a { color: blue; }", "role": "hero"}
+        ],
+        "code_caption": "style.css"
+      },
+      "strategy": {
+        "ref": "d_tied",
+        "concept": "specificity alone cannot break this tie",
+        "relationship": "cause_effect",
+        "must_see": "the scale balanced between the two rules, tipping neither way",
+        "changes_from_previous": "the hero moves from neither rule to the tied pair as one unit",
+        "focus": "the balance point"
+      }
+    },
+    "d_order": {
+      "ref": "d_order",
+      "type": "diagram",
+      "spec": "the tie-breaker",
+      "frame": {
+        "template": "flow",
+        "title": "Document order decides",
+        "steps": [
+          {"label": "Rule 1 (earlier)", "role": "plain"},
+          {"label": "Rule 2 (later)", "role": "hero"}
+        ]
+      },
+      "strategy": {
+        "ref": "d_order",
+        "concept": "the later rule in the document wins the tie",
+        "relationship": "process",
+        "must_see": "two rules in document order, the later one lit as the winner",
+        "changes_from_previous": "the hero moves from the tied pair to the later rule",
+        "focus": "the later rule"
+      }
+    }
+  },
+  "status": "draft"
+}

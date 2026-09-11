@@ -1,0 +1,56 @@
+{
+  "short_id": "anchor_state_pointer_wrong_slot",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "After pushing A, B and C, which item does top point at?",
+  "estimated_seconds": 16.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "After pushing A, B and C, which item does top point at?",
+      "on_screen": "Where top points",
+      "visual_ref": "d_stack"
+    },
+    {
+      "speaker": "student",
+      "line": "Top points at C, the most recently pushed item, sitting above A and B.",
+      "on_screen": "top -> C",
+      "visual_ref": "d_stack",
+      "source_quote": "pushing C sets top to 2, so top is always the index of the item that would come off next"
+    }
+  ],
+  "visuals": {
+    "d_stack": {
+      "ref": "d_stack",
+      "type": "diagram",
+      "spec": "a 3-item stack with top pointing at the most recent push",
+      "frame": {
+        "template": "state",
+        "title": "top after pushing A, B, C",
+        "anchor_label": "C",
+        "store": {
+          "label": "Stack",
+          "orientation": "vertical",
+          "slots": [
+            {"label": "A", "role": "plain", "state": "resting"},
+            {"label": "B", "role": "hero", "state": "resting"},
+            {"label": "C", "role": "plain", "state": "resting"}
+          ],
+          "pointer": "top",
+          "pointer_at": 1,
+          "open_end": true
+        }
+      },
+      "strategy": {
+        "ref": "d_stack",
+        "concept": "top points at the most recently pushed item, C",
+        "relationship": "structure",
+        "physical_form": "single_container",
+        "must_see": "a container with three slots filled and the index pointing at the topmost one, C",
+        "changes_from_previous": "",
+        "focus": "the item top points at"
+      }
+    }
+  },
+  "status": "draft"
+}

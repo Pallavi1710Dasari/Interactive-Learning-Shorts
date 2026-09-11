@@ -1,0 +1,44 @@
+{
+  "short_id": "motion_concept_static_pass",
+  "session_id": "eval",
+  "source_section_id": "3.1",
+  "question": "How does contiguous allocation compare to paging?",
+  "estimated_seconds": 30.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "How does contiguous allocation compare to paging?", "on_screen": "Contiguous vs paging", "visual_ref": "r1"},
+    {"speaker": "student", "line": "Contiguous allocation gives each process one unbroken block, while paging splits it into fixed-size frames.", "on_screen": "One block vs many frames", "visual_ref": "r2", "source_quote": "contiguous allocation gives each process one unbroken block, while paging splits memory into fixed-size frames"},
+    {"speaker": "student", "line": "So contiguous allocation suffers external fragmentation, while paging does not.", "on_screen": "External fragmentation", "visual_ref": "r3", "source_quote": "contiguous allocation suffers external fragmentation; paging does not"}
+  ],
+  "visuals": {
+    "r1": {
+      "ref": "r1", "type": "diagram", "spec": "two approaches, named",
+      "frame": {"template": "compare", "title": "Contiguous vs paging",
+        "panels": [{"title": "Contiguous"}, {"title": "Paging"}]},
+      "strategy": {"ref": "r1", "concept": "two allocation approaches",
+        "relationship": "comparison", "must_see": "two cards, both named",
+        "focus": "Contiguous"}
+    },
+    "r2": {
+      "ref": "r2", "type": "diagram", "spec": "one block vs several frames",
+      "frame": {"template": "compare", "title": "One block vs several frames",
+        "panels": [{"title": "Contiguous", "items": [{"label": "One block", "role": "hero"}]},
+                   {"title": "Paging", "items": [{"label": "Frame 1"}, {"label": "Frame 2"}]}]},
+      "strategy": {"ref": "r2", "concept": "one unbroken block versus several frames",
+        "relationship": "structure", "must_see": "one solid block beside several frames",
+        "changes_from_previous": "the block and the frames are now drawn", "focus": "One block"}
+    },
+    "r3": {
+      "ref": "r3", "type": "diagram", "spec": "fragmentation, side by side",
+      "frame": {"template": "compare", "title": "Fragmentation",
+        "panels": [{"title": "Contiguous", "role": "lost",
+                    "items": [{"label": "One block", "role": "lost"}]},
+                   {"title": "Paging", "role": "hero",
+                    "items": [{"label": "Frame 1"}, {"label": "Frame 2"}]}]},
+      "strategy": {"ref": "r3", "concept": "only contiguous allocation fragments",
+        "relationship": "comparison", "must_see": "the contiguous side marked wasteful",
+        "changes_from_previous": "contiguous is now marked lost, paging is hero",
+        "focus": "Contiguous"}
+    }
+  },
+  "status": "draft"
+}

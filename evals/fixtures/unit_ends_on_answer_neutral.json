@@ -1,0 +1,25 @@
+{
+  "short_id": "ends_on_answer_neutral",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "Which page does the stack's pointer resolve to once B is pushed?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "Which page does the stack's pointer resolve to once B is pushed?", "on_screen": "Pointer after push", "visual_ref": "r"},
+    {"speaker": "student", "line": "The pointer resolves to B, the item that was just pushed on top.", "on_screen": "Pointer resolves to B", "visual_ref": "r", "source_quote": "the stack pointer resolves to the item most recently pushed"}
+  ],
+  "visuals": {
+    "r": {
+      "ref": "r", "type": "diagram", "spec": "final stack state",
+      "frame": {
+        "template": "bar",
+        "title": "Stack contents",
+        "cells": [
+          {"label": "A", "role": "plain"},
+          {"label": "B", "role": "plain"}
+        ]
+      }
+    }
+  },
+  "status": "draft"
+}

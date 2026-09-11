@@ -1,0 +1,78 @@
+{
+  "short_id": "vision_distinction_only_in_text",
+  "session_id": "eval",
+  "source_section_id": "1.4",
+  "question": "What is the difference between a mutable and an immutable object?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What is the difference between a mutable and an immutable object?",
+      "on_screen": "Mutable vs immutable",
+      "visual_ref": "d_intro"
+    },
+    {
+      "speaker": "student",
+      "line": "A mutable object's contents can change after it is created, in place.",
+      "on_screen": "Mutable: changes in place",
+      "visual_ref": "d_compare",
+      "source_quote": "A mutable object can be changed after it is created."
+    },
+    {
+      "speaker": "student",
+      "line": "An immutable object's contents can never change — any edit makes a new object instead.",
+      "on_screen": "Immutable: never changes",
+      "visual_ref": "d_compare",
+      "source_quote": "An immutable object cannot be changed once created; any edit produces a new object."
+    }
+  ],
+  "visuals": {
+    "d_intro": {
+      "ref": "d_intro",
+      "type": "diagram",
+      "spec": "the two categories, named",
+      "frame": {
+        "template": "stat",
+        "title": "Two kinds of object",
+        "value": "Mutable / Immutable",
+        "caption": "objects behave differently once created"
+      },
+      "strategy": {
+        "ref": "d_intro",
+        "concept": "objects fall into two categories by whether they can change",
+        "relationship": "comparison",
+        "must_see": "the two category names, side by side",
+        "changes_from_previous": "",
+        "focus": "the two category names"
+      }
+    },
+    "d_compare": {
+      "ref": "d_compare",
+      "type": "diagram",
+      "spec": "the difference between the two",
+      "frame": {
+        "template": "compare",
+        "title": "Mutable vs immutable",
+        "panels": [
+          {
+            "title": "Mutable",
+            "items": [{"label": "Object", "role": "plain"}]
+          },
+          {
+            "title": "Immutable",
+            "items": [{"label": "Object", "role": "plain"}]
+          }
+        ]
+      },
+      "strategy": {
+        "ref": "d_compare",
+        "concept": "a mutable object changes in place; an immutable one never does",
+        "relationship": "comparison",
+        "must_see": "the same object shown once changing in place and once staying fixed while a new object appears beside it",
+        "changes_from_previous": "the mutable panel's object updates; the immutable panel gains a second, separate object",
+        "focus": "the object that changes"
+      }
+    }
+  },
+  "status": "draft"
+}

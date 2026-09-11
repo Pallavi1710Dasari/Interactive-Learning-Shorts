@@ -1,0 +1,32 @@
+{
+  "short_id": "motion_insert_visible",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "What happens to the stack when C is pushed?",
+  "estimated_seconds": 14.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "What happens to the stack when C is pushed?", "on_screen": "Pushing C", "visual_ref": "d_before"},
+    {"speaker": "student", "line": "Before the push, the stack holds A and B.", "on_screen": "A, B", "visual_ref": "d_before", "source_quote": "A stack stores items in the order they arrive"},
+    {"speaker": "student", "line": "Pushing C adds it on top of A and B.", "on_screen": "A, B, C", "visual_ref": "d_after", "source_quote": "push adds an item on top"}
+  ],
+  "visuals": {
+    "d_before": {
+      "ref": "d_before", "type": "diagram", "spec": "stack with A, B",
+      "frame": {"template": "state", "title": "Before pushing C",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "plain", "state": "resting"}],
+          "pointer": "top", "pointer_at": 1, "open_end": true}}
+    },
+    "d_after": {
+      "ref": "d_after", "type": "diagram", "spec": "C arriving onto the stack",
+      "frame": {"template": "state", "title": "C arrives on top",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "plain", "state": "resting"},
+                    {"label": "C", "role": "hero", "state": "arriving"}],
+          "pointer": "top", "pointer_at": 2, "pointer_at_previous": 1, "open_end": true}}
+    }
+  },
+  "status": "draft"
+}

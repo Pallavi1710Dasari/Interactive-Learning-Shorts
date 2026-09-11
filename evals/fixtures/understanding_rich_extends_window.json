@@ -1,0 +1,40 @@
+{
+  "understanding": {
+    "section_id": "3.2",
+    "core_idea": "Paging replaces a process's contiguous memory requirement with fixed-size frames, at the cost of an extra address-translation step and some internal fragmentation.",
+    "key_points": [
+      "pages map to frames",
+      "translation happens on every access",
+      "the last page is rarely full"
+    ],
+    "teaching_sequence": [
+      {
+        "concept": "Contiguous allocation's constraint",
+        "purpose": "Establish why a single unbroken block causes external fragmentation",
+        "explanation_goal": "Learner understands the problem paging is solving"
+      },
+      {
+        "concept": "Pages and frames",
+        "purpose": "Show memory split into fixed-size units that need not be adjacent",
+        "explanation_goal": "Learner understands the structural fix"
+      },
+      {
+        "concept": "The page table translates every access",
+        "purpose": "Explain the mechanism that makes scattered frames usable",
+        "explanation_goal": "Learner understands the cost paging adds in exchange"
+      }
+    ],
+    "concrete_examples": [
+      "A 4.5KB process on 4KB pages needs 2 frames, and the second is half-empty."
+    ],
+    "example_plan": { "need": "required", "example": "A 4.5KB process on 4KB pages needs 2 frames, and the second is half-empty." },
+    "common_confusions": [
+      "Learners assume paging has no cost because it removes external fragmentation, missing the translation overhead and internal fragmentation it introduces."
+    ],
+    "confusion_plan": { "need": "required", "confusion": "Paging is not free: it trades one waste (external fragmentation) for two costs (a translation step, and internal fragmentation on the last page)." },
+    "cannot_answer": [],
+    "source_evidence": [
+      "The average waste is half a page per process, which is why very large page sizes are not automatically better."
+    ]
+  }
+}

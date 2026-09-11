@@ -41,7 +41,7 @@ they were text. Three things caused it and all three are fixed here.
 """
 
 from pydantic import BaseModel
-from ..schema import Script, Visual, Section, Frame, VisualStrategy
+from ..schema import Script, Visual, Section, Frame, VisualStrategy, SectionUnderstanding
 from ..llm import ask_json
 from .. import config
 from . import layout
@@ -73,10 +73,40 @@ __RULES__
 
 YOU ARE NOT DECIDING WHAT THE VIEWER SEES. THAT IS ALREADY DECIDED.
 A strategist has been through this short ahead of you and written down, for every
-beat, the concept it teaches, what KIND of claim it makes, what the viewer must
-see, and which single object is the focus. That brief is below and it is
-authoritative about WHAT. Your job is HOW: choose the shape that shows it and
-supply the words.
+beat, the concept it teaches, what KIND of claim it makes, its PHYSICAL FORM,
+what the viewer must see, and which single object is the focus. That brief is
+below and it is authoritative about WHAT. Your job is HOW: choose the shape
+that shows it and supply the words.
+
+`physical_form`, WHEN THE BRIEF GIVES ONE, IS THE TIE-BREAKER `relationship`
+CANNOT BE: two beats can share a `relationship` and need opposite templates — a
+stack filling up and a linked list growing are both `process`, and one is
+`single_container` (draw it as "state": slots inside one bordered thing) while
+the other is `linked_nodes` (draw it as "flow", horizontal, separate boxes with
+a real gap and an arrow: never as slots in one container, which claims the
+opposite of what a linked list is). Read `physical_form` before you reach for
+the mapping below — it tells you WHICH shape within the relationship's own
+family is correct, not just which family:
+
+  single_container -> "state". Contiguous positions inside one bordered thing.
+  linked_nodes      -> "flow" (flow_orientation usually "horizontal") or
+                       "graph" for several distinct linked things fanning out
+                       from one. Never "state" — that claims one container,
+                       which a linked structure is not.
+  nested_levels     -> "hierarchy". Levels stacked, each resting on the one
+                       below. Never "graph" — that draws one level of
+                       distinct children, not levels resting on each other.
+  flat_parts        -> "graph" (a root with distinct named children), or
+                       "split"/"bar"/"table" for a division into fields.
+  two_sides         -> "compare", or "state"/"graph" when the two sides are
+                       two marked places in the SAME persistent container
+                       already on screen (see `comparison` below).
+  single_object     -> whatever template draws that one thing's state, look
+                       or effect — "state", "cause_effect", "preview", "stat",
+                       "icons", or "analogy".
+
+Absent or `not_applicable`, fall back to `relationship` and the mapping below
+exactly as before.
 
 This split exists because doing both at once did not work. Asked for a scene and a
 template in the same breath, the template won every time — it is a concrete choice
@@ -91,20 +121,68 @@ because the strategy is what the rendered frame is graded against afterwards.
 
 `relationship` NARROWS THE TEMPLATE, AND IT IS THE FASTEST WAY TO THE RIGHT SHAPE:
 
-  process        -> "state" WHEN THE STAGES ARE STATES OF ONE CONTAINER, otherwise
-                    "flow", or "icons" with arrows=true. Rule 6: the stages are
-                    drawn in order and the movement between them is on screen.
-                    Pushing, popping, filling, draining, a buffer emptying — all
-                    of those are one thing in successive states, and "state" draws
-                    the thing in those states instead of naming the stages.
+A RULE THAT COMES BEFORE THE MAPPING BELOW, NOT A CASE INSIDE IT: "process",
+"data_movement" and "cause_effect" are claims that something HAPPENS, and a
+STATIC template — "bar", "compare", "table", "split", "mapping", or "icons"
+with arrows=false — can only ever NAME that something happened, never show it
+happening. So for these three relationships, every one of those templates is
+off the table categorically, not case by case. This is a category rule and not
+a growing list because it already had to be added twice: a "process" claim
+measured drawn as "bar" (a row of boxes reading "Push 1", "Push 2"), fixed;
+the very next short measured the SAME relationship drawn as "compare" instead
+(two columns of boxes with labels changing between beats, no pointer, no
+arrow, nothing entering or leaving — the judge's own words: "no frame actually
+draws pointers or arrows"). Two different static templates, one underlying
+mistake. Whichever static shape occurs to you for one of these three
+relationships, it is wrong; reach for "state", "flow", "cause_effect", "icons"
+with arrows=true, or "analogy" instead — every one of those can show a change
+happening, which is the only thing these three relationships are ever claiming.
+
+  process        -> "analogy" WHEN THE CONCEPT IS A DATA STRUCTURE OR MECHANISM
+                    WITH A WELL-KNOWN REAL-WORLD EQUIVALENT — a stack, a queue,
+                    a cache, recursion, a linked list, a tree, a hash table, a
+                    graph, see the analogy template below for the fixed list —
+                    and this beat is INTRODUCING it rather than operating on it
+                    yet.
+                    Otherwise "state" WHEN THE STAGES ARE STATES OF ONE CONTAINER,
+                    otherwise "flow", or "icons" with arrows=true. Rule 6: the
+                    stages are drawn in order and the movement between them is on
+                    screen. Pushing, popping, filling, draining, a buffer
+                    emptying — all of those are one thing in successive states,
+                    and "state" draws the thing in those states instead of
+                    naming the stages.
+
+                    "state" AND "flow" ARE NOT INTERCHANGEABLE FOR THIS, AND THE
+                    QUESTION THAT PICKS BETWEEN THEM IS WHAT THE CONCEPT ACTUALLY
+                    IS, not which one looks handy. "state" draws ONE physical
+                    container with contiguous slots — a stack, a queue, an array
+                    — because that is what those concepts ARE: one place, cut
+                    into positions. "flow" draws SEPARATE boxes with a real gap
+                    and a real arrow between them — use it when the stages are
+                    genuinely DIFFERENT NODES that only a pointer relates, most
+                    concretely a linked list: each node really does live
+                    somewhere else, and drawing it as slots in one bordered row
+                    (which is what "state" would draw) claims the opposite —
+                    that it is one contiguous thing, which is exactly the claim
+                    a linked list denies. An array and a linked list rendering
+                    as visually-identical boxes with different text was the
+                    measured complaint this distinction exists to end. Set
+                    flow_orientation to "horizontal" for a chain, which is
+                    usually drawn growing sideways rather than falling down the
+                    screen, and flow_terminator (e.g. "null", "None") when the
+                    beat is about the chain's own end — a linked list's last
+                    node genuinely points at nothing, and that is a state a
+                    viewer needs to see drawn, not a frame that simply stops.
   comparison     -> "compare". Rule 7: BOTH STATES AT ONCE, side by side. Never
                     two beats showing one side each — a difference the viewer has
                     to hold in memory across a cut is a difference they did not
                     see.
-  data_movement  -> "state" WHEN WHAT IT MOVES INTO IS A PLACE IN A CONTAINER (a
-                    page into a free frame, a value into a slot), otherwise "icons"
-                    with arrows=true, or "mapping". Rule 8: the thing that moves,
-                    where it starts, where it lands, and the path between.
+  data_movement  -> "analogy" for the SAME curated nouns, same reason as
+                    process above. Otherwise "state" WHEN WHAT IT MOVES INTO IS A
+                    PLACE IN A CONTAINER (a page into a free frame, a value into
+                    a slot), otherwise "icons" with arrows=true, or "mapping".
+                    Rule 8: the thing that moves, where it starts, where it
+                    lands, and the path between.
   hierarchy      -> "hierarchy" for NESTED LEVELS (boxes inside boxes, so the
                     structure is in the arrangement — a hierarchy drawn as a flat
                     row is a hierarchy the viewer cannot see). "graph" for a root
@@ -115,9 +193,11 @@ because the strategy is what the rendered frame is graded against afterwards.
                     screen with the direction between them drawn. "graph" when
                     ONE cause has SEVERAL distinct effects — cause_effect is one
                     arrow and cannot show that at once.
-  structure      -> "split", "bar", "table", or "graph" when the structure is a
-                    root and several named parts rather than a division into
-                    fields.
+  structure      -> "analogy" for the same curated nouns, when nothing is
+                    moving yet and the beat is just the thing's SHAPE.
+                    Otherwise "split", "bar", "table", or "graph" when the
+                    structure is a root and several named parts rather than a
+                    division into fields.
   effect         -> "preview". Rule 3 at its strongest: the picture IS the answer.
   quantity       -> "stat".
 
@@ -126,6 +206,19 @@ values, its real selectors, its real numbers, and you should always prefer those
 a paraphrase — but it does not give you a better SHAPE. In particular the presence
 of a code block is not a reason to draw a code frame: see WHAT DECIDES IS THE
 LEARNING OBJECTIVE below, which is the order to work down.
+
+A REAL MISS, MEASURED: a beat strategised as `relationship: process` — a loop
+running once per element, building a list one item at a time — was drawn as
+"bar", a row of equal cells. `bar` is a `structure` shape: it holds a division
+still and shows none of it happening. The beat got redesigned only after a
+grader caught the mismatch, which is a wasted call this ladder exists to
+prevent. `process` is never "bar", however tempting a row of similar-looking
+items looks when several of them get created one after another — a process
+needs a shape that draws the STAGES, or the ONE thing moving through them
+("state", "flow", "icons" with arrows=true, or "analogy" for the curated
+nouns above), not a shape that lines the results up and holds still.
+When in doubt, reread `relationship` before picking: if it says process or
+data_movement, "bar" and "table" are off the table entirely.
 
 BUT "DEVELOP" MEANS SOMETHING CHANGES. RECOLOURING ONE CELL IS NOT A NEW FRAME.
 This is the defect to avoid, and it is the one that gets complained about:
@@ -299,6 +392,14 @@ Three rules, and all three are verified by code after you answer:
 If you cannot support a claim, make a smaller claim. A frame showing one rule
 correctly beats a frame showing three where one is invented.
 
+THE ONE EXEMPTION, AND IT IS NARROW. An "analogy" frame's `analogy_caption` is
+a STATED comparison brought TO the lesson from outside it — "like a stack of
+plates" — and is not held to "use only concepts the narration or material
+give you", the same way a real photograph of a CPU needs no citation to depict
+a CPU correctly. Nothing else on this list gets that exemption, and
+`analogy_technical`'s own labels do not either: that panel is the section's
+own mechanism, and every word in it is checked exactly like any other panel's.
+
 DRAW WHAT THE READING MATERIAL SHOWS YOU
 You are given the section of the reading material this short came from, and that is
 not background — it is where the picture comes from. The dialogue is a compression
@@ -314,8 +415,38 @@ things are exactly what a diagram is for:
   a number, size or range         -> a "stat" frame
   two named alternatives          -> a "compare" frame
   a structure, layout or sequence -> "split", "bar", "flow", "mapping"
+  a data structure or mechanism with a well-known real-world equivalent (a
+    stack, a queue, a cache, recursion, a linked list, a tree, a hash table, a
+    graph), and this beat is just INTRODUCING it -> "analogy": the real thing
+    beside the section's own structure. Prefer this to "icons" or "bar" for
+    exactly these nouns.
   a container that HOLDS things   -> "state": a stack, a queue, an array, a set of
                                      frames, and anything entering or leaving one
+  SEPARATE nodes only a pointer relates -> "flow": a linked list, a chain of
+                                     frames each holding its own successor —
+                                     see the "state" vs "flow" contrast above.
+                                     "state" is ONE container with contiguous
+                                     slots (an array IS one physical row, drawn
+                                     as an unbroken bordered row of cells); a
+                                     linked list is NOT one container — each
+                                     node genuinely lives somewhere else, so it
+                                     needs separate boxes with a real gap and a
+                                     real drawn arrow, which is what "flow"
+                                     draws and "state" cannot.
+
+A REAL MISS: a hash-table short's FIRST beat — introducing the bucket array,
+nothing arriving or leaving yet — was drawn as "state" (empty buckets) instead
+of "analogy" (a real row of labelled boxes beside the same bucket diagram),
+even though the row above it is listed BEFORE the container row and the noun
+is in the curated list. "It is a container" is true and is not the question:
+the question is whether THIS BEAT is the short's first look at that
+container, with nothing moving yet. If it is, "state" is not a fallback
+choice available here — the beat is not describing motion, it is describing
+what the thing IS, which is exactly what "analogy" exists to ground. Reserve
+"state" on a curated noun for a LATER beat, once something has actually
+started arriving, leaving, filling or draining — the container's shape is
+established, and now the composition can specialise to the mechanism you
+picked "analogy" to introduce.
 
 Take the first row that fits before the later ones. A document about how text looks
 is best drawn by showing the text; its code block is the SECOND-best picture of it,
@@ -361,7 +492,7 @@ script. Name every label exactly as it should appear. Two or three sentences.
 CHOOSE A TEMPLATE, DO NOT DRAW
 You do not place anything on the canvas. You choose the SHAPE of each frame and
 supply its words; the renderer computes every coordinate and fits every label to
-its box. There are eight shapes. Pick the one the sentence actually needs.
+its box. There are nine shapes. Pick the one the sentence actually needs.
 
   "bar"      One row of equal cells. For anything countable laid out in a line:
              physical memory, frames, slots, a timeline.
@@ -378,9 +509,30 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
   "split"    ONE wide bar cut into named parts. For one thing divided into fields:
              an address into page number and offset.
              -> parts: up to 3.
-  "flow"     Steps top to bottom with arrows. For a sequence of events:
-             what happens on a page fault.
+  "flow"     Steps top to bottom with arrows, SEPARATE BOXES with a real gap
+             between them. For a sequence of events (what happens on a page
+             fault), and — see the "state" vs "flow" contrast above — for
+             SEPARATE NODES only a pointer relates, most concretely a linked
+             list: each box is its own thing, unlike "state"'s one contiguous
+             container.
              -> steps: up to 4.
+             flow_orientation: "vertical" (default, falling down the screen) or
+                "horizontal" (running left to right) — use horizontal for a
+                chain, which is normally drawn growing sideways.
+             flow_terminator: OPTIONAL. Set it when the beat is about the
+                sequence's OWN END — a linked list's last node genuinely points
+                at nothing — to draw a small circle-with-a-slash after the last
+                step, in the material's own word for it ("null", "None"). Leave
+                it out for an ordinary sequence that just finishes on its last
+                step, like a page-fault path.
+             REQUIRED WHENEVER `steps` HAS 2 OR MORE ENTRIES: set
+                `anchor_label` (see the frame-level field) to the label of
+                steps[0] — the source, the node a traversal starts from, the
+                one that must render first. `steps` is drawn in the order you
+                write it: reversing it reverses which end the traversal
+                appears to start from, and a frame with 2+ steps and no
+                anchor_label FAILS a grader outright, the same as getting it
+                wrong — leaving it out is not a safer choice than naming it.
   "table"    A header row and rows, one of them highlighted. For lookups and
              comparisons: a page table, internal versus external.
              -> columns: up to 3, rows: up to 4, each {cells, role}.
@@ -421,6 +573,38 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
                pointer_at    which slot it marks. -1 IS CORRECT AND MEANINGFUL for
                              an empty stack: it draws below the base, which is how
                              `top = -1` states itself.
+                             REQUIRED WHENEVER pointer_at NAMES A SLOT THAT
+                             ACTUALLY HOLDS SOMETHING: set `anchor_label`
+                             (below `slots`, see the frame-level field) to the
+                             label the pointer is SUPPOSED to be indicating.
+                             This is what lets a checker confirm the index you
+                             wrote actually lands on the slot you meant rather
+                             than a valid but wrong one — pointer_at=1 when you
+                             meant the top of a 3-item stack is a real index
+                             into a real slot, and nothing about the number
+                             alone says it is wrong. A frame with a resolvable
+                             pointer_at and no anchor_label FAILS a grader
+                             outright. Not required when pointer_at is -1 or
+                             names an empty slot — there is nothing there to
+                             name.
+               pointer_at_previous   OPTIONAL. Fill this in when THIS BEAT is
+                             about the pointer CHANGING — `top` advancing after
+                             a push, `head` moving after an insertion, a node's
+                             `next` being handed from the node before it to the
+                             one just inserted after it — with where the SAME
+                             pointer was pointing on the PREVIOUS beat. Leave it
+                             out when the pointer has not moved, or this is the
+                             first beat it appears on. THIS IS HOW A POINTER
+                             CHANGE IS SHOWN RATHER THAN JUST STATED: filled in,
+                             the renderer draws the pointer visibly
+                             disconnecting from its old target and reconnecting
+                             to its new one instead of only ever appearing
+                             already arrived — the literal "animate the pointer
+                             disconnecting and reconnecting" a linked-list
+                             insertion needs. Do not fill it in with the same
+                             value as pointer_at — that asks for no animation at
+                             all, which is also a legitimate answer for a beat
+                             where the pointer genuinely holds still.
                open_end      true for a stack or a queue, which are entered past an
                              end. false for a fixed array or a set of frames, whose
                              ends are their own and which are entered from outside
@@ -452,6 +636,26 @@ its box. There are eight shapes. Pick the one the sentence actually needs.
              "hero", and a viewer reads the rule off the two of them without a
              word of narration. A frame with a lost item and nothing lit says only
              that something is wrong, not what is right instead.
+
+             A DIFFERENT BEAT, AND A REAL MISS: "only this slot is ever touched,
+             the others never are" has NOTHING arriving or leaving — it is a
+             settled snapshot, not a motion beat. Two things both have to be
+             true for it to read as its own picture and not a rerun of whatever
+             beat last filled that slot:
+               state    the occupied slot is "resting", same as any settled
+                        occupant — NOT "arriving" copied forward from the beat
+                        that put it there. "arriving" draws the floating box
+                        and the arrow every time, so reusing it here draws the
+                        SAME picture as the storing beat, which is the exact
+                        defect measured: a hash-table short's "no other bucket
+                        is ever inspected" beat repeated its "storing the value"
+                        beat byte-for-byte.
+               role     the OTHER slots — the ones the claim says are never
+                        touched — are "quiet", not "plain". "plain" means
+                        "present and could matter"; "quiet" is what says "this
+                        one, deliberately, not those", which is the entire
+                        content of this beat. Without it, the frame shows a
+                        settled value and says nothing about exclusivity at all.
 
              ACROSS BEATS, KEEP THE STORE AND CHANGE ITS CONTENTS. Beat 2 pushes,
              beat 3 pushes again, beat 4 pops: the same container, three different
@@ -674,6 +878,16 @@ __ICON_LIST__
              above the hardware; an element inside its parent.
              -> levels: 2 to 4, each {label, role}. TOP OF THE LIST IS THE TOP OF
                 THE STACK.
+                REQUIRED WHENEVER `levels` HAS 2 OR MORE ENTRIES: set
+                `anchor_label` (see the frame-level field) to levels[0]'s own
+                label — the parent, the outermost, the one that must render on
+                top. This is what lets a checker confirm the PARENT actually
+                ended up first rather than trusting that it did: `levels`
+                written [child, parent] instead of [parent, child] draws the
+                child above the parent, correctly by the renderer's own rules
+                and wrongly for the concept, and nothing else can tell the
+                difference after the fact. A hierarchy frame with 2+ levels
+                and no anchor_label FAILS a grader outright.
              THIS IS RULE 9, AND ITS ABSENCE PRODUCED THE FRAME THIS BRIEF QUOTES
              AS ITS WORST. "Users, Applications, Operating System, Hardware" had no
              stacked shape to go in, so it went to "icons" — which lays things out
@@ -695,6 +909,65 @@ __ICON_LIST__
              column, which says "a process with two stages" — a different claim
              from "this makes that true". The effect is drawn larger than the
              cause, because the beat is always about the effect.
+  "analogy"  A REAL-WORLD OBJECT BESIDE THE SECTION'S OWN STRUCTURE — a photo on
+             the left, the actual mechanism on the right. For the handful of
+             data structures and mechanisms a viewer already has a physical
+             intuition for:
+             a stack (a spring-loaded plate dispenser — you can only take from
+             the top), a queue (a line of people — first in line is served
+             first), a cache (a personal address book — a few numbers kept close
+             at hand instead of looking every one up), recursion (nested dolls
+             — each one waiting on the one inside it), a linked list (a chain —
+             each link connects only to the next one, never straight to one
+             further down), a tree (a real tree's own branches — one trunk
+             splitting into limbs, each limb splitting again), a hash table (a
+             bank of numbered safe-deposit boxes — a key sends you straight to
+             one box, never a search through all of them), a graph (a subway
+             map — stations joined by lines, with no single station everything
+             else answers to the way a hierarchy has one root).
+
+             ONLY THESE EIGHT. This is not a general "find an analogy" template
+             any more than "icons" is a general "draw something" template.
+             `analogy_subject` MUST be one of: stack, queue, cache, recursion,
+             linked_list, tree, hash_table, graph. Naming anything else draws a
+             plain labelled box instead of a photo — honest, but says nothing —
+             so pick from the eight or use a different template.
+
+             -> analogy_subject: one of the eight above.
+                analogy_caption: the comparison itself, PHRASED AS a comparison
+                — "like a stack of plates", "similar to a line at a counter" —
+                NEVER as a fact ("a stack IS a plate dispenser"). This is the
+                one label in this entire brief NOT held to the grounding rule
+                below: a real photo of a plate stack needs no citation to
+                depict a plate stack correctly, and neither does the sentence
+                beside it — see EVERY FRAME IS A CLAIM below for the one line
+                this template is exempt from and why.
+                analogy_technical: a Panel — title, and up to 4 {label, role}
+                items — drawing the SECTION'S OWN structure, e.g.
+                {"title": "Call stack", "items": [{"label": "main()"},
+                {"label": "foo()"}, {"label": "bar()", "role": "hero"}]}.
+                EVERY LABEL HERE IS STILL CHECKED against the narration and
+                the source, exactly like any other panel's.
+
+             USE THIS FOR THE BEAT THAT INTRODUCES THE STRUCTURE, before
+             anything is pushed, popped, moved, or traversed. Once the beat is
+             an OPERATION happening TO a container (a stack, a queue, a
+             cache), "state" is the right template instead — it can show a
+             slot arriving or leaving, and a Panel cannot. Once the beat is
+             about a non-container shape being operated on (a value found in
+             a tree, a lookup landing in a hash table, an edge walked in a
+             graph), "hierarchy", "mapping", "graph", or "flow" takes over for
+             the same reason — analogy's right panel is a still Panel, and a
+             traversal is motion a Panel cannot draw either.
+
+               BAD   the first beat of a stack short drawn as "icons": a `box`
+                     pictogram labelled "Stack". A box is not a picture of a
+                     stack, it is the fallback for an icon name the renderer
+                     does not recognise, wearing a label.
+               GOOD  "analogy": a photo of a stack of plates captioned "like a
+                     stack of plates — you can only take from the top",
+                     beside a panel titled "Call stack" holding the same three
+                     frames the rest of the short will push onto and pop from.
 
 PICK THE TEMPLATE FROM THE RELATIONSHIP, NOT FROM THE SUBJECT
 Ask what the sentence CLAIMS, and the template follows:
@@ -702,6 +975,8 @@ Ask what the sentence CLAIMS, and the template follows:
   one thing divides into named fields    -> "split"
   two sets correspond, row for row       -> "mapping"
   a sequence of events in order          -> "flow"
+  separate nodes only a pointer relates  -> "flow" (flow_orientation
+                                             "horizontal", flow_terminator set)
   countable slots in a line              -> "bar"
   a lookup: this key gives that value    -> "table"
   two alternatives weighed against each  -> "compare"
@@ -711,6 +986,8 @@ Ask what the sentence CLAIMS, and the template follows:
   a single figure is the whole point     -> "stat"
   one thing sits on top of / inside another -> "hierarchy"
   this MAKES that happen                 -> "cause_effect"
+  a data structure or mechanism with a well-known real-world equivalent, being
+    INTRODUCED, not yet operated on        -> "analogy"
 
 WHAT DECIDES IS THE LEARNING OBJECTIVE, NOT WHAT THE SOURCE HAPPENS TO CONTAIN.
 This list used to end "the material teaches it with code -> code", and say that a
@@ -781,7 +1058,25 @@ Every cell, box and row takes a role, and the role decides its colour:
            goes wrong, and it is rejected.
   "plain"  present and relevant, but not what is being said right now.
   "lost"   something wasted, rejected, invalid or unusable. Used sparingly.
-  "quiet"  context the viewer should not read yet.
+  "quiet"  context the viewer should not read yet — OR present but explicitly
+           EXCLUDED by the claim this beat is making. Two different beats reach
+           for the same role because both mean "not this one, and the viewer
+           should feel that, not just fail to notice it":
+
+             a step not yet reached      -> quiet (the "not yet" reading)
+             a slot the operation NEVER
+             touches, on purpose         -> quiet (the "correctly excluded"
+                                            reading)
+
+           A REAL MISS THIS FIXES: a beat claiming "the key routes to exactly
+           one bucket, and no other bucket is ever inspected" was drawn with
+           the untouched buckets left "plain" — which reads as "these are
+           present and could matter", the opposite of the claim, and the frame
+           came out looking like the PREVIOUS beat (something arriving in that
+           same bucket) instead of a distinct one. `plain` on an explicitly-
+           excluded element always reads as a repeat of whatever beat last
+           showed the group at rest; `quiet` is what makes "this one, not
+           those" visible instead of merely implied by an unlabelled arrow.
 Moving the hero is how a SINGLE frame directs attention. It is NOT how a short is
 built, and reading it that way is what produced the defect this brief spends most of
 its length warning about.
@@ -851,14 +1146,34 @@ beat's sentence shortened.
 `spec` is one sentence of prose saying what the frame shows, for the graders and
 for a human reading the unit later. It is not drawn.
 
+`anchor_label` IS ONLY FOR "hierarchy", "flow", and "state" FRAMES WHOSE ORDER
+OR POINTER CARRIES A MEANING THAT CAN BE GOTTEN BACKWARDS — leave it empty for
+every other template, and empty even for these three when there is only one
+level, one step, or no pointer to get wrong. Where it applies, it is the exact
+label that belongs in this frame's semantically PRIMARY position — see each
+template's own section above for what that means for it (the parent for
+hierarchy, the flow's source for flow, the pointer's true target for state). It
+is not drawn on screen; it exists so the frame you hand back can be checked
+against what you meant by it, not just against whether a shape exists.
+
+THIS IS A REQUIRED FIELD ON AN ELIGIBLE FRAME, NOT AN OPTIONAL EXTRA — a
+hierarchy with 2+ levels, a flow with 2+ steps, or a state whose pointer_at
+names a filled slot, that comes back with anchor_label left blank FAILS a
+grader exactly as if it had been filled in wrong. There is no safer choice
+between naming it and skipping it: skipping it is treated as a claim nobody
+can check, which is the same defect as a wrong claim. If you are unsure which
+label belongs there, that uncertainty is exactly what this field exists to
+resolve — answer it, do not leave it for later.
+
 Output JSON:
 {"visuals":[{"ref":"...","spec":"one sentence","frame":{
   "template":"bar|mapping|split|flow|table|stat|code|compare|preview|icons|
-              hierarchy|cause_effect",
+              hierarchy|cause_effect|analogy",
   "title":"...",
   "cells":[{"label":"...","role":"plain|hero|lost|quiet"}], "cells_title":"...",
   "left":[...], "right":[...], "left_title":"...", "right_title":"...",
   "parts":[...], "steps":[...],
+  "flow_orientation":"vertical|horizontal", "flow_terminator":"null",
   "columns":["..."], "rows":[{"cells":["..."],"role":"..."}],
   "value":"...", "caption":"...",
   "code_lines":[{"label":"  font-family: \"Roboto\";","role":"hero"}],
@@ -868,9 +1183,15 @@ Output JSON:
   "levels":[{"label":"Hardware","role":"plain"}],
   "cause":{"label":"...","role":"plain"}, "effect":{"label":"...","role":"hero"},
   "mechanism":"parser stops",
+  "anchor_label":"Hardware",
   "samples":[{"text":"Tourism","label":"Lobster","font":"Lobster","scale":3,
               "weight":700,"italic":false,"decoration":null,"color":"blue",
-              "background":null,"role":"hero"}]}}]}
+              "background":null,"role":"hero"}],
+  "analogy_subject":"stack|queue|cache|recursion|linked_list|tree|hash_table|graph",
+  "analogy_caption":"Like a stack of plates — you can only take from the top.",
+  "analogy_technical":{"title":"Call stack","role":"plain",
+              "items":[{"label":"main()","role":"plain"},
+                       {"label":"bar()","role":"hero"}]}}}]}
 
 Include only the fields the chosen template uses. There is no "takeaway" template
 and no "note" field — the last ref is the finished composition, see above."""
@@ -1050,6 +1371,29 @@ def _design_graders(section: Section | None = None):
                # no focus" has been in the brief from the start; this is the first
                # thing to act on it.
                checks.check_frames_match_strategy,
+               # The tie-breaker relationship alone cannot give: a stack and a
+               # linked list can both be `process` and still need opposite
+               # shapes. Same actionable-by-a-redesign reasoning as the check
+               # just above — a redesign can always pick a different template
+               # for a beat whose physical_form was never asked for the one
+               # chosen.
+               checks.check_physical_form_matches_template,
+               # Same reasoning again, one level more specific: physical_form
+               # gets the SHAPE right (state vs flow vs hierarchy); this
+               # catches the shape being right and the ORDER inside it
+               # backwards — a real, correctly-nested hierarchy frame with the
+               # parent and child swapped, which a redesign can fix by
+               # reordering `levels`/`steps` or re-aiming `pointer_at` without
+               # touching the template choice at all.
+               checks.check_anchor_matches_structure,
+               # Three more, same actionable-by-a-redesign shape: none of them
+               # require a different template or a different physical_form,
+               # only that the beats around an action actually show it —
+               # marking a slot arriving/leaving, retargeting a pointer with
+               # pointer_at_previous, or moving a traversal's hero forward.
+               checks.check_state_item_transitions_visible,
+               checks.check_state_pointer_moves_are_shown,
+               checks.check_flow_traversal_progresses,
                checks.check_one_hero_per_frame,
                # Catches the failure that motivated it directly: a frame whose
                # template names a structured field (Store, Graph) that was left
@@ -1057,7 +1401,17 @@ def _design_graders(section: Section | None = None):
                # sees that only as a symptom two steps downstream — frames that
                # look byte-identical, with no way to tell "nothing was drawn"
                # from "the same thing was drawn twice on purpose".
-               checks.check_template_data_present]
+               checks.check_template_data_present,
+               # Same actionable-by-a-redesign shape as frames_match_strategy just
+               # above: a redesign can always pick a different template for a beat
+               # whose strategy never asked for code, so a code-as-default-filler
+               # verdict belongs in the gate rather than shipping unexamined.
+               checks.check_code_not_overused,
+               # Same shape once more, one level up: not one frame's template
+               # but the reel's overall reliance on the box family. A redesign
+               # can act on this by giving the beats named in the verdict a
+               # different shape, exactly like the code-overuse case above.
+               checks.check_generic_boxes_not_overused]
     if section is not None:
         graders.append(lambda u: checks.check_code_frames_quote_source(u, section.text))
     return graders
@@ -1069,7 +1423,9 @@ def design_visuals(script: Script, section: Section | None = None, *,
                    attempts: int = MAX_DESIGN_ATTEMPTS,
                    note: str | None = None,
                    vision: bool = True,
-                   scores_out: dict | None = None) -> tuple[dict[str, Visual], list[str]]:
+                   scores_out: dict | None = None,
+                   understanding: SectionUnderstanding | None = None,
+                   ) -> tuple[dict[str, Visual], list[str]]:
     """
     Design the frames, grade them, and ask again for the ones that failed.
 
@@ -1140,7 +1496,7 @@ def design_visuals(script: Script, section: Section | None = None, *,
     # this step existed, which is worse but is not broken.
     strategy: VisualStrategy | None = None
     try:
-        strategy = plan_strategy(script, section)
+        strategy = plan_strategy(script, section, understanding=understanding)
     except Exception as e:
         print(f"    strategy for {script.short_id} unavailable "
               f"({type(e).__name__}: {str(e)[:90]}) — designing from the beats alone")
@@ -1262,7 +1618,8 @@ def design_visuals(script: Script, section: Section | None = None, *,
             if weak:
                 try:
                     strategy = plan_strategy(script, section,
-                                             feedback="\n".join(f"  - {p}" for p in vision_problems))
+                                             feedback="\n".join(f"  - {p}" for p in vision_problems),
+                                             understanding=understanding)
                     print(f"    re-planned the strategy for {script.short_id}: the judge "
                           f"rejected what {len(weak)} frame(s) SHOW, not how they look")
                 except Exception as e:

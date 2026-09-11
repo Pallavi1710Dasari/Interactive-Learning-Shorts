@@ -1,0 +1,9 @@
+{
+  "short_id": "os_s18_question_no_mark",
+  "question": "The reason paging removes external fragmentation",
+  "beats": [
+    {"speaker":"interviewer","line":"The reason paging removes external fragmentation.","on_screen":"Paging vs fragmentation","visual_ref":"title"},
+    {"speaker":"student","line":"Paging splits memory into fixed-size frames, so any page can go in any free frame.","on_screen":"Any page, any frame","visual_ref":"d1"},
+    {"speaker":"student","line":"That means scattered free space is always usable, and external fragmentation disappears.","on_screen":"Fragmentation disappears","visual_ref":"d2"}
+  ]
+}

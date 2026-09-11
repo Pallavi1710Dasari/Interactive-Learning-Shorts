@@ -441,12 +441,24 @@ def render(short_id: str, force: bool = False,
             "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
                    f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=0x0B0F0E",
             "-r", str(fps),
-            "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+            # crf 20 -> 23 and preset medium -> slow: a pure encoding-efficiency
+            # trade, not a visual one. ThreeStage's depth field never holds still —
+            # every frame differs from the last by design (see its own docstring) —
+            # so most of a frame's bits were going to out-of-focus background
+            # texture that already reads as "indistinguishable" at half resolution.
+            # 23 is still transparent at this resolution for flat diagram colour and
+            # text; the only thing it costs is a few more compression artifacts in
+            # pixels nobody is looking at. slower buys back some of that quality per
+            # bit at the cost of encode time, which is a rounding error next to the
+            # capture time this file's own comments already measured in the minutes.
+            "-c:v", "libx264", "-preset", "slow", "-crf", "23",
             # yuv420p or Safari and most phones will not play it at all.
             "-pix_fmt", "yuv420p", "-movflags", "+faststart",
         ]
         if audio.exists():
-            cmd += ["-c:a", "aac", "-b:a", "160k", "-shortest"]
+            # 160k -> 128k. This is narration, not music — 128kbps AAC is standard
+            # broadcast quality for spoken voice and has real headroom below it.
+            cmd += ["-c:a", "aac", "-b:a", "128k", "-shortest"]
         cmd += [str(mp4)]
 
         done = subprocess.run(cmd, capture_output=True, text=True)

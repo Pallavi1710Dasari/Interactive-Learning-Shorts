@@ -1,0 +1,25 @@
+{
+  "short_id": "motion_traversal_stuck",
+  "session_id": "eval",
+  "source_section_id": "7.1",
+  "question": "How does a traversal move from head to the last node?",
+  "estimated_seconds": 14.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "How does a traversal move from head to the last node?", "on_screen": "Following pointers", "visual_ref": "d_step1"},
+    {"speaker": "student", "line": "The traversal starts at head, the first node in the chain.", "on_screen": "at head", "visual_ref": "d_step1", "source_quote": "starting at the node the list calls head"},
+    {"speaker": "student", "line": "It then reads head's pointer to move toward the next node.", "on_screen": "still at head", "visual_ref": "d_step2", "source_quote": "reading its pointer to reach the second node"}
+  ],
+  "visuals": {
+    "d_step1": {
+      "ref": "d_step1", "type": "diagram", "spec": "traversal at head",
+      "frame": {"template": "flow", "title": "Starting at head", "flow_orientation": "horizontal", "anchor_label": "head",
+        "steps": [{"label": "head", "role": "hero"}, {"label": "Node 2", "role": "plain"}, {"label": "Node 3", "role": "plain"}]}
+    },
+    "d_step2": {
+      "ref": "d_step2", "type": "diagram", "spec": "traversal claims to move on, hero unchanged",
+      "frame": {"template": "flow", "title": "Reading head's pointer", "flow_orientation": "horizontal", "anchor_label": "head",
+        "steps": [{"label": "head", "role": "hero"}, {"label": "Node 2", "role": "plain"}, {"label": "Node 3", "role": "plain"}]}
+    }
+  },
+  "status": "draft"
+}

@@ -1,0 +1,50 @@
+{
+  "short_id": "anchor_flow_reversed_direction",
+  "session_id": "eval",
+  "source_section_id": "7.1",
+  "question": "How does a traversal move from the head to the last node?",
+  "estimated_seconds": 18.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "How does a traversal move from the head to the last node?",
+      "on_screen": "Head to tail",
+      "visual_ref": "d_chain"
+    },
+    {
+      "speaker": "student",
+      "line": "Starting at head, the traversal follows each pointer to reach the next node in turn.",
+      "on_screen": "Following pointers",
+      "visual_ref": "d_chain",
+      "source_quote": "finding the third item means starting at the node the list calls head, reading its pointer to reach the second node"
+    }
+  ],
+  "visuals": {
+    "d_chain": {
+      "ref": "d_chain",
+      "type": "diagram",
+      "spec": "nodes A to C, traversal starting at head",
+      "frame": {
+        "template": "flow",
+        "title": "Traversal order",
+        "flow_orientation": "horizontal",
+        "anchor_label": "A (head)",
+        "steps": [
+          {"label": "C", "role": "plain"},
+          {"label": "B", "role": "plain"},
+          {"label": "A (head)", "role": "hero"}
+        ]
+      },
+      "strategy": {
+        "ref": "d_chain",
+        "concept": "the traversal starts at head and follows pointers forward",
+        "relationship": "process",
+        "physical_form": "linked_nodes",
+        "must_see": "separate nodes in a row, starting at head and moving toward the last node",
+        "changes_from_previous": "",
+        "focus": "the head node"
+      }
+    }
+  },
+  "status": "draft"
+}

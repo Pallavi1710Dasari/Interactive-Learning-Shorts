@@ -25,11 +25,12 @@ import type { Unit } from "./types";
  * WHAT IS DELIBERATELY NOT HERE: the action rail, the tap-to-play affordance, and
  * the judge's scores. The first two are controls, which a video file cannot honour
  * and should not show; the third is internal QA (faithfulness/clarity/pace) that
- * has no business in a file that gets posted. `chrome={false}` is what the renderer
- * passes, and it is why the export is postable as-is.
+ * a student watching a reel has no use for, on the live player or the exported
+ * MP4 alike — it stays in step 2's review cards (see StepReview), the one place
+ * anyone reads it to decide whether a short should ship.
  */
 export function ReelStage({
-  unit, beatIndex, time, speaking, hue, chrome = true, progressPct, onStageClick,
+  unit, beatIndex, time, speaking, hue, progressPct, onStageClick,
 }: {
   unit: Unit;
   /** Which beat is on screen. */
@@ -40,8 +41,6 @@ export function ReelStage({
   speaking: boolean;
   /** The short's own hue, so the depth layer matches the background. */
   hue: number;
-  /** false in the MP4 renderer: hide the header's QA scores. */
-  chrome?: boolean;
   /** 0..100 fill for the current segment. */
   progressPct: number;
   /** Tap-to-pause in the player; absent in the renderer, which cannot be tapped. */
@@ -84,13 +83,6 @@ export function ReelStage({
         <div className="who">
           <span className="mode" aria-hidden="true">{isAsking ? "🤔" : "📖"}</span>
           {isAsking ? "Asking" : "Answering"}
-        </div>
-        <div className="tagline">
-          §{unit.section}
-          {/* QA scores are for the reviewer, not for a file that gets posted. */}
-          {chrome && unit.judge && <> · <span title="faithfulness / clarity / pace">
-            {unit.judge.faithfulness}·{unit.judge.clarity}·{unit.judge.pace}
-          </span></>}
         </div>
       </header>
 

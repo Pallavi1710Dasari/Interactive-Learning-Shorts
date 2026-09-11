@@ -2,7 +2,10 @@
 The eval runner. Run this before every prompt change and after every fix.
 
     python -m evals.run_evals              # code graders only (free, instant)
-    python -m evals.run_evals --judge      # also run LLM-judge cases (costs money)
+    python -m evals.run_evals --judge      # also run LLM-judge and vision-judge
+                                            # cases (costs money; vision cases also
+                                            # need a working headless Chromium —
+                                            # see shorts/raster.py)
 
 Exit code is non-zero if any case fails, so you can wire it into CI later.
 """
@@ -13,7 +16,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from shorts.schema import Script, ShortUnit, SectionUnderstanding
+from shorts.schema import Script, ShortUnit, SectionUnderstanding, Topic
 from shorts.parse import parse_markdown, find_section
 from shorts import checks, revision
 
@@ -28,6 +31,7 @@ GRADERS = {
     "no_refusal":     lambda s, src: checks.check_no_refusal(s),
     "on_topic":       lambda s, src: checks.check_answers_its_section(s, src),
     "no_repetition":  lambda s, src: checks.check_beats_develop(s),
+    "qa_sentence_form": lambda s, src: checks.check_qa_sentence_form(s),
 }
 
 #: Graders that read a whole ShortUnit — the FRAMES — rather than the script.
@@ -44,8 +48,17 @@ UNIT_GRADERS = {
     "samples_differ":     checks.check_samples_differ,
     "svg_quality":        checks.check_svg_quality,
     "frames_match_strategy": checks.check_frames_match_strategy,
+    "physical_form_matches_template": checks.check_physical_form_matches_template,
+    "anchor_matches_structure": checks.check_anchor_matches_structure,
+    "state_item_transitions_visible": checks.check_state_item_transitions_visible,
+    "state_pointer_moves_are_shown": checks.check_state_pointer_moves_are_shown,
+    "flow_traversal_progresses": checks.check_flow_traversal_progresses,
+    "generic_boxes_not_overused": checks.check_generic_boxes_not_overused,
     "one_hero_per_frame":    checks.check_one_hero_per_frame,
     "diagram_matches_narration": checks.check_diagram_matches_narration,
+    "ends_on_answer":        checks.check_ends_on_answer,
+    "motion_concept_not_static": checks.check_motion_concept_not_static,
+    "code_not_overused":     checks.check_code_not_overused,
 }
 
 #: Graders that read a SCRIPT against the content understanding that produced it.
@@ -72,6 +85,15 @@ UNDERSTANDING_GRADERS = {
     "confusion_plan":    checks.check_confusion_plan,
     "hook_plan":         checks.check_hook_plan,
     "plan_depth":        checks.check_plan_depth,
+    "duration_budget":   checks.check_duration_budget,
+}
+
+#: Graders that read a TOPIC against the SectionUnderstanding for the same
+#: section — the reconciliation check added to close the gap check_plan_depth
+#: never covered: not "is this reading deep enough" but "is the topic select.py
+#: chose even the topic this reading landed on".
+TOPIC_GRADERS = {
+    "topic_matches_understanding": checks.check_topic_matches_understanding,
 }
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
@@ -124,6 +146,104 @@ def run_unit_case(case: dict, sections) -> tuple[bool, str]:
         return False, f"reason missing {needle!r}; got: {result.reason}"
 
     return True, result.reason
+
+
+def run_vision_judge_case(case: dict, sections) -> tuple[bool, str]:
+    """
+    A real vision-model call against ACTUAL RENDERED PIXELS — skills/vision.py's
+    judge_frames, the one component in this pipeline that looks at a picture
+    rather than reads a description of one. Costs a real API call and needs a
+    working headless Chromium (see shorts/raster.py), so — like llm_judge and
+    golden — this only runs behind --judge.
+
+    The fixture is a ShortUnit, same shape as unit_grader's. The difference is
+    what happens to it before judging: unit_grader reads the `frame` specs as
+    structure, but judge_frames only looks at pixels, so every visual's frame is
+    rendered to SVG first (skills.layout.render — local and free, the same
+    drawing step design_visuals uses) rather than left as JSON.
+
+    A fixture's per-visual `strategy` (BeatStrategy) is threaded into a
+    VisualStrategy so the judge sees the same must_see/relationship context a
+    real build gives it — the closer this is to the real call, the more a
+    fixture here proves about the real pipeline.
+
+    NOT DISTINGUISHING "found nothing wrong" FROM "was never run" WOULD MAKE THIS
+    WORTHLESS AS A REGRESSION GUARD. An environment with no browser or no vision
+    model configured returns ({}, []) — indistinguishable, by content, from a
+    short that was judged and scored perfectly — so an empty result here is
+    reported as a failure with its own message rather than silently passing.
+    """
+    from shorts.schema import Script, Visual, VisualStrategy
+    from shorts.skills import vision
+    from shorts.skills import layout as layout_mod
+
+    data = json.loads((ROOT / case["fixture"]).read_text(encoding="utf-8"))
+    script = Script(short_id=data["short_id"], question=data["question"],
+                    beats=data["beats"])
+
+    visuals: dict[str, "Visual"] = {}
+    beat_strategies = []
+    for ref, raw in data["visuals"].items():
+        v = Visual(**raw)
+        if v.frame is not None:
+            v.svg = layout_mod.render(v.frame)
+        if v.strategy is not None:
+            beat_strategies.append(v.strategy)
+        visuals[ref] = v
+
+    strategy = VisualStrategy(subject=data.get("subject", script.question),
+                              beats=beat_strategies) if beat_strategies else None
+
+    scores, composition_problems = vision.judge_frames(
+        script, visuals, strategy=strategy, section=None)
+
+    if not scores and not composition_problems:
+        return False, ("vision judge did not run in this environment — no "
+                       "Chromium, VISION_JUDGE=0, or no model call reached the "
+                       "server; this case cannot confirm anything")
+
+    exp = case["expect"]
+    all_problems = list(composition_problems)
+    for s in scores.values():
+        all_problems += s.problems
+
+    if "any_frame_failed" in exp:
+        got = any(not s.passed for s in scores.values())
+        if got != exp["any_frame_failed"]:
+            return False, (f"expected any_frame_failed={exp['any_frame_failed']}, "
+                           f"got {got} — scores: "
+                           f"{ {r: s.model_dump() for r, s in scores.items()} }")
+
+    if "composition_problems_present" in exp:
+        got = bool(composition_problems)
+        if got != exp["composition_problems_present"]:
+            return False, (f"expected composition_problems_present="
+                           f"{exp['composition_problems_present']}, got {got}: "
+                           f"{composition_problems}")
+
+    needle = exp.get("problems_contain")
+    if needle and needle.lower() not in " ".join(all_problems).lower():
+        return False, f"expected a problem containing {needle!r}; got: {all_problems}"
+
+    # NOT "composition_problems_present: false" — this judge is strict enough
+    # that a real, non-contrived composition still earns genuine polish notes
+    # (see visual_state_happens.json's own eval case), and asserting silence
+    # would make the false-positive guard chase a bar no fixture may ever clear.
+    # This instead asserts the sequence-level verdict never claims the ONE
+    # thing a false-positive guard actually needs to rule out: that the frames
+    # are of unrelated subjects with no developing thread between them. A note
+    # about one frame's geometry is not that; a claim of fragmentation is.
+    exclude = exp.get("composition_problems_exclude", [])
+    if isinstance(exclude, str):
+        exclude = [exclude]
+    joined = " ".join(composition_problems).lower()
+    hit = [w for w in exclude if w.lower() in joined]
+    if hit:
+        return False, (f"composition_problems claims fragmentation ({hit!r}); "
+                       f"got: {composition_problems}")
+
+    return True, (f"{len(scores)} frame(s) scored, "
+                  f"{len(composition_problems)} composition problem(s)")
 
 
 def load_content(fixture: str):
@@ -188,6 +308,26 @@ def run_understanding_case(case: dict, sections) -> tuple[bool, str]:
     grader = UNDERSTANDING_GRADERS[case["grader"]]
     return _check_expectations(grader(understanding, source_for(case, sections)),
                                case["expect"])
+
+
+def load_topic_match(fixture: str) -> tuple[Topic, SectionUnderstanding]:
+    """A topic plus the SectionUnderstanding it is (or is not) reconciled with.
+
+    Its own loader rather than a reuse of load_content: that one pairs an
+    understanding with the SCRIPT written from it, and this pair is a step
+    earlier — a topic and the reading it is being checked against, before any
+    script exists.
+    """
+    data = json.loads((ROOT / fixture).read_text(encoding="utf-8"))
+    return Topic(**data["topic"]), SectionUnderstanding(**data["understanding"])
+
+
+def run_topic_case(case: dict, sections) -> tuple[bool, str]:
+    """A topic checked against the SectionUnderstanding for its own section —
+    run.py's new reconciliation check, exercised without a live model call."""
+    topic, understanding = load_topic_match(case["fixture"])
+    grader = TOPIC_GRADERS[case["grader"]]
+    return _check_expectations(grader(topic, understanding), case["expect"])
 
 
 def run_revision_case(case: dict, sections) -> tuple[bool, str]:
@@ -448,7 +588,7 @@ def main():
         # anger check in the suite only gets exercised on the rare occasions
         # someone pays for the paid cases too.
         free_golden = kind == "golden" and case.get("step") in ("section_richness", "speech", "legend")
-        if kind in ("llm_judge", "golden") and not args.judge and not free_golden:
+        if kind in ("llm_judge", "golden", "vision_judge") and not args.judge and not free_golden:
             print(f"{DIM}  ·  {case['id']:6} {case['name'][:52]:52} skipped (needs --judge){RESET}")
             skipped += 1
             continue
@@ -461,10 +601,14 @@ def main():
                 ok, detail = run_content_case(case, sections)
             elif kind == "understanding_grader":
                 ok, detail = run_understanding_case(case, sections)
+            elif kind == "topic_grader":
+                ok, detail = run_topic_case(case, sections)
             elif kind == "revision":
                 ok, detail = run_revision_case(case, sections)
             elif kind == "llm_judge":
                 ok, detail = run_judge_case(case, sections)
+            elif kind == "vision_judge":
+                ok, detail = run_vision_judge_case(case, sections)
             else:
                 ok, detail = run_golden_case(case, sections)
         except Exception as e:

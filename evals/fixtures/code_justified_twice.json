@@ -1,0 +1,98 @@
+{
+  "short_id": "code_justified_twice",
+  "session_id": "eval",
+  "source_section_id": "1.4",
+  "question": "What exactly does the CSS font-family property specify, and how do you write it?",
+  "estimated_seconds": 22.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What exactly does the CSS font-family property specify, and how do you write it?",
+      "on_screen": "font-family syntax",
+      "visual_ref": "q_font"
+    },
+    {
+      "speaker": "student",
+      "line": "It sets which typeface the browser uses, written as the property name, a colon, then the font name.",
+      "on_screen": "property: value",
+      "visual_ref": "d_property",
+      "source_quote": "The font-family property specifies the typeface."
+    },
+    {
+      "speaker": "student",
+      "line": "A font name with spaces needs quotes around it, or the browser reads each word as a separate name.",
+      "on_screen": "Quoting the value",
+      "visual_ref": "d_quoting",
+      "source_quote": "Font names containing spaces should be quoted."
+    }
+  ],
+  "visuals": {
+    "q_font": {
+      "ref": "q_font",
+      "type": "diagram",
+      "spec": "the declaration",
+      "frame": {
+        "template": "code",
+        "title": "The font-family declaration",
+        "code_lines": [
+          {"label": ".main-heading {", "role": "plain"},
+          {"label": "  font-family: \"Roboto\";", "role": "hero"},
+          {"label": "}", "role": "plain"}
+        ],
+        "code_caption": "style.css"
+      },
+      "strategy": {
+        "ref": "q_font",
+        "concept": "the font-family property's own declaration syntax",
+        "relationship": "structure",
+        "must_see": "the property name, the colon, and the quoted value it takes — the declaration's syntax itself",
+        "changes_from_previous": "",
+        "focus": "the font-family declaration"
+      }
+    },
+    "d_property": {
+      "ref": "d_property",
+      "type": "diagram",
+      "spec": "property and value",
+      "frame": {
+        "template": "code",
+        "title": "Property, then value",
+        "code_lines": [
+          {"label": "font-family", "role": "hero"},
+          {"label": ": \"Roboto\";", "role": "plain"}
+        ],
+        "code_caption": "style.css"
+      },
+      "strategy": {
+        "ref": "d_property",
+        "concept": "the property name comes first, the value after the colon",
+        "relationship": "structure",
+        "must_see": "the property keyword lit, separated from its value by the colon that CSS syntax requires",
+        "changes_from_previous": "the hero moves from the whole declaration to just the property keyword",
+        "focus": "the property keyword"
+      }
+    },
+    "d_quoting": {
+      "ref": "d_quoting",
+      "type": "diagram",
+      "spec": "why the quotes matter",
+      "frame": {
+        "template": "compare",
+        "title": "Quoted vs unquoted",
+        "panels": [
+          {"title": "Unquoted", "items": [{"label": "font-family: Segoe UI;", "role": "plain"}]},
+          {"title": "Quoted", "items": [{"label": "font-family: \"Segoe UI\";", "role": "hero"}]}
+        ]
+      },
+      "strategy": {
+        "ref": "d_quoting",
+        "concept": "an unquoted multi-word font name is read as two separate names",
+        "relationship": "comparison",
+        "must_see": "the same font name once broken by a missing quote and once working correctly",
+        "changes_from_previous": "a new comparison of the same value, quoted and unquoted",
+        "focus": "the quoted value"
+      }
+    }
+  },
+  "status": "draft"
+}

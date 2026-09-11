@@ -1,0 +1,11 @@
+{
+  "template": "flow",
+  "title": "Inserting D",
+  "flow_orientation": "horizontal",
+  "flow_terminator": "null",
+  "steps": [
+    {"label": "A", "role": "plain"},
+    {"label": "B", "role": "hero"},
+    {"label": "C", "role": "plain"}
+  ]
+}

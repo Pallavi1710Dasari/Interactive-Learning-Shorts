@@ -3,13 +3,14 @@
 This is the highest-leverage prompt in the project. Everything downstream inherits
 its quality. Tune it against the eval set, not by vibes.
 """
-from ..schema import (Script, Topic, Section, SectionUnderstanding,
+from ..schema import (Script, Topic, Section, SectionUnderstanding, QuestionWorkflow,
+                      QuestionFraming, TeachingApproach,
                       MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND)
 from ..llm import ask_json
-from .. import revision
+from .. import revision, checks
 
-MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 87
-MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 125
+MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 62
+MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
 #: THERE IS DELIBERATELY NO SINGLE TARGET IN THE BRIEF ANY MORE.
 #:
 #: This was 56, then 112, and both were wrong in the same way: a figure in the
@@ -30,9 +31,12 @@ Beats 2-6: the student answers in 4 or 5 SHORT parts. FIVE IS THE MAXIMUM.
 Every beat after the first is the student. No follow-up question.
 
 Each answer beat is ONE idea with ONE picture, and stays at or under 24 words.
-That cap does not move. Four or five beats is how this fills 45 seconds — NOT
-four or five longer beats. If a beat needs more than 24 words, it is two beats or
-it is padded.
+That cap does not move BY DEFAULT. Four or five beats is how this fills 45
+seconds — NOT four or five longer beats. If a beat needs more than 24 words, it
+is two beats or it is padded — UNLESS a block further down names a higher,
+per-call cap for a section that earned it (see THIS SECTION EARNS A WIDER
+WINDOW THAN USUAL below the material, when it appears); that block is the only
+thing that ever moves this number, and it says by how much.
 
 THE LAST BEAT MUST ANSWER THE QUESTION. THIS IS NOT NEGOTIABLE.
 Read the question again, then read your last beat. If the last beat is the last step
@@ -233,6 +237,18 @@ THE QUESTION (beat 1)
   more than the answer delivers — asking about two things and explaining one, or
   asking "how" and answering "what" — is the most common defect in these scripts.
   If the material only supports a narrower question, ask the narrower question.
+- NAME THE MECHANISM, NOT THE WORKED EXAMPLE. A section that teaches a general
+  idea through one concrete case tempts the question into naming the case: "how
+  does one loop turn an array of orders into receipt rows?" is a caption for a
+  screenshot, not a question — a learner who watched this could not answer "how
+  do you render a list from an array" in an interview, because that transferable
+  version was never asked. Ask the general version ("how does a loop turn an
+  array into a list of rendered elements?") and put the example's real values —
+  copied verbatim — in the ANSWER, where they are evidence, not in the question,
+  where they make it unrecognisable outside this one document. This applies
+  whether writing fresh or regenerating from a reviewer's note: a note asking to
+  "make it clearer" or "be more specific" is about the ANSWER'S wording, not a
+  license to re-anchor the question on the example either.
 
 EACH ANSWER BEAT
 - ONE idea only. 12 to 20 spoken words. NEVER more than 24 — a longer beat is
@@ -248,6 +264,27 @@ EACH ANSWER BEAT
   the ANSWER, see above.
 - Together the beats must flow as one continuous explanation, not three
   disconnected facts — someone reads the whole thing aloud in one take.
+
+EVERY BEAT IS ONE COMPLETE SENTENCE A TOTAL BEGINNER COULD READ ONCE AND KEEP
+The bar is not "technically correct", it is "a person meeting this concept for
+the first time understands it on one pass and could say it back in an
+interview". That rules out two habits that read fine to someone who already
+knows the material:
+
+  BAD   "Contiguous allocation requiring one unbroken block leads to unusable
+         gaps as processes of varying sizes are allocated and freed over time."
+        ^ One sentence stapling the mechanism, the cause and the consequence
+          together — a run-on, not a beat. By the second clause the listener
+          has lost the first.
+  GOOD  "Contiguous allocation needs one unbroken block of memory."
+        "As processes come and go, free memory ends up as scattered gaps too
+         small to use."
+
+Prefer the everyday word over the technical synonym whenever a plain one says
+the same thing — "the process is paused" over "the process is suspended
+pending completion of the I/O operation". Jargon the material itself
+introduces (page table, frame, TLB) stays; jargon you reach for instead of a
+word the listener already owns does not.
 
 on_screen (the text burned onto the video)
 - MAXIMUM 8 WORDS. This is a hard limit; longer text does not fit a phone screen.
@@ -322,15 +359,37 @@ This is the order of work, and it is not optional: find the quote, then say it
 simply. Writing the line first and hunting for a quote afterwards is how wrong
 answers get made.
 
-STAY INSIDE THE READING MATERIAL
-The reading material is the ONLY thing you know. You have no other knowledge of
-this subject for the length of this task.
+TEACH THE CONCEPT — EXPLAIN IT, DO NOT ONLY RESTATE IT
+A good teacher does not just read the page back to a student. Where the material
+states a rule or a behaviour without spelling out WHY it holds or WHAT is
+happening internally, you may explain that, in your own words — WHEN it is a
+direct, standard consequence of what the material DOES state, not a fact you are
+bringing in to prop it up. "Paging splits memory into frames" is the sentence;
+"...so a process no longer needs one unbroken run of memory, which is what
+external fragmentation was costing it" is the reason the sentence matters, and a
+short that only ever gives the first has taught a fact instead of a mechanism.
+Most of this reasoning should already be sitting in CONTENT UNDERSTANDING's
+`why it is needed` / `learner ends up` lines when one is present — write those
+out, do not re-derive your own.
+
+THE LINE, EXACTLY WHERE IT IS: you may REASON from what the material states to
+make its own claim clearer or to connect two things it separately says. You may
+NEVER introduce a fact the material does not support to do it — a number, a name,
+a version, a benchmark, a comparison to something it never mentions — however
+true it is elsewhere. The test for any sentence you are about to add: could a
+careful reader of THIS SECTION ALONE follow you to it, using only what the
+section says? If getting there needs something only someone who already knew the
+wider topic would know, it does not belong in this short — narrow the question
+instead of reaching for it.
+
 - Never add a fact the material does not state — no version numbers, vendor names,
   benchmarks, dates, statistics, or "typically it's around..." figures.
 - Use the material's OWN example. If it demonstrates with 1011, explain with 1011;
   do not substitute a number you find neater.
 - Never contradict the material, and never "correct" it.
-- Padding with outside knowledge is the worst failure mode in this project.
+- Padding with an unrelated outside fact is still the worst failure mode in this
+  project. Explaining more of the material's OWN mechanism is not that — inventing
+  a different one to explain it with is.
 
 CONTENT UNDERSTANDING — WHAT TO EXPLAIN. NOT SOMETHING YOU MAY QUOTE.
 Some runs hand you a CONTENT UNDERSTANDING block above the section. An earlier step
@@ -551,9 +610,67 @@ carry source_quote:
 "source_quote":"copied verbatim from the section"}}]}}"""
 
 
+#: STEP 8 — one paragraph of concrete guidance per TeachingApproachKind, added
+#: to the prompt ONLY when write_script is given an `approach` (see
+#: write_script_for_workflow below). Each one is the SAME device-specific rule
+#: the workflow spec itself states — process_demonstration walks a sequence,
+#: comparison holds two things up together, analogy supports rather than
+#: replaces the real explanation, and so on. Keyed by the exact
+#: TeachingApproachKind string, so a typo here would simply fail to match
+#: rather than silently applying the wrong guidance.
+_APPROACH_GUIDANCE: dict[str, str] = {
+    "process_demonstration": (
+        "Walk the process as a sequence: the INITIAL STATE, the ACTION or "
+        "CHANGE that happens, and the RESULTING STATE. Beats should follow "
+        "that order — show the mechanism happening, step by step, rather "
+        "than describing it as a static fact."
+    ),
+    "comparison": (
+        "Hold the two things being compared up against each other explicitly. "
+        "State what the two sides share and, at least as clearly, what "
+        "actually differs — the difference IS the concept, so do not explain "
+        "one side and leave the other implied."
+    ),
+    "analogy": (
+        "Use the analogy to make the concept easier to picture, but the "
+        "analogy SUPPORTS the explanation — it does not replace it. At least "
+        "one beat must still explain the actual technical concept in its own "
+        "terms; do not end the script having only described the analogy."
+    ),
+    "real_world_example": (
+        "Ground the explanation in the real-world case, but connect it back "
+        "EXPLICITLY to the technical concept — name the concept itself, not "
+        "only the example, so a viewer leaves knowing what to call it."
+    ),
+    "conceptual_visual": (
+        "Narrate the STRUCTURE or the STATE CHANGE — what contains what, what "
+        "points to what, what changes — so the explanation supports a picture "
+        "of relationships and state. Do not reach for code or syntax here "
+        "unless the approved approach below is itself `code`; this device is "
+        "structural, not a code walkthrough."
+    ),
+    "code": (
+        "The code IS the concept here, so show and explain it directly — name "
+        "the actual syntax, the actual keyword, the actual line from the "
+        "section. This is the one approach where walking real code is the "
+        "right way to teach, because the learning objective is the code "
+        "itself."
+    ),
+    "direct_explanation": (
+        "Explain the concept plainly and directly, concept-first. Do not "
+        "force an analogy, a comparison, a demonstration or a code "
+        "walkthrough onto it — a clear, well-ordered explanation is the "
+        "complete answer here, not a placeholder for something more "
+        "elaborate."
+    ),
+}
+
+
 def write_script(topic: Topic, section: Section, feedback: str | None = None,
                  current: Script | None = None, document: str | None = None,
-                 understanding: SectionUnderstanding | None = None) -> Script:
+                 understanding: SectionUnderstanding | None = None,
+                 framing: QuestionFraming | None = None,
+                 approach: TeachingApproach | None = None) -> Script:
     """
     Write one script.
 
@@ -587,6 +704,18 @@ def write_script(topic: Topic, section: Section, feedback: str | None = None,
     each attempt — a grader complaining about beat 3 has not changed what the
     section teaches, so re-reading it would buy a second opinion on a settled
     question at the price of another call.
+
+    `framing` AND `approach` ARE STEP 8's ADDITION, and BOTH OPTIONAL — every
+    existing call site (run.py, server.py, rescript.py) omits them and gets
+    BYTE-IDENTICAL behaviour to before, the same contract `understanding`
+    already has one level up. Passed together (see write_script_for_workflow,
+    the gated entry point that always supplies both from an approved
+    QuestionWorkflow), they add ONE more guidance block to the SAME prompt and
+    the SAME call — never a second LLM call to translate them into
+    instructions first. `topic.topic` is still what beat 1 is built from; the
+    caller that wants the TEACHING question asked (framing.teaching_question,
+    which may differ from the plain approved question) passes a `topic`
+    already carrying it — this function does not re-derive that choice.
     """
     user = f"""TOPIC: {topic.topic}
 WHY IT MATTERS: {topic.why_it_matters}
@@ -658,6 +787,85 @@ matched against THE SECTION.
 =============================================================
 """
 
+    # STEP 8: THE APPROVED TEACHING PLAN. GUIDANCE, LIKE CONTENT UNDERSTANDING
+    # ABOVE IT — never a source of claims, never something to quote. Placed
+    # directly after it and before the section for the same reason: this is
+    # the LAST and MOST SPECIFIC instruction about HOW to answer before the
+    # model reads the one thing it may answer FROM.
+    #
+    # Both `framing` and `approach` are handed in TOGETHER by
+    # write_script_for_workflow, or not at all by every existing caller — see
+    # this function's own docstring.
+    if framing is not None and approach is not None:
+        user += f"""
+THE APPROVED TEACHING PLAN — a human approved both of these before this
+script was written. You are not re-deciding either one; follow them.
+"""
+        if framing.source_question and framing.source_question != topic.topic:
+            user += f"ORIGINALLY APPROVED QUESTION: {framing.source_question}\n"
+        if framing.framing_rationale:
+            user += f"WHY IT WAS FRAMED THIS WAY: {framing.framing_rationale}\n"
+        user += f"THIS QUESTION'S ROLE IN THE REEL: {framing.role}\n"
+
+        approach_line = approach.primary
+        if approach.combined_with:
+            approach_line += f", combined with {', '.join(approach.combined_with)}"
+        user += f"""
+THE APPROVED TEACHING APPROACH — how the answer beats must teach this: {approach_line}
+{_APPROACH_GUIDANCE.get(approach.primary, "")}
+"""
+        for extra in approach.combined_with:
+            guidance = _APPROACH_GUIDANCE.get(extra)
+            if guidance:
+                user += f"ALSO, for the combined approach ({extra}): {guidance}\n"
+        if approach.rationale:
+            user += f"WHY THIS APPROACH WAS CHOSEN: {approach.rationale}\n"
+
+        user += """
+DO NOT OVERRIDE THE APPROVED APPROACH. In particular, do not reach for
+showing code merely because the section happens to contain some, or because
+that feels like the easiest way to fill the beats — use code only if the
+approved approach above IS `code`. Everything else in this brief (grounding,
+citations, length, one-idea-per-beat) still applies exactly as it always has;
+the approved plan says WHAT DEVICE to teach with, not a license to relax any
+other rule.
+"""
+
+    # ONLY WHEN THE READING ITSELF EARNED IT. checks.duration_budget reads the
+    # exact same understanding and returns the ordinary (25, 45) unless the plan
+    # holds a genuine 5th thing to say beyond MIN_PLAN_MATERIAL — see its
+    # docstring. Silent otherwise: the brief's own LENGTH section above already
+    # states 45 as the ceiling, and repeating that here for the common case would
+    # just be noise on every call.
+    _, max_seconds = checks.duration_budget(understanding)
+    if max_seconds > MAX_SECONDS:
+        max_words = int(max_seconds * WORDS_PER_SECOND)
+        user += f"""
+THIS SECTION EARNS A WIDER WINDOW THAN USUAL.
+The CONTENT UNDERSTANDING above holds enough distinct material — beyond the usual
+four things to say — to support more than the ordinary short. For THIS short
+only, the ceiling in LENGTH above is raised from {MAX_WORDS} words (45s) to
+{max_words} words (~{max_seconds}s), and EACH ANSWER BEAT may run up to
+{checks.MAX_ANSWER_WORDS_EXTENDED} words instead of the usual {checks.MAX_ANSWER_WORDS}.
+FIVE IS STILL THE MAXIMUM number of answer beats — this is extra room, not a
+sixth beat.
+
+THE EXTRA ROOM HAS TWO HONEST USES, AND ONLY TWO:
+  1. A genuine 5th answer beat, if the plan's teaching_sequence, example or
+     misconception has a distinct thing left to say that four beats did not
+     cover — the beat is still its own idea, at or under
+     {checks.MAX_ANSWER_WORDS_EXTENDED} words.
+  2. A short clause of REASONING added to a beat that already has its citation —
+     the "...which is why X" or "...so that Y" that turns a cited fact into an
+     explained one. See TEACH THE CONCEPT above: this is where that reasoning
+     is meant to spend its extra words, when the plan's own `purpose` or
+     `explanation_goal` carries it.
+Neither use is "make an existing sentence longer because you can." If four
+beats at the ordinary length already say everything, four short beats is still
+the finished short — this section qualifying for more room is not an
+instruction to use all of it.
+"""
+
     user += f"""
 THE SECTION THIS SHORT IS FILED UNDER — start here [{section.section_id}] {section.title}
 ---
@@ -704,3 +912,74 @@ do not mention the material."""
     # payload than a script alone, and a truncated response comes back with no
     # text block at all (see the note in llm.py).
     return ask_json(SYSTEM, user, Script, max_tokens=4000, label="script")
+
+
+def write_script_for_workflow(workflow: QuestionWorkflow, section: Section,
+                              feedback: str | None = None, current: Script | None = None,
+                              document: str | None = None,
+                              understanding: SectionUnderstanding | None = None,
+                              ) -> QuestionWorkflow:
+    """
+    Step 8's entry point: write a script for a FULLY APPROVED workflow — using
+    its framing and its approved teaching approach, not merely its original
+    Topic — and attach the result to workflow.script.
+
+    THE ONE GATE, THE SAME SHAPE AS frame_workflow AND
+    choose_teaching_approach_for_workflow ONE AND TWO STAGES EARLIER:
+      - workflow.approved_topic must be set (question approved — not pending,
+        rejected, or mid-regeneration)
+      - workflow.framing must exist
+      - workflow.approved_teaching_approach must be set (not merely chosen —
+        APPROVED: not pending, not a regeneration still awaiting review)
+    All three raise ValueError, checked BEFORE any LLM call, so a workflow
+    that fails any of them spends nothing.
+
+    A NEW ENTRY POINT, write_script UNCHANGED. write_script(topic, ...) still
+    works exactly as it always has for every existing caller (run.py,
+    server.py, rescript.py) — this function is additive, not a replacement.
+    It is a THIN WRAPPER: it gates, builds ONE Topic carrying the TEACHING
+    question (see below), and calls write_script itself with `framing` and
+    `approach` supplied — the SAME single call, never a second one to
+    translate them first.
+
+    THE TEACHING QUESTION DRIVES THE SCRIPT, NOT THE RAW APPROVED QUESTION.
+    workflow.approved_topic.topic is the human-approved question text, but
+    framing.teaching_question is the human-approved decision about HOW that
+    question should actually be ASKED on screen — reframed for a clearer
+    teaching flow, or identical to the approved question when no reframe was
+    needed (framing.py's own contract). This function asks the TEACHING
+    question in beat 1 by building a Topic whose `.topic` is
+    framing.teaching_question, everything else (id, why_it_matters,
+    answer_quote, concept) carried over from approved_topic unchanged — and
+    the original approved question is still shown to the model, for context,
+    inside the teaching-plan block write_script builds when `framing` is
+    supplied. See write_script's own "THE APPROVED TEACHING PLAN".
+
+    ONLY workflow.script IS WRITTEN. selection, question_approval, framing,
+    teaching_approach, teaching_approach_approval and visual_strategy all pass
+    through model_copy untouched.
+    """
+    topic = workflow.approved_topic
+    if topic is None:
+        raise ValueError(
+            f"cannot write a script for {workflow.selection.topic.id}: "
+            f"question_approval.status={workflow.question_approval.status!r}, "
+            f"not 'approved'")
+    if workflow.framing is None:
+        raise ValueError(
+            f"cannot write a script for {workflow.selection.topic.id}: "
+            f"this workflow has no framing")
+    approach = workflow.approved_teaching_approach
+    if approach is None:
+        raise ValueError(
+            f"cannot write a script for {workflow.selection.topic.id}: "
+            f"teaching_approach_approval.status="
+            f"{workflow.teaching_approach_approval.status!r}, not 'approved'")
+
+    framing = workflow.framing
+    teaching_topic = topic.model_copy(update={"topic": framing.teaching_question})
+
+    script = write_script(teaching_topic, section, feedback=feedback, current=current,
+                          document=document, understanding=understanding,
+                          framing=framing, approach=approach)
+    return workflow.model_copy(update={"script": script})

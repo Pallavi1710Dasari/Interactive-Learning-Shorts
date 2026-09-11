@@ -1,0 +1,9 @@
+{
+  "short_id": "os_s18_question_double_mark",
+  "question": "What is a page fault? Why does it block the whole process?",
+  "beats": [
+    {"speaker":"interviewer","line":"What is a page fault? Why does it block the whole process?","on_screen":"Page fault + blocking","visual_ref":"title"},
+    {"speaker":"student","line":"A page fault is a trap the MMU raises when a page table entry's valid bit is clear.","on_screen":"MMU raises a trap","visual_ref":"d1"},
+    {"speaker":"student","line":"The process blocks because the OS has to read that page in from disk before it can continue.","on_screen":"Process waits on disk","visual_ref":"d2"}
+  ]
+}

@@ -8,14 +8,31 @@ HTTP so a human can sit in the middle of them. The split matters because the
 review step is interactive: you cannot regenerate one answer from a batch script.
 
 Cost shape, worth knowing before clicking:
-  POST /api/material   1 LLM call  (topic selection)
+  POST /api/material            1 LLM call  (topic selection)
+  POST /api/selections/approve  0 calls — a state change, nothing more
+  POST /api/selections/reject   0 calls
+  POST /api/selections/regenerate  1 call — refines ONE question's wording
+  POST /api/teaching-approach/approve     0 calls
+  POST /api/teaching-approach/regenerate  1 call — reconsiders ONE teaching approach
+  POST /api/visual-plan/approve           0 calls
+  POST /api/visual-plan/regenerate        1 call — reconsiders ONE visual plan
+  POST /api/workflow/advance  0-2 calls PER WORKFLOW PER CALL — framing +
+                             teaching-approach on one call, then (a human gate
+                             later) script + visual-plan on a later call; 0 for
+                             anything still pending, rejected, or already past
+                             the pair it is due for — plus AT MOST 1
+                             understanding call PER SECTION shared across every
+                             workflow filed under it
   POST /api/script     1 understanding call per SECTION (cached, shared)
                        + 1 call per script, + up to 3 on the grader retry loop
                        + 1 judge call per script that passes the free graders
   POST /api/regenerate 1 call
   POST /api/finalize   1 call per diagram + 1 judge call per short  <- the expensive one
 
-So Step 2 is cheap and Step 3 is not. Only finalize what a human approved.
+So question approval is free, question regeneration is one cheap call, and
+neither /api/script nor /api/scripts will act on a topic whose approval (when
+the caller sends one) is not "approved" — see _gate_topic. Only finalize what a
+human approved.
 
 THE JUDGE NOW RUNS AT REVIEW TOO, which is the one line of this shape that moved.
 The free graders say whether a script is well FORMED; only the judge says whether
@@ -34,15 +51,17 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .schema import Script, Topic, Section, ShortUnit
+from .schema import Script, Topic, Section, ShortUnit, QuestionApproval, QuestionWorkflow
 from .parse import parse_markdown, find_section
-from .skills.select import select_topics_with_notes
+from .skills.select import select_topics_with_selections
 from .skills.script import write_script
 from .skills.understanding import understanding_for
 from .skills.visuals import design_visuals, render_diagrams
 from . import raster
 from .skills.audit import judge_script
-from . import checks, config, feed, revision, usage, voice
+from .run import _realign_topic
+from . import checks, config, feed, review, revision, usage, voice
+from . import workflow as question_workflow
 
 app = FastAPI(title="Interactive Learning Shorts")
 usage.load()   # cumulative across restarts
@@ -213,13 +232,16 @@ MAX_MATERIAL_CHARS = 200_000
 
 class MaterialIn(BaseModel):
     text: str
-    target: int = 5
+    # Default is ONE: the single most important, most interview-asked concept in
+    # the material, not a batch of ranked cards to review. select.py already ranks
+    # by importance and keeps only the top `target`, so target=1 keeps its #1.
+    target: int = 1
 
 
 @app.post("/api/material")
 async def material(
     text: str | None = Form(default=None),
-    target: int = Form(default=5),
+    target: int = Form(default=1),
     file: UploadFile | None = File(default=None),
 ):
     """
@@ -257,11 +279,20 @@ async def material(
 
     cursor = usage.mark()
     try:
-        topics, notes = select_topics_with_notes(sections, target)
+        topics, notes, selections = select_topics_with_selections(sections, target)
     except ValueError as e:
         # Every cited section was invented. That is a bad selection, not a bug —
         # say so instead of returning a 500.
         raise HTTPException(422, str(e))
+
+    # ONE QuestionWorkflow PER SELECTED TOPIC, every one starting `pending` — the
+    # structured object Step 3's approval endpoints below read and write. The UI
+    # gets selection.source_title and selection.reasons from HERE, not by
+    # reconstructing them from `topics` (requirement H): it is the same
+    # QuestionSelection select.build_question_selections already built, just not
+    # thrown away at the API boundary the way it was before this step.
+    workflows = [QuestionWorkflow(selection=s) for s in selections]
+
     return {
         "usage": usage.since(cursor), "total": usage.totals(),
         "notes": notes,
@@ -269,8 +300,270 @@ async def material(
         "sections": [{"section_id": s.section_id, "title": s.title,
                       "chars": len(s.text), "lines": f"{s.start_line}-{s.end_line}"}
                      for s in sections],
+        # LEGACY, KEPT. Every current caller of /api/material reads `topics`
+        # directly (see ScriptIn/ScriptsIn below, and web/src/api.ts's
+        # MaterialResult) — removing it would be a breaking change for no
+        # necessity, since `workflows` carries every one of these topics too
+        # (workflow.selection.topic).
         "topics": [t.model_dump() for t in topics.topics],
+        "workflows": [w.model_dump() for w in workflows],
     }
+
+
+# ------------------------------------------------- step 1b: question approval gate
+#
+# STATELESS, LIKE EVERY OTHER STEP IN THIS FILE. The server holds no per-doc_id
+# store of decisions — the caller sends the QuestionWorkflow it already has (from
+# /api/material, or from a previous call to one of these three) and gets back the
+# updated one. This is the same shape /api/regenerate already uses for a script:
+# the browser's own state IS the session, for exactly as long as the browser tab
+# is open, which is the persistence lifecycle Step 3 asks these decisions to
+# survive — see review.py's module docstring and run_question_gate for the CLI's
+# equivalent, which persists to a JSON file instead because a terminal has no
+# browser tab to hold state in.
+#
+# review.approve_question / reject_question / regenerate DO ALL THE WORK — these
+# three routes are thin: parse the request, call the one shared function, report
+# the result. No endpoint here re-implements a rule review.py already owns.
+
+class SelectionApproveIn(BaseModel):
+    doc_id: str
+    workflow: QuestionWorkflow
+    note: str | None = None
+
+
+@app.post("/api/selections/approve")
+def approve_selection(body: SelectionApproveIn):
+    return {"workflow": review.approve_question(body.workflow, note=body.note).model_dump()}
+
+
+class SelectionRejectIn(BaseModel):
+    doc_id: str
+    workflow: QuestionWorkflow
+    note: str | None = None
+
+
+@app.post("/api/selections/reject")
+def reject_selection(body: SelectionRejectIn):
+    return {"workflow": review.reject_question(body.workflow, note=body.note).model_dump()}
+
+
+class SelectionRegenerateIn(BaseModel):
+    doc_id: str
+    workflow: QuestionWorkflow
+    #: REQUIRED — review.regenerate enforces this too (schema.RegenerationAttempt's
+    #: own validator is what actually raises), but failing here with a clear 400
+    #: is friendlier than a call that walks all the way to the LLM prompt first.
+    reason: str
+
+
+@app.post("/api/selections/regenerate")
+def regenerate_selection(body: SelectionRegenerateIn):
+    """
+    Ask the LLM to refine one question's wording from a human's reason.
+
+    NO DIRECT EDITING ENDPOINT EXISTS, ON PURPOSE — see
+    schema.QuestionApproval's own "NO DIRECT EDITING" note. A human who wants
+    different wording sends `reason`, not a replacement question string; there
+    is no field here for one.
+    """
+    if not body.reason.strip():
+        raise HTTPException(400, "say what should improve")
+    sections = _sections(body.doc_id)
+    cursor = usage.mark()
+    try:
+        updated = review.regenerate(body.workflow, body.reason, sections)
+    except ValueError as e:
+        raise HTTPException(429, str(e))
+    except KeyError as e:
+        raise HTTPException(422, str(e))
+    return {"workflow": updated.model_dump(),
+            "usage": usage.since(cursor), "total": usage.totals()}
+
+
+# --------------------------------------------------- step 4/5/6: teaching approach
+#
+# SAME STATELESS SHAPE AS THE SELECTION ENDPOINTS ABOVE, one stage later: the
+# caller already holds a QuestionWorkflow (approved, framed, with a
+# teaching_approach — nothing here computes any of those; see skills/framing.py
+# and skills/teaching_approach.py, neither wired into an orchestration path yet)
+# and gets back the updated one. review.approve_teaching_approach /
+# regenerate_teaching_approach do all the work; these two routes are thin.
+
+class TeachingApproachApproveIn(BaseModel):
+    doc_id: str
+    workflow: QuestionWorkflow
+    note: str | None = None
+
+
+@app.post("/api/teaching-approach/approve")
+def approve_teaching_approach_endpoint(body: TeachingApproachApproveIn):
+    try:
+        updated = review.approve_teaching_approach(body.workflow, note=body.note)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"workflow": updated.model_dump()}
+
+
+class TeachingApproachRegenerateIn(BaseModel):
+    doc_id: str
+    workflow: QuestionWorkflow
+    #: REQUIRED — review.regenerate_teaching_approach enforces this too
+    #: (schema.TeachingApproachRegenerationAttempt's own validator is what
+    #: actually raises), but failing here with a clear 400 is friendlier than
+    #: a call that walks all the way to the LLM prompt first.
+    reason: str
+
+
+@app.post("/api/teaching-approach/regenerate")
+def regenerate_teaching_approach_endpoint(body: TeachingApproachRegenerateIn):
+    """
+    Ask the LLM to reconsider ONE workflow's teaching approach from a human's
+    reason.
+
+    NO DIRECT-OVERRIDE ENDPOINT EXISTS, ON PURPOSE — see
+    schema.TeachingApproachApproval's own "NO DIRECT OVERRIDES" note. A human
+    who wants a different device sends `reason`, never a replacement
+    primary/combined_with/alternatives/rationale — there is no field here for
+    any of those, and the model always returns a complete, fresh decision.
+    """
+    if not body.reason.strip():
+        raise HTTPException(400, "say what should improve")
+    sections = _sections(body.doc_id)
+    cursor = usage.mark()
+    try:
+        updated = review.regenerate_teaching_approach(body.workflow, body.reason, sections)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    except KeyError as e:
+        raise HTTPException(422, str(e))
+    return {"workflow": updated.model_dump(),
+            "usage": usage.since(cursor), "total": usage.totals()}
+
+
+# --------------------------------------------------------- step 10/11: visual plan
+#
+# SAME STATELESS SHAPE AS THE TEACHING-APPROACH ENDPOINTS ABOVE, one stage
+# later: the caller already holds a QuestionWorkflow (approved, framed, with
+# an approved teaching_approach and a script — /api/workflow/advance already
+# generates visual_strategy for one of those; nothing here computes it) and
+# gets back the updated one. review.approve_visual_plan /
+# regenerate_visual_plan do all the work; these two routes are thin.
+
+class VisualPlanApproveIn(BaseModel):
+    doc_id: str
+    workflow: QuestionWorkflow
+    note: str | None = None
+
+
+@app.post("/api/visual-plan/approve")
+def approve_visual_plan_endpoint(body: VisualPlanApproveIn):
+    try:
+        updated = review.approve_visual_plan(body.workflow, note=body.note)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"workflow": updated.model_dump()}
+
+
+class VisualPlanRegenerateIn(BaseModel):
+    doc_id: str
+    workflow: QuestionWorkflow
+    #: REQUIRED — review.regenerate_visual_plan enforces this too
+    #: (schema.VisualStrategyRegenerationAttempt's own validator is what
+    #: actually raises), but failing here with a clear 400 is friendlier than
+    #: a call that walks all the way to the LLM prompt first.
+    reason: str
+
+
+@app.post("/api/visual-plan/regenerate")
+def regenerate_visual_plan_endpoint(body: VisualPlanRegenerateIn):
+    """
+    Ask the LLM to reconsider ONE workflow's visual plan from a human's
+    reason.
+
+    NO DIRECT-EDITING ENDPOINT EXISTS, ON PURPOSE — see
+    schema.VisualPlanApproval's own "NO DIRECT EDITING" note. A human who
+    wants a different picture sends `reason`, never a replacement
+    subject/beats — there is no field here for either, and the model always
+    returns a complete, fresh plan.
+    """
+    if not body.reason.strip():
+        raise HTTPException(400, "say what should improve")
+    sections = _sections(body.doc_id)
+    cursor = usage.mark()
+    try:
+        updated = review.regenerate_visual_plan(body.workflow, body.reason, sections)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    except KeyError as e:
+        raise HTTPException(422, str(e))
+    return {"workflow": updated.model_dump(),
+            "usage": usage.since(cursor), "total": usage.totals()}
+
+
+# ------------------------------------------------------------- step 7: advance
+#
+# THE ORCHESTRATION BOUNDARY, OVER HTTP. shorts/workflow.py decides what stage
+# is next, whether reaching it needs an LLM call, and when to stop; this route
+# is thin, same as every other route in this section — it does not re-decide
+# any of that itself.
+
+class AdvanceWorkflowsIn(BaseModel):
+    doc_id: str
+    workflows: list[QuestionWorkflow]
+
+
+@app.post("/api/workflow/advance")
+def advance_workflows(body: AdvanceWorkflowsIn):
+    """
+    Advance every workflow in `workflows` as far as it can go without a
+    human, and report where each one stopped.
+
+    STATELESS, LIKE EVERY OTHER ENDPOINT HERE. The caller already holds these
+    workflows — from /api/material, or from a previous call to this endpoint
+    or to /api/selections/* or /api/teaching-approach/* — and gets back the
+    advanced ones; nothing is kept server-side between requests.
+
+    NO HUMAN GATE IS EVER BYPASSED, AND NO WORKFLOW CAN BLOCK ANOTHER — see
+    shorts/workflow.py's own docstring. A workflow still pending question
+    approval, or one whose generation failed, comes back reported as such;
+    neither can turn this into a 500 for the whole batch. Calling this
+    again on workflows that already stopped costs nothing — see
+    workflow.advance's own idempotency note.
+    """
+    sections = _sections(body.doc_id)
+    doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
+    cursor = usage.mark()
+    results = question_workflow.advance_many(body.workflows, sections, document=doc_text)
+    return {
+        "results": [{"workflow": r.workflow.model_dump(), "status": r.status,
+                     "detail": r.detail} for r in results],
+        "usage": usage.since(cursor), "total": usage.totals(),
+    }
+
+
+def _gate_topic(topic: Topic, approval: QuestionApproval | None) -> Topic:
+    """
+    Step 3's downstream gate, applied right before any paid call is made for a
+    topic — the one place /api/script and /api/scripts enforce "pending/
+    rejected/regenerating must not proceed" (requirement E) server-side rather
+    than only trusting the caller to have filtered already.
+
+    `approval` IS OPTIONAL, AND None IS THE ORDINARY CASE FOR ANY CALLER THAT
+    PREDATES STEP 3 — this returns `topic` completely unchanged, exactly how
+    /api/script and /api/scripts behaved before this existed, so nothing that
+    calls them without an approval breaks. A caller that DOES send one (the
+    web UI's approval step) is held to it: pending, rejected and regenerating
+    all raise. Mirrors schema.QuestionWorkflow.approved_topic for the one case
+    where a caller has an approval but not the full QuestionSelection needed
+    to build a QuestionWorkflow.
+    """
+    if approval is None:
+        return topic
+    if approval.status != "approved":
+        raise ValueError(f"question is not approved (status={approval.status})")
+    effective = (approval.regenerated_question or approval.edited_question or "").strip()
+    return topic.model_copy(update={"topic": effective or topic.topic})
 
 
 # ------------------------------------------------------- step 2: scripts + review
@@ -278,6 +571,10 @@ async def material(
 class ScriptIn(BaseModel):
     doc_id: str
     topic: Topic
+    #: Step 3's gate. OPTIONAL — omitted, this endpoint behaves exactly as it
+    #: did before Step 3 existed. Sent, it must be "approved" or this call
+    #: refuses before spending anything — see _gate_topic.
+    approval: QuestionApproval | None = None
 
 
 @app.post("/api/script")
@@ -285,7 +582,11 @@ def make_script(body: ScriptIn):
     """Write one script, with the same grader retry loop run.py uses."""
     sections = _sections(body.doc_id)
     try:
-        section = find_section(sections, body.topic.source_section_id)
+        topic = _gate_topic(body.topic, body.approval)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    try:
+        section = find_section(sections, topic.source_section_id)
     except KeyError as e:
         raise HTTPException(422, str(e))
 
@@ -300,8 +601,16 @@ def make_script(body: ScriptIn):
     # Once, before the loop — the same rule the CLI follows in run.build_one. The
     # three attempts differ by a grader's complaint, not by what the section says.
     understanding = understanding_for(section, document=doc_text)
+    # Same reconciliation as /api/scripts and run.build_one — see the comment
+    # there. This endpoint is the per-card "Retry" path, so a topic that has
+    # already drifted from its section's core_idea gets the same one-call
+    # repair here rather than only on the first draft.
+    if understanding:
+        match = checks.check_topic_matches_understanding(topic, understanding)
+        if not match.passed:
+            topic = _realign_topic(topic, section, understanding, doc_text)
     for attempt in range(1, 4):
-        script = write_script(body.topic, section, feedback, document=doc_text,
+        script = write_script(topic, section, feedback, document=doc_text,
                               understanding=understanding)
         results = _grade(script, section, doc_text, understanding=understanding)
         graders = _chips(results)
@@ -314,7 +623,7 @@ def make_script(body: ScriptIn):
     # the same information finalize used to gather afterwards.
     judge = _review_judge(script, section, results)
 
-    return {"topic": body.topic.model_dump(), "section_id": section.section_id,
+    return {"topic": topic.model_dump(), "section_id": section.section_id,
             "qa": _as_qa(script), "attempts": attempts,
             "graders": attempts[-1]["graders"], "judge": judge,
             "usage": usage.since(cursor), "total": usage.totals()}
@@ -323,6 +632,10 @@ def make_script(body: ScriptIn):
 class ScriptsIn(BaseModel):
     doc_id: str
     topics: list[Topic]
+    #: Step 3's gate, per topic id. OPTIONAL — omitted (or a topic's id simply
+    #: absent from it), this endpoint behaves exactly as it did before Step 3
+    #: existed. See ScriptIn.approval / _gate_topic.
+    approvals: dict[str, QuestionApproval] | None = None
 
 
 @app.post("/api/scripts")
@@ -347,7 +660,15 @@ def make_scripts(body: ScriptsIn):
         four good drafts because the fifth had a bad minute, and the page showed
         "500 Internal Server Error" with nothing to retry. A failure is per-card
         data now: that card offers Retry, the rest render.
+
+        THE GATE CHECK IS THE FIRST THING HERE, for the same reason: an
+        unapproved topic slipped into this batch must become ONE failed card
+        (requirement E/J), never a 500 that loses every other card's draft.
         """
+        try:
+            topic = _gate_topic(topic, (body.approvals or {}).get(topic.id))
+        except ValueError as e:
+            return {"topic": topic.model_dump(), "error": str(e)}
         try:
             section = find_section(sections, topic.source_section_id)
         except KeyError as e:
@@ -373,6 +694,18 @@ def make_scripts(body: ScriptsIn):
         # topics filed under one section wait on one reading rather than each
         # paying for their own. See understanding_for, which does the sharing.
         understanding = understanding_for(section, document=doc_text)
+
+        # THE RECONCILIATION CHECK, HERE TOO. This endpoint used to duplicate
+        # run.build_one's script-writing loop without duplicating the check right
+        # above it — so a topic drifting from its own section's core_idea was
+        # caught and repaired on the CLI path (python -m shorts.run) and shipped
+        # unexamined on this one, which is the path the web UI actually calls.
+        # Same free check, same one-call repair only on a real mismatch — see
+        # checks.check_topic_matches_understanding and run._realign_topic.
+        if understanding:
+            match = checks.check_topic_matches_understanding(topic, understanding)
+            if not match.passed:
+                topic = _realign_topic(topic, section, understanding, doc_text)
 
         feedback, script, graders = None, None, []
         try:
@@ -540,15 +873,17 @@ def _rejudge_after_fix(unit: ShortUnit, script: Script, topic: Topic,
         # path above and may cost one reading. Worth it: the judge's complaint is
         # nearly always that a beat is not supported by its section, and what the
         # section does and does not answer is exactly what this step reports.
+        repair_understanding = understanding_for(section)
         fixed = write_script(topic=topic, section=section,
                              feedback=feedback, current=script,
-                             understanding=understanding_for(section))
+                             understanding=repair_understanding)
         # The code graders come first and are free. A rewrite that breaks a hard
         # rule is not worth a judge call.
         if not checks.all_passed(checks.run_script_graders(fixed, section.text)):
             print(f"    ! repair of {unit.short_id} failed the code graders — keeping the original")
         else:
-            visuals, _ = design_visuals(fixed, section, draw=body.do_svg)
+            visuals, _ = design_visuals(fixed, section, draw=body.do_svg,
+                                        understanding=repair_understanding)
             repaired = unit.model_copy(update={
                 "question": fixed.question, "beats": fixed.beats,
                 "estimated_seconds": fixed.estimated_seconds, "visuals": visuals})
@@ -584,6 +919,7 @@ def finalize(body: FinalizeIn):
 
     cursor = usage.mark()
     sections = _sections(body.doc_id)
+    doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
     built, failed = [], []
 
     def build_one(item: dict) -> tuple[str | None, dict | None, list[str]]:
@@ -606,10 +942,21 @@ def finalize(body: FinalizeIn):
             # design_visuals, not spec_visuals: it grades what comes back and asks
             # again for a short whose frames repeat, print the narration, or draw a
             # capital A where a server was meant. One call for a short that passes.
+            #
+            # UNDERSTANDING IS RECOMPUTED HERE, AND IT COSTS NOTHING IN THE COMMON
+            # CASE. understanding_for is cache-keyed by (section text, document
+            # text) — /api/scripts already read this section this same turn, so
+            # this is a cache hit, not a second paid reading. Passed to
+            # design_visuals so the visual strategist can ground `subject` in the
+            # section's own core_idea instead of re-deriving it from the beats
+            # alone — see strategy.plan_strategy's own docstring for the gap this
+            # closes.
+            understanding = understanding_for(section, document=doc_text)
             vision_scores: dict = {}
             visuals, design_problems = design_visuals(script, section,
                                                       draw=body.do_svg,
-                                                      scores_out=vision_scores)
+                                                      scores_out=vision_scores,
+                                                      understanding=understanding)
 
             unit = ShortUnit(
                 short_id=script.short_id,
@@ -816,7 +1163,8 @@ def revisual(body: RevisualIn):
 
     cursor = usage.mark()
     script = Script(short_id=unit.short_id, question=unit.question, beats=unit.beats)
-    visuals, problems = design_visuals(script, section, previous=unit.visuals, note=note)
+    visuals, problems = design_visuals(script, section, previous=unit.visuals, note=note,
+                                       understanding=understanding_for(section))
     # A renamed ref would fail ShortUnit's every_ref_resolved validator and lose the
     # short; keep the old frame for anything the redesign did not cover.
     for ref, old in unit.visuals.items():

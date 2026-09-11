@@ -117,7 +117,6 @@ export function CaptureStage({ unit }: { unit: Unit }) {
         time={t}
         speaking
         hue={hue}
-        chrome={false}
         progressPct={beatFill(t / Math.max(unit.seconds, 0.001), beatIndex,
                               unit.beats.length)}
       />

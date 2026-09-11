@@ -4,13 +4,14 @@ import { getHealth, getShorts, getUsage, renderStatus, startRender,
 import { CostPill } from "./CostPill";
 import { Reel } from "./Reel";
 import { StepMaterial } from "./StepMaterial";
+import { StepApprove } from "./StepApprove";
 import { StepReview } from "./StepReview";
 import { VoiceLab } from "./VoiceLab";
 import { CaptureStage } from "./CaptureStage";
 import { pickVoices, useVoices } from "./useNarration";
-import type { Feedback, Unit } from "./types";
+import type { Feedback, Topic, Unit } from "./types";
 
-type Step = "material" | "review" | "reels";
+type Step = "material" | "approve" | "review" | "reels";
 
 export default function App() {
   // #capture/<short_id> — the MP4 renderer's entry point, and deliberately the
@@ -72,6 +73,13 @@ function CaptureRoute({ shortId }: { shortId: string }) {
 function Workspace() {
   const [step, setStep] = useState<Step>("material");
   const [voiceOpen, setVoiceOpen] = useState(false);
+  // The cost breakdown is opt-in, not ambient. It used to render unconditionally
+  // in the topbar, which put a running dollar figure and a token count in front
+  // of a non-engineer reviewer on every screen — the product owner's own
+  // complaint. The spend is still real and still worth a glance, so a click
+  // reveals it; see the dot on the toggle button below for why a spend still
+  // cannot go by unnoticed while collapsed.
+  const [costOpen, setCostOpen] = useState(false);
   // THE ACTIVE VOICE IS SHOWN IN THE HEADER, not only inside the panel that sets
   // it. The voice is stored on the SERVER and shared by every device pointed at
   // it, so "which voice is live" is a fact about the app rather than about this
@@ -86,6 +94,10 @@ function Workspace() {
   // Re-read when the studio closes: that is the only thing that can change it.
   useEffect(() => { if (!voiceOpen) readVoice(); }, [voiceOpen, readVoice]);
   const [material, setMaterial] = useState<MaterialResult | null>(null);
+  // Step 3's gate output: ONLY the topics a human approved (with regenerated
+  // wording already substituted in — see StepApprove's onDone). StepReview is
+  // handed these instead of material.topics, unmodified otherwise.
+  const [approvedTopics, setApprovedTopics] = useState<Topic[] | null>(null);
   const [shorts, setShorts] = useState<Unit[]>([]);
   const [health, setHealth] = useState<Awaited<ReturnType<typeof getHealth>> | null>(null);
   const [total, setTotal] = useState<UsageTotals | null>(null);
@@ -134,13 +146,24 @@ function Workspace() {
         <nav className="steps">
           <Crumb n={1} label="Material" on={step === "material"} done={!!material}
                  onClick={() => setStep("material")} />
-          <Crumb n={2} label="Review Q&amp;A" on={step === "review"} done={shorts.length > 0}
-                 disabled={!material} onClick={() => setStep("review")} />
-          <Crumb n={3} label="Reels" on={step === "reels"} done={false}
+          <Crumb n={2} label="Approve" on={step === "approve"} done={!!approvedTopics}
+                 disabled={!material} onClick={() => setStep("approve")} />
+          <Crumb n={3} label="Review Q&amp;A" on={step === "review"} done={shorts.length > 0}
+                 disabled={!approvedTopics} onClick={() => setStep("review")} />
+          <Crumb n={4} label="Reels" on={step === "reels"} done={false}
                  disabled={!shorts.length} onClick={() => setStep("reels")} />
         </nav>
         <span className="spacer" />
-        {total && <CostPill total={total} delta={delta} />}
+        {total && costOpen && <CostPill total={total} delta={delta} />}
+        <button className="ghost sm costtoggle" onClick={() => setCostOpen((v) => !v)}
+                title={costOpen ? "hide cost & token spend" : "show cost & token spend"}>
+          $
+          {/* A spend still has to be noticeable while the pill is collapsed —
+              this is the one thing that survives hiding it — but it is a dot,
+              not the figure itself, so it does not reintroduce the always-on
+              number the toggle exists to remove. */}
+          {!costOpen && delta && delta.cost > 0 && <i className="costdot" aria-hidden="true" />}
+        </button>
         <span className="hintline">{health ? (health.stub ? "stub mode" : health.model) : "…"}</span>
         <button className={`ghost sm voicechip${voiceNow?.startsWith("chatterbox") ? " mine" : ""}`}
                 onClick={() => setVoiceOpen(true)}
@@ -160,12 +183,24 @@ function Workspace() {
 
       {step === "material" && (
         <StepMaterial
-          onDone={(r) => { onSpend(r.usage, r.total); setMaterial(r); setStep("review"); }}
+          onDone={(r) => {
+            onSpend(r.usage, r.total);
+            setMaterial(r);
+            setApprovedTopics(null);   // a fresh material means a fresh approval pass
+            setStep("approve");
+          }}
         />
       )}
-      {step === "review" && material && (
-        <StepReview
+      {step === "approve" && material && (
+        <StepApprove
           material={material}
+          onSpend={onSpend}
+          onDone={(topics) => { setApprovedTopics(topics); setStep("review"); }}
+        />
+      )}
+      {step === "review" && material && approvedTopics && (
+        <StepReview
+          material={{ ...material, topics: approvedTopics }}
           onSpend={onSpend}
           onDone={(s) => { setShorts(s); setStep("reels"); }}
           // A held short is kept out of the feed, so open the feed that includes it
@@ -397,8 +432,7 @@ function Reels({ shorts, focus, onReplace }: {
       <div className="hint">
         scroll for the next short · <kbd>space</kbd> pause (stops the voice) ·{" "}
         <kbd>←</kbd>/<kbd>→</kbd> beat · <kbd>j</kbd>/<kbd>k</kbd> short ·{" "}
-        <kbd>l</kbd> like · <kbd>s</kbd> save · <kbd>m</kbd> mute ·{" "}
-        <kbd>r</kbd> replay · <kbd>d</kbd> download
+        <kbd>m</kbd> mute · <kbd>r</kbd> replay · <kbd>d</kbd> download
       </div>
     </div>
   );

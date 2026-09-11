@@ -206,11 +206,12 @@ def call(system: str, user: str, model: str | None = None, max_tokens: int = 400
          think: bool = False, label: str = "llm"):
     """One raw message call. Thinking off unless asked for — see module docstring."""
     model = model or config.MODEL_GENERATOR
+    started = time.perf_counter()
     resp = client().messages.create(
         model=model, max_tokens=max_tokens, system=_system(system, model),
         messages=[{"role": "user", "content": user}], **_reasoning(model, think),
     )
-    usage.record(label, model, resp)
+    usage.record(label, model, resp, duration_seconds=time.perf_counter() - started)
     return resp
 
 
@@ -259,12 +260,13 @@ def ask_json(
     last_err = None
 
     for attempt in range(retries + 1):
+        started = time.perf_counter()
         resp = client().messages.create(
             model=model, max_tokens=budget, system=_system(system, model),
             messages=messages,
             **_reasoning(model, think),
         )
-        usage.record(label, model, resp)
+        usage.record(label, model, resp, duration_seconds=time.perf_counter() - started)
         raw = "".join(b.text for b in resp.content if b.type == "text")
 
         if not raw.strip():

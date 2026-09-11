@@ -802,6 +802,41 @@ cases:
     expect:
       passed: true
 
+  - id: E099
+    name: A plan sitting exactly at MIN_PLAN_MATERIAL keeps the ordinary 45s ceiling
+    why: >
+      duration_budget's own boundary case, and the one most likely to drift
+      quietly wrong: material EQUAL to MIN_PLAN_MATERIAL (4) must still get the
+      ordinary window, not the extended one, because it fills exactly
+      MIN_ANSWERS beats and schema.HARD_MAX_SECONDS's own arithmetic already
+      assumes the 45s ceiling covers that case. Reuses E051's fixture, which is
+      exactly this boundary (3 steps + a required example = 4).
+    type: understanding_grader
+    grader: duration_budget
+    section_id: "3.2"
+    fixture: evals/fixtures/content_all_requirements_met.json
+    expect:
+      passed: true
+      reason_contains: "25-45s"
+
+  - id: E100
+    name: A plan with a genuine 5th thing to say earns the wider window
+    why: >
+      The case duration_budget exists for. This fixture's reading holds 3
+      teaching steps, a required example AND a required misconception — material
+      = 5, one more than E099's boundary case — so there is a real 5th thing to
+      say and check_timing should stop rejecting a script that says it. Confirms
+      the ceiling widens to schema.HARD_MAX_SECONDS (58s), not further: the
+      budget is capped there regardless of how far above the threshold material
+      sits, because checks.MAX_ANSWERS (5) caps the beat count either way.
+    type: understanding_grader
+    grader: duration_budget
+    section_id: "3.2"
+    fixture: evals/fixtures/understanding_rich_extends_window.json
+    expect:
+      passed: true
+      reason_contains: "58s (extended)"
+
   - id: E049
     name: A concise but complete 29-second short ships
     why: >
@@ -1455,6 +1490,703 @@ cases:
     expect:
       passed: false
       reason_contains: "distinct citable sentence"
+
+  # ------------------------------------------------- question/answer sentence form
+  #
+  # "Complete sentences, beginner-simple, memorable" is the requirement; only the
+  # first third of it is something free code can judge at all. These three narrow
+  # structural failures are that slice — see check_qa_sentence_form's docstring for
+  # why "simple" and "memorable" are left to the SYSTEM prompts in select.py and
+  # script.py instead of to a grader here.
+
+  - id: E083
+    name: A question with no "?" is rejected as not actually a question
+    why: >
+      Nothing previously stopped a topic string surviving into the short as a
+      bare noun phrase instead of a question — MAX_ANSWER_WORDS and the beat
+      count both pass a script whose `question` field never asks anything.
+    type: code_grader
+    grader: qa_sentence_form
+    fixture: evals/fixtures/qa_question_no_mark.json
+    expect:
+      passed: false
+      reason_contains: "not phrased as a question"
+
+  - id: E084
+    name: A question stapling two "?"s together is rejected
+    why: >
+      "What is a page fault? Why does it block the whole process?" is two
+      questions run together, not one — it contradicts select.py's own ONE
+      QUESTION PER CONCEPT rule and leaves a viewer unsure which one the answer
+      is actually answering.
+    type: code_grader
+    grader: qa_sentence_form
+    fixture: evals/fixtures/qa_question_double_mark.json
+    expect:
+      passed: false
+      reason_contains: "stapled together"
+
+  - id: E085
+    name: An answer beat with no terminal punctuation is rejected as a fragment
+    why: >
+      A line that just trails off ("...before the instruction can continue")
+      is not a sentence a student can hold in their mind, however accurate it
+      is — the check requires a beat to actually end, in ".", "!" or "?".
+    type: code_grader
+    grader: qa_sentence_form
+    fixture: evals/fixtures/qa_beat_no_terminal_punct.json
+    expect:
+      passed: false
+      reason_contains: "trails off"
+
+  - id: E086
+    name: A single, complete question with complete-sentence beats passes
+    why: >
+      The false-positive guard. Reuses the page-fault script every other code
+      grader already treats as the good example, so a change that starts
+      flagging normal, complete Q&A here has broken the check rather than
+      caught a real defect.
+    type: code_grader
+    grader: qa_sentence_form
+    fixture: evals/fixtures/good_page_fault.json
+    expect:
+      passed: true
+
+  # ---------------------------------------------------------- start/end framing
+  #
+  # schema.Script.starts_with_interviewer already guarantees beat 0 asks the
+  # question. Nothing guaranteed the short LANDS on the answer at the other end
+  # — these are the failing and passing halves of check_ends_on_answer.
+
+  - id: E087
+    name: A short ending on an unaccented frame is rejected
+    why: >
+      The answer beat states the pointer resolves to B, but the last frame
+      marks every slot "plain" — the picture never lights the thing the
+      answer just named, so the short trails off on a neutral frame instead
+      of landing on the answer.
+    type: unit_grader
+    grader: ends_on_answer
+    fixture: evals/fixtures/unit_ends_on_answer_neutral.json
+    expect:
+      passed: false
+      reason_contains: "no element marked hero"
+
+  - id: E088
+    name: A short ending on a frame with its hero lit passes
+    why: >
+      The false-positive guard for E087 — same question, same answer, and the
+      only difference is the final slot is marked hero the way the answer
+      earns it. A grader that fails this too has stopped checking "does it
+      land" and started checking something else.
+    type: unit_grader
+    grader: ends_on_answer
+    fixture: evals/fixtures/unit_ends_on_answer_hero.json
+    expect:
+      passed: true
+
+  # ---------------------------------------------- topic/understanding reconciliation
+  #
+  # select.py ranks every topic's importance across the WHOLE document in one
+  # call, before any section gets a deep individual reading. understanding_for
+  # (skills/understanding.py) reads one section in far more detail and validates
+  # its own core_idea against that section's text — but it runs LATER, in
+  # run.py's build_one, after select.py's topic and question are already locked
+  # in, and nothing had ever compared the two. check_plan_depth grades whether
+  # the reading found enough MATERIAL; these two cases are for the check that
+  # asks a different question — is the topic even about the same THING the
+  # reading landed on. Both fixtures share one section understanding — 4.2 of
+  # content/css_specificity.md, "When specificity ties" — and differ only in
+  # which topic is checked against it, so a change that starts flagging (or
+  # stops flagging) the right one has broken the comparison itself rather than
+  # picked a harder example.
+
+  - id: E089
+    name: A topic aimed at !important is rejected against the specificity-tie section
+    why: >
+      The real gap this closes. Section 4.2 is "When specificity ties" and its
+      own validated core idea is that a tie is broken by DOCUMENT ORDER — the
+      later rule wins. This topic is genuinely important and genuinely
+      well-formed, and it is about a different section entirely: 4.3's
+      !important flag, which overrides even an inline style. Filed under 4.2,
+      it is exactly the drift the product owner complained about — "the
+      questions... often do not focus on the main learning concept" — and nothing
+      before this check would have caught it: it passes importance, the yes/no
+      filter, the duplicate-concept filter and check_plan_depth without any of
+      them ever reading understanding.core_idea against the topic at all.
+    type: topic_grader
+    grader: topic_matches_understanding
+    section_id: "4.2"
+    fixture: evals/fixtures/topic_understanding_mismatch.json
+    expect:
+      passed: false
+      reason_contains: "shares no word"
+
+  - id: E090
+    name: A topic already about the tie-breaking rule passes
+    why: >
+      The false-positive guard for E089 — same section, same validated core
+      idea, and the only difference is the topic is actually asking about
+      document order breaking a specificity tie, which is what 4.2 teaches. A
+      check that flags this too has stopped catching mismatch and started
+      penalising any topic that does not restate core_idea word for word.
+    type: topic_grader
+    grader: topic_matches_understanding
+    section_id: "4.2"
+    fixture: evals/fixtures/topic_understanding_aligned.json
+    expect:
+      passed: true
+
+  # ------------------------------------------------------- static-all-the-way-through
+  #
+  # check_frames_develop and check_frames_progress both grade whether a picture's
+  # CONTENT changed, deliberately over whether its TEMPLATE varied (commit
+  # 909bab9) — right for a recoloured repost, and it leaves open a short that
+  # holds ONE static scaffold (icons/compare/bar/table/split/mapping) for its
+  # entire length even though the strategist itself called the concept a
+  # process, a data movement or a cause and effect. check_motion_concept_not_static
+  # is the narrower check for exactly that gap.
+
+  - id: E091
+    name: A short held on one static template throughout a process/data_movement concept is rejected
+    why: >
+      Confirmed real: output/sync_vs_async.json is `compare`x3 end to end for a
+      short about a SEQUENCE of events, and it passes every existing grader
+      because the CONTENT of each `compare` frame genuinely changes beat to
+      beat — nothing ever draws the handshake happening, only ever compares
+      two still panels of it.
+    type: unit_grader
+    grader: motion_concept_not_static
+    fixture: evals/fixtures/unit_motion_concept_static_fail.json
+    expect:
+      passed: false
+      reason_contains: "data_movement, process"
+
+  - id: E092
+    name: A short held on one static template for a genuinely static comparison passes
+    why: >
+      The false-positive guard for E091, and the case 909bab9 protects. Same
+      shape — three `compare` frames, one scaffold — but the strategist called
+      every beat structure/comparison, which is legitimately still: contiguous
+      allocation versus paging is two alternatives weighed against each other,
+      not a sequence with a step this grader should demand be animated.
+    type: unit_grader
+    grader: motion_concept_not_static
+    fixture: evals/fixtures/unit_motion_concept_static_pass.json
+    expect:
+      passed: true
+
+  # ------------------------------------------------------------------- analogy
+  #
+  # Free, no model call: does layout.render() actually produce a picture for the
+  # new `analogy` template, and does it degrade to a plain box instead of
+  # crashing when the photo is unavailable (offline, or a subject with no
+  # curated photo)?
+
+  - id: E093
+    name: An analogy frame renders its photo panel and its technical panel
+    why: >
+      The new template's happy path — a stack analogy beside the section's own
+      call-stack structure, with bar() marked hero. Checks the technical panel
+      and the legend it earns from having two roles in play; it does not pin
+      down whether the photo itself was fetched, since that is optional and
+      degrades gracefully by design (see E094).
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_analogy_stack.json
+    expect:
+      must_contain: ["Call stack", "plates", "Focus", "Context"]
+
+  - id: E094
+    name: An analogy frame with no curated photo degrades to a plain labelled box
+    why: >
+      analogy_subject names something outside the curated nouns (stack, queue,
+      cache, recursion, linked_list, tree, hash_table, graph) and no
+      analogy_technical or analogy_caption was given either — the worst case,
+      and the one a redraw with no network
+      access hits routinely. The frame must still render, falling back to a
+      plain box captioned with the subject itself, exactly like an unknown
+      Glyph.icon already falls back to _pict_box in the icons template.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_analogy_unknown_subject.json
+    expect:
+      must_contain: ["widget"]
+      must_not_contain: ["Focus", "Context"]
+
+  # ------------------------------------------------------- linked-list chains
+  #
+  # `flow`, extended: separate boxes with a real gap and a real arrow, which is
+  # most of what a linked list needs and a `state` container cannot draw — a
+  # `state` frame is ONE physical container with contiguous slots, and an array
+  # and a linked list rendering as visually-identical boxes with different text
+  # was the measured complaint. Two additions, both free to check: a horizontal
+  # run (a chain is normally drawn growing sideways, not falling down the
+  # screen) and a drawn terminator (a linked list's last node genuinely points
+  # at nothing, and that absence has to be ON SCREEN, not implied by the frame
+  # simply stopping — the same argument Store.pointer_at=-1 already makes for
+  # an empty stack).
+
+  - id: E095
+    name: A horizontal flow with a terminator draws separate nodes and a real stop mark
+    why: >
+      Wiring test for flow_orientation and flow_terminator. Before these fields,
+      `flow` had no way to lay its steps out left to right, and nothing after
+      the last step ever rendered — a chain simply ran out of boxes, which is
+      indistinguishable from "the artist stopped drawing". This pins that both
+      new fields actually reach the SVG: the terminator's own word ("null") and
+      the circle-with-a-slash mark that draws it (_terminator in layout.py),
+      distinct from the ordinary rectangles the three real nodes use.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_flow_linked_list.json
+    expect:
+      must_contain: ["null", "<circle"]
+
+  - id: E096
+    name: An ordinary flow with no terminator draws no stop mark
+    why: >
+      THE GUARD AGAINST AN ALWAYS-ON TERMINATOR. A page-fault path is a genuine
+      sequence of events that just ends on its last step — TLB miss, page table
+      walk, fault handler — and nothing about "this is where it stops" applies
+      to it the way it does to a linked list's null. flow_terminator is None by
+      default, and this is the regression that would catch a _flow that started
+      drawing the mark unconditionally.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_flow_vertical_no_terminator.json
+    expect:
+      must_not_contain: ["<circle"]
+
+  # ---------------------------------------------------- pointer retargeting
+  #
+  # Store.pointer_at_previous: the field that lets a beat about a pointer
+  # CHANGING — `top` advancing after a push, a linked-list `next` handed from
+  # one node to the one just inserted after it — draw the pointer visibly
+  # disconnecting from its old target and reconnecting to its new one, reusing
+  # web/src/AnimatedSvg.tsx's existing slide() rather than a new animation
+  # primitive: the pointer's arrow+label group is drawn at its CURRENT
+  # position exactly as before, and data-slide carries it back to its PREVIOUS
+  # one.
+
+  - id: E097
+    name: A pointer that moved since the last beat is tagged to slide in from its old position
+    why: >
+      THE BEHAVIOURAL HALF, pinned exactly rather than just "some data-slide
+      appears" — this stack's `top` moves from slot 1 (B) to slot 2 (C), one
+      slot up in a vertical store, and the geometry _state already computes for
+      the arriving/leaving item (slot_xy, slot_h) says that is 111 screen units.
+      If this stops matching, either the retargeting math broke or the wrong
+      slot's position leaked in.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_state_pointer_retarget.json
+    expect:
+      must_contain: ['data-slide="0,111"']
+
+  - id: E098
+    name: A pointer with no previous position gets no slide — it did not move
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E097. Same stack, same pointer, but
+      pointer_at_previous is unset — the ordinary case, most beats do not
+      retarget anything — and a pointer that is not changing must render
+      exactly as it always has, with no data-slide at all. Catches a retarget
+      that fires whenever pointer_at is merely present, rather than only when
+      it differs from a real previous value.
+    type: golden
+    step: legend
+    fixture: evals/fixtures/frame_state_pointer_no_previous.json
+    expect:
+      must_not_contain: ["data-slide"]
+
+  - id: E101
+    name: Code used as the default picture for two unrelated beats is rejected
+    why: >
+      _RELATIONSHIP_TEMPLATES allows 'code' in almost every row because the
+      material's own snippet is often a legitimate, grounded picture — and that
+      is exactly what makes code an easy default when the design step has no
+      better idea. Both frames here are genuinely about a comparison and a
+      cause-and-effect (a tie, and what breaks it), and neither strategy names
+      the code's own syntax as the thing to see — the code is standing in for a
+      relationship it cannot show, not answering a claim about itself.
+    type: unit_grader
+    grader: code_not_overused
+    fixture: evals/fixtures/code_overuse_default_filler.json
+    expect:
+      passed: false
+      reason_contains: "default picture"
+
+  - id: E102
+    name: Code used twice, each time because the beat is genuinely about syntax, passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E101. Without it the cheap way to make
+      code_not_overused green is to cap every unit at one code frame, which
+      would break the real case a short about CSS syntax needs — one beat on
+      the declaration's shape, a second on the property/value split inside it.
+      Both strategies here say so explicitly ("syntax", "property", "keyword"),
+      so two code frames is the correct drawing, not overuse.
+    type: unit_grader
+    grader: code_not_overused
+    fixture: evals/fixtures/code_justified_twice.json
+    expect:
+      passed: true
+
+  - id: E106
+    name: A linked list drawn as slots in one container is rejected
+    why: >
+      relationship alone cannot catch this: the beat is `relationship:
+      structure`, a legal call, and "state" is a legal template for a
+      structure claim in general — check_frames_match_strategy passes it
+      clean. But this beat's physical_form is linked_nodes, and "state" draws
+      contiguous slots inside ONE bordered container, which claims the exact
+      opposite of what a linked list is — that the nodes are one contiguous
+      thing rather than separate objects joined only by a pointer. This is
+      the gap physical_form exists to close.
+    type: unit_grader
+    grader: physical_form_matches_template
+    fixture: evals/fixtures/physical_form_linked_as_container.json
+    expect:
+      passed: false
+      reason_contains: "linked_nodes"
+
+  - id: E107
+    name: The same linked list drawn as separate connected nodes passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E106. Same concept, same strategy, only the
+      template changed — "flow" with separate boxes, a real gap and a drawn
+      pointer between them, which is the honest picture of nodes related only
+      by a reference. Without this case the cheap way to make
+      physical_form_matches_template green is to reject every "state" or
+      "flow" frame, which would break the very distinction this check exists
+      to enforce.
+    type: unit_grader
+    grader: physical_form_matches_template
+    fixture: evals/fixtures/physical_form_linked_as_flow.json
+    expect:
+      passed: true
+
+  - id: E108
+    name: A hierarchy frame with the parent rendered below the child is rejected
+    why: >
+      layout.py's hierarchy renderer is deterministic — levels[0] always draws
+      on top — but that is a promise about the RENDERER, not the DATA. This
+      frame has two real, correctly-nested levels (every prior structural
+      grader passes it clean), and the strategy's own must_see says
+      "applications on top, the OS in the middle" — but `levels` lists the
+      Operating System first, so the renderer faithfully puts the OS on top
+      and Applications below it, the wrong way round. anchor_label ("Applications")
+      is the one place that claim is written down, and it is the only thing
+      that can catch this.
+    type: unit_grader
+    grader: anchor_matches_structure
+    fixture: evals/fixtures/anchor_hierarchy_parent_below_child.json
+    expect:
+      passed: false
+      reason_contains: "wrong order"
+
+  - id: E109
+    name: The same hierarchy with levels in the right order passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E108. Identical strategy and anchor_label,
+      only `levels` reordered to put Applications first — without this case
+      the cheap way to make anchor_matches_structure green is to reject every
+      hierarchy frame, which would make it noise and get it ignored.
+    type: unit_grader
+    grader: anchor_matches_structure
+    fixture: evals/fixtures/anchor_hierarchy_correct_order.json
+    expect:
+      passed: true
+
+  - id: E110
+    name: A traversal drawn starting from the wrong end is rejected
+    why: >
+      The strategy says the traversal starts at head and moves toward the
+      last node, and anchor_label names the head node — but `steps` lists C
+      first and the head node last, so the flow template (which always draws
+      steps[0] first) shows the traversal running backwards. Every existing
+      frame-shape check passes this: three real, distinct, connected nodes,
+      correctly drawn as "flow". None of them can tell which end is the start.
+    type: unit_grader
+    grader: anchor_matches_structure
+    fixture: evals/fixtures/anchor_flow_reversed_direction.json
+    expect:
+      passed: false
+      reason_contains: "direction is reversed"
+
+  - id: E111
+    name: The same traversal with steps in the right order passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E110. Identical strategy and anchor_label,
+      only `steps` reordered to start at head.
+    type: unit_grader
+    grader: anchor_matches_structure
+    fixture: evals/fixtures/anchor_flow_correct_direction.json
+    expect:
+      passed: true
+
+  - id: E112
+    name: A stack pointer aimed at the wrong slot is rejected
+    why: >
+      The narration and strategy both say `top` points at C, the most
+      recently pushed item — and anchor_label names C — but pointer_at is 1,
+      which is B's slot. -1 and out-of-range values are legitimate, meaningful
+      states (Store.pointer_at's own docstring), so a bounds check could never
+      catch this — pointer_at=1 is a perfectly valid index into a 3-slot
+      stack, just the wrong one. Only comparing the claimed anchor against
+      what is actually at that slot catches a confidently-wrong pointer.
+    type: unit_grader
+    grader: anchor_matches_structure
+    fixture: evals/fixtures/anchor_state_pointer_wrong_slot.json
+    expect:
+      passed: false
+      reason_contains: "wrong slot"
+
+  - id: E113
+    name: The same stack with top pointing at C passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E112. Identical strategy and anchor_label,
+      only pointer_at corrected from 1 to 2.
+    type: unit_grader
+    grader: anchor_matches_structure
+    fixture: evals/fixtures/anchor_state_pointer_correct_slot.json
+    expect:
+      passed: true
+
+  - id: E114
+    name: An item that appears without ever arriving is rejected
+    why: >
+      Slot.state exists so a push is a picture rather than a relabel — but
+      nothing before this compared one state frame to the next to confirm it
+      was used that way. This frame introduces C already "resting", with no
+      earlier frame showing it "arriving" — every other grader passes it (the
+      template is right, the physical form is right, the picture did change),
+      because the defect is not in what was drawn, it is in HOW C got there:
+      teleported into the container instead of shown entering it.
+    type: unit_grader
+    grader: state_item_transitions_visible
+    fixture: evals/fixtures/motion_insert_invisible.json
+    expect:
+      passed: false
+      reason_contains: "no frame showing it arriving"
+
+  - id: E115
+    name: The same push with C shown arriving passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E114. Identical stack, identical pointer
+      move — only C's state changed from "resting" to "arriving" in the frame
+      it first appears in.
+    type: unit_grader
+    grader: state_item_transitions_visible
+    fixture: evals/fixtures/motion_insert_visible.json
+    expect:
+      passed: true
+
+  - id: E116
+    name: An item that vanishes without ever leaving is rejected
+    why: >
+      The inverse of E114: C is popped, and the next frame simply does not
+      contain it — no frame marks it "leaving" first. A viewer sees the item
+      disappear between beats rather than lift out of the container, the same
+      invisible-transition defect on the removal side.
+    type: unit_grader
+    grader: state_item_transitions_visible
+    fixture: evals/fixtures/motion_remove_invisible.json
+    expect:
+      passed: false
+      reason_contains: "no frame marking it leaving"
+
+  - id: E117
+    name: A pop shown leaving, then gone, passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E116, and it also exercises the third rule
+      (a marked departure must actually finish): three frames — C resting,
+      then C leaving, then C genuinely absent. Without this case the cheap way
+      to make state_item_transitions_visible green is to reject every
+      disappearance, which would break the real three-frame pop this pipeline
+      is supposed to produce.
+    type: unit_grader
+    grader: state_item_transitions_visible
+    fixture: evals/fixtures/motion_remove_visible.json
+    expect:
+      passed: true
+
+  - id: E118
+    name: A pointer retargeted to its own current slot is rejected
+    why: >
+      pointer_at_previous is set equal to pointer_at — a retarget that, per
+      the field's own docstring, "asks for no animation at all". Structurally
+      valid (both are real slot indices), and exactly the shape that lets a
+      pointer look retargeted on paper while rendering as never having moved.
+    type: unit_grader
+    grader: state_pointer_moves_are_shown
+    fixture: evals/fixtures/motion_pointer_no_move.json
+    expect:
+      passed: false
+      reason_contains: "asks for no movement"
+
+  - id: E119
+    name: A pointer that moves with no retarget marked is rejected
+    why: >
+      top genuinely moves from slot 1 to slot 2 between two real frames, but
+      the second frame leaves pointer_at_previous empty — the pointer will
+      render already arrived at C with no disconnect-and-reconnect shown, the
+      same silent-teleport defect check_state_item_transitions_visible
+      catches for an item, here for the index that names one.
+    type: unit_grader
+    grader: state_pointer_moves_are_shown
+    fixture: evals/fixtures/motion_pointer_silent_move.json
+    expect:
+      passed: false
+      reason_contains: "pointer_at_previous was not set"
+
+  - id: E120
+    name: A correctly retargeted pointer passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E118/E119. Reuses motion_insert_visible's
+      own push sequence, where pointer_at_previous is filled in correctly —
+      confirms the two failure fixtures above are not just rejecting every
+      pointer_at_previous.
+    type: unit_grader
+    grader: state_pointer_moves_are_shown
+    fixture: evals/fixtures/motion_insert_visible.json
+    expect:
+      passed: true
+
+  - id: E121
+    name: A traversal whose hero never advances is rejected
+    why: >
+      The same 3-node chain, drawn twice, with the hero still on "head" both
+      times — the narration claims the traversal moved on to read the next
+      pointer, but nothing about the picture shows it going anywhere. Neither
+      check_frames_match_strategy nor check_physical_form_matches_template
+      catches this: the template is correctly "flow" for a linked_nodes claim
+      either way, and the defect is specifically that the hero did not move.
+    type: unit_grader
+    grader: flow_traversal_progresses
+    fixture: evals/fixtures/motion_traversal_stuck.json
+    expect:
+      passed: false
+      reason_contains: "hold still or move backwards"
+
+  - id: E122
+    name: A traversal whose hero moves to the next node passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E121. Identical chain and identical
+      narration, only the hero moved from "head" to "Node 2" in the second
+      frame — the honest drawing of the same traversal actually progressing.
+    type: unit_grader
+    grader: flow_traversal_progresses
+    fixture: evals/fixtures/motion_traversal_advances.json
+    expect:
+      passed: true
+
+  - id: E123
+    name: Four different concepts all forced into generic boxes is rejected
+    why: >
+      A hierarchy (table), a structure (split), a process (bar) and a
+      comparison (compare) — four genuinely different kinds of claim, every
+      one of them individually legal for its own relationship
+      (check_frames_match_strategy and check_physical_form_matches_template
+      both pass this fixture clean) and every frame distinct from the last
+      (check_frames_develop passes too). What none of those ask is whether the
+      reel, watched straight through, is one rounded-rectangle template after
+      another regardless of what each beat is actually about — which is
+      exactly what this is.
+    type: unit_grader
+    grader: generic_boxes_not_overused
+    fixture: evals/fixtures/generic_boxes_overused.json
+    expect:
+      passed: false
+      reason_contains: "different kinds of claim"
+
+  - id: E124
+    name: An all-comparison reel using compare throughout is not penalised
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E123. Three `compare` frames in a row, and
+      every one of them is a genuine comparison beat — the short's entire
+      question is a three-way comparison across different measures. Without
+      this case the cheap way to make generic_boxes_not_overused green is to
+      cap every reel at one or two box frames, which would break the real
+      short this pipeline is supposed to produce when comparison actually is
+      the concept.
+    type: unit_grader
+    grader: generic_boxes_not_overused
+    fixture: evals/fixtures/generic_boxes_consistent_comparison.json
+    expect:
+      passed: true
+
+  # ----------------------------------------------------------------- vision judge
+  #
+  # skills/vision.py's judge_frames is the one component in this pipeline that
+  # looks at ACTUAL RENDERED PIXELS rather than reads a description of them, and
+  # until these three cases it had no regression coverage at all — every other
+  # fixture in this file is graded by free deterministic code. These need a real
+  # model call AND a working headless Chromium (see shorts/raster.py), so they
+  # are gated behind --judge like every other real-model case.
+
+  - id: E103
+    name: A visually unrelated sequence is flagged as fragmented
+    why: >
+      The narration is one coherent explanation (paging vs contiguous
+      allocation), but the frames are not — a bar, a font preview, a rating
+      stat and a weather icon pair, none of them about memory at all. No
+      structural grader catches this: each frame is individually well-formed,
+      each template is used correctly, and check_frames_develop is satisfied by
+      frames merely differing from each other, which four unrelated pictures
+      trivially do. Only looking at the sequence as a picture shows it never
+      develops one subject.
+    type: vision_judge
+    fixture: evals/fixtures/vision_fragmented_sequence.json
+    expect:
+      composition_problems_present: true
+
+  - id: E104
+    name: A comparison that only differs in its words is flagged
+    why: >
+      The strategy for d_compare explicitly asks to SEE the mutable object
+      change in place and a new object appear beside the immutable one — and
+      the frame drawn is two identical boxes, one per panel, differing only in
+      their titles ("Mutable" / "Immutable"). A learner reading the words would
+      get the distinction; a learner looking at the picture would not, which is
+      exactly the "important distinction shown only through text" failure this
+      pipeline has no other way to catch — check_frames_match_strategy checks
+      the TEMPLATE is legal for a comparison, not that the two sides actually
+      look different.
+    type: vision_judge
+    fixture: evals/fixtures/vision_distinction_only_in_text.json
+    expect:
+      any_frame_failed: true
+
+  - id: E105
+    name: A genuinely coherent sequence is never called fragmented
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E103, RESHAPED BY WHAT TWO REAL RUNS SAID.
+      developing_frames.json looked coherent on paper and got genuinely
+      flagged — frame 2 abandons the visual language, frames 1 and 3 are
+      near-identical — a real catch, not noise. visual_state_happens.json (one
+      persistent stack, slots changing across all four frames: empty, push A,
+      push C, pop C) got flagged too, on its own genuine merits: push and pop
+      look too similar, an item never visibly lands in its slot. Both are true
+      findings about this renderer, not false positives, and asserting
+      "zero composition_problems" would have this guard chasing a bar this
+      judge — correctly — may never grant any fixture.
+      So the guard is narrower and still real: this composition, uncontrived,
+      single-subject and genuinely progressing, must never be told it is a set
+      of UNRELATED, DISCONNECTED frames with no developing thread — the actual
+      fragmentation claim E103 exists to catch. Every complaint the real run
+      returned was about ONE frame's geometry or the stack's own rendering,
+      never that. A judge that starts calling this sequence disconnected is
+      regressing on the failure this pair of cases is actually about.
+    type: vision_judge
+    fixture: evals/fixtures/visual_state_happens.json
+    expect:
+      composition_problems_exclude:
+        - "unrelated"
+        - "disconnected"
+        - "different subject"
+        - "no shared"
+        - "does not develop one subject"
+        - "never develops one subject"
 
   # ------------------------------------------------------------------ llm judge
 

@@ -1,0 +1,52 @@
+{
+  "short_id": "generic_boxes_overused",
+  "session_id": "eval",
+  "source_section_id": "3.3",
+  "question": "How is the operating system organized, and what happens on a page fault?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "How is the operating system organized, and what happens on a page fault?", "on_screen": "OS structure", "visual_ref": "d_layers"},
+    {"speaker": "student", "line": "The OS sits between applications above it and hardware below.", "on_screen": "Layers", "visual_ref": "d_layers", "source_quote": "The operating system manages hardware and provides services to applications."},
+    {"speaker": "student", "line": "A logical address splits into a page number and an offset.", "on_screen": "Split address", "visual_ref": "d_split", "source_quote": "A logical address is split into a page number and an offset."},
+    {"speaker": "student", "line": "On a fault, the OS loads the missing page and retries.", "on_screen": "Fault steps", "visual_ref": "d_steps", "source_quote": "The OS loads the missing page and the instruction is retried."},
+    {"speaker": "student", "line": "Contiguous allocation and paging trade off differently.", "on_screen": "Trade-off", "visual_ref": "d_compare", "source_quote": "Paging removes the requirement for contiguity."}
+  ],
+  "visuals": {
+    "d_layers": {
+      "ref": "d_layers", "type": "diagram", "spec": "OS layers, forced into a table",
+      "frame": {"template": "table", "title": "OS layers",
+        "columns": ["Layer"], "rows": [{"cells": ["Applications"], "role": "plain"},
+                                        {"cells": ["Operating System"], "role": "hero"},
+                                        {"cells": ["Hardware"], "role": "plain"}]},
+      "strategy": {"ref": "d_layers", "concept": "the OS sits between applications and hardware",
+        "relationship": "hierarchy", "physical_form": "nested_levels",
+        "must_see": "three levels stacked", "changes_from_previous": "", "focus": "the OS layer"}
+    },
+    "d_split": {
+      "ref": "d_split", "type": "diagram", "spec": "address split into fields",
+      "frame": {"template": "split", "title": "Address fields",
+        "parts": [{"label": "Page number", "role": "hero"}, {"label": "Offset", "role": "plain"}]},
+      "strategy": {"ref": "d_split", "concept": "an address is divided into a page number and an offset",
+        "relationship": "structure", "physical_form": "flat_parts",
+        "must_see": "one bar divided into two named fields", "changes_from_previous": "a new subject, the address", "focus": "the page number field"}
+    },
+    "d_steps": {
+      "ref": "d_steps", "type": "diagram", "spec": "fault-handling steps forced into a bar",
+      "frame": {"template": "bar", "title": "Handling a fault",
+        "cells": [{"label": "Detect fault", "role": "plain"}, {"label": "Load page", "role": "hero"}, {"label": "Retry", "role": "plain"}]},
+      "strategy": {"ref": "d_steps", "concept": "the OS loads the missing page and retries the instruction",
+        "relationship": "process", "physical_form": "single_object",
+        "must_see": "the fault handled in ordered stages", "changes_from_previous": "a new subject, the fault sequence", "focus": "loading the page"}
+    },
+    "d_compare": {
+      "ref": "d_compare", "type": "diagram", "spec": "contiguous vs paging",
+      "frame": {"template": "compare", "title": "Contiguous vs paging",
+        "panels": [{"title": "Contiguous", "role": "lost", "items": [{"label": "One block", "role": "plain"}]},
+                   {"title": "Paging", "role": "hero", "items": [{"label": "Scattered frames", "role": "plain"}]}]},
+      "strategy": {"ref": "d_compare", "concept": "paging trades contiguity for flexibility",
+        "relationship": "comparison", "physical_form": "two_sides",
+        "must_see": "both allocation strategies side by side", "changes_from_previous": "a new subject, the trade-off", "focus": "paging"}
+    }
+  },
+  "status": "draft"
+}

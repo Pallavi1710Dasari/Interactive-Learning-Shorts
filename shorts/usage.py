@@ -44,6 +44,7 @@ class Call:
     output_tokens: int
     cost: float
     estimated: bool             # True when the price table was used
+    duration_seconds: float = 0.0   # wall clock around the request, see record()
 
 
 @dataclass
@@ -53,6 +54,7 @@ class Totals:
     output_tokens: int = 0
     cost: float = 0.0
     estimated: bool = False
+    duration_seconds: float = 0.0
     by_label: dict = field(default_factory=dict)
 
 
@@ -88,8 +90,17 @@ def _price(model: str, tin: int, tout: int) -> float:
     return tin * pin + tout * pout
 
 
-def record(label: str, model: str, resp) -> Call | None:
-    """Log one model call. Never raises — accounting must not break generation."""
+def record(label: str, model: str, resp, duration_seconds: float = 0.0) -> Call | None:
+    """Log one model call. Never raises — accounting must not break generation.
+
+    duration_seconds is wall clock around the actual API request, timed at the
+    call site in llm.py (perf_counter, not measured here — by the time resp
+    exists the clock has already stopped). It defaults to 0.0 rather than being
+    required so a caller that hasn't been updated yet — or a future call site
+    someone adds without threading timing through — still records tokens and
+    cost instead of raising, matching the "never raises" contract this whole
+    function exists to keep.
+    """
     try:
         u = getattr(resp, "usage", None)
         if u is None:
@@ -106,7 +117,8 @@ def record(label: str, model: str, resp) -> Call | None:
         else:
             cost, estimated = _price(model, tin, tout), True
 
-        call = Call(label, model, tin, tout, round(cost, 6), estimated)
+        call = Call(label, model, tin, tout, round(cost, 6), estimated,
+                    round(float(duration_seconds), 3))
         with _lock:
             _load_locked()
             _calls.append(call)
@@ -124,11 +136,15 @@ def _sum(calls: list[Call]) -> Totals:
         t.output_tokens += c.output_tokens
         t.cost += c.cost
         t.estimated = t.estimated or c.estimated
-        row = t.by_label.setdefault(c.label, {"calls": 0, "tokens": 0, "cost": 0.0})
+        t.duration_seconds += c.duration_seconds
+        row = t.by_label.setdefault(
+            c.label, {"calls": 0, "tokens": 0, "cost": 0.0, "duration_seconds": 0.0})
         row["calls"] += 1
         row["tokens"] += c.input_tokens + c.output_tokens
         row["cost"] = round(row["cost"] + c.cost, 6)
+        row["duration_seconds"] = round(row["duration_seconds"] + c.duration_seconds, 3)
     t.cost = round(t.cost, 6)
+    t.duration_seconds = round(t.duration_seconds, 3)
     return t
 
 

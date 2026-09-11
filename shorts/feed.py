@@ -156,7 +156,18 @@ def _clean_svg(svg: str) -> str:
 
 def collect(include_quarantined: bool = False) -> list[dict]:
     """
-    Every unit in output/, newest section first, in reel-playable form.
+    Every unit in output/, MOST RECENTLY CREATED FIRST, in reel-playable form.
+
+    THIS WAS NEWEST-FIRST IN NAME ONLY. The final sort used to be
+    `units.sort(key=lambda u: u["section"])` — ascending, alphabetical, by
+    `source_section_id` — which is a fact about the READING MATERIAL, not about
+    when a unit was built. A short built today under section "1.2" sorted above
+    one built weeks ago under "3.1", so a freshly generated reel could land
+    anywhere in the list depending on which section it happened to answer, and
+    the reviewer had no reliable way to find what was new without reading every
+    entry. ShortUnit carries no created-at field, so the file's own mtime — set
+    the moment this pipeline wrote it — is the actual signal for "new", and
+    nothing before this read it for ordering at all.
 
     QUARANTINED UNITS ARE HELD BACK. A short whose judge verdict came in under the
     bar is stored with status "needs_review" and left out of this list, because this
@@ -197,8 +208,13 @@ def collect(include_quarantined: bool = False) -> list[dict]:
                        "problems": unit.eval.problems} if unit.eval else None),
             "diagrams": sum(1 for b in beats if b["svg"]),
             "beats": beats,
+            # The file's own mtime, in epoch seconds — this IS the recency
+            # signal the sort below uses, and it costs nothing to also hand to
+            # the reviewer so "is this the one I just built" is answerable
+            # without guessing from position alone.
+            "created": path.stat().st_mtime,
         })
-    units.sort(key=lambda u: u["section"])
+    units.sort(key=lambda u: u["created"], reverse=True)
     return units
 
 

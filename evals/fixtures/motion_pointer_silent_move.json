@@ -1,0 +1,32 @@
+{
+  "short_id": "motion_pointer_silent_move",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "Where does top point after pushing B, then C?",
+  "estimated_seconds": 14.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "Where does top point after pushing B, then C?", "on_screen": "top advances", "visual_ref": "d_after_b"},
+    {"speaker": "student", "line": "After pushing B, top points at B.", "on_screen": "top -> B", "visual_ref": "d_after_b", "source_quote": "pushing B sets top to 1"},
+    {"speaker": "student", "line": "After pushing C, top points at C instead.", "on_screen": "top -> C", "visual_ref": "d_after_c", "source_quote": "pushing C sets top to 2"}
+  ],
+  "visuals": {
+    "d_after_b": {
+      "ref": "d_after_b", "type": "diagram", "spec": "stack after pushing B",
+      "frame": {"template": "state", "title": "top after pushing B", "anchor_label": "B",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "hero", "state": "resting"}],
+          "pointer": "top", "pointer_at": 1, "open_end": true}}
+    },
+    "d_after_c": {
+      "ref": "d_after_c", "type": "diagram", "spec": "stack after pushing C, pointer retargeted with no retarget marked",
+      "frame": {"template": "state", "title": "top after pushing C", "anchor_label": "C",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "plain", "state": "resting"},
+                    {"label": "C", "role": "hero", "state": "arriving"}],
+          "pointer": "top", "pointer_at": 2, "open_end": true}}
+    }
+  },
+  "status": "draft"
+}

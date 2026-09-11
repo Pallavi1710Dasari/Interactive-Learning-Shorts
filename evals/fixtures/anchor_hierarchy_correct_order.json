@@ -1,0 +1,49 @@
+{
+  "short_id": "anchor_hierarchy_correct_order",
+  "session_id": "eval",
+  "source_section_id": "3.3",
+  "question": "Where does the operating system sit relative to applications and hardware?",
+  "estimated_seconds": 18.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "Where does the operating system sit relative to applications and hardware?",
+      "on_screen": "Where the OS sits",
+      "visual_ref": "d_layers"
+    },
+    {
+      "speaker": "student",
+      "line": "The operating system sits between the applications above it and the hardware below.",
+      "on_screen": "OS in the middle",
+      "visual_ref": "d_layers",
+      "source_quote": "The operating system manages hardware and provides services to applications."
+    }
+  ],
+  "visuals": {
+    "d_layers": {
+      "ref": "d_layers",
+      "type": "diagram",
+      "spec": "three layers, the OS in the middle",
+      "frame": {
+        "template": "hierarchy",
+        "title": "Where the OS sits",
+        "anchor_label": "Applications",
+        "levels": [
+          {"label": "Applications", "role": "plain"},
+          {"label": "Operating System", "role": "hero"},
+          {"label": "Hardware", "role": "plain"}
+        ]
+      },
+      "strategy": {
+        "ref": "d_layers",
+        "concept": "applications sit above the operating system, which sits above the hardware",
+        "relationship": "hierarchy",
+        "physical_form": "nested_levels",
+        "must_see": "three levels stacked, applications on top, the OS in the middle, hardware at the base",
+        "changes_from_previous": "",
+        "focus": "the operating system layer"
+      }
+    }
+  },
+  "status": "draft"
+}

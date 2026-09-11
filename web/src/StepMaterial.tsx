@@ -10,7 +10,11 @@ import { Spinner } from "./Spinner";
 export function StepMaterial({ onDone }: { onDone: (r: MaterialResult) => void }) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [target, setTarget] = useState(5);
+  // Default to ONE concept: the single most important, most interview-asked idea
+  // in the material. A learner reviewing five ranked cards at once was reviewing a
+  // deck, not deciding on the one thing worth watching. Still adjustable up to 12
+  // for material that genuinely holds several distinct concepts.
+  const [target, setTarget] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const picker = useRef<HTMLInputElement>(null);

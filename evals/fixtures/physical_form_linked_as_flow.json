@@ -1,0 +1,50 @@
+{
+  "short_id": "physical_form_linked_as_flow",
+  "session_id": "eval",
+  "source_section_id": "7.1",
+  "question": "How does a linked list find the next item without an index?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "How does a linked list find the next item without an index?",
+      "on_screen": "Finding the next item",
+      "visual_ref": "d_nodes"
+    },
+    {
+      "speaker": "student",
+      "line": "Each node holds its value and a pointer to the next node, wherever that node lives in memory.",
+      "on_screen": "Value and pointer",
+      "visual_ref": "d_nodes",
+      "source_quote": "each node holds two things: the value itself, and a pointer to the next node in the list"
+    }
+  ],
+  "visuals": {
+    "d_nodes": {
+      "ref": "d_nodes",
+      "type": "diagram",
+      "spec": "nodes joined by pointers",
+      "frame": {
+        "template": "flow",
+        "title": "A linked list's nodes",
+        "flow_orientation": "horizontal",
+        "flow_terminator": "null",
+        "steps": [
+          {"label": "A", "role": "plain"},
+          {"label": "B", "role": "hero"},
+          {"label": "C", "role": "plain"}
+        ]
+      },
+      "strategy": {
+        "ref": "d_nodes",
+        "concept": "each node points to the next node, wherever it lives",
+        "relationship": "structure",
+        "physical_form": "linked_nodes",
+        "must_see": "separate nodes, each one only connected to the next by a drawn pointer, not sitting in one contiguous container",
+        "changes_from_previous": "",
+        "focus": "the pointer from A to B"
+      }
+    }
+  },
+  "status": "draft"
+}

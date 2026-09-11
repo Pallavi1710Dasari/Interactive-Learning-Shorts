@@ -246,10 +246,6 @@ kbd {
   box-shadow: 0 0 0 3px rgba(47, 211, 155, 0.09);
 }
 .castone.on span { color: var(--cream); }
-.tagline {
-  font-size: 10.5px; color: var(--muted); background: rgba(0, 0, 0, 0.34);
-  padding: 5px 10px; border-radius: 99px; font-variant-numeric: tabular-nums;
-}
 
 .avatar { border-radius: 50%; display: block; transition: transform 0.22s, filter 0.22s; }
 .avatar.dim { filter: grayscale(0.65) brightness(0.62); transform: scale(0.9); }
@@ -433,7 +429,8 @@ kbd {
   color: var(--teal-hi); background: rgba(0, 0, 0, 0.42); padding: 5px 12px; border-radius: 99px;
 }
 
-/* running spend, always visible */
+/* Running spend — shown only once the $ toggle in the topbar is clicked open;
+   see .costtoggle below for why. */
 .costpill {
   display: inline-flex; align-items: baseline; gap: 7px; padding: 5px 12px; border-radius: 99px;
   background: rgba(29, 158, 117, 0.1); border: 1px solid rgba(47, 211, 155, 0.26);
@@ -446,6 +443,20 @@ kbd {
   animation: flashin 1.4s ease-out;
 }
 @keyframes flashin { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; } }
+
+/* The toggle that replaced the always-on pill. Same ghost-button shape as the
+   other topbar buttons (voice, existing reels) so it does not stand out as a
+   different kind of control. */
+.costtoggle { position: relative; font-weight: 700; }
+/* A spend still has to register while the breakdown is collapsed, so a dot
+   survives the collapse — see the comment in App.tsx on why it is a dot and
+   not the figure itself. */
+.costdot {
+  position: absolute; top: 4px; right: 4px; width: 6px; height: 6px;
+  border-radius: 50%; background: #f0c674; font-style: normal;
+  box-shadow: 0 0 6px rgba(240, 198, 116, 0.7);
+  animation: flashin 1.4s ease-out;
+}
 
 .stepdot {
   display: grid; place-items: center; width: 22px; height: 22px; margin: 6px 6px 0;

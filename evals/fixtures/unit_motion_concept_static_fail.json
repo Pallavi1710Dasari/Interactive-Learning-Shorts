@@ -1,0 +1,42 @@
+{
+  "short_id": "motion_concept_static_fail",
+  "session_id": "eval",
+  "source_section_id": "3.1",
+  "question": "How does a TCP handshake establish a connection?",
+  "estimated_seconds": 30.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "How does a TCP handshake establish a connection?", "on_screen": "TCP handshake", "visual_ref": "r1"},
+    {"speaker": "student", "line": "The client sends a SYN, and the server replies with a SYN-ACK.", "on_screen": "SYN, SYN-ACK", "visual_ref": "r2", "source_quote": "the client sends a SYN, the server replies with a SYN-ACK"},
+    {"speaker": "student", "line": "The client then sends a final ACK, and only after that does the server consider the connection open.", "on_screen": "Final ACK opens it", "visual_ref": "r3", "source_quote": "the client answers with an ACK, and the server considers the connection open"}
+  ],
+  "visuals": {
+    "r1": {
+      "ref": "r1", "type": "diagram", "spec": "client and server, idle",
+      "frame": {"template": "compare", "title": "Client vs server",
+        "panels": [{"title": "Client", "items": [{"label": "Idle"}]},
+                   {"title": "Server", "items": [{"label": "Listening"}]}]},
+      "strategy": {"ref": "r1", "concept": "two sides before the handshake starts",
+        "relationship": "process", "must_see": "two boxes, neither lit yet",
+        "focus": "client"}
+    },
+    "r2": {
+      "ref": "r2", "type": "diagram", "spec": "SYN then SYN-ACK",
+      "frame": {"template": "compare", "title": "SYN / SYN-ACK",
+        "panels": [{"title": "Client", "items": [{"label": "SYN", "role": "hero"}]},
+                   {"title": "Server", "items": [{"label": "SYN-ACK"}]}]},
+      "strategy": {"ref": "r2", "concept": "the first two segments of the handshake",
+        "relationship": "process", "must_see": "SYN lit on the client side",
+        "changes_from_previous": "SYN is now lit", "focus": "SYN"}
+    },
+    "r3": {
+      "ref": "r3", "type": "diagram", "spec": "ACK arrives, connection opens",
+      "frame": {"template": "compare", "title": "Final ACK",
+        "panels": [{"title": "Client", "items": [{"label": "ACK", "role": "hero"}]},
+                   {"title": "Server", "items": [{"label": "Open", "role": "hero"}]}]},
+      "strategy": {"ref": "r3", "concept": "the ACK arriving opens the connection",
+        "relationship": "data_movement", "must_see": "the ACK travelling to the server",
+        "changes_from_previous": "the server panel is now lit open", "focus": "ACK"}
+    }
+  },
+  "status": "draft"
+}

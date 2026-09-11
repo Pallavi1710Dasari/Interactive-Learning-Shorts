@@ -21,7 +21,7 @@ import re
 from .schema import MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND
 from .checks import MAX_ANSWER_WORDS, MIN_ANSWERS, MIN_QUOTE_WORDS
 
-MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)      # 45
+MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)      # 62
 MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)      # 112
 # Derived, not a literal: the length window has moved once already, and a hardcoded
 # target silently drifts outside it when it moves again.
@@ -48,11 +48,27 @@ def fake(model_cls, system: str, user: str):
         return model_cls(faithfulness=5, clarity=5, pace=4,
                          diagram_correct=True, problems=[])
     if name == "VisualStrategy":
+        # STEP 10's own path is DETECTED, NOT PASSED AS A FLAG — the marker
+        # plan_strategy only writes when it was given an `approach` (see
+        # skills/strategy.py's own prompt block). Routes to a DIFFERENT stub
+        # that actually varies by approach — see _workflow_aware_strategy's
+        # own note on why the ORIGINAL _strategy below must stay fixed at
+        # "structure" (it has to keep agreeing with _visuals()'s
+        # always-"bar" stub; the workflow-aware path is never carried that
+        # far by anything in this codebase yet).
+        if "THE APPROVED TEACHING APPROACH FOR THIS SHORT" in user:
+            return model_cls(**_workflow_aware_strategy(user))
         return model_cls(**_strategy(user))
     if name == "VisionReport":
         return model_cls(**_vision(user))
     if name == "SectionUnderstanding":
         return model_cls(**_understanding(user))
+    if name == "_RegeneratedQuestion":
+        return model_cls(**_regenerated_question(user))
+    if name == "_FramingOutput":
+        return model_cls(**_framing(user))
+    if name == "TeachingApproach":
+        return model_cls(**_teaching_approach(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 
@@ -83,6 +99,63 @@ def _topics(user: str) -> dict:
             "difficulty": "medium",
         })
     return {"topics": topics}
+
+
+def _regenerated_question(user: str) -> dict:
+    """
+    A deterministic, honest tweak of the original question — never a fabricated
+    rewrite — so SHORTS_STUB=1 can exercise review.regenerate end to end with no
+    network call.
+
+    Appends the reviewer's own words rather than inventing new phrasing, the
+    same "never claim more than the input supports" contract every other stub
+    in this file follows: a stub that produced a plausible-sounding rewrite
+    would be exercising an LLM's judgement, which is exactly what a stub
+    cannot honestly stand in for.
+    """
+    original = _find(r"^ORIGINAL QUESTION:\s*(.+)$", user, re.M) or "What does this section explain?"
+    reason = _find(r"^REVIEWER'S REQUESTED CHANGE:\s*(.+)$", user, re.M) or ""
+    base = original.rstrip("?").strip()
+    question = f"{base}, specifically regarding {reason}?" if reason else f"{base}?"
+    return {"question": question}
+
+
+def _framing(user: str) -> dict:
+    """
+    The stub keeps the teaching question IDENTICAL to the approved one — the
+    only honest default a rule-based stand-in can produce. Deciding whether a
+    reframe would teach better is exactly the pedagogical judgement a stub
+    cannot make; copying the approved question verbatim can never violate
+    "stay on the same concept" or "answerable from the section", which an
+    invented reframe risks doing.
+    """
+    approved = _find(r"^APPROVED QUESTION.*?:\s*\n(.+)$", user, re.M) or "What does this section explain?"
+    return {"teaching_question": approved.strip(),
+           "framing_rationale": "Stub: kept the approved question as written.",
+           "role": "primary"}
+
+
+def _teaching_approach(user: str) -> dict:
+    """
+    Always direct_explanation, with nothing combined and no alternatives — the
+    one device that is a defensible, honest default for ANY concept, the same
+    reason _understanding defaults its plans to not_needed rather than
+    guessing at a required one.
+
+    A stub that picked code, or any other specific device, would be
+    pretending to make the pedagogical judgement this step exists to make for
+    real — exactly what a stub must not do. It also means a stub run can never
+    exhibit the code-by-default failure this step is guarded against: the
+    mechanical path never reaches for code at all, so if that bias ever shows
+    up it can only be in what the real model chooses, not in the plumbing.
+    """
+    concept = _find(r"^CONCEPT:\s*(.+)$", user, re.M) or "this concept"
+    return {
+        "primary": "direct_explanation",
+        "combined_with": [],
+        "alternatives": [],
+        "rationale": f"Stub: explaining {concept} plainly, with no device chosen.",
+    }
 
 
 def _script(user: str) -> dict:
@@ -362,6 +435,99 @@ def _strategy(user: str) -> dict:
         })
     return {"subject": "a stub composition that grows one cell per beat",
             "beats": beats}
+
+
+#: STEP 10 — deterministic per-approach shape, so a stub run through
+#: plan_strategy_for_workflow exercises a genuinely different, concept-first
+#: path per approach rather than always the same "structure" answer
+#: _strategy above gives. Never "code": the whole point of this table is that
+#: nothing here reaches for code or text by default — see
+#: _workflow_aware_strategy's own docstring for why this is never carried
+#: into _visuals()'s stub, which is the one that has to keep agreeing with
+#: _strategy's fixed answer.
+_STUB_APPROACH_SHAPE = {
+    "process_demonstration": ("process", "single_container"),
+    "comparison": ("comparison", "two_sides"),
+    "analogy": ("structure", "single_object"),
+    "real_world_example": ("structure", "single_object"),
+    "conceptual_visual": ("hierarchy", "nested_levels"),
+    "code": ("structure", "not_applicable"),
+    "direct_explanation": ("structure", "single_object"),
+}
+
+
+def _workflow_aware_strategy(user: str) -> dict:
+    """
+    A deterministic, APPROACH-VARYING stub for plan_strategy_for_workflow —
+    Step 10's own path.
+
+    KEPT SEPARATE FROM _strategy ABOVE ON PURPOSE. That one always answers
+    "structure" because it has to agree with _visuals()'s own stub, which
+    always draws every frame as "bar" — see its own comment. Nothing in this
+    codebase carries a workflow-aware strategy into _visuals() yet (visual
+    RENDERING is explicitly future work — see shorts/skills/strategy.py's
+    own module docstring on what this step must not do), so this stub is
+    free to vary by approach without breaking that agreement, and doing so
+    is the whole point: a stub that always said "structure" regardless of
+    the approved approach would prove nothing about whether the approach
+    actually reached the strategist.
+    """
+    refs = _refs(user)
+    lines = dict(re.findall(r"^\[([a-z0-9_]+)\]\s*\w+:\s*(.+)$", user, re.M))
+    primary = _find(r"^THE APPROVED TEACHING APPROACH FOR THIS SHORT:\s*(.+)$",
+                    user, re.M) or ""
+    primary = primary.split(",")[0].strip()   # drop ", combined with ..." if present
+    relationship, physical_form = _STUB_APPROACH_SHAPE.get(primary, ("structure", "single_object"))
+
+    # STEP 11 — reconsider_visual_strategy sends the SAME "THE APPROVED
+    # TEACHING APPROACH..." marker this stub already dispatches on, plus its
+    # own "THE PREVIOUS PLAN..." marker. Detected here so a REGENERATION
+    # produces a deterministic but genuinely DIFFERENT dict than a fresh
+    # plan — subject and why_visual both reference the reviewer's own
+    # reason — rather than silently returning byte-identical output for two
+    # calls that are supposed to represent two different decisions.
+    reason = ""
+    if "THE PREVIOUS PLAN, WHICH A HUMAN REVIEWED" in user:
+        m = re.search(
+            r"THE REVIEWER'S REQUESTED CHANGE — address this directly:\n(.*?)\n\n",
+            user, re.S)
+        if m:
+            reason = m.group(1).strip()
+
+    beats = []
+    for i, ref in enumerate(refs):
+        subject = lines.get(ref, ref.replace("_", " ")) or ref
+        if relationship == "process":
+            must_see = f"{subject} arriving, then settling into place"
+            changes = "" if i == 0 else "the next step's state is now visible"
+        elif relationship == "comparison":
+            must_see = f"both sides held up at once, {subject} on one of them"
+            changes = "" if i == 0 else "the second side's own detail now sits alongside the first"
+        elif relationship == "hierarchy":
+            must_see = f"{subject} shown as one level resting on another"
+            changes = "" if i == 0 else "one more level is now visible in the stack"
+        else:
+            must_see = f"{subject} shown as a single, concrete object"
+            changes = "" if i == 0 else "the object's own state has changed"
+        why_visual = f"the narration alone does not show {subject} directly"
+        if reason:
+            why_visual += f"; revised per reviewer note: {reason[:60]}"
+        beats.append({
+            "ref": ref,
+            "concept": subject[:90],
+            "relationship": relationship,
+            "physical_form": physical_form,
+            "why_visual": why_visual,
+            "must_see": must_see,
+            "changes_from_previous": changes,
+            "focus": subject,
+        })
+    subject_line = (f"a stub composition revised for the approved "
+                    f"{primary or 'direct_explanation'} approach per: {reason[:60]}"
+                    if reason else
+                    f"a stub composition built for the approved "
+                    f"{primary or 'direct_explanation'} approach")
+    return {"subject": subject_line, "beats": beats}
 
 
 def _vision(user: str) -> dict:

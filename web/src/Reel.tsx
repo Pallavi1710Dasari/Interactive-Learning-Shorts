@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNarration } from "./useNarration";
 import { Avatar } from "./Avatars";
 import { ReelStage, beatFill, hueFor } from "./ReelStage";
-import { CommentIcon, DownloadIcon, HeartIcon, RedrawIcon, ReplayIcon, SaveIcon,
-         ShareIcon, SpinnerIcon, VolumeIcon } from "./RailIcons";
+import { CommentIcon, DownloadIcon, RedrawIcon, ReplayIcon,
+         SpinnerIcon, VolumeIcon } from "./RailIcons";
 import { revisual } from "./api";
 import type { Feedback, Unit } from "./types";
 
@@ -38,9 +38,6 @@ export function Reel({
   // progress > 0.5`, which called a short finished on the strength of a sampled
   // clock — see Narration.completed for why that read as an unfinished video.
   const finished = n.completed;
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [shared, setShared] = useState<string | null>(null);
   const [flagged, setFlagged] = useState(false);
   // The redraw composer. Open state and text live here rather than in App because
   // the note is about THIS short and nothing above needs to know it was typed.
@@ -77,19 +74,6 @@ export function Reel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
-  // COPIES THE DEEP LINK, rather than opening a share sheet that is not there.
-  // #reels/<id> is a real route (see App.tsx), so this produces a URL that opens
-  // this exact short — which is what a share button is for on a feed whose items
-  // are individually addressable.
-  const share = async () => {
-    const url = `${location.origin}/#reels/${encodeURIComponent(unit.short_id)}`;
-    try {
-      if (navigator.share) await navigator.share({ title: unit.question, url });
-      else { await navigator.clipboard.writeText(url); setShared("link copied"); }
-    } catch { setShared("copy failed"); }
-    setTimeout(() => setShared(null), 1800);
-  };
-
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
@@ -98,8 +82,6 @@ export function Reel({
       else if (e.key === "ArrowRight") { e.preventDefault(); n.goToBeat(n.beat + 1); }
       else if (e.key === "ArrowLeft") { e.preventDefault(); n.goToBeat(n.beat - 1); }
       else if (e.key === "r") n.replay();
-      else if (e.key === "l") setLiked((v) => !v);
-      else if (e.key === "s") setSaved((v) => !v);
       else if (e.key === "d") onDownload?.(unit);
     };
     window.addEventListener("keydown", onKey);
@@ -122,20 +104,17 @@ export function Reel({
         onStageClick={n.toggle}
       />
 
-      {/* The action rail. Reads top to bottom the way a reel's does: react, then
-          respond, then pass it on, then keep it. The speaker avatar sits at the
-          top because on a reel that slot is whose post it is, and here the
-          "author" of the moment is whoever is talking. */}
+      {/* The action rail. Reads top to bottom the way a reel's does: whose turn it
+          is, react to it, then keep it. The speaker avatar sits at the top because
+          on a reel that slot is whose post it is, and here the "author" of the
+          moment is whoever is talking. Like/share/save were dropped: they toggled
+          local state and did nothing else (share only copied a link), and on a
+          solo-study tool that social-engagement chrome read as a kids' app rather
+          than exam prep. */}
       <div className="rail">
         <div className="whocell" title={isAsking ? "interviewer asking" : "student answering"}>
           <Avatar speaker={beat.speaker} speaking={n.speaking} size={34} />
         </div>
-
-        <button className={`railbtn${liked ? " on" : ""}`}
-                onClick={() => setLiked((v) => !v)} title="like (l)">
-          <HeartIcon filled={liked} />
-          <em>{liked ? 1 : 0}</em>
-        </button>
 
         {/* The honest label for "this confused me". It is the one feedback signal
             the reel can collect that the pipeline actually consumes — see
@@ -148,17 +127,6 @@ export function Reel({
                 title="mark this moment confusing (c)">
           <CommentIcon />
           <em>{flagged ? "noted" : "unclear"}</em>
-        </button>
-
-        <button className="railbtn" onClick={share} title="copy a link to this short">
-          <ShareIcon />
-          <em>{shared ?? "share"}</em>
-        </button>
-
-        <button className={`railbtn${saved ? " on" : ""}`}
-                onClick={() => setSaved((v) => !v)} title="save (s)">
-          <SaveIcon filled={saved} />
-          <em>{saved ? "saved" : "save"}</em>
         </button>
 
         <button className={`railbtn${downloading ? " busy" : ""}`} disabled={downloading}

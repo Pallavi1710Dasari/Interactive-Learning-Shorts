@@ -1,0 +1,43 @@
+{
+  "short_id": "generic_boxes_consistent_comparison",
+  "session_id": "eval",
+  "source_section_id": "3.3",
+  "question": "How does contiguous allocation compare with paging across three different measures?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "How does contiguous allocation compare with paging across three different measures?", "on_screen": "Contiguous vs paging", "visual_ref": "d_frag"},
+    {"speaker": "student", "line": "Contiguous allocation wastes memory to external fragmentation; paging does not.", "on_screen": "Fragmentation", "visual_ref": "d_frag", "source_quote": "Paging removes the requirement for contiguity."},
+    {"speaker": "student", "line": "Contiguous allocation needs no translation step; paging needs one per access.", "on_screen": "Translation cost", "visual_ref": "d_translate", "source_quote": "The hardware concatenates the frame number with the offset."},
+    {"speaker": "student", "line": "Contiguous allocation is simpler to implement; paging needs a page table per process.", "on_screen": "Implementation cost", "visual_ref": "d_impl", "source_quote": "Each page table entry also carries a valid bit."}
+  ],
+  "visuals": {
+    "d_frag": {
+      "ref": "d_frag", "type": "diagram", "spec": "fragmentation comparison",
+      "frame": {"template": "compare", "title": "External fragmentation",
+        "panels": [{"title": "Contiguous", "role": "lost", "items": [{"label": "Wasted gaps", "role": "plain"}]},
+                   {"title": "Paging", "role": "hero", "items": [{"label": "No gaps", "role": "plain"}]}]},
+      "strategy": {"ref": "d_frag", "concept": "paging removes external fragmentation",
+        "relationship": "comparison", "physical_form": "two_sides",
+        "must_see": "both allocation strategies side by side", "changes_from_previous": "", "focus": "paging"}
+    },
+    "d_translate": {
+      "ref": "d_translate", "type": "diagram", "spec": "translation cost comparison",
+      "frame": {"template": "compare", "title": "Translation cost",
+        "panels": [{"title": "Contiguous", "role": "hero", "items": [{"label": "Direct address", "role": "plain"}]},
+                   {"title": "Paging", "role": "lost", "items": [{"label": "Table lookup", "role": "plain"}]}]},
+      "strategy": {"ref": "d_translate", "concept": "paging adds a translation step contiguous allocation does not need",
+        "relationship": "comparison", "physical_form": "two_sides",
+        "must_see": "both allocation strategies side by side, this time on translation cost", "changes_from_previous": "the winning side flips to contiguous", "focus": "contiguous allocation"}
+    },
+    "d_impl": {
+      "ref": "d_impl", "type": "diagram", "spec": "implementation cost comparison",
+      "frame": {"template": "compare", "title": "Implementation cost",
+        "panels": [{"title": "Contiguous", "role": "hero", "items": [{"label": "No extra structure", "role": "plain"}]},
+                   {"title": "Paging", "role": "lost", "items": [{"label": "Page table per process", "role": "plain"}]}]},
+      "strategy": {"ref": "d_impl", "concept": "paging needs a page table contiguous allocation does not",
+        "relationship": "comparison", "physical_form": "two_sides",
+        "must_see": "both allocation strategies side by side, this time on implementation cost", "changes_from_previous": "a new measure being compared", "focus": "contiguous allocation"}
+    }
+  },
+  "status": "draft"
+}

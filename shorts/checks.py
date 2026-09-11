@@ -9,7 +9,8 @@ import html, re
 from math import ceil
 from dataclasses import dataclass, field
 from .schema import (
-    Script, ShortUnit, MIN_SECONDS, MAX_SECONDS,
+    Script, ShortUnit, Section, QuestionSelection, QuestionFraming, QuestionWorkflow,
+    TeachingApproach, VisualStrategy, MIN_SECONDS, MAX_SECONDS, HARD_MAX_SECONDS,
     MAX_OVERLAY_WORDS, WORDS_PER_SECOND,
 )
 
@@ -26,18 +27,27 @@ class GraderResult:
         return f"[{mark}] {self.name}" + (f" — {self.reason}" if self.reason else "")
 
 
-def check_timing(script: Script) -> GraderResult:
-    """The single most valuable check in the pipeline. Runs in microseconds."""
+def check_timing(script: Script, max_seconds: int | None = None) -> GraderResult:
+    """
+    The single most valuable check in the pipeline. Runs in microseconds.
+
+    `max_seconds` defaults to MAX_SECONDS (45) so every existing caller — the eval
+    harness, smoke_test, any check_timing(script) written before this param existed
+    — is byte-identical. run_script_graders is the one caller that passes a wider
+    ceiling, and only when checks.duration_budget says the section's own reading
+    earned it. See schema.HARD_MAX_SECONDS for what "wider" is bounded by and why.
+    """
+    ceiling = MAX_SECONDS if max_seconds is None else max_seconds
     secs = script.estimated_seconds
     if secs < MIN_SECONDS:
         return GraderResult("timing", False,
             f"too short: {secs}s ({script.word_count} words). Need >= {MIN_SECONDS}s "
             f"(~{int(MIN_SECONDS * WORDS_PER_SECOND)} words).",
             {"seconds": secs, "words": script.word_count})
-    if secs > MAX_SECONDS:
+    if secs > ceiling:
         return GraderResult("timing", False,
-            f"too long: {secs}s ({script.word_count} words). Need <= {MAX_SECONDS}s "
-            f"(~{int(MAX_SECONDS * WORDS_PER_SECOND)} words).",
+            f"too long: {secs}s ({script.word_count} words). Need <= {ceiling}s "
+            f"(~{int(ceiling * WORDS_PER_SECOND)} words).",
             {"seconds": secs, "words": script.word_count})
     return GraderResult("timing", True, f"{secs}s ({script.word_count} words)",
                         {"seconds": secs, "words": script.word_count})
@@ -90,8 +100,30 @@ MAX_ANSWERS = 5
 #: exactly the wall of text that splitting the answer exists to prevent.
 MAX_ANSWER_WORDS = 24
 
+#: THE ONE, NARROW, GATED EXCEPTION TO THE CONSTANT ABOVE.
+#:
+#: Deliberately short of the 32-word "wall of text" line the comment above draws
+#: — 30, not 32 — and deliberately not a blanket raise: `run_script_graders`
+#: only reaches for this when `duration_budget` has already decided, from the
+#: SAME material-richness signal, that this section earns the wider duration
+#: window (see checks.duration_budget and schema.HARD_MAX_SECONDS). A thin
+#: section still gets 24, exactly as before.
+#:
+#: WHY A WORD BUDGET AT ALL, WHEN THE DURATION ALREADY WIDENED. Extra seconds
+#: bought extra BEATS (schema.HARD_MAX_SECONDS's own arithmetic is built on a
+#: 5th beat, not longer ones), and that is right for a section with a genuine
+#: 5th distinct thing to say. It is the wrong shape for a section whose extra
+#: material is a single step that needs one more clause to explain WHY it is
+#: true rather than a whole new beat's worth of content — forcing that into a
+#: 6th beat is exactly the "becomes a list again" failure MAX_ANSWERS exists to
+#: prevent, and forcing it into 24 words is the "citation with no room left to
+#: explain it" defect this whole change is trying to fix. Six extra words is a
+#: single short clause, not a second sentence — "...which is why X" — not room
+#: for a second wall of text.
+MAX_ANSWER_WORDS_EXTENDED = 30
 
-def check_dialogue_shape(script: Script) -> GraderResult:
+
+def check_dialogue_shape(script: Script, max_answer_words: int | None = None) -> GraderResult:
     """
     One question, then the answer in 2 or 3 short parts.
 
@@ -104,7 +136,13 @@ def check_dialogue_shape(script: Script) -> GraderResult:
     different reason than it first had it — see MAX_ANSWERS. Splitting far enough
     is easy; stopping is not, and the stop is now enforced by MAX_ANSWER_WORDS
     holding at 24 rather than by a tight beat count.
+
+    `max_answer_words` defaults to MAX_ANSWER_WORDS, so every existing caller is
+    unaffected. `run_script_graders` is the one caller that passes
+    MAX_ANSWER_WORDS_EXTENDED, and only when duration_budget already decided this
+    section's material earns it — see that constant's own comment.
     """
+    cap = MAX_ANSWER_WORDS if max_answer_words is None else max_answer_words
     speakers = [b.speaker for b in script.beats]
     if speakers[0] != "interviewer":
         return GraderResult("dialogue_shape", False, "first beat is not the interviewer")
@@ -123,14 +161,63 @@ def check_dialogue_shape(script: Script) -> GraderResult:
 
     # A "split" answer with one giant beat is still a wall of text.
     long_beats = [(i, len(b.line.split())) for i, b in enumerate(script.beats)
-                  if b.speaker == "student" and len(b.line.split()) > MAX_ANSWER_WORDS]
+                  if b.speaker == "student" and len(b.line.split()) > cap]
     if long_beats:
         worst = ", ".join(f"beat {i}: {n} words" for i, n in long_beats)
         return GraderResult("dialogue_shape", False,
-            f"{len(long_beats)} answer beat(s) over {MAX_ANSWER_WORDS} words ({worst}) — "
+            f"{len(long_beats)} answer beat(s) over {cap} words ({worst}) — "
             "keep each one to a single idea")
 
     return GraderResult("dialogue_shape", True, f"{answers} answer beats, all concise")
+
+
+def check_qa_sentence_form(script: Script) -> GraderResult:
+    """
+    The question is phrased as ONE question, and every answer beat is a whole
+    sentence — not "simple" or "memorable", which no free check can judge, but the
+    structural floor those actually need: a fragment can't be simple to read and a
+    stapled-together double question can't be memorable, because there's no ONE
+    thing to remember. See SYSTEM in select.py and script.py for the prose rules
+    this can't enforce in code.
+
+    Three narrow, structural failures, each one a script that reads as unfinished
+    rather than as a sentence a student could hold in their mind:
+
+      script.question has no "?" — select.py's SYSTEM already bans yes/no
+      questions and demands What/Why/How/Which/When/Where, but nothing stopped
+      the topic string itself surviving into the short as a bare noun phrase
+      ("The reason paging beats contiguous allocation") instead of a question.
+
+      script.question has MORE than one "?" — two questions stapled into one
+      turns "one concept per short" (select.py's own rule) into two, and a viewer
+      cannot tell which one the answer is actually answering.
+
+      a student beat's line does not end in ".", "!" or "?" — the line just
+      trails off, which is a sentence fragment however short and on-topic it is.
+    """
+    problems: list[str] = []
+
+    question = script.question.strip()
+    marks = question.count("?")
+    if marks == 0:
+        problems.append(f'question is not phrased as a question: "{question}"')
+    elif marks > 1:
+        problems.append(
+            f'question contains {marks} "?"s — that is two questions stapled '
+            f'together, not one: "{question}"')
+
+    for i, b in enumerate(script.beats):
+        if b.speaker != "student":
+            continue
+        line = b.line.strip()
+        if not line.endswith((".", "!", "?")):
+            problems.append(f'beat {i} trails off with no terminal punctuation: "{line}"')
+
+    if problems:
+        return GraderResult("qa_sentence_form", False, "; ".join(problems),
+                            {"problems": problems})
+    return GraderResult("qa_sentence_form", True,
+                        "question is a single question and every beat is a complete sentence")
 
 
 # --------------------------------------------------------------------- grounding
@@ -952,6 +1039,20 @@ def check_diagram_matches_narration(unit: ShortUnit,
     # chain as the drawing, so a frame that faithfully renders a spec which itself
     # wandered off the narration would score perfectly — which is the exact defect
     # this grader exists to find. Measure the picture against what is SAID.
+    #
+    # ANALOGY_CAPTION IS THE ONE DELIBERATE EXCEPTION, and it is exempted here
+    # rather than left to fail and explained away. schema.Frame.analogy_caption
+    # is a STATED comparison — "like a stack of plates" — brought TO the lesson
+    # to make an abstract container concrete, the same as a real photo of a CPU
+    # needs no citation to depict a CPU correctly. It is rendered as on-screen
+    # text (so a viewer can read the comparison), which means this grader would
+    # otherwise see "plates", "dispenser", "rolodex" as foreign nouns and flag
+    # the very template built to introduce them. Only the caption's own words
+    # are added — analogy_technical's labels get no such exemption and are
+    # checked exactly like any other panel's.
+    allowed |= set(_stems(" ".join(
+        v.frame.analogy_caption or "" for v in unit.visuals.values()
+        if v.frame is not None)))
 
     offenders: list[str] = []
     checked = 0
@@ -1066,6 +1167,17 @@ def _frame_labels(frame) -> list[str]:
     for panel in frame.panels:
         out.append(panel.title)
         out.extend(item.label for item in panel.items)
+    # analogy's RIGHT panel is a Panel too (the section's own mechanism), and it
+    # is scanned exactly like the loop above — it is graded on the ordinary
+    # rule, unlike analogy_caption below, which is deliberately NOT collected
+    # here: that field is a stated comparison ("like a stack of plates"), not a
+    # claim about the material, and _frame_labels feeds the "is this label a
+    # sentence echoing the narration" checks that a stated analogy is supposed
+    # to fail differently — see check_diagram_matches_narration's own exemption
+    # for analogy_caption.
+    if frame.analogy_technical is not None:
+        out.append(frame.analogy_technical.title)
+        out.extend(item.label for item in frame.analogy_technical.items)
     # A STORE'S SLOTS ARE LABELS TOO, and leaving them out would have made every
     # `state` frame look empty to _near_same, _only_grew, frames_progress and
     # frames_are_visual — so a stack whose contents changed on every beat would
@@ -1712,6 +1824,217 @@ def check_frames_develop(unit: ShortUnit) -> GraderResult:
                         + (f" ({grew} by adding to it)" if grew else ""))
 
 
+def _unique_frames(unit: ShortUnit) -> list:
+    """Frames in beat order, deduplicated exactly like check_frames_develop's own
+    walk — consecutive beats sharing one visual_ref are one held picture, not a
+    repeat to compare against itself.
+    """
+    refs: list[str] = []
+    for beat in unit.beats:
+        if not refs or refs[-1] != beat.visual_ref:
+            refs.append(beat.visual_ref)
+    return [unit.visuals[r].frame for r in refs
+            if r in unit.visuals and unit.visuals[r].frame is not None]
+
+
+def _store_labels(frame, states: tuple[str, ...] | None = None) -> set[str]:
+    """Labels currently occupying a slot, optionally restricted to given states."""
+    store = getattr(frame, "store", None)
+    if store is None:
+        return set()
+    return {slot.label for slot in store.slots
+            if slot.label and (states is None or slot.state in states)}
+
+
+def check_state_item_transitions_visible(unit: ShortUnit) -> GraderResult:
+    """
+    An insert must be SEEN arriving; a remove must be SEEN leaving and gone.
+
+    THE GAP THIS CLOSES. Slot.state (resting/arriving/leaving) and layout.py's
+    renderer already exist specifically so a push or a pop is a picture rather
+    than a relabelled box — but nothing before this compared one state frame
+    to the next to confirm the fields were actually used that way. A design
+    step can add a new label straight into "resting" (the item simply exists
+    now, with no arriving frame ever drawn) or drop a label with no slot ever
+    marked "leaving" for it, and every existing grader passes both: the
+    template is right (check_frames_match_strategy), the physical form is
+    right (check_physical_form_matches_template), and the picture did change
+    (check_frames_develop) — it just changed by teleportation instead of by
+    the motion the renderer exists to draw.
+
+    THREE RULES, walking consecutive DISTINCT `state` frames in beat order:
+
+      INSERTION MUST BE SEEN. A label present in this frame that was not
+      present in ANY state in the previous frame is new — and if it is not
+      marked "arriving" in THIS frame, it appeared with no arrival drawn.
+
+      REMOVAL MUST BE SEEN. A label present in the previous frame that is
+      gone from this one is removed — and unless one of the two frames marked
+      it "leaving", it vanished with no departure drawn.
+
+      A DEPARTURE MUST FINISH. A label marked "leaving" in one frame must not
+      still be present, in any state, in the NEXT one — "leaving" that never
+      actually leaves is a removal that never completes.
+
+    Only ever compares a `state` frame to the state frame next to it — a
+    beat's own frame paired with a different template's neighbour has nothing
+    to compare, so those pairs are skipped rather than treated as a violation.
+    """
+    frames = [f for f in _unique_frames(unit) if f.template == "state" and f.store]
+    if len(frames) < 2:
+        return GraderResult("state_item_transitions_visible", True,
+                            "fewer than two state frames — nothing to compare")
+
+    problems = []
+    for i in range(len(frames) - 1):
+        prev, curr = frames[i], frames[i + 1]
+        prev_all = _store_labels(prev)
+        curr_all = _store_labels(curr)
+        curr_arriving = _store_labels(curr, ("arriving",))
+        prev_leaving = _store_labels(prev, ("leaving",))
+        curr_leaving = _store_labels(curr, ("leaving",))
+
+        for label in curr_all - prev_all:
+            if label not in curr_arriving:
+                problems.append(
+                    f"'{label}' appears in the container with no frame showing it "
+                    f"arriving — the insertion is invisible, not a frame this "
+                    f"pipeline drew an entrance for")
+
+        for label in prev_all - curr_all:
+            if label not in prev_leaving and label not in curr_leaving:
+                problems.append(
+                    f"'{label}' is gone from the container with no frame marking "
+                    f"it leaving — the removal is invisible, it simply stopped "
+                    f"being drawn")
+
+        for label in prev_leaving:
+            if label in curr_all:
+                problems.append(
+                    f"'{label}' was marked leaving and is still in the container "
+                    f"on the next frame — the departure never completes")
+
+    if problems:
+        return GraderResult("state_item_transitions_visible", False, "; ".join(problems[:4]),
+                            {"problems": problems})
+    return GraderResult("state_item_transitions_visible", True,
+                        f"{len(frames)} state frame(s), every insertion and removal is shown")
+
+
+def check_state_pointer_moves_are_shown(unit: ShortUnit) -> GraderResult:
+    """
+    A retargeted pointer must actually retarget, and a moved pointer must be
+    marked so the renderer can show it moving.
+
+    Store.pointer_at_previous exists for exactly one reason — see its own
+    docstring — "the literal 'a pointer disconnecting and reconnecting' the
+    product brief asked for". Two ways that promise goes unfulfilled, and
+    nothing before this caught either:
+
+      SET BUT UNCHANGED. pointer_at_previous is filled in with the SAME value
+      as pointer_at — a retarget that asks for no animation, which the field's
+      own docstring already names as the thing not to do. Structurally valid,
+      renders as a pointer that never appears to move.
+
+      MOVED BUT UNMARKED. The pointer's target genuinely differs from the
+      previous state frame's, but pointer_at_previous was left empty — the
+      pointer will render already arrived at its new slot with no frame
+      showing it leaving the old one, the same silent teleport
+      check_state_item_transitions_visible catches for an item, here for the
+      index that names one.
+
+    Skipped for a container whose pointer is absent (`-1`, or `None`) on
+    either side of the comparison — there is nothing to retarget.
+    """
+    frames = [f for f in _unique_frames(unit) if f.template == "state" and f.store]
+    problems = []
+
+    for f in frames:
+        s = f.store
+        if s.pointer_at is not None and s.pointer_at_previous is not None \
+                and s.pointer_at == s.pointer_at_previous:
+            problems.append(
+                "pointer_at_previous is set to the same slot as pointer_at — "
+                "that asks for no movement, so either the pointer did not "
+                "actually move this beat (leave pointer_at_previous out) or "
+                "the previous position was written wrong")
+
+    for i in range(len(frames) - 1):
+        prev, curr = frames[i].store, frames[i + 1].store
+        if prev.pointer_at is None or curr.pointer_at is None:
+            continue
+        if prev.pointer_at == curr.pointer_at:
+            continue
+        if curr.pointer_at_previous is None:
+            problems.append(
+                f"the pointer moved from slot {prev.pointer_at} to slot "
+                f"{curr.pointer_at} between frames but pointer_at_previous was "
+                f"not set on the new frame — the move renders as already "
+                f"arrived, with no disconnect-and-reconnect shown")
+
+    if problems:
+        return GraderResult("state_pointer_moves_are_shown", False, "; ".join(problems[:4]),
+                            {"problems": problems})
+    return GraderResult("state_pointer_moves_are_shown", True,
+                        "every pointer retarget is marked so it renders as movement")
+
+
+def check_flow_traversal_progresses(unit: ShortUnit) -> GraderResult:
+    """
+    A traversal must visibly ADVANCE — the same chain, a different node lit.
+
+    THE GAP. Rule 6/8 already say a process or a data movement must be drawn
+    happening rather than named, and check_motion_concept_not_static catches a
+    whole short that never leaves a static template — but nothing checks the
+    one shape a `flow` traversal specifically takes: the SAME nodes, in the
+    SAME order, beat after beat, with only the hero moving along them. That
+    is the correct drawing of "follow the pointer node by node" — a fresh set
+    of boxes every beat would be a different claim — so it must not regress:
+    two consecutive `flow` frames over the identical chain with the hero on
+    the SAME node, or moved backwards, is a traversal that is not going
+    anywhere on screen while the narration says it is.
+
+    Only checked when consecutive `flow` frames draw the SAME steps in the
+    SAME order — a beat that genuinely redraws a different or reordered chain
+    is a different picture, already covered by check_frames_develop, and not
+    what this asks about.
+    """
+    frames = [f for f in _unique_frames(unit) if f.template == "flow" and f.steps]
+    if len(frames) < 2:
+        return GraderResult("flow_traversal_progresses", True,
+                            "fewer than two flow frames — nothing to compare")
+
+    problems = []
+    for i in range(len(frames) - 1):
+        prev, curr = frames[i], frames[i + 1]
+        prev_labels = [c.label for c in prev.steps]
+        curr_labels = [c.label for c in curr.steps]
+        if prev_labels != curr_labels:
+            continue  # a different chain — not this check's question
+
+        def _hero_index(steps):
+            for idx, c in enumerate(steps):
+                if c.role == "hero":
+                    return idx
+            return None
+
+        prev_hero, curr_hero = _hero_index(prev.steps), _hero_index(curr.steps)
+        if prev_hero is None or curr_hero is None:
+            continue
+        if curr_hero <= prev_hero:
+            problems.append(
+                f"the same {len(curr_labels)}-node chain is drawn again with the "
+                f"hero at node {curr_hero} after being at node {prev_hero} — a "
+                f"traversal must move to a LATER node each frame, not hold "
+                f"still or move backwards")
+
+    if problems:
+        return GraderResult("flow_traversal_progresses", False, "; ".join(problems[:4]),
+                            {"problems": problems})
+    return GraderResult("flow_traversal_progresses", True,
+                        f"{len(frames)} flow frame(s), the traversal advances each time")
+
+
 def _slot_states(frame) -> tuple:
     """Which of a store's slots are resting, arriving or leaving.
 
@@ -1733,6 +2056,11 @@ def _roles(frame) -> tuple:
               + frame.parts + frame.steps + frame.code_lines),
         tuple(r.role for r in frame.rows),
         tuple((p.role, tuple(i.role for i in p.items)) for p in frame.panels),
+        # analogy's right-hand Panel, same shape as the panels tuple above —
+        # its LEFT side (a photo) carries no role, so it is not part of this.
+        ((frame.analogy_technical.role,
+          tuple(i.role for i in frame.analogy_technical.items))
+         if frame.analogy_technical is not None else ()),
         tuple(g.role for g in frame.glyphs),
         tuple(s.role for s in frame.samples),
         # A store's roles AND its slot states. The state belongs here rather than
@@ -1914,7 +2242,14 @@ _RELATIONSHIP_TEMPLATES = {
     # "state" is here and FIRST in intent: a process whose stages are states of one
     # container — pushing, popping, filling, draining — is drawn by showing the
     # container in those states, not by a row of boxes naming them.
-    "process":       {"state", "flow", "icons", "code", "cause_effect"},
+    #
+    # "analogy" too, for the concept-introducing beat rather than the operation
+    # beat: "how does a stack work" is a process in the sense that push/pop is
+    # ordered, but the FIRST beat of such a short is usually "what IS a stack",
+    # which has no stage to animate yet — a real-world analogy plus the still
+    # structure is the honest picture for that one beat, and `state` takes over
+    # once there is a push or a pop to show happening.
+    "process":       {"state", "flow", "icons", "code", "cause_effect", "analogy"},
     # Rule 7: BOTH STATES AT ONCE. A `bar` or a `stat` shows one.
     #
     # "state" satisfies that rule when the two things compared are PLACES IN ONE
@@ -1935,7 +2270,13 @@ _RELATIONSHIP_TEMPLATES = {
     # `graph` when there are SEVERAL distinct destinations from one source — data
     # fanning out to more than one place, which "cause_effect" (one arrow) and
     # "state" (one container) cannot show at once.
-    "data_movement": {"state", "icons", "mapping", "flow", "cause_effect", "graph"},
+    # "analogy" for the same concept-introduction reason as "process" above: a
+    # cache holding a value is data movement in the mature sense (a lookup
+    # arrives, a value comes back), but the beat that first names the container
+    # is honestly drawn as the borrowed real-world object beside the container's
+    # still shape.
+    "data_movement": {"state", "icons", "mapping", "flow", "cause_effect", "graph",
+                      "analogy"},
     # Rule 9: spatial hierarchy. A row of peers is the thing being rejected.
     # `graph` too: a root with children IS a (shallow) hierarchy, and it is the
     # right shape whenever the children are DISTINCT NAMED THINGS rather than
@@ -1960,8 +2301,15 @@ _RELATIONSHIP_TEMPLATES = {
     # `graph` for the same reason again: one root with several named parts IS a
     # structure — "the kernel is made of the scheduler, the driver and the
     # filesystem" is one thing and what it is composed of, not a process.
+    #
+    # `analogy` earns its place here MOST NATURALLY of the three rows it is in:
+    # analogy_technical is a Panel — a still stack of named boxes, no motion,
+    # no arriving or leaving slot — so a beat naming a container's STRUCTURE
+    # ("a stack holds items on top of each other") is exactly what this
+    # template draws honestly, without borrowing a claim of movement it cannot
+    # show. See skills/strategy.py rule 13.
     "structure":     {"split", "bar", "table", "mapping", "code", "hierarchy",
-                      "icons", "state", "flow", "graph"},
+                      "icons", "state", "flow", "graph", "analogy"},
     "effect":        {"preview", "code", "compare"},
     "quantity":      {"stat", "bar", "table"},
 }
@@ -2016,6 +2364,339 @@ def check_frames_match_strategy(unit: ShortUnit) -> GraderResult:
                         f"{checked} frame(s) drawn in a shape that carries their claim")
 
 
+#: THE TIE-BREAKER `_RELATIONSHIP_TEMPLATES` CANNOT GIVE. `relationship` alone
+#: allows both "state" and "flow" for a `process` claim, because both CAN show
+#: something happening — but a stack (single_container) and a linked list
+#: (linked_nodes) are both `process` and only one of them is a container with
+#: contiguous slots. `physical_form` is the fact that tells them apart, and this
+#: is the set membership test for it, the same shape as _RELATIONSHIP_TEMPLATES
+#: one level down: within whatever `relationship` already allowed, which of
+#: those shapes can actually carry THIS physical form.
+#:
+#: "code" is in every row for the same reason it is in every row above: the
+#: material's own snippet is a legitimate, grounded picture of nearly any claim,
+#: and rejecting it would push the designer off the most grounded frame
+#: available.
+_PHYSICAL_FORM_TEMPLATES = {
+    "single_container": {"state", "code"},
+    "linked_nodes":      {"flow", "graph", "code"},
+    "nested_levels":     {"hierarchy", "code"},
+    "flat_parts":        {"graph", "split", "bar", "table", "code"},
+    "two_sides":         {"compare", "state", "graph", "code"},
+    "single_object":      {"state", "cause_effect", "preview", "stat", "icons",
+                           "analogy", "code"},
+}
+
+
+def check_physical_form_matches_template(unit: ShortUnit) -> GraderResult:
+    """
+    A frame must be drawn in the shape its own PHYSICAL FORM actually has.
+
+    THE GAP THIS CLOSES. check_frames_match_strategy enforces `relationship` —
+    the KIND of claim — and stops there, because relationship alone allows both
+    "state" and "flow" for a `process` claim: both templates CAN show something
+    happening, so neither is a relationship violation. But a stack filling up
+    and a linked list growing are both `process`, and drawing a linked list as
+    "state" (slots inside one bordered container) claims something false about
+    it — that it is one contiguous thing, which a linked list specifically is
+    not. That distinction lived entirely in visuals.py's prose before
+    `physical_form` existed, with nothing downstream able to tell whether the
+    design step had actually followed it.
+
+    Skipped silently, exactly like check_frames_match_strategy, for any frame
+    with no strategy or whose physical_form is "not_applicable" (the default) —
+    units built before this field existed, or a beat whose claim genuinely
+    is not shaped like any of the physical forms, must still grade cleanly.
+    """
+    offenders = []
+    checked = 0
+    for ref, visual in unit.visuals.items():
+        plan, frame = visual.strategy, visual.frame
+        if plan is None or frame is None:
+            continue
+        form = getattr(plan, "physical_form", "not_applicable")
+        if form == "not_applicable":
+            continue
+        allowed = _PHYSICAL_FORM_TEMPLATES.get(form)
+        if not allowed:
+            continue
+        checked += 1
+        if frame.template not in allowed:
+            offenders.append(
+                f"[{ref}] has physical_form '{form}' and was drawn as "
+                f"'{frame.template}', which cannot show it — use one of "
+                f"{', '.join(sorted(allowed))}")
+
+    if not checked:
+        return GraderResult("physical_form_matches_template", True,
+                            "no physical_form to check against")
+    if offenders:
+        return GraderResult("physical_form_matches_template", False, "; ".join(offenders))
+    return GraderResult("physical_form_matches_template", True,
+                        f"{checked} frame(s) drawn in the shape their physical form requires")
+
+
+def _label_matches(anchor: str, candidate: str) -> bool:
+    """Loose match between two short labels — same call, same response, so a
+    real match differs at most by capitalisation, an article, or a trailing
+    word, never by vocabulary. Stem-overlap rather than exact equality for
+    exactly that tolerance, and nothing looser: one side's stems must be a
+    full subset of the other's, not merely intersecting.
+    """
+    a, b = set(_stems(anchor)), set(_stems(candidate))
+    if not a or not b:
+        return False
+    return a <= b or b <= a
+
+
+def check_anchor_matches_structure(unit: ShortUnit) -> GraderResult:
+    """
+    A claimed PRIMARY position must be where the structure actually put it.
+
+    THE GAP THIS CLOSES, AND WHY NOTHING BEFORE IT COULD. layout.py's
+    positioning is deterministic — levels[0] always renders at the top,
+    steps[0] always renders first, the slot at store.pointer_at always
+    renders wherever the pointer points — but that is a promise about the
+    RENDERER, not about the DATA handed to it. A hierarchy frame with
+    `levels` written [child, parent] instead of [parent, child] renders
+    perfectly correctly BY THE RENDERER'S OWN RULES and wrongly for the
+    concept: the child ends up on top, drawn exactly as confidently as a
+    correct frame would be. Every existing structural grader passes it — two
+    real levels, properly nested, one clearly on top. None of them can tell
+    WHICH one belongs there, because nothing before `anchor_label` said what
+    the intended answer was.
+
+    This is the one check that reads that stated answer and confirms the
+    frame agrees with it:
+
+      hierarchy   anchor_label must match levels[0].label — the parent
+                  actually rendered on top.
+      flow        anchor_label must match steps[0].label — the flow actually
+                  starts where it was meant to.
+      state       anchor_label must match the label AT store.slots[pointer_at]
+                  — the pointer actually lands on the item it was meant to
+                  indicate, not merely on some valid slot.
+
+    ANCHOR_LABEL IS REQUIRED, NOT OPTIONAL, ON AN ELIGIBLE FRAME — measured,
+    not assumed. It shipped optional first, on the reasoning that most frames
+    would offer one anyway; two real builds later, EVERY eligible frame in
+    both — a stack's pointer confidently aimed at C, a linked list's flow
+    confidently starting at head — came back with an empty anchor_label, and
+    this check passed all of them as "nothing to check" while the exact
+    defect it exists for (a confidently-wrong pointer, a reversed flow) was
+    free to ship undetected. An optional field the model has no reason to
+    reach for is a field that does not exist in practice. So a frame is
+    "eligible" when there IS a primary position to name — hierarchy with 2+
+    levels, flow with 2+ steps, or state with pointer_at resolving to a
+    slot that actually holds something — and an eligible frame that leaves
+    anchor_label blank fails this check exactly as if it had named the wrong
+    label, because from here the two are indistinguishable in effect: a
+    claim nobody can verify.
+
+    Skipped silently — same contract as every other strategy-shaped check in
+    this file — for a frame with no frame, an ineligible frame (a single
+    level, a single step, no resolvable pointer), or a template this check
+    does not cover.
+    """
+    offenders = []
+    checked = 0
+    for ref, visual in unit.visuals.items():
+        frame = visual.frame
+        if frame is None:
+            continue
+        anchor = (getattr(frame, "anchor_label", "") or "").strip()
+
+        if frame.template == "hierarchy":
+            levels = frame.levels or []
+            if len(levels) < 2:
+                continue
+            checked += 1
+            if not anchor:
+                offenders.append(
+                    f"[{ref}] has {len(levels)} levels and no anchor_label — name "
+                    f"which one is the parent (must render on top, levels[0]) so "
+                    f"the order can be checked")
+            elif not _label_matches(anchor, levels[0].label):
+                offenders.append(
+                    f"[{ref}] claims '{anchor}' as the parent (must render on top, "
+                    f"levels[0]), but levels[0] is '{levels[0].label}' — the levels "
+                    f"list has the parent and child in the wrong order")
+
+        elif frame.template == "flow":
+            steps = frame.steps or []
+            if len(steps) < 2:
+                continue
+            checked += 1
+            if not anchor:
+                offenders.append(
+                    f"[{ref}] has {len(steps)} steps and no anchor_label — name "
+                    f"which one is the source (must render first, steps[0]) so "
+                    f"the direction can be checked")
+            elif not _label_matches(anchor, steps[0].label):
+                offenders.append(
+                    f"[{ref}] claims '{anchor}' as the source (must render first, "
+                    f"steps[0]), but steps[0] is '{steps[0].label}' — the flow's "
+                    f"direction is reversed")
+
+        elif frame.template == "state":
+            store = frame.store
+            if store is None or not store.slots:
+                continue
+            idx = store.pointer_at
+            if idx is None or not (0 <= idx < len(store.slots)):
+                # A pointer past the end or on an empty container is a real,
+                # meaningful state (see Store.pointer_at's own docstring), and
+                # there is no slot for anchor_label to name — not eligible.
+                continue
+            actual = store.slots[idx].label
+            if not actual:
+                # The pointer targets a real, in-range slot that is itself
+                # empty (e.g. an index sitting one past the last pushed item)
+                # — a valid state with nothing to name, not eligible.
+                continue
+            checked += 1
+            if not anchor:
+                offenders.append(
+                    f"[{ref}] has pointer_at naming a filled slot ('{actual}') and "
+                    f"no anchor_label — name what the pointer should be indicating "
+                    f"so the target can be checked")
+            elif not _label_matches(anchor, actual):
+                offenders.append(
+                    f"[{ref}] claims the pointer should indicate '{anchor}', but "
+                    f"pointer_at names slot {idx}, which holds '{actual}' — the "
+                    f"pointer is aimed at the wrong slot")
+
+    if not checked:
+        return GraderResult("anchor_matches_structure", True, "no eligible frame to check")
+    if offenders:
+        return GraderResult("anchor_matches_structure", False, "; ".join(offenders))
+    return GraderResult("anchor_matches_structure", True,
+                        f"{checked} frame(s) have their claimed anchor where the structure puts it")
+
+
+#: Terms that make "code" a legitimate picture of a SPECIFIC beat: its own
+#: must_see/concept is about the code's syntax, a keyword, a property, a
+#: selector, a declaration — the thing on screen IS the code, not a stand-in for
+#: some other relationship the material happened to include a snippet for.
+#:
+#: Deliberately generous (a real syntax-teaching beat should say one of these
+#: words naturally) rather than an exhaustive allow-list — false negatives here
+#: just mean check_code_not_overused stays silent, which is the safe failure
+#: direction for a heuristic keyword match.
+_CODE_OBJECTIVE_WORDS = (
+    "syntax", "keyword", "property", "selector", "declaration", "statement",
+    "attribute", "signature", "parameter", "operator", "written as", "line of code",
+)
+
+
+def check_code_not_overused(unit: ShortUnit) -> GraderResult:
+    """
+    The 'code' template is the material's own snippet, and _RELATIONSHIP_TEMPLATES
+    allows it in almost every row for exactly that reason — see the comment above
+    it. That is a deliberate, correct choice for the ONE beat whose claim really
+    is the code. It is a defect the same choice makes easy to fall into for every
+    OTHER beat too: a process, a comparison, a hierarchy all have a code snippet
+    sitting right there in the section, and reaching for it every time is how a
+    short about a mechanism ends up as four screenshots of the same file — visual
+    variety, not visual thinking.
+
+    What this catches: MORE THAN ONE frame in the same unit drawn as 'code', where
+    NONE of them has a strategy whose must_see/concept says the beat is actually
+    about the code itself (see _CODE_OBJECTIVE_WORDS). One code frame is never
+    flagged — the single most grounded picture of a beat is not overuse. Two or
+    more where AT LEAST ONE names a code-specific objective are not flagged either:
+    a short with a "here is the property" beat and a separate "here is the value
+    syntax" beat can legitimately want two. It is "the design step defaulted to
+    code every time because it had no better idea" this exists to catch, and that
+    reads as ALL of them lacking a reason, not some of them.
+
+    Skipped, not failed, when there is no strategy to read at all (a unit built
+    before the strategist existed, or the eval harness) — the same rule
+    check_frames_match_strategy uses just above.
+    """
+    code_refs = [ref for ref, v in unit.visuals.items()
+                 if v.frame is not None and v.frame.template == "code"]
+    if len(code_refs) <= 1:
+        return GraderResult("code_not_overused", True,
+                            f"{len(code_refs)} code frame(s) — not overused")
+
+    justified = []
+    for ref in code_refs:
+        plan = unit.visuals[ref].strategy
+        if plan is None:
+            continue
+        text = f"{plan.concept} {plan.must_see}".lower()
+        if any(word in text for word in _CODE_OBJECTIVE_WORDS):
+            justified.append(ref)
+
+    if not any(unit.visuals[ref].strategy is not None for ref in code_refs):
+        return GraderResult("code_not_overused", True,
+                            "no strategy to check against", {"skipped": True})
+
+    if not justified:
+        return GraderResult("code_not_overused", False,
+            f"{len(code_refs)} frames ({', '.join(code_refs)}) all use the 'code' "
+            f"template and none of their strategies names code syntax, a keyword, a "
+            f"property or a selector as the thing to see — code is being used as the "
+            f"default picture rather than drawn for the beats whose claim actually is "
+            f"the code. Draw each beat's own relationship instead (see "
+            f"_RELATIONSHIP_TEMPLATES for what else can carry it).",
+            {"code_refs": code_refs})
+    return GraderResult("code_not_overused", True,
+        f"{len(code_refs)} code frame(s), {len(justified)} justified by their own strategy")
+
+
+def _frame_role_collections(frame) -> list[tuple[str, list[str]]]:
+    """
+    Every role-bearing group in a Frame, named — a row, a column, one card's items.
+
+    Pulled out of check_one_hero_per_frame so check_ends_on_answer can ask "does
+    this frame have a hero ANYWHERE" without re-deriving, template shape by
+    template shape, the same list check_one_hero_per_frame already had to learn
+    (a Frame's hero can live in cells, glyphs, panels, store.slots, or graph
+    nodes, and a second grader guessing at that list independently is exactly
+    how the two quietly drift apart the next time a template gains a field).
+    """
+    collections: list[tuple[str, list[str]]] = [
+        ("cells", [c.role for c in frame.cells]),
+        ("left column", [c.role for c in frame.left]),
+        ("right column", [c.role for c in frame.right]),
+        ("parts", [c.role for c in frame.parts]),
+        ("steps", [c.role for c in frame.steps]),
+        ("code lines", [c.role for c in frame.code_lines]),
+        ("samples", [c.role for c in frame.samples]),
+        ("glyphs", [c.role for c in frame.glyphs]),
+        ("levels", [c.role for c in frame.levels]),
+        ("rows", [r.role for r in frame.rows]),
+        ("panels", [p.role for p in frame.panels]),
+        ("cause/effect", [c.role for c in (frame.cause, frame.effect)
+                          if c is not None]),
+        # OCCUPIED slots only. An empty slot carries "plain" by default and is
+        # not a candidate for the accent, so counting them would make a store
+        # with two items and four empty places look like it has plenty of
+        # unaccented elements when in fact both of its items are lit.
+        ("slots", [sl.role for sl in (frame.store.slots if frame.store else ())
+                   if sl.label]),
+        # Root and branches together, one group — a graph makes ONE claim
+        # about how its parts relate, and that claim can legitimately need
+        # two lit ends (the root AND the one branch its beat is about), the
+        # same reasoning check_one_hero_per_frame already applies to a
+        # mapping's two columns.
+        ("graph nodes",
+         ([frame.graph.root.role] if frame.graph else [])
+         + [br.node.role for br in (frame.graph.branches if frame.graph else ())]),
+    ]
+    for i, panel in enumerate(frame.panels, 1):
+        collections.append((f"panel {i} items", [c.role for c in panel.items]))
+    # analogy's right-hand Panel — the LEFT side is a photo and carries no role
+    # at all, so it is never a candidate for "no element marked hero" the way
+    # a compare panel's items are.
+    if frame.analogy_technical is not None:
+        collections.append(("analogy panel items",
+                            [c.role for c in frame.analogy_technical.items]))
+    return collections
+
+
 def check_one_hero_per_frame(unit: ShortUnit) -> GraderResult:
     """
     Every frame needs a focus, and no single row of a frame may have two.
@@ -2052,39 +2733,7 @@ def check_one_hero_per_frame(unit: ShortUnit) -> GraderResult:
 
         # Each entry is one collection that is laid out as a unit — a row, a
         # column, the items inside one card. Heroes are counted inside each.
-        collections: list[tuple[str, list[str]]] = [
-            ("cells", [c.role for c in frame.cells]),
-            ("left column", [c.role for c in frame.left]),
-            ("right column", [c.role for c in frame.right]),
-            ("parts", [c.role for c in frame.parts]),
-            ("steps", [c.role for c in frame.steps]),
-            ("code lines", [c.role for c in frame.code_lines]),
-            ("samples", [c.role for c in frame.samples]),
-            ("glyphs", [c.role for c in frame.glyphs]),
-            ("levels", [c.role for c in frame.levels]),
-            ("rows", [r.role for r in frame.rows]),
-            ("panels", [p.role for p in frame.panels]),
-            ("cause/effect", [c.role for c in (frame.cause, frame.effect)
-                              if c is not None]),
-            # OCCUPIED slots only. An empty slot carries "plain" by default and is
-            # not a candidate for the accent, so counting them would make a store
-            # with two items and four empty places look like it has plenty of
-            # unaccented elements when in fact both of its items are lit.
-            ("slots", [sl.role for sl in (frame.store.slots if frame.store else ())
-                       if sl.label]),
-            # Root and branches together, one group — a graph makes ONE claim
-            # about how its parts relate, and that claim can legitimately need
-            # two lit ends (the root AND the one branch its beat is about), the
-            # same reasoning check_one_hero_per_frame already applies to a
-            # mapping's two columns.
-            ("graph nodes",
-             ([frame.graph.root.role] if frame.graph else [])
-             + [br.node.role for br in (frame.graph.branches if frame.graph else ())]),
-        ]
-        for i, panel in enumerate(frame.panels, 1):
-            collections.append((f"panel {i} items", [c.role for c in panel.items]))
-
-        populated = [(n, roles) for n, roles in collections if roles]
+        populated = [(n, roles) for n, roles in _frame_role_collections(frame) if roles]
         # `stat` and `takeaway` draw one thing and hard-code it as the focus, so
         # they carry no roles at all and cannot be judged this way.
         if not populated:
@@ -2126,6 +2775,52 @@ def check_one_hero_per_frame(unit: ShortUnit) -> GraderResult:
     return GraderResult("one_hero_per_frame", True, "every frame has a single focus")
 
 
+def check_ends_on_answer(unit: ShortUnit) -> GraderResult:
+    """
+    The short's LAST frame must visually land on the answer, not trail off.
+
+    schema.Script.starts_with_interviewer already guarantees the OPEN is right —
+    beat 0 is always the question. Nothing guaranteed the CLOSE was: a short
+    could walk through every step of a mechanism and end on a frame that is
+    still describing the process rather than emphasising the resolved answer,
+    which reads as the video stopping mid-thought rather than concluding.
+
+    Reuses _frame_role_collections rather than re-deriving "where can a hero
+    live on this template" a third time — check_one_hero_per_frame already
+    had to learn that once, and a second, independently-drifting copy of the
+    same enumeration is how a new template (a Store, a Graph) quietly becomes
+    invisible to one grader and not the other.
+
+    `stat` and `takeaway` are exempted for the same reason
+    check_one_hero_per_frame skips them: both hard-code their own emphasis in
+    the renderer (layout._stat and layout._takeaway both emit a hard-coded
+    data-role="focus") and carry no Cell/Glyph/Slot roles at all, so "no
+    element marked hero" is true of every takeaway frame ever built and would
+    fail the very template whose entire job is landing the last line — the
+    fixture for this failure mode would be indistinguishable from the fixture
+    for the short thing working exactly as designed.
+    """
+    last_beat = unit.beats[-1]
+    visual = unit.visuals.get(last_beat.visual_ref)
+    frame = visual.frame if visual else None
+    if frame is None:
+        return GraderResult("ends_on_answer", True,
+            f"[{last_beat.visual_ref}] has no rendered frame to check (e.g. a raw image)")
+
+    populated = [(n, roles) for n, roles in _frame_role_collections(frame) if roles]
+    if not populated:
+        return GraderResult("ends_on_answer", True,
+            f"[{last_beat.visual_ref}] ({frame.template}) hard-codes its own focus")
+
+    if not any("hero" in roles for _, roles in populated):
+        return GraderResult("ends_on_answer", False,
+            f"short ends on [{last_beat.visual_ref}] ({frame.template}) with no element "
+            f"marked hero — the short trails off on a neutral frame instead of landing "
+            f"on the answer")
+    return GraderResult("ends_on_answer", True,
+                        "the final frame visually lands on the answer")
+
+
 def check_technical_beats_use_diagrams(unit: ShortUnit) -> GraderResult:
     """Non-negotiable #4: technical content must not be rendered by an image model."""
     offenders = [v.ref for v in unit.visuals.values() if v.type == "image"
@@ -2136,6 +2831,187 @@ def check_technical_beats_use_diagrams(unit: ShortUnit) -> GraderResult:
         return GraderResult("technical_visuals", False,
             f"technical specs assigned type=image instead of diagram: {offenders}")
     return GraderResult("technical_visuals", True, "no technical content sent to an image model")
+
+
+#: Templates that never move: no arriving/leaving slot, no travelling payload, no
+#: cause-to-effect arrow. Held for every beat of a short, this is the complaint in
+#: its own words — "boxes, comparisons, two labels, an arrow" — measured, not
+#: guessed: tallied across all 262 frames in 64 real units, icons+compare+bar
+#: alone were 48.5% of every frame this pipeline had ever drawn.
+_STATIC_TEMPLATES = {"icons", "compare", "bar", "table", "split", "mapping"}
+
+#: Relationships that genuinely have movement or direction — rules 6, 8 and 10 of
+#: EDUCATIONAL_VISUAL_RULES. Deliberately NOT "comparison", "structure" or
+#: "effect": those are legitimately still, and commit 909bab9 already chose to
+#: grade a picture's CONTENT over its TEMPLATE for exactly that reason — a short
+#: that holds one scaffold because its concept is a one-time comparison is the
+#: right shape, not the defect this grader exists to catch.
+_MOTION_RELATIONSHIPS = {"process", "data_movement", "cause_effect"}
+
+
+def check_motion_concept_not_static(unit: ShortUnit) -> GraderResult:
+    """
+    A short the strategist itself called a process, a data movement or a cause
+    and effect must show at least one of those beats HAPPENING — not hold one
+    static template for its entire length.
+
+    THE GAP 909bab9 LEFT OPEN, ON PURPOSE, AND STILL OPEN. That commit is right
+    that "did the picture's CONTENT change" is the question for a recoloured
+    repost, and check_frames_develop / check_frames_progress both grade exactly
+    that, correctly. Neither one asks whether the TEMPLATE itself ever left the
+    static shelf: `icons`/`compare`/`bar`/`table`/`split`/`mapping` can all
+    develop their CONTENT beat to beat — a fifth pictogram arrives, a losing
+    column dims — and still never draw a container changing, a payload
+    travelling, or a cause reaching its effect. That passes every existing
+    grader and still reads, to a human watching it, as one static shape holding
+    still for the length of the video.
+
+    CONFIRMED REAL, not hypothetical: output/sync_vs_async.json is `compare`x3
+    end to end for a short about a SEQUENCE of events, and output/
+    kernel_dependencies.json is `graph`x5 for a short with an actual dependency
+    CHAIN in it — neither one ever shows anything moving, and both hold one
+    template throughout.
+
+    NOT A SECOND check_frames_progress. That grader owns "does the picture
+    change" and this must not re-fight that battle — a short can pass this and
+    still be repetitive, and vice versa. This asks a narrower question: were
+    ALL of its frames static AND did the strategist's own plan call at least one
+    beat a kind of claim that needs motion to be honest. A short the strategist
+    called structure/comparison/effect throughout and drew on one static
+    scaffold is exactly what 909bab9 protects, and this grader passes it —
+    see the false-positive fixture.
+
+    Skipped, not failed, when there is nothing to compare: no rendered frames,
+    or no strategy recorded for any beat (a unit built or loaded before the
+    strategist existed).
+    """
+    refs = list(dict.fromkeys(b.visual_ref for b in unit.beats))
+    templates: list[str] = []
+    relationships: list[str] = []
+    for ref in refs:
+        visual = unit.visuals.get(ref)
+        if visual is None or visual.frame is None:
+            continue
+        templates.append(visual.frame.template)
+        if visual.strategy is not None:
+            relationships.append(visual.strategy.relationship)
+
+    if not templates:
+        return GraderResult("motion_concept_not_static", True, "no rendered frames to check")
+
+    if not all(t in _STATIC_TEMPLATES for t in templates):
+        return GraderResult("motion_concept_not_static", True,
+            "at least one frame is not held to a static, non-motion template")
+
+    moving = sorted({r for r in relationships if r in _MOTION_RELATIONSHIPS})
+    if not moving:
+        return GraderResult("motion_concept_not_static", True,
+            "every frame is static, but the strategist never called this concept "
+            "a process, a data movement or a cause and effect — a genuinely still "
+            "concept held on one scaffold is not a defect")
+
+    return GraderResult("motion_concept_not_static", False,
+        f"every one of {len(templates)} frame(s) is drawn in a static template "
+        f"({', '.join(sorted(set(templates)))}), but the strategist called "
+        f"{len(moving)} of its beat(s) {', '.join(moving)} — the concept has "
+        f"movement or direction on the page and the short showed none of it. Use "
+        f"`state` for a container changing, `flow`/`cause_effect` for a sequence "
+        f"or a trigger, or `analogy` for the beat that introduces the container.",
+        {"templates": templates, "relationships": relationships})
+
+
+#: The specific family check_motion_concept_not_static's own docstring names as
+#: "static" in the no-movement sense, minus "icons" — a pictogram is a drawn
+#: picture of a real thing, not text sitting in a rounded rectangle, and does
+#: not read as the "sticky note" vocabulary this check is about. What is left
+#: — bar, table, split, mapping, compare — is exactly the shape family that
+#: looks identical regardless of the concept behind it: a row or a grid of
+#: rounded boxes, holding words.
+_BOX_TEMPLATES = {"bar", "table", "split", "mapping", "compare"}
+
+#: Below this share of a reel's frames, the box family is a legitimate choice
+#: for some of the beats and not the whole reel's personality.
+_MAX_BOX_SHARE = 0.5
+
+
+def check_generic_boxes_not_overused(unit: ShortUnit) -> GraderResult:
+    """
+    A reel should not read as the same rounded-box template wearing different
+    words, when the beats behind it are not all making the same kind of claim.
+
+    THE COMPLAINT THIS EXISTS FOR: a reel that is individually correct on every
+    structural grader — right template family for each relationship
+    (check_frames_match_strategy), right physical form (check_physical_form_
+    matches_template), each frame distinct from its neighbours (check_frames_
+    develop) — and still reads as generic and juvenile, because MOST of its
+    frames are `bar`/`table`/`split`/`mapping`/`compare`: rows and grids of
+    rounded rectangles holding text, the visual vocabulary of a presentation
+    slide rather than a technical explainer. None of the existing graders ask
+    this question, because each of them grades ONE frame or ONE transition
+    against ONE rule, never the reel's overall visual personality.
+
+    NOT A DUPLICATE OF check_motion_concept_not_static. That check asks whether
+    a reel calling itself a process ever shows movement — narrow, and about
+    correctness. This asks whether the reel LOOKS like it reached for the
+    nearest box every time, which is a maturity question and applies whether
+    or not any beat needed motion. A reel that is genuinely, entirely a set of
+    comparisons is not this defect (see the gate below); a reel with a
+    hierarchy, a container and a process all flattened into `table` because
+    that was easiest is.
+
+    THE GATE THAT KEEPS THIS FROM FIRING ON A GENUINE ALL-COMPARISON REEL: it
+    only fails when the beats drawn in the box family are not all the SAME
+    relationship. A short whose entire question is "how do these three
+    approaches compare" and draws `compare` five times in a row is one
+    consistent, correct choice, not five generic ones — see the false-positive
+    fixture. What this catches is DIFFERENT concepts — a hierarchy, a
+    container, a plain structure — all landing on the box family anyway.
+
+    Skipped when there is no strategy recorded for any beat (a unit built
+    before the strategist existed) — there is no relationship to check
+    diversity against, so nothing here is asserted.
+    """
+    refs = list(dict.fromkeys(b.visual_ref for b in unit.beats))
+    templates: list[str] = []
+    box_relationships: list[str] = []
+    has_strategy = False
+    for ref in refs:
+        visual = unit.visuals.get(ref)
+        if visual is None or visual.frame is None:
+            continue
+        templates.append(visual.frame.template)
+        if visual.strategy is not None:
+            has_strategy = True
+            if visual.frame.template in _BOX_TEMPLATES:
+                box_relationships.append(visual.strategy.relationship)
+
+    if not templates or not has_strategy:
+        return GraderResult("generic_boxes_not_overused", True,
+                            "no strategy to check diversity against")
+
+    box_count = sum(1 for t in templates if t in _BOX_TEMPLATES)
+    if box_count / len(templates) <= _MAX_BOX_SHARE:
+        return GraderResult("generic_boxes_not_overused", True,
+            f"{box_count} of {len(templates)} frame(s) use a generic box template "
+            f"— not the majority of the reel")
+
+    if len(set(box_relationships)) <= 1:
+        return GraderResult("generic_boxes_not_overused", True,
+            f"{box_count} of {len(templates)} frame(s) use a generic box template, "
+            f"but they are all the same kind of claim ({box_relationships[0]!r}) "
+            f"— a consistent choice, not a default")
+
+    return GraderResult("generic_boxes_not_overused", False,
+        f"{box_count} of {len(templates)} frame(s) ({', '.join(sorted(set(t for t in templates if t in _BOX_TEMPLATES)))}) "
+        f"are drawn in a generic rounded-box template, covering "
+        f"{len(set(box_relationships))} different kinds of claim "
+        f"({', '.join(sorted(set(box_relationships)))}) — the reel reads as one "
+        f"box template wearing different words rather than a picture chosen for "
+        f"each concept. Give at least the beats whose relationship is process, "
+        f"data_movement, cause_effect or hierarchy their own shape — see the "
+        f"template mapping in visuals.py's SPEC_SYSTEM.",
+        {"box_count": box_count, "total": len(templates),
+         "relationships": sorted(set(box_relationships))})
 
 
 # ------------------------------------------------------- the teaching sequence
@@ -2557,10 +3433,41 @@ def _covered_steps(steps, beat_stems: list[set], all_stems: set):
 
         where = None
         if distinctive:
+            # A SINGLE SHARED WORD IS NOT ENOUGH WHEN THE STEP HAS MORE TO GO ON.
+            #
+            # Found on a real short about hash tables. Step 3, "Storing with the
+            # computed index", has exactly one distinctive stem: "stor". Beat 1 was
+            # a scene-setting opener — "A hash table STORES values under keys, in
+            # buckets..." — a sentence about hash tables in general, not about
+            # storing AT a computed index specifically. One coincidental verb was
+            # enough to credit the step to a beat that never explained it, and the
+            # false credit then read as an ORDER INVERSION once the step actually
+            # explained (in a later beat) looked like a repeat.
+            #
+            # The fix asks for one more piece of corroborating evidence when there
+            # is any to ask for: a step's OTHER concept words (the ones it shares
+            # with a neighbour, so they were excluded from `distinctive`) still
+            # narrow down which beat is really talking about THIS step rather than
+            # a different one that happens to use the same word. "Storing with the
+            # computed index" also carries "computed" and "index" — words a beat
+            # about hash TABLES IN GENERAL has no reason to use, and a beat about
+            # the storing MECHANISM does. Requiring at least one of them alongside
+            # the distinctive word is what tells a generic mention of "stores"
+            # apart from the step actually being explained.
+            #
+            # Skipped when a step's own concept has nothing left to ask for — its
+            # distinctive stem(s) already cover its full concept (a two-word phrase
+            # like "Keys and buckets" where nothing is shared with a neighbour) —
+            # because there is no more signal available and falling back to the
+            # single-word match is the same risk this field always carried.
+            other_marks = stems - distinctive
             for b, bstems in enumerate(beat_stems):
-                if any(_grounded(s, bstems) for s in distinctive):
-                    where = b
-                    break
+                if not any(_grounded(s, bstems) for s in distinctive):
+                    continue
+                if other_marks and not any(_grounded(s, bstems) for s in other_marks):
+                    continue
+                where = b
+                break
         located.append((i, step, where))
     return located
 
@@ -3950,6 +4857,82 @@ def check_beats_develop(script: Script) -> GraderResult:
 MIN_PLAN_MATERIAL = MIN_ANSWERS
 
 
+def _plan_wants(plan) -> bool:
+    return getattr(plan, "need", None) in ("required", "helpful")
+
+
+def plan_material(understanding) -> tuple[int, str]:
+    """
+    How many distinct beat-worthy things a validated reading actually holds.
+
+    THE ONE DEFINITION OF "MATERIAL", shared by check_plan_depth (is there enough
+    for MIN_PLAN_MATERIAL beats) and duration_budget (is there enough for a 5th).
+    Splitting this out is not a refactor for its own sake — check_plan_depth's own
+    docstring is explicit that a second definition of the same judgement is the
+    defect this file keeps removing.
+
+    Caller must already know `understanding` is not None and its teaching_sequence
+    is not empty — this does not re-check either, so a caller skips this and
+    reports "inconclusive" itself first (see check_plan_depth).
+    """
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    example = _plan_wants(getattr(understanding, "example_plan", None))
+    confusion = _plan_wants(getattr(understanding, "confusion_plan", None))
+    material = len(steps) + int(example) + int(confusion)
+    made_of = (f"{len(steps)} teaching step(s)"
+               + (" + a worked example" if example else "")
+               + (" + a misconception to correct" if confusion else ""))
+    return material, made_of
+
+
+def duration_budget(understanding) -> tuple[int, int]:
+    """
+    (min_seconds, max_seconds) this section's own reading actually supports.
+
+    Always (MIN_SECONDS, MAX_SECONDS) unless the reading holds MORE than
+    MIN_PLAN_MATERIAL things to say — strictly more, not equal: a plan sitting
+    exactly at MIN_PLAN_MATERIAL fills exactly MIN_ANSWERS beats and the 45s
+    ceiling already fits that, per schema.HARD_MAX_SECONDS's own arithmetic. Only
+    a plan with a genuine 5th thing to say — enough for checks.MAX_ANSWERS's fifth
+    beat — earns the wider ceiling, and MAX_ANSWERS/MAX_ANSWER_WORDS are what cap
+    it even then: this never asks for more beats or longer ones than those two
+    constants already allow, it only stops check_timing rejecting a script that
+    used them.
+
+    Same "inconclusive" handling as check_plan_depth, for the same reason: a
+    quarantined or absent reading has not earned a narrower answer OR a wider one,
+    so it gets the ordinary band rather than a guess.
+    """
+    if understanding is None:
+        return MIN_SECONDS, MAX_SECONDS
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    if not steps:
+        return MIN_SECONDS, MAX_SECONDS
+    material, _ = plan_material(understanding)
+    if material <= MIN_PLAN_MATERIAL:
+        return MIN_SECONDS, MAX_SECONDS
+    return MIN_SECONDS, HARD_MAX_SECONDS
+
+
+def check_duration_budget(understanding, section_text: str | None = None) -> GraderResult:
+    """
+    Reports the (min, max) seconds duration_budget grants this section's own
+    reading — observable rather than gating, the same way check_plan_depth grades
+    the reading and leaves check_timing as the one hard gate on the script itself.
+
+    Always passes: this is not a second opinion on whether the plan is deep
+    enough (check_plan_depth already is that one), it is a report of what the
+    budget came out to, so a change to duration_budget's arithmetic is caught by
+    a fixture here rather than discovered later as a script mysteriously allowed
+    (or refused) a length it should not have been.
+    """
+    min_s, max_s = duration_budget(understanding)
+    extended = max_s > MAX_SECONDS
+    return GraderResult("duration_budget", True,
+        f"{min_s}-{max_s}s" + (" (extended)" if extended else " (ordinary)"),
+        {"min_seconds": min_s, "max_seconds": max_s, "extended": extended})
+
+
 def check_plan_depth(understanding, section_text: str | None = None) -> GraderResult:
     """
     Is there enough in this reading to fill 35-50 seconds without restating?
@@ -3994,15 +4977,7 @@ def check_plan_depth(understanding, section_text: str | None = None) -> GraderRe
             "teaching sequence was dropped — depth cannot be judged from what is left",
             {"conclusive": False})
 
-    def _wants(plan) -> bool:
-        return getattr(plan, "need", None) in ("required", "helpful")
-
-    example = _wants(getattr(understanding, "example_plan", None))
-    confusion = _wants(getattr(understanding, "confusion_plan", None))
-    material = len(steps) + int(example) + int(confusion)
-    made_of = (f"{len(steps)} teaching step(s)"
-               + (" + a worked example" if example else "")
-               + (" + a misconception to correct" if confusion else ""))
+    material, made_of = plan_material(understanding)
 
     if material < MIN_PLAN_MATERIAL:
         return GraderResult("plan_depth", False,
@@ -4012,13 +4987,432 @@ def check_plan_depth(understanding, section_text: str | None = None) -> GraderRe
             f"another. The spare beat has nothing to be about, so it would be filled "
             f"by restating — which check_beats_develop then rejects. This topic wants "
             f"a shorter format, or select's gate",
-            {"material": material, "steps": len(steps), "example": example,
-             "misconception": confusion, "conclusive": True})
+            {"material": material, "steps": len(steps), "conclusive": True})
 
     return GraderResult("plan_depth", True,
         f"{material} thing(s) to say for {MIN_PLAN_MATERIAL} beat(s): {made_of}",
-        {"material": material, "steps": len(steps), "example": example,
-         "misconception": confusion, "conclusive": True})
+        {"material": material, "steps": len(steps), "conclusive": True})
+
+
+# ------------------------------------------------- topic/understanding reconciliation
+#
+# THE GAP THIS CLOSES. select.py ranks every topic's importance across the WHOLE
+# document in one call, before any section has had a deep individual reading.
+# understanding_for(section) — the one place a section's real "one thing it
+# teaches" gets read out and validated against the section's own text — only
+# runs later, in run.py's build_one, AFTER select.py's topic and question are
+# already locked in. Nothing had ever compared the two: check_plan_depth above
+# grades whether the READING found enough material, never whether the topic
+# selected FROM it is the same topic the reading itself landed on. A topic can
+# therefore pass importance, the yes/no filter, the duplicate-concept filter and
+# check_plan_depth, and still be a question about the wrong idea in its own
+# section — which is the product complaint that motivated this: "the
+# questions... often do not focus on the main learning concept."
+#
+# DELIBERATELY BLUNT, and reusing _stems rather than inventing new fuzzy
+# matching. This does not ask whether the topic is a GOOD reading of core_idea
+# — that is a judgement call and belongs to a human or a paid grader — only
+# whether the two are naming the same THING at all: does the topic's concept
+# share even one content stem with the section's own core_idea? Two honest
+# phrasings of the SAME idea always share at least one content word
+# ("paging"/"fragmentation", "selector"/"specificity", "stack"/"push"), because
+# both are naming the same mechanism. Zero stems in common means the topic and
+# the validated reading are simply not about the same thing, however plausible
+# either one reads on its own — see evals/cases.yaml's css_specificity case for
+# a real instance: a topic about the !important flag, filed under the section
+# that actually teaches how a specificity TIE is broken by document order.
+def check_question_selection_source_title(selection: QuestionSelection,
+                                          sections: list[Section]) -> GraderResult:
+    """
+    Does source_title actually name the section source_section_id points at?
+
+    select.build_question_selections resolves source_title with a deterministic
+    dict lookup against the parsed Section list — never from the LLM — so this is
+    the check that would catch it drifting: a stale selection read back after the
+    document was re-parsed with renumbered or retitled headings, or a QuestionSelection
+    built by hand with the wrong title.
+    """
+    section_id = selection.topic.source_section_id
+    section = next((s for s in sections if s.section_id == section_id), None)
+    if section is None:
+        return GraderResult("question_selection_source_title", False,
+            f"source_section_id {section_id!r} does not match any parsed section",
+            {"section_id": section_id})
+    if selection.source_title != section.title:
+        return GraderResult("question_selection_source_title", False,
+            f"source_title {selection.source_title!r} does not match section "
+            f"{section_id}'s actual title {section.title!r}",
+            {"section_id": section_id, "expected": section.title,
+             "got": selection.source_title})
+    return GraderResult("question_selection_source_title", True,
+        f"source_title matches section {section_id}'s title {section.title!r}",
+        {"section_id": section_id})
+
+
+def check_framing_source_matches_effective_question(workflow: QuestionWorkflow) -> GraderResult:
+    """
+    Does framing.source_question exactly equal the workflow's
+    effective_question — the human-approved question at the moment of framing?
+
+    skills.framing.frame_question sets source_question DETERMINISTICALLY from
+    effective_question, never from the model's own output (see that module's
+    _FramingOutput, which has no field for it) — this is the check that would
+    catch a future regression breaking that guarantee: a refactor that let the
+    model's text through, or a stale framing read back after the workflow's
+    approved question changed again (a later regeneration, say) without being
+    reframed.
+    """
+    if workflow.framing is None:
+        return GraderResult("framing_source_matches_effective_question", True,
+            "no framing on this workflow", {"skipped": True})
+    expected = workflow.effective_question
+    if workflow.framing.source_question != expected:
+        return GraderResult("framing_source_matches_effective_question", False,
+            f"framing.source_question {workflow.framing.source_question!r} does not "
+            f"match the workflow's current effective_question {expected!r} — this "
+            f"framing is stale, or was not built from this workflow",
+            {"expected": expected, "got": workflow.framing.source_question})
+    return GraderResult("framing_source_matches_effective_question", True,
+        "framing.source_question matches effective_question", {"expected": expected})
+
+
+def check_framing_stays_on_concept(framing: QuestionFraming, topic) -> GraderResult:
+    """
+    Does framing.teaching_question still share the topic's own concept, or did
+    reframing quietly change the subject?
+
+    THE SAME SHAPE OF CHECK AS check_topic_matches_understanding, one stage
+    later: a prompt instruction ("stay on the same concept") is not a
+    guarantee, so this is the free, deterministic backstop. Loose on purpose —
+    stem overlap, not exact wording — because a real reframe is SUPPOSED to
+    change the wording; it must only be caught when it changes the SUBJECT.
+    """
+    label = (topic.concept or topic.topic or "").strip()
+    if not label:
+        return GraderResult("framing_stays_on_concept", True,
+            "topic has neither a concept nor a question to compare",
+            {"conclusive": False})
+
+    concept_stems = set(_stems(label))
+    teaching_stems = set(_stems(framing.teaching_question))
+    if not concept_stems or not teaching_stems:
+        return GraderResult("framing_stays_on_concept", True,
+            "too little text on one side to compare", {"conclusive": False})
+
+    overlap = concept_stems & teaching_stems
+    if not overlap:
+        return GraderResult("framing_stays_on_concept", False,
+            f"teaching_question {framing.teaching_question!r} shares no word with "
+            f"the topic's own concept ({label!r}) — framing may have drifted onto "
+            f"a different subject", {"conclusive": True})
+    return GraderResult("framing_stays_on_concept", True,
+        f"shares {', '.join(sorted(overlap)[:5])!r} with the topic's concept",
+        {"overlap": sorted(overlap), "conclusive": True})
+
+
+#: Phrases that justify `code` by the material's AVAILABILITY rather than by
+#: the concept's NECESSITY — "the section has code" is a fact about the
+#: reading, not a reason the concept itself needs code to be taught. See
+#: check_teaching_approach_not_code_by_default, and
+#: skills/teaching_approach.py's own "CODE IS NOT THE DEFAULT".
+_CODE_AVAILABILITY_EXCUSES = (
+    "contains code", "has code", "shows code", "shows a code", "is a code",
+    "code example is available", "code is available", "code snippet is available",
+    "programming course", "programming language course", "written in code",
+    "code is present", "code is shown", "material contains", "section contains",
+    "uses code",
+)
+
+
+def check_teaching_approach_not_code_by_default(approach: TeachingApproach) -> GraderResult:
+    """
+    Catches the specific failure Step 5 exists to prevent: `code` picked
+    because the material HAPPENS to contain code, not because the CONCEPT
+    needs code to be taught.
+
+    DELIBERATELY NARROW. This cannot judge whether `code` is the right call —
+    that needs a human, or a judge that has read the section — so it only
+    catches the laziest version of the mistake: a rationale that justifies
+    code by pointing at AVAILABILITY ("the section has code", "this is a
+    programming course") instead of at NECESSITY (the concept IS a piece of
+    syntax, or the section shows nothing but code has nothing to do with
+    whether the rationale actually says why THIS concept needs it). Every
+    check like this in the file is honest about that limit — see
+    check_framing_stays_on_concept for the same shape of caveat one stage
+    earlier.
+    """
+    if approach.primary != "code" and "code" not in approach.combined_with:
+        return GraderResult("teaching_approach_not_code_by_default", True,
+            "code was not selected", {"skipped": True})
+    rationale = (approach.rationale or "").strip()
+    if not rationale:
+        return GraderResult("teaching_approach_not_code_by_default", False,
+            "code was selected with no rationale to justify it", {"conclusive": True})
+    lowered = rationale.lower()
+    hit = next((p for p in _CODE_AVAILABILITY_EXCUSES if p in lowered), None)
+    if hit:
+        return GraderResult("teaching_approach_not_code_by_default", False,
+            f"code was justified by availability ({hit!r}), not by the concept "
+            f"needing code to teach it — rationale: {rationale!r}",
+            {"excuse": hit})
+    return GraderResult("teaching_approach_not_code_by_default", True,
+        "code's rationale does not lean on a bare availability excuse")
+
+
+#: Praise that could be said about any approach for any concept — the
+#: generic-statement failure the brief explicitly calls out ("this approach
+#: is engaging" is not a reason).
+_GENERIC_APPROACH_RATIONALE_PHRASES = (
+    "is engaging", "is more engaging", "is interesting", "is more interesting",
+    "makes it fun", "makes it more fun", "keeps it interesting",
+    "is visually appealing", "looks good", "is popular", "is a popular way",
+    "is a great way", "is a good way to explain", "is the best way",
+)
+
+
+def check_teaching_approach_rationale_specific(approach: TeachingApproach) -> GraderResult:
+    """
+    Catches a rationale that praises the chosen approach in the abstract
+    instead of explaining why THIS approach fits THIS concept.
+
+    Same shape and same honesty as check_teaching_approach_not_code_by_default:
+    cannot verify the rationale is actually RIGHT, only that it is not one of
+    the specific generic dodges the brief names.
+    """
+    rationale = (approach.rationale or "").strip()
+    if not rationale:
+        return GraderResult("teaching_approach_rationale_specific", False,
+            "no rationale was given", {"conclusive": True})
+    lowered = rationale.lower()
+    hit = next((p for p in _GENERIC_APPROACH_RATIONALE_PHRASES if p in lowered), None)
+    if hit:
+        return GraderResult("teaching_approach_rationale_specific", False,
+            f"rationale leans on a generic claim ({hit!r}) instead of explaining "
+            f"why this approach fits the concept: {rationale!r}", {"excuse": hit})
+    return GraderResult("teaching_approach_rationale_specific", True,
+        "rationale does not rely on a generic phrase")
+
+
+def check_script_matches_teaching_approach(script: Script,
+                                          approach: TeachingApproach) -> GraderResult:
+    """
+    Does the SCRIPT ITSELF — not the prompt that asked for it — agree with
+    the teaching approach it was supposed to follow?
+
+    CHECKED ON THE SCRIPT'S OWN TEXT, DELIBERATELY, not on whether
+    skills.script.write_script's prompt happened to mention the approach.
+    Asserting a phrase appeared in the PROMPT only proves the request was
+    sent, never that it was honoured — this checks the OUTPUT, the same
+    standard every other grader in this file already holds beats to.
+
+    TWO DIRECTIONS, BOTH USING _is_code_quote — the same heuristic
+    check_code_not_overused already uses one stage later, reused rather than
+    reinvented:
+
+      CODE APPROVED, NONE SHOWN. If `code` is the primary approach (or is
+      combined in), at least one beat's source_quote should actually read as
+      code. A script that never shows code did not follow a code-centric
+      approval, whatever the prompt asked for.
+
+      CODE NOT APPROVED, BUT DOMINATES ANYWAY. This is Step 8's own "CODE
+      PROTECTION" requirement, made checkable: when `code` was NOT the
+      approved device, MORE THAN HALF the answer beats citing code-like
+      quotes is the failure — not any code citation at all, since the
+      section may legitimately offer code as its only concrete evidence even
+      under, say, conceptual_visual. One or two supporting code citations
+      alongside prose ones is not the defect; code as the script's dominant
+      evidence despite a non-code approval is.
+
+    Silent (passes, `skipped`) when there are no student beats to check —
+    nothing here to contradict an approach that was never exercised.
+    """
+    student_quotes = [b.source_quote for b in script.beats
+                      if b.speaker == "student" and b.source_quote]
+    if not student_quotes:
+        return GraderResult("script_matches_teaching_approach", True,
+            "no cited student beats to check", {"skipped": True})
+
+    code_quotes = [q for q in student_quotes if _is_code_quote(q)]
+    approved_code = approach.primary == "code" or "code" in approach.combined_with
+
+    if approved_code and not code_quotes:
+        return GraderResult("script_matches_teaching_approach", False,
+            f"the approved teaching approach is {approach.primary!r} — code — but "
+            f"no beat's source_quote reads as code, so the script never actually "
+            f"shows the code the approach called for",
+            {"approach": approach.primary})
+
+    if not approved_code and len(code_quotes) > len(student_quotes) / 2:
+        return GraderResult("script_matches_teaching_approach", False,
+            f"the approved teaching approach is {approach.primary!r}, not code, "
+            f"but {len(code_quotes)}/{len(student_quotes)} answer beat(s) cite "
+            f"code as their evidence — code must not dominate a non-code approach",
+            {"approach": approach.primary, "code_beats": len(code_quotes),
+             "total_beats": len(student_quotes)})
+
+    return GraderResult("script_matches_teaching_approach", True,
+        f"consistent with the approved {approach.primary!r} approach",
+        {"approach": approach.primary})
+
+
+#: A backtick span, e.g. `foo()` — the one code signal _is_code_quote's own
+#: heuristics (keywords, symbols, indentation) do not already cover, since a
+#: single inline mention can be too short to trip those but still reads as
+#: "look at this code" when it shows up in must_see/why_visual prose.
+_BACKTICK_CODE = re.compile(r"`[^`]+`")
+
+
+def _mentions_code(text: str) -> bool:
+    """Does this beat-strategy PROSE (must_see / why_visual / concept), not a
+    cited source quote, read as being ABOUT code — syntax, a snippet, a
+    function body — rather than about the concept the code implements?
+
+    Reuses _is_code_quote, the same heuristic check_code_not_overused and
+    check_script_matches_teaching_approach already hold beats to, plus a
+    backtick check for the short inline mentions ("call `insert()`") that
+    heuristic is too strict to catch on its own.
+    """
+    return bool(text) and (_is_code_quote(text) or bool(_BACKTICK_CODE.search(text)))
+
+
+def check_visual_strategy_matches_teaching_approach(
+        strategy: VisualStrategy, approach: TeachingApproach) -> GraderResult:
+    """
+    Does the VISUAL STRATEGY ITSELF — not the prompt that asked for it — agree
+    with the teaching approach it was supposed to visualise?
+
+    Same standard, same reuse, as check_script_matches_teaching_approach one
+    stage earlier: checked on the OUTPUT's own must_see/why_visual/concept
+    text, never on whether strategy.py's prompt happened to mention the
+    approach — a prompt asking for something proves the request was sent,
+    never that it was honoured.
+
+    TWO DIRECTIONS:
+
+      CODE APPROVED, NONE SHOWN is not checked here — code being the approved
+      approach does not obligate every beat to show code, only permits it;
+      absence of code is never a defect on its own.
+
+      CODE NOT APPROVED, BUT DOMINATES ANYWAY. When `code` is neither the
+      primary approach nor combined in, MORE THAN HALF the beats reading as
+      code-about (via _mentions_code) is the failure this exists to catch —
+      the exact "code becomes the default visual" regression Step 10 was
+      asked to guard against. One beat legitimately pointing at a symbol name
+      is not the defect; code as the plan's dominant visual language despite
+      a non-code approval is.
+
+    Silent (passes, `skipped`) when there are no beats to check.
+    """
+    if not strategy.beats:
+        return GraderResult("visual_strategy_matches_teaching_approach", True,
+            "no beats to check", {"skipped": True})
+
+    approved_code = approach.primary == "code" or "code" in approach.combined_with
+    if approved_code:
+        return GraderResult("visual_strategy_matches_teaching_approach", True,
+            f"approved approach is {approach.primary!r} — code is permitted, "
+            f"not required, on any given beat", {"approach": approach.primary})
+
+    code_beats = [b for b in strategy.beats
+                  if _mentions_code(b.must_see) or _mentions_code(b.why_visual)]
+    if len(code_beats) > len(strategy.beats) / 2:
+        return GraderResult("visual_strategy_matches_teaching_approach", False,
+            f"the approved teaching approach is {approach.primary!r}, not code, "
+            f"but {len(code_beats)}/{len(strategy.beats)} beat(s) describe a "
+            f"code-centred visual — code must not be the default visual for a "
+            f"concept that can be shown another way",
+            {"approach": approach.primary, "code_beats": len(code_beats),
+             "total_beats": len(strategy.beats)})
+
+    return GraderResult("visual_strategy_matches_teaching_approach", True,
+        f"consistent with the approved {approach.primary!r} approach",
+        {"approach": approach.primary})
+
+
+def check_visual_strategy_covers_every_beat(
+        strategy: VisualStrategy, refs: list[str]) -> GraderResult:
+    """
+    Does every ref the script actually cites get its own visual decision —
+    and is that decision a real one, not a placeholder?
+
+    Two ways a beat can be visually absent: missing from strategy.beats
+    entirely, or present with must_see/focus left blank (a strategy object
+    that technically has an entry but never decided what to show). Both are
+    the same failure from a viewer's seat — nothing appears — so both are
+    checked here rather than only counting entries.
+
+    `refs` is deliberately the caller's own list of the refs that matter
+    (typically every ref a Script's beats cite) rather than something this
+    function derives, so it says exactly what "every meaningful beat" means
+    for the caller — mirroring how check_source_quotes takes the beats it
+    should check rather than assuming every beat needs one.
+    """
+    if not refs:
+        return GraderResult("visual_strategy_covers_every_beat", True,
+            "no refs to check", {"skipped": True})
+
+    by_ref = strategy.by_ref()
+    missing = [r for r in refs if r not in by_ref]
+    if missing:
+        return GraderResult("visual_strategy_covers_every_beat", False,
+            f"{len(missing)} ref(s) have no visual decision at all: {missing}",
+            {"missing_refs": missing})
+
+    empty = [r for r in refs if not by_ref[r].must_see.strip()
+             or not by_ref[r].focus.strip()]
+    if empty:
+        return GraderResult("visual_strategy_covers_every_beat", False,
+            f"{len(empty)} ref(s) have a strategy entry but no actual visual "
+            f"decision (must_see or focus left blank): {empty}",
+            {"empty_refs": empty})
+
+    return GraderResult("visual_strategy_covers_every_beat", True,
+        f"all {len(refs)} ref(s) have a visual decision", {"beats": len(refs)})
+
+
+def check_topic_matches_understanding(topic, understanding) -> GraderResult:
+    """
+    Does the topic select.py handed us agree with what understanding_for(section)
+    validated as THIS section's own central idea?
+
+    `understanding` may be None or empty — the reading failed its own graders, or
+    never ran — and that is inconclusive, not a failure, for the same reason
+    check_plan_depth treats a quarantined reading as inconclusive rather than as
+    evidence against the topic: there is nothing here to compare the topic to.
+
+    Compared against `topic.concept` when set, falling back to `topic.topic` (the
+    question itself) for a topics.json written before `concept` existed — see
+    schema.Topic.concept, which is Optional for exactly that reason.
+    """
+    if understanding is None or not (understanding.core_idea or "").strip():
+        return GraderResult("topic_matches_understanding", True,
+            "no validated reading to compare against", {"conclusive": False})
+
+    label = (topic.concept or topic.topic or "").strip()
+    if not label:
+        return GraderResult("topic_matches_understanding", True,
+            "topic has neither a concept nor a question to compare",
+            {"conclusive": False})
+
+    topic_stems = set(_stems(label))
+    idea_stems = set(_stems(understanding.core_idea))
+    if not topic_stems or not idea_stems:
+        return GraderResult("topic_matches_understanding", True,
+            "too little text on one side to compare", {"conclusive": False})
+
+    overlap = topic_stems & idea_stems
+    if not overlap:
+        return GraderResult("topic_matches_understanding", False,
+            f"topic's concept {label!r} shares no word with this section's own "
+            f"core idea ({understanding.core_idea!r}) — select.py picked a "
+            f"different subject than understanding_for's validated reading of "
+            f"the same section",
+            {"topic_stems": sorted(topic_stems), "idea_stems": sorted(idea_stems),
+             "conclusive": True})
+
+    return GraderResult("topic_matches_understanding", True,
+        f"shares {', '.join(sorted(overlap)[:5])!r} with the section's core idea",
+        {"overlap": sorted(overlap), "conclusive": True})
 
 
 def check_question_grounded(script: Script, source_text: str) -> GraderResult:
@@ -4087,9 +5481,15 @@ SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_r
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_svg_quality, check_frames_are_visual, check_frames_develop,
                   check_frames_progress, check_frames_match_strategy,
+                  check_physical_form_matches_template,
+                  check_anchor_matches_structure,
+                  check_state_item_transitions_visible,
+                  check_state_pointer_moves_are_shown,
+                  check_flow_traversal_progresses,
                   check_one_hero_per_frame, check_template_data_present,
                   check_samples_differ, check_code_frames_quote_source,
-                  check_icons_are_pictures, check_diagram_matches_narration]
+                  check_icons_are_pictures, check_diagram_matches_narration,
+                  check_code_not_overused, check_generic_boxes_not_overused]
 
 #: Unit graders that read the reading material as well as the unit.
 _NEEDS_SOURCE = {check_diagram_matches_narration, check_code_frames_quote_source}
@@ -4126,8 +5526,24 @@ def run_script_graders(script: Script, source_text: str | None = None,
     hand that one object to both write_script and this function. Grading a retry
     against a freshly-read plan would move the target between attempts: the script
     would be rewritten to satisfy a sequence it was never shown.
+
+    TIMING'S CEILING COMES FROM THE SAME `understanding`, NOT A NEW ARGUMENT. Every
+    call site here already passes (or omits) `understanding` for
+    check_follows_teaching_sequence's sake, so duration_budget rides along for
+    free — a caller that has no understanding gets the ordinary 45s ceiling, one
+    that does gets whatever duration_budget says its own reading earned. The
+    per-beat word cap rides along on the SAME decision: a section that earned the
+    wider duration window also earns MAX_ANSWER_WORDS_EXTENDED rather than
+    MAX_ANSWER_WORDS, since both are the same "this material has more to it"
+    signal — see MAX_ANSWER_WORDS_EXTENDED's own comment for why a wider window
+    alone was not enough.
     """
-    results = [g(script) for g in SCRIPT_GRADERS]
+    _, max_seconds = duration_budget(understanding)
+    max_answer_words = MAX_ANSWER_WORDS_EXTENDED if max_seconds > MAX_SECONDS else MAX_ANSWER_WORDS
+    results = [check_timing(script, max_seconds=max_seconds) if g is check_timing else
+               check_dialogue_shape(script, max_answer_words=max_answer_words) if g is check_dialogue_shape else
+               g(script)
+               for g in SCRIPT_GRADERS]
     if source_text:
         results.append(check_source_quotes(script, source_text, doc_text=doc_text))
         results.append(check_answers_its_section(script, source_text))

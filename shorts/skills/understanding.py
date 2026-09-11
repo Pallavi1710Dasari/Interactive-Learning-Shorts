@@ -241,25 +241,55 @@ confusion_plan — whether THIS short should correct a wrong belief, and which o
 
   For "not_needed", leave the other fields empty.
 
-cannot_answer — questions this section does NOT answer.
-  Things a reader would reasonably want to know after reading it that the section
-  itself does not establish: an adjacent mechanism it mentions but never explains,
-  the "why" behind a rule it only states, a term it uses and never defines. Be
-  specific, and phrase each as a question.
+TEACH THE CONCEPT, NOT ONLY THE SENTENCE
+A good teacher does not just repeat the page back. Where the section states a
+rule or a behaviour without spelling out WHY it holds or WHAT is happening
+internally, you may work that out and use it — WHEN it is a direct, standard
+consequence of what the section DOES establish, not a fact borrowed from outside
+it. This is what separates "paging splits memory into frames" (the sentence) from
+"paging splits memory into frames, so a process no longer needs one unbroken run
+of it" (the reason the sentence matters) — the second is not in most sections
+word for word, and a learner who only gets the first has memorised a fact rather
+than understood a mechanism.
+
+THE LINE THIS MUST NOT CROSS, exactly: you may REASON from what the section
+states to make its own claim clearer or to connect two things it separately says.
+You may never introduce a fact the section does not support to do it — a number,
+a name, a version, a benchmark, a comparison to something the section never
+mentions. However true it is elsewhere, it does not belong here.
+The test for anything you are tempted to add: could a careful reader of THIS
+SECTION ALONE follow the reasoning to it, using only what the section says? If
+reaching it needs a fact only someone who already knew the wider topic would
+have, it is outside knowledge wearing an explanation's clothes, and it belongs in
+cannot_answer instead.
+
+cannot_answer — questions this section does NOT establish, EVEN BY REASONING FROM
+  what it says. Not everything you might explain the "why" or "how" of is
+  out of reach now — see TEACH THE CONCEPT above — so this list is narrower than
+  it sounds: a claim that would need a fact the section never gives (a number, a
+  name, a comparison to something unmentioned), or a genuinely separate mechanism
+  the section only gestures at without enough to reason from. Be specific, and
+  phrase each as a question.
   This list is used to keep the writing step OUT of those places, so it is most
   useful when it names what the section is likely to be padded with — the
-  neighbouring ideas that sound like they belong and are not on the page.
+  neighbouring ideas that sound like they belong and cannot honestly be reasoned
+  out from what IS on the page.
 
 source_evidence — spans copied out of the section, VERBATIM, that ground the points
   above. Two to five. Copy character for character; do not tidy them, and do not
   join sentences that are not adjacent. These are for traceability only. Whatever
   you put here, the writing step still has to find its own sentences in the section.
 
-STAY INSIDE THE SECTION
-The section is the only thing you know about this subject. Never add a fact it does
-not state, never correct it, and never fill a gap with what you know about the
-topic. An empty list is a correct answer. A confident wrong one poisons everything
-downstream, because the writing step trusts this as a reading of the page.
+STAY INSIDE THE SECTION'S OWN FACTS — NOT INSIDE ITS EXACT WORDING
+The section is the only source of FACTS about this subject: numbers, names,
+examples, terminology, what the material claims is true. Never add one it does
+not state, never correct it, and never fill a factual gap with something you know
+about the topic from elsewhere. An empty list is a correct answer. A confident
+wrong fact poisons everything downstream, because the writing step trusts this as
+a reading of the page.
+That is a narrower rule than "never explain beyond the sentence" — see TEACH THE
+CONCEPT above. Reasoning correctly from the section's own stated facts to the
+mechanism behind them is understanding it, not adding to it.
 
 Output JSON:
 {"section_id":"...","core_idea":"...","key_points":["..."],

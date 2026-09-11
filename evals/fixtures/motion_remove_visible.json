@@ -1,0 +1,42 @@
+{
+  "short_id": "motion_remove_visible",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "What happens to the stack when C is popped?",
+  "estimated_seconds": 18.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "What happens to the stack when C is popped?", "on_screen": "Popping C", "visual_ref": "d_before"},
+    {"speaker": "student", "line": "Before the pop, the stack holds A, B and C.", "on_screen": "A, B, C", "visual_ref": "d_before", "source_quote": "pop removes the item on top"},
+    {"speaker": "student", "line": "Popping lifts C off the top of the stack.", "on_screen": "C leaves", "visual_ref": "d_leaving", "source_quote": "pop removes the item on top"},
+    {"speaker": "student", "line": "Only A and B remain, with top now at B.", "on_screen": "A, B", "visual_ref": "d_after", "source_quote": "pop removes the item on top"}
+  ],
+  "visuals": {
+    "d_before": {
+      "ref": "d_before", "type": "diagram", "spec": "stack with A, B, C",
+      "frame": {"template": "state", "title": "Before popping C",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "plain", "state": "resting"},
+                    {"label": "C", "role": "hero", "state": "resting"}],
+          "pointer": "top", "pointer_at": 2, "open_end": true}}
+    },
+    "d_leaving": {
+      "ref": "d_leaving", "type": "diagram", "spec": "C lifting off the stack",
+      "frame": {"template": "state", "title": "C leaves the stack",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "plain", "state": "resting"},
+                    {"label": "C", "role": "hero", "state": "leaving"}],
+          "pointer": "top", "pointer_at": 2, "open_end": true}}
+    },
+    "d_after": {
+      "ref": "d_after", "type": "diagram", "spec": "stack with A, B after pop",
+      "frame": {"template": "state", "title": "After popping C",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "hero", "state": "resting"}],
+          "pointer": "top", "pointer_at": 1, "pointer_at_previous": 2, "open_end": true}}
+    }
+  },
+  "status": "draft"
+}

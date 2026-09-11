@@ -1,0 +1,23 @@
+{
+  "short_id": "motion_pointer_no_move",
+  "session_id": "eval",
+  "source_section_id": "5.1",
+  "question": "Where does top point after pushing C?",
+  "estimated_seconds": 12.0,
+  "beats": [
+    {"speaker": "interviewer", "line": "Where does top point after pushing C?", "on_screen": "top after push", "visual_ref": "d_stack"},
+    {"speaker": "student", "line": "Top advances to point at C, the item just pushed.", "on_screen": "top -> C", "visual_ref": "d_stack", "source_quote": "pushing C sets top to 2"}
+  ],
+  "visuals": {
+    "d_stack": {
+      "ref": "d_stack", "type": "diagram", "spec": "stack pointer retargeted to a slot it already occupied",
+      "frame": {"template": "state", "title": "top after pushing C", "anchor_label": "C",
+        "store": {"label": "Stack", "orientation": "vertical",
+          "slots": [{"label": "A", "role": "plain", "state": "resting"},
+                    {"label": "B", "role": "plain", "state": "resting"},
+                    {"label": "C", "role": "hero", "state": "arriving"}],
+          "pointer": "top", "pointer_at": 2, "pointer_at_previous": 2, "open_end": true}}
+    }
+  },
+  "status": "draft"
+}

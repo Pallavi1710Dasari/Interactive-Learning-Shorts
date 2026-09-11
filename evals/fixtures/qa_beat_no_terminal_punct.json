@@ -1,0 +1,9 @@
+{
+  "short_id": "os_s18_beat_no_terminal_punct",
+  "question": "Why does a process block for the whole duration of a page fault?",
+  "beats": [
+    {"speaker":"interviewer","line":"Why does a process block for the whole duration of a page fault?","on_screen":"Why block on a fault","visual_ref":"title"},
+    {"speaker":"student","line":"The OS has to fetch the missing page from disk before the instruction can continue","on_screen":"Fetch from disk","visual_ref":"d1"},
+    {"speaker":"student","line":"So the process stays blocked until that disk read completes.","on_screen":"Blocked until read completes","visual_ref":"d2"}
+  ]
+}

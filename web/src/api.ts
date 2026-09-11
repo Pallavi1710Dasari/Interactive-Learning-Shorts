@@ -1,4 +1,5 @@
-import type { QA, Topic, Unit, GraderResult } from "./types";
+import type { QA, Topic, Unit, GraderResult, QuestionApproval, QuestionWorkflow,
+             WorkflowProgress } from "./types";
 
 // Vite proxies /api to the FastAPI server in dev (see vite.config.ts), and in
 // production the same server serves this bundle — so a relative path works in both.
@@ -29,6 +30,8 @@ export type MaterialResult = {
   notes?: string[];
   sections: { section_id: string; title: string; chars: number; lines: string }[];
   topics: Topic[];
+  /** Step 3 — one per topic, each starting `pending`. See StepApprove. */
+  workflows: QuestionWorkflow[];
 };
 
 /** Step 1 — paste or upload. Multipart so one endpoint serves both. */
@@ -54,8 +57,10 @@ export type ScriptResult = {
   total: UsageTotals;
 };
 
-export const makeScript = (doc_id: string, topic: Topic) =>
-  post<ScriptResult>("/api/script", { doc_id, topic });
+/** `approval` is Step 3's gate — omit it and this behaves exactly as before
+ *  Step 3 existed. Sent, the server refuses (409) unless it is "approved". */
+export const makeScript = (doc_id: string, topic: Topic, approval?: QuestionApproval) =>
+  post<ScriptResult>("/api/script", { doc_id, topic, approval });
 
 export type BatchResult = {
   results: { topic: Topic; qa?: QA; graders?: GraderResult[]; error?: string }[];
@@ -63,9 +68,68 @@ export type BatchResult = {
   total: UsageTotals;
 };
 
-/** Draft every topic in one request; the server runs them concurrently. */
-export const makeScripts = (doc_id: string, topics: Topic[]) =>
-  post<BatchResult>("/api/scripts", { doc_id, topics });
+/** Draft every topic in one request; the server runs them concurrently.
+ *  `approvals` is Step 3's gate, keyed by topic id — see makeScript. */
+export const makeScripts = (doc_id: string, topics: Topic[],
+                            approvals?: Record<string, QuestionApproval>) =>
+  post<BatchResult>("/api/scripts", { doc_id, topics, approvals });
+
+// ------------------------------------------------- Step 3: question approval gate
+
+/** Approve a workflow as it currently stands (original question, or the
+ *  latest regeneration) — see StepApprove. */
+export const approveSelection = (doc_id: string, workflow: QuestionWorkflow, note?: string) =>
+  post<{ workflow: QuestionWorkflow }>("/api/selections/approve", { doc_id, workflow, note });
+
+export const rejectSelection = (doc_id: string, workflow: QuestionWorkflow, note?: string) =>
+  post<{ workflow: QuestionWorkflow }>("/api/selections/reject", { doc_id, workflow, note });
+
+/** Ask the LLM to refine the question's WORDING from a human's reason. There
+ *  is no way to send replacement text directly — see QuestionApproval's "NO
+ *  DIRECT EDITING" in shorts/schema.py. Always lands back on `pending`. */
+export const regenerateSelection = (doc_id: string, workflow: QuestionWorkflow, reason: string) =>
+  post<{ workflow: QuestionWorkflow; usage: UsageTotals; total: UsageTotals }>(
+    "/api/selections/regenerate", { doc_id, workflow, reason });
+
+// ------------------------------------------------- Step 6: teaching approach gate
+
+/** Approve a workflow's teaching approach as it currently stands (the LLM's
+ *  original decision, or the latest regeneration). */
+export const approveTeachingApproach = (doc_id: string, workflow: QuestionWorkflow, note?: string) =>
+  post<{ workflow: QuestionWorkflow }>("/api/teaching-approach/approve", { doc_id, workflow, note });
+
+/** Ask the LLM to reconsider the teaching approach from a human's reason.
+ *  There is no way to send a replacement primary/combined_with/alternatives/
+ *  rationale directly — see TeachingApproachApproval's "NO DIRECT OVERRIDES"
+ *  in shorts/schema.py. Always lands back on `pending`. */
+export const regenerateTeachingApproach = (doc_id: string, workflow: QuestionWorkflow, reason: string) =>
+  post<{ workflow: QuestionWorkflow; usage: UsageTotals; total: UsageTotals }>(
+    "/api/teaching-approach/regenerate", { doc_id, workflow, reason });
+
+// ------------------------------------------------------- Step 11: visual plan gate
+
+/** Approve a workflow's visual plan as it currently stands (Step 10's
+ *  original plan, or the latest regeneration). */
+export const approveVisualPlan = (doc_id: string, workflow: QuestionWorkflow, note?: string) =>
+  post<{ workflow: QuestionWorkflow }>("/api/visual-plan/approve", { doc_id, workflow, note });
+
+/** Ask the LLM to reconsider the visual plan from a human's reason. There is
+ *  no way to send a replacement subject/beats directly — see
+ *  VisualPlanApproval's "NO DIRECT EDITING" in shorts/schema.py. Always
+ *  lands back on `pending`. */
+export const regenerateVisualPlan = (doc_id: string, workflow: QuestionWorkflow, reason: string) =>
+  post<{ workflow: QuestionWorkflow; usage: UsageTotals; total: UsageTotals }>(
+    "/api/visual-plan/regenerate", { doc_id, workflow, reason });
+
+// --------------------------------------------------- Step 7: advance workflows
+
+/** shorts/workflow.py's orchestration boundary, over HTTP: advance every
+ *  workflow as far as it can go without a human, and report where each one
+ *  stopped. Safe to call repeatedly — a workflow already at a stopping point
+ *  comes back unchanged, at no extra cost (see WorkflowProgress). */
+export const advanceWorkflows = (doc_id: string, workflows: QuestionWorkflow[]) =>
+  post<{ results: WorkflowProgress[]; usage: UsageTotals; total: UsageTotals }>(
+    "/api/workflow/advance", { doc_id, workflows });
 
 export const regenerate = (
   doc_id: string,

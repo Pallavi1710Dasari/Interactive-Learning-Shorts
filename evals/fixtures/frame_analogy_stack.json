@@ -1,0 +1,14 @@
+{
+  "template": "analogy",
+  "title": "What is a call stack?",
+  "analogy_subject": "stack",
+  "analogy_caption": "Like a stack of plates — you can only take from the top.",
+  "analogy_technical": {
+    "title": "Call stack",
+    "items": [
+      {"label": "main()", "role": "plain"},
+      {"label": "foo()", "role": "plain"},
+      {"label": "bar()", "role": "hero"}
+    ]
+  }
+}

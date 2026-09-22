@@ -14,9 +14,9 @@
 Markdown reading material (a doc with ## / ### headings)
    → parsed into Sections
    → LLM selects the most important, answerable Topics
-   → LLM writes a source-grounded interviewer/student dialogue Script per topic
+   → LLM writes a source-grounded, single-narrator Script per topic
    → LLM designs a visual "strategy," then a per-beat diagram spec, rendered by local template code into SVG
-   → TTS renders the dialogue into a recorded audio track (word/beat-level timings)
+   → TTS renders the narration into a recorded audio track (word/beat-level timings)
    → deterministic graders + two LLM judges (text judge, vision judge) score everything
    → a human approves/rejects/edits via a terminal CLI or a browser review UI
    → an approved ShortUnit is rendered to an MP4 by headless-Chromium-photographing the actual React player
@@ -36,7 +36,7 @@ Two orchestrators exist over the same skill modules: `shorts/run.py` (CLI, batch
 | 0. Parse | `shorts/parse.py` | Markdown → `list[Section]`, each with a stable `section_id`, `title`, `text`, line span. Handles heading-numbering collisions (parent-qualification + occurrence suffixes). |
 | 1. Select topics | `shorts/skills/select.py` | LLM ranks/picks `Topic`s (question, `answer_quote`, `importance`, `difficulty`) from the sections, plus free deterministic passes that drop unanswerable/duplicate/unsupported topics. |
 | 1b. Understand the section | `shorts/skills/understanding.py` | One LLM call per section producing a `SectionUnderstanding` (core idea, teaching sequence, hook/example/confusion decisions, what the section *can't* answer) — cached per section. |
-| 2. Write the script | `shorts/skills/script.py` | LLM writes a `Script` (interviewer beat + 4–5 student beats, each ≤24 words, each carrying a verbatim `source_quote`). Retried up to 3× by the caller (`run.py`/`server.py`) using grader feedback (`shorts/revision.py`). |
+| 2. Write the script | `shorts/skills/script.py` | LLM writes a `Script`: one narrator, one opening beat + 4–5 answer beats, each ≤24 words, each answer beat carrying a verbatim `source_quote`. Retried up to 3× by the caller (`run.py`/`server.py`) using grader feedback (`shorts/revision.py`). |
 | 3. Plan the visual strategy | `shorts/skills/strategy.py` | LLM decides, per beat, *what a viewer must see* (`relationship`, `physical_form`, `must_see`, `focus`) — before any drawing shape is chosen. |
 | 4. Design + render diagrams | `shorts/skills/visuals.py` + `shorts/skills/layout.py` | LLM (`spec_visuals`) picks one of 15 Frame templates per beat and fills in structured fields (never coordinates); `layout.py` (100% local, no LLM) computes every coordinate/label-fit and emits SVG, tagged with `data-enter`/`data-role`/`data-slide` for frontend animation. Looped up to `DESIGN_ATTEMPTS` (default 2) with a vision-judge-in-the-loop redesign gate. |
 | 5. Voice | `shorts/voice.py` → `shorts/tts.py` → `shorts/providers.py` | Synthesizes each beat separately (so duration is measured, never estimated), normalizes audio, joins with silence gaps, records per-beat spans. Runs **concurrently** with visual design. |
@@ -132,7 +132,7 @@ shorts/
 
 **Topic/question selection** (`skills/select.py`): the model ranks candidate topics 1–5 against a rubric, must supply a **verbatim `answer_quote`** proving the topic is answerable, and applies a "depth test" (must have a mechanism + consequence + example + correctable misconception) so thin sections are rejected even if superficially important. Deterministic passes then drop unanswerable topics (quote doesn't actually occur in the doc), near-duplicate concepts, and yes/no-phrased questions.
 
-**Script generation** (`skills/script.py::write_script`, "the highest-leverage prompt in the project"): produces one interviewer beat + 4–5 student beats (≤24 words each, `checks.MAX_ANSWER_WORDS`). Every claim must carry a `source_quote` copied verbatim from the **section only** (not the whole doc — a documented fix for beats that cited material outside their own section). The `SectionUnderstanding.as_brief()` block governs *what to say and in what order*, never grounding — grounding is always separately re-checked against raw section text. A length window (25–45s, `MIN_SECONDS`/`MAX_SECONDS` in `schema.py`) is intentionally wide with no single target — the concept decides where in the band it lands, and a documented four-iteration history (30–60 → 18–45 → 12–28 → 35–50 → 25–45) records why each earlier setting was wrong.
+**Script generation** (`skills/script.py::write_script`, "the highest-leverage prompt in the project"): produces one narrator's connected explanation — one opening beat + 4–5 answer beats (≤24 words each, `checks.MAX_ANSWER_WORDS`). Every answer-beat claim must carry a `source_quote` copied verbatim from the **section only** (not the whole doc — a documented fix for beats that cited material outside their own section). The `SectionUnderstanding.as_brief()` block governs *what to say and in what order*, never grounding — grounding is always separately re-checked against raw section text. A length window (25–45s, `MIN_SECONDS`/`MAX_SECONDS` in `schema.py`) is intentionally wide with no single target — the concept decides where in the band it lands, and a documented four-iteration history (30–60 → 18–45 → 12–28 → 35–50 → 25–45) records why each earlier setting was wrong.
 
 **Question framing:** happens in two places — `select.py` writes the initial question (banned from being yes/no, scored for importance), and `run.py::_realign_topic`/`server.py`'s equivalent rewrites the question (reusing `write_script` itself) if `checks.check_topic_matches_understanding` detects the topic has drifted from what the section's own reading (`SectionUnderstanding.core_idea`) actually established.
 
@@ -159,7 +159,7 @@ Two layers: **deterministic graders** (`shorts/checks.py`, ~45 functions, free/i
 | Area | Representative graders (in `checks.py`) |
 |---|---|
 | Length/timing | `check_timing`, `check_overlays` |
-| Dialogue shape | `check_dialogue_shape`, `check_qa_sentence_form` |
+| Narration shape | `check_narration_shape`, `check_narration_sentence_form` |
 | Grounding / faithfulness proxy | `check_grounding` (word-overlap), `check_source_quotes` (verbatim substring), `check_answers_its_section`, `check_no_refusal`, `check_question_grounded` |
 | Repetition/development | `check_beats_develop` (script), `check_frames_develop`/`check_frames_progress` (visuals) |
 | Teaching-plan quality (on `SectionUnderstanding`) | `check_teaching_sequence`, `check_example_plan`, `check_confusion_plan`, `check_hook_plan`, `check_plan_depth`, `check_duration_budget` |

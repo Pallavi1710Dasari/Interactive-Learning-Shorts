@@ -49,7 +49,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from .schema import QuestionWorkflow, Section, SectionUnderstanding
-from .parse import find_section
+from .parse import find_section, evidence_text
 from .skills.framing import frame_workflow
 from .skills.teaching_approach import choose_teaching_approach_for_workflow
 from .skills.script import write_script_for_workflow
@@ -143,7 +143,8 @@ class WorkflowProgress(BaseModel):
 
 def advance(workflow: QuestionWorkflow, sections: list[Section], *,
            understanding: SectionUnderstanding | None = None,
-           document: str | None = None) -> WorkflowProgress:
+           document: str | None = None,
+           source_text: str | None = None) -> WorkflowProgress:
     """
     Move `workflow` forward exactly as far as it can go without a human, and
     report where it stopped.
@@ -190,6 +191,16 @@ def advance(workflow: QuestionWorkflow, sections: list[Section], *,
     `document`, WHEN SUPPLIED, is passed only to script generation (the one
     stage that reads it — see skills.script.write_script's own `document`
     parameter); framing and teaching-approach generation have no use for it.
+
+    `source_text`, ON THE SAME TERMS AS `document`: passed only to script
+    generation, as write_script_for_workflow's own `source_text` (see its
+    docstring, and skills.script.write_script's — parse.evidence_text is
+    where a caller resolves it). Framing and teaching-approach still read
+    their own section text directly and are unaffected; only what a script's
+    beats may cite from widens. Like `understanding`, this function never
+    resolves it itself — see advance_many, which computes it once per section
+    from the SAME evidence-group `understanding` was read from, so the two
+    never disagree about what "this section" means for a given workflow.
 
     NO SCRIPT-GENERATION LOGIC LIVES HERE. `section` is looked up (a plain
     dict-style lookup by id, not a decision) and handed straight to
@@ -244,7 +255,8 @@ def advance(workflow: QuestionWorkflow, sections: list[Section], *,
         try:
             section = find_section(sections, workflow.selection.topic.source_section_id)
             workflow = write_script_for_workflow(
-                workflow, section, document=document, understanding=understanding)
+                workflow, section, document=document, understanding=understanding,
+                source_text=source_text)
         except Exception as e:
             return WorkflowProgress(
                 workflow=workflow, status="script_failed",
@@ -293,7 +305,19 @@ def advance_many(workflows: list[QuestionWorkflow], sections: list[Section], *,
     `understanding_by_section` lets a caller that already has readings short-
     circuit the lookup entirely — an entry present in the dict (even one
     mapped to None, meaning "the reading failed or was skipped") is used
-    as-is and never re-fetched.
+    as-is and never re-fetched. A caller that supplies one is responsible for
+    having read it against the same evidence pool this function would
+    otherwise resolve (see parse.evidence_text) — no production caller does
+    today (run.py and server.py both pass `None`, letting this function
+    resolve and read for itself), so there is nothing to reconcile yet, but a
+    future caller that pre-reads sections itself should resolve evidence the
+    same way.
+
+    THE RESOLVED EVIDENCE POOL (parse.evidence_text) IS COMPUTED HERE TOO, on
+    the same lazy, once-per-section-per-call terms as `understanding` above,
+    and passed to BOTH understanding_for (what is read and verified) and
+    advance (what write_script_for_workflow may cite from) — so the two can
+    never disagree about what "this section" means for a given workflow.
 
     `document` IS THREADED THROUGH TO advance() TOO (Step 9), not only used
     for the understanding fetch here — script generation is the one stage
@@ -306,6 +330,13 @@ def advance_many(workflows: list[QuestionWorkflow], sections: list[Section], *,
     """
     by_id = {s.section_id: s for s in sections}
     resolved: dict[str, SectionUnderstanding | None] = dict(understanding_by_section or {})
+    # THE SAME RESOLVED-EVIDENCE POOL understanding_for reads AND write_script_
+    # for_workflow cites from — see parse.evidence_text. Computed at most once
+    # per section per call, lazily, alongside `resolved` above: a section with
+    # no elaborating siblings ("Example", "How It Works", ...) resolves to
+    # exactly its own text, so this is free and a no-op for every section that
+    # does not use that authoring pattern.
+    source_texts: dict[str, str] = {}
 
     results = []
     for wf in workflows:
@@ -319,12 +350,18 @@ def advance_many(workflows: list[QuestionWorkflow], sections: list[Section], *,
             )
         )
         understanding = None
+        source_text = None
         if needs_generation:
+            if section_id not in source_texts and section_id in by_id:
+                source_texts[section_id] = evidence_text(sections, section_id)
+            source_text = source_texts.get(section_id)
             if section_id not in resolved:
                 section = by_id.get(section_id)
                 resolved[section_id] = (
-                    understanding_for(section, document=document, quiet=True)
+                    understanding_for(section, document=document, quiet=True,
+                                      source_text=source_text)
                     if section is not None else None)
             understanding = resolved[section_id]
-        results.append(advance(wf, sections, understanding=understanding, document=document))
+        results.append(advance(wf, sections, understanding=understanding, document=document,
+                               source_text=source_text))
     return results

@@ -79,6 +79,22 @@ class Provider:
     def synth(self, text: str, voice_id: str, speaker: str) -> bytes:
         raise NotImplementedError
 
+    def warm(self) -> None:
+        """
+        Pay any one-time startup cost NOW, in the background, instead of on
+        whichever short happens to be built first.
+
+        Called once from server.py at process startup (see voice.warm()).
+        Must never block the caller and must never raise past it — a failed
+        or skipped warm-up is not fatal, it just means the ordinary lazy path
+        (Chatterbox._ensure(), for the one provider that overrides this) pays
+        the cost on first use instead, exactly as it did before this existed.
+
+        A no-op for every provider except Chatterbox: an API-key provider or
+        a bundled model with no separate load step has nothing to warm.
+        """
+        pass
+
 
 # --------------------------------------------------------------------- elevenlabs
 
@@ -541,6 +557,37 @@ class Chatterbox(Provider):
             return False, (f"no interpreter at {exe} — create it with\n"
                            f"    {config.CHATTERBOX_INSTALL_HINT}")
         return True, "ready (clips supplied by the caller)"
+
+    def warm(self) -> None:
+        """
+        Start the resident worker NOW, in a background thread, instead of
+        letting the first real build pay its ~150-190s CPU load cost against
+        VOICE_BUILD_TIMEOUT (240s default) — see server.py's startup hook.
+        THE BUG THIS FIXES: on a fresh process, that load alone can eat most
+        or all of the timeout, leaving too little of it for the synthesis
+        that still has to happen, so the very first short after every server
+        start silently shipped with no recorded track.
+
+        Same lock as synth() uses around _ensure() — if a real build's synth()
+        call races this, one of them waits for the other's _ensure() to
+        finish rather than starting a second worker process; either way the
+        model loads exactly once.
+
+        Silently does nothing when not configured (no interpreter, no
+        reference clips) — safe to call unconditionally.
+        """
+        if not self.available()[0]:
+            return
+
+        def _bg() -> None:
+            try:
+                with self._lock:
+                    self._ensure()
+            except Exception as e:
+                print(f"    ! chatterbox warm-up failed, will retry on first "
+                      f"use: {type(e).__name__}: {e}")
+
+        threading.Thread(target=_bg, daemon=True, name="chatterbox-warmup").start()
 
     # ------------------------------------------------------------------ worker
     def _ensure(self):

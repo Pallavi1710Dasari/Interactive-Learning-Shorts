@@ -1865,6 +1865,70 @@ cases:
     expect:
       passed: true
 
+  - id: E125
+    name: A nested-levels concept drawn as flow is rejected
+    why: >
+      A REAL DEFECT FROM A SHIPPED SHORT, not a hypothetical: usestate_hook_
+      mechanism's d_rerender_result frame was planned as physical_form
+      nested_levels — three levels, each resting on the one below — and drawn
+      as "flow" instead, which draws equal peers in a chain and says nothing
+      about one resting on another. check_frames_match_strategy alone cannot
+      catch it: `structure` legally allows both "flow" and "hierarchy", so
+      the relationship check passes clean while the picture claims the wrong
+      shape entirely.
+    type: unit_grader
+    grader: physical_form_matches_template
+    fixture: evals/fixtures/physical_form_nested_as_flow.json
+    expect:
+      passed: false
+      reason_contains: "nested_levels"
+
+  - id: E126
+    name: The same nested-levels concept drawn as hierarchy passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E125. Same concept, same strategy, only
+      the template changed to "hierarchy" — levels stacked, each resting on
+      the one below, which is the honest picture of a layered system. Without
+      this case the cheap way to make physical_form_matches_template green on
+      E125 is to reject every "flow" or "hierarchy" frame outright.
+    type: unit_grader
+    grader: physical_form_matches_template
+    fixture: evals/fixtures/physical_form_nested_as_hierarchy.json
+    expect:
+      passed: true
+
+  - id: E127
+    name: A flat-parts concept drawn as cause_effect is rejected
+    why: >
+      THE SECOND REAL DEFECT FROM THE SAME SHIPPED SHORT: usestate_hook_
+      mechanism's d_usestate_purpose frame was planned as physical_form
+      flat_parts — three independent named fields, none containing another —
+      and drawn as "cause_effect", which names exactly one cause and one
+      effect joined by a mechanism arrow. Three co-equal parts squeezed into
+      a two-box cause/effect frame is a shape that cannot represent the claim
+      at all, not merely an inexact one.
+    type: unit_grader
+    grader: physical_form_matches_template
+    fixture: evals/fixtures/physical_form_flat_as_cause_effect.json
+    expect:
+      passed: false
+      reason_contains: "flat_parts"
+
+  - id: E128
+    name: The same flat-parts concept drawn as a bar of cells passes
+    why: >
+      THE FALSE-POSITIVE GUARD FOR E127. Same concept, same strategy, only
+      the template changed to "bar" — three named cells side by side, none
+      contained in another, which is the honest picture of three independent
+      parts. Without this case the cheap way to make
+      physical_form_matches_template green on E127 is to reject every "bar"
+      or "cause_effect" frame outright.
+    type: unit_grader
+    grader: physical_form_matches_template
+    fixture: evals/fixtures/physical_form_flat_as_bar.json
+    expect:
+      passed: true
+
   - id: E108
     name: A hierarchy frame with the parent rendered below the child is rejected
     why: >

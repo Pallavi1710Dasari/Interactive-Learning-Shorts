@@ -2,7 +2,7 @@ import { useState } from "react";
 import { approveSelection, rejectSelection, regenerateSelection,
          type MaterialResult, type UsageTotals } from "./api";
 import { Spinner } from "./Spinner";
-import { effectiveQuestion, type QuestionWorkflow, type Topic } from "./types";
+import { effectiveQuestion, type QuestionWorkflow } from "./types";
 
 /**
  * Step 2 — Step 3 of the question workflow: approve, reject, or request an
@@ -26,7 +26,7 @@ export function StepApprove({
   material, onDone, onSpend,
 }: {
   material: MaterialResult;
-  onDone: (topics: Topic[]) => void;
+  onDone: (workflows: QuestionWorkflow[]) => void;
   onSpend: (delta: UsageTotals, total: UsageTotals) => void;
 }) {
   const [items, setItems] = useState<QuestionWorkflow[]>(material.workflows);
@@ -127,15 +127,14 @@ export function StepApprove({
         <span className="hintline">
           {pending.length > 0
             ? "approve or reject every question first"
-            : "drafts the script for each approved question"}
+            : "decides how to teach each approved question, next"}
         </span>
         <button
           className="primary"
           disabled={!canContinue}
-          onClick={() => onDone(approved.map((it) =>
-            ({ ...it.selection.topic, topic: effectiveQuestion(it) })))}
+          onClick={() => onDone(approved)}
         >
-          Draft {approved.length} script{approved.length === 1 ? "" : "s"} →
+          Continue to teaching approach →
         </button>
       </div>
     </div>
@@ -161,22 +160,56 @@ function ApproveCard({
   const { topic } = selection;
   const effective = effectiveQuestion(workflow);
   const attempts = qa.regeneration_history.length;
+  // ONE plain-language line on why this is worth teaching — not the full
+  // selection-pipeline breakdown (importance/concrete_and_answerable/
+  // distinct_angle/...). Prefer the reason actually about importance; any
+  // reason at all beats none. The full breakdown is still one click away,
+  // in <details> below, for debugging — never shown by default.
+  // FILTERED HERE TOO, NOT JUST IN THE SCHEMA. schema.py's QuestionSelection
+  // validator now drops blank-explanation reasons before they ever leave the
+  // server, but a workflow object can also arrive here from a REGENERATE
+  // round-trip or from state a browser tab held onto from before that fix —
+  // this is the belt to that braces, so a blank reason can never render as
+  // an empty bullet with nothing but a category tag in it.
+  const realReasons = selection.reasons.filter((r) => r.explanation && r.explanation.trim());
+  const topReasonObj = realReasons.find((r) => r.category === "importance") ?? realReasons[0];
+  const topReason = topReasonObj?.explanation;
+  // EXCLUDED FROM THE EXPANDED LIST BELOW, not just shown above it. This used
+  // to render the exact same reason object twice — once as this one-line
+  // summary, once again as its own bullet in "Why this question was
+  // selected" — which read as the panel repeating itself before a reviewer
+  // even got to a genuinely different reason.
+  const otherReasons = realReasons.filter((r) => r !== topReasonObj);
 
   return (
     <div className={`card${qa.status === "approved" ? " approved" : ""}${qa.status === "rejected" ? " skipped" : ""}`}>
       <div className="cardhead">
         <div>
-          <span className="tag">§{topic.source_section_id}</span>{" "}
-          <span className="tag dim">{selection.source_title}</span>
+          <div className="qlabel">Question</div>
           <div className="topic">{effective}</div>
           {effective !== topic.topic && <div className="why">originally: {topic.topic}</div>}
-          <ul className="reasons">
-            {selection.reasons.map((r, k) => (
-              <li key={k}><span className="tag dim">{r.category}</span> {r.explanation}</li>
-            ))}
-          </ul>
+
+          <div className="qlabel">Learning outcome / topic</div>
+          <div className="outcome">{topic.why_it_matters}</div>
+          <div className="why">
+            <span className="tag dim">§{topic.source_section_id}</span>{" "}
+            {selection.source_title}
+          </div>
+
+          {topReason && <div className="why onereason">{topReason}</div>}
           {attempts > 0 && (
             <div className="why">{attempts} regeneration{attempts === 1 ? "" : "s"} so far</div>
+          )}
+
+          {otherReasons.length > 0 && (
+            <details className="advanced">
+              <summary>Why this question was selected</summary>
+              <ul className="reasons">
+                {otherReasons.map((r, k) => (
+                  <li key={k}><span className="tag dim">{r.category}</span> {r.explanation}</li>
+                ))}
+              </ul>
+            </details>
           )}
         </div>
         <div className="cardactions">

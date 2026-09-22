@@ -307,7 +307,8 @@ Output JSON:
 
 
 def understand(section: Section, document: str | None = None,
-               model_override: str | None = None) -> SectionUnderstanding:
+               model_override: str | None = None,
+               source_text: str | None = None) -> SectionUnderstanding:
     """Read one section. Raises if the model call fails — see understanding_for().
 
     `document` is CONTEXT ONLY and follows the rule it follows in write_script: it
@@ -315,7 +316,23 @@ def understand(section: Section, document: str | None = None,
     rather than guessed at. Nothing may be read out of it as a fact about this
     section, because everything this step returns is presented downstream as a
     reading of THIS page.
+
+    `source_text` is OPTIONAL and defaults to `section.text` — every existing
+    caller that omits it gets byte-identical behaviour to before. A caller that
+    resolved a wider evidence pool for this section (see parse.evidence_text,
+    for a concept split across "Example"/"How It Works"/similar sibling
+    headings) passes that resolved text here instead, and it becomes BOTH what
+    is read AND what teaching_sequence/example_plan/confusion_plan/hook_plan
+    are verified against below — reading the wider pool but still checking
+    claims against the narrow section would quarantine a perfectly good plan
+    that legitimately draws on a sibling section (an example_plan naming the
+    literal code from "Example" would fail check_example_plan's grounding
+    check against "What are Props?" alone, exactly the false rejection this
+    parameter exists to avoid). `understanding.section_id` is still the
+    TOPIC's OWN section id regardless — this widens what is read, not which
+    section a topic is filed under.
     """
+    text_to_read = section.text if source_text is None else source_text
     user = ""
     if document:
         user += f"""THE FULL READING MATERIAL — CONTEXT ONLY, NOT PART OF THE SECTION
@@ -329,7 +346,7 @@ anything out of it. Everything you return must be about the section below.
 
     user += f"""THE SECTION TO READ — [{section.section_id}] {section.title}
 ---
-{section.text}
+{text_to_read}
 ---
 
 Work out what this section teaches. Use "{section.section_id}" as section_id."""
@@ -358,7 +375,7 @@ Work out what this section teaches. Use "{section.section_id}" as section_id."""
     # a sequence that is well-formed, and spending another call on it would buy a
     # second opinion at the price of the thing this step was supposed to be cheap
     # about.
-    verdict = check_teaching_sequence(understanding, section_text=section.text)
+    verdict = check_teaching_sequence(understanding, section_text=text_to_read)
     if not verdict.passed:
         print(f"    ~ teaching sequence [{section.section_id}] dropped — {verdict.reason}")
         understanding.teaching_sequence = []
@@ -370,7 +387,7 @@ Work out what this section teaches. Use "{section.section_id}" as section_id."""
     # into a beat with the authority of a plan. Setting it to None (rather than to
     # not_needed) is the honest state: no decision was made, so the script step
     # gets no example guidance at all and behaves as it did before this field.
-    verdict = check_example_plan(understanding, section_text=section.text)
+    verdict = check_example_plan(understanding, section_text=text_to_read)
     if not verdict.passed:
         print(f"    ~ example plan [{section.section_id}] dropped — {verdict.reason}")
         understanding.example_plan = None
@@ -382,7 +399,7 @@ Work out what this section teaches. Use "{section.section_id}" as section_id."""
     # a fabricated error into a viewer's head and then "fix" it with a fabricated
     # fact. None means no decision, so the script writes as it did before this
     # field existed rather than being handed a bad one.
-    verdict = check_confusion_plan(understanding, section_text=section.text)
+    verdict = check_confusion_plan(understanding, section_text=text_to_read)
     if not verdict.passed:
         print(f"    ~ confusion plan [{section.section_id}] dropped — {verdict.reason}")
         understanding.confusion_plan = None
@@ -392,7 +409,7 @@ Work out what this section teaches. Use "{section.section_id}" as section_id."""
     # concept is its own best opening, and a hook that failed grounding is evidence
     # of nothing at all. None leaves beat 1 to the script brief, which has always
     # known how to write one.
-    verdict = check_hook_plan(understanding, section_text=section.text)
+    verdict = check_hook_plan(understanding, section_text=text_to_read)
     if not verdict.passed:
         print(f"    ~ hook plan [{section.section_id}] dropped — {verdict.reason}")
         understanding.hook_plan = None
@@ -431,7 +448,8 @@ _INFLIGHT: dict[tuple[int, int], threading.Lock] = {}
 
 
 def understanding_for(section: Section, document: str | None = None,
-                      quiet: bool = False) -> SectionUnderstanding | None:
+                      quiet: bool = False,
+                      source_text: str | None = None) -> SectionUnderstanding | None:
     """The understanding for one section, cached, returning None instead of raising.
 
     TWO THINGS THIS BUYS, and both are why call sites use it rather than understand():
@@ -446,8 +464,21 @@ def understanding_for(section: Section, document: str | None = None,
          still does, so a bad minute on this call returns None and the script is
          written exactly as it was before this step existed — rather than turning
          into a 500 on a path that used to succeed.
+
+    `source_text` is forwarded to understand() unchanged — see its own
+    docstring. Optional, defaults to `section.text`, so a caller that omits it
+    gets byte-identical behaviour. IT IS ALSO PART OF THE CACHE KEY (below),
+    which is what keeps the sharing in point 1 correct rather than merely
+    convenient: two topics whose resolved evidence pools are the same wider
+    group (see parse.evidence_text — e.g. every topic filed under any member
+    of a "definition + Example + How It Works" cluster) hash to the same key
+    and correctly share ONE reading of that whole cluster, exactly the way
+    several topics filed under one plain section already shared one reading.
+    A topic whose evidence is still a singleton section keys identically to
+    before, since `source_text` then equals `section.text`.
     """
-    key = (hash(section.text), hash(document or ""))
+    text_to_read = section.text if source_text is None else source_text
+    key = (hash(text_to_read), hash(document or ""))
 
     with _LOCK:
         if key in _CACHE:
@@ -462,7 +493,7 @@ def understanding_for(section: Section, document: str | None = None,
                 return _CACHE[key]
 
         try:
-            understanding = understand(section, document=document)
+            understanding = understand(section, document=document, source_text=source_text)
         except Exception as e:
             # NOT cached. A failure is a bad minute on one call, not a fact about
             # this section — caching it would make every later short in the batch

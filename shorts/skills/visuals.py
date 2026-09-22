@@ -41,7 +41,8 @@ they were text. Three things caused it and all three are fixed here.
 """
 
 from pydantic import BaseModel
-from ..schema import Script, Visual, Section, Frame, VisualStrategy, SectionUnderstanding
+from ..schema import (Script, Visual, Section, Frame, VisualStrategy, SectionUnderstanding,
+                     TeachingApproach)
 from ..llm import ask_json
 from .. import config
 from . import layout
@@ -280,8 +281,8 @@ picture back, give it that beat's visual_ref and hold the picture honestly.
 
 TITLE BEAT 1 WITH THE QUESTION, AND DRAW THE SUBJECT UNDER IT.
 
-Beat 1 is the interviewer ASKING, and the frame has to look like the thing being
-asked or the reel opens on a mismatch: the voice poses a question while the picture
+Beat 1 is the narrator OPENING on the question, and the frame has to look like the
+thing being asked or the reel opens on a mismatch: the voice poses a question while the picture
 presents a finished topic, and a viewer arriving on it cannot tell a question from a
 conclusion. So the frame's `title` is the question, phrased AS a question and short
 enough to read at a glance — "What is a Function?", "Which runs first?", "Why does
@@ -298,7 +299,7 @@ title, over a picture, never instead of one.
 If the honest answer is "the subject is an abstract idea", draw what it acts on or
 sits between, and title that with the question.
 
-AND DO NOT OPEN ON THE ANSWER'S CODE. Beat 1 is the interviewer's question, and its
+AND DO NOT OPEN ON THE ANSWER'S CODE. Beat 1 is the opening question, and its
 frame should show the SUBJECT — the thing being asked about, drawn — not the listing
 that answers it. A short that starts on the same code panel it ends on has shown the
 viewer the answer before the question finished, and then has nothing left to reveal.
@@ -1248,12 +1249,12 @@ def spec_visuals(script: Script, section: Section | None = None,
             seen.add(b.visual_ref)
             refs.append(b.visual_ref)
 
-    beats = "\n".join(f"[{b.visual_ref}] {b.speaker}: {b.line}" for b in script.beats)
+    beats = "\n".join(f"[{b.visual_ref}] {b.line}" for b in script.beats)
     user = f"QUESTION: {script.question}\n\nBEATS, in order:\n{beats}\n"
 
     if section is not None:
-        # After the beats, not before: the composition is designed for the dialogue,
-        # and the material is the source of what the dialogue's nouns look like. Put
+        # After the beats, not before: the composition is designed for the narration,
+        # and the material is the source of what the narration's nouns look like. Put
         # first, the model plans a diagram of the section and then tries to hang the
         # beats off it, which is how a frame drifts onto a neighbouring idea.
         user += f"""
@@ -1425,6 +1426,8 @@ def design_visuals(script: Script, section: Section | None = None, *,
                    vision: bool = True,
                    scores_out: dict | None = None,
                    understanding: SectionUnderstanding | None = None,
+                   strategy: VisualStrategy | None = None,
+                   approach: TeachingApproach | None = None,
                    ) -> tuple[dict[str, Visual], list[str]]:
     """
     Design the frames, grade them, and ask again for the ones that failed.
@@ -1470,6 +1473,13 @@ def design_visuals(script: Script, section: Section | None = None, *,
     is one design call plus one vision call, and the vision call is skipped
     entirely when `draw` is off (there is no picture), when VISION_JUDGE=0, or when
     there is no browser to rasterise with.
+
+    `strategy` AND `approach` ARE OPTIONAL AND ADDITIVE. Omitted, this plans its
+    own VisualStrategy exactly as it always has. Supplied — see server.py's
+    /api/finalize, which passes workflow.approved_visual_strategy and
+    workflow.approved_teaching_approach — the human-approved plan from Step
+    10/11 review is drawn from directly, instead of a fresh (and unreviewed)
+    one this function would otherwise plan silently.
     """
     from ..schema import ShortUnit
 
@@ -1492,14 +1502,24 @@ def design_visuals(script: Script, section: Section | None = None, *,
     # re-planned when the judge keeps rejecting the same frame for what it shows
     # rather than how it looks — see the concept_communication check below.
     #
+    # `strategy`, WHEN THE CALLER ALREADY HAS ONE, IS USED AS GIVEN — the
+    # human-approved VisualStrategy from Step 10/11 review
+    # (workflow.approved_visual_strategy), so a reviewer's approved plan is
+    # what actually gets drawn rather than a silently re-planned one. This is
+    # additive: every existing caller passes nothing and gets BYTE-IDENTICAL
+    # behaviour — this step still plans its own strategy, with `approach`
+    # threaded through the same way workflow-aware script generation already
+    # threads it into write_script.
+    #
     # Never fatal. A short with no strategy designs exactly the way it did before
     # this step existed, which is worse but is not broken.
-    strategy: VisualStrategy | None = None
-    try:
-        strategy = plan_strategy(script, section, understanding=understanding)
-    except Exception as e:
-        print(f"    strategy for {script.short_id} unavailable "
-              f"({type(e).__name__}: {str(e)[:90]}) — designing from the beats alone")
+    if strategy is None:
+        try:
+            strategy = plan_strategy(script, section, understanding=understanding,
+                                     approach=approach)
+        except Exception as e:
+            print(f"    strategy for {script.short_id} unavailable "
+                  f"({type(e).__name__}: {str(e)[:90]}) — designing from the beats alone")
 
     best: dict[str, Visual] | None = None
     best_problems: list[str] | None = None
@@ -1619,7 +1639,7 @@ def design_visuals(script: Script, section: Section | None = None, *,
                 try:
                     strategy = plan_strategy(script, section,
                                              feedback="\n".join(f"  - {p}" for p in vision_problems),
-                                             understanding=understanding)
+                                             understanding=understanding, approach=approach)
                     print(f"    re-planned the strategy for {script.short_id}: the judge "
                           f"rejected what {len(weak)} frame(s) SHOW, not how they look")
                 except Exception as e:

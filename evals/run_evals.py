@@ -25,13 +25,13 @@ ROOT = Path(__file__).resolve().parent.parent
 GRADERS = {
     "timing":         lambda s, src: checks.check_timing(s),
     "overlays":       lambda s, src: checks.check_overlays(s),
-    "dialogue_shape": lambda s, src: checks.check_dialogue_shape(s),
+    "dialogue_shape": lambda s, src: checks.check_narration_shape(s),
     "grounding":      lambda s, src: checks.check_grounding(s, src),
     "source_quotes":  lambda s, src: checks.check_source_quotes(s, src),
     "no_refusal":     lambda s, src: checks.check_no_refusal(s),
     "on_topic":       lambda s, src: checks.check_answers_its_section(s, src),
     "no_repetition":  lambda s, src: checks.check_beats_develop(s),
-    "qa_sentence_form": lambda s, src: checks.check_qa_sentence_form(s),
+    "qa_sentence_form": lambda s, src: checks.check_narration_sentence_form(s),
 }
 
 #: Graders that read a whole ShortUnit — the FRAMES — rather than the script.
@@ -100,7 +100,7 @@ GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", 
 
 
 def load_script(fixture: str) -> Script:
-    data = json.loads((ROOT / fixture).read_text())
+    data = json.loads((ROOT / fixture).read_text(encoding="utf-8"))
     return Script(**data)
 
 
@@ -127,7 +127,7 @@ def run_code_case(case: dict, sections) -> tuple[bool, str]:
 
 def run_unit_case(case: dict, sections) -> tuple[bool, str]:
     """A frame-level case. The fixture is a whole ShortUnit, not a Script."""
-    unit = ShortUnit(**json.loads((ROOT / case["fixture"]).read_text()))
+    unit = ShortUnit(**json.loads((ROOT / case["fixture"]).read_text(encoding="utf-8")))
     # Most frame graders read only the unit. check_diagram_matches_narration also
     # grounds labels against the section, so hand it the source when it asks for
     # one — by signature rather than by name, so the next such grader just works.
@@ -568,7 +568,7 @@ def main():
     ap.add_argument("--only", help="run a single case id, e.g. E004")
     args = ap.parse_args()
 
-    spec = yaml.safe_load((ROOT / "evals" / "cases.yaml").read_text())
+    spec = yaml.safe_load((ROOT / "evals" / "cases.yaml").read_text(encoding="utf-8"))
     sections = parse_markdown(ROOT / spec["source_doc"])
 
     cases = spec["cases"]

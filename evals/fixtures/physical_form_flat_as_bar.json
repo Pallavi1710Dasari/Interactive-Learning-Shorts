@@ -1,0 +1,48 @@
+{
+  "short_id": "physical_form_flat_as_bar",
+  "session_id": "eval",
+  "source_section_id": "7.4",
+  "question": "What does calling useState(0) actually give you?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "What does calling useState(0) actually give you?",
+      "on_screen": "What useState(0) returns",
+      "visual_ref": "d_destructure"
+    },
+    {
+      "speaker": "student",
+      "line": "It gives you three independent things: the current value, the setter function, and the initial value you passed in.",
+      "on_screen": "count, setCount, 0",
+      "visual_ref": "d_destructure",
+      "source_quote": "useState(0) returns the current value, an updater function, and takes the initial value 0"
+    }
+  ],
+  "visuals": {
+    "d_destructure": {
+      "ref": "d_destructure",
+      "type": "diagram",
+      "spec": "three named parts of one return value",
+      "frame": {
+        "template": "bar",
+        "title": "useState(0) returns three parts",
+        "cells": [
+          {"label": "0 (initial)", "role": "plain"},
+          {"label": "count", "role": "hero"},
+          {"label": "setCount", "role": "plain"}
+        ]
+      },
+      "strategy": {
+        "ref": "d_destructure",
+        "concept": "useState(0) hands back three separate, named parts",
+        "relationship": "structure",
+        "physical_form": "flat_parts",
+        "must_see": "three separate named fields sitting side by side, none contained in another",
+        "changes_from_previous": "",
+        "focus": "the three parts named individually"
+      }
+    }
+  },
+  "status": "draft"
+}

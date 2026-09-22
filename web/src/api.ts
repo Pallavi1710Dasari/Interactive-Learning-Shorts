@@ -1,17 +1,57 @@
 import type { QA, Topic, Unit, GraderResult, QuestionApproval, QuestionWorkflow,
-             WorkflowProgress } from "./types";
+             TeachingApproachKind, WorkflowProgress, Judge } from "./types";
 
 // Vite proxies /api to the FastAPI server in dev (see vite.config.ts), and in
 // production the same server serves this bundle — so a relative path works in both.
-async function post<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await detail(res));
-  return res.json();
+//
+// EVERY CALL HAS A TIMEOUT, and this used to not be true. `fetch` with no
+// `signal` waits as long as the browser lets it — which is not "forever" in
+// theory, but is far longer than a human waits before assuming the app is
+// broken, and a stuck request never rejects, so a caller's `catch` never
+// runs. That is exactly what StepBuild.tsx's blank, endlessly-spinning
+// "planning the visuals…" screen was: the fetch for /api/workflow/advance or
+// /api/finalize hung — a slow model call, a crashed backend, a dropped
+// connection — and nothing ever turned `working` false, because nothing
+// ever rejected the promise `working` was waiting on. The catch block and the
+// Retry button were already there; they just never fired.
+//
+// DEFAULT_TIMEOUT_MS covers an ordinary single-workflow call (one script
+// draft, one regeneration, one approval). `timeoutMs` lets a caller ask for
+// longer where that is genuinely not enough — see LONG_TIMEOUT_MS below, for
+// calls that do real generation work across several workflows.
+const DEFAULT_TIMEOUT_MS = 180_000;
+
+async function post<T>(url: string, body: unknown, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(await detail(res));
+    return await res.json();
+  } catch (e) {
+    if ((e as Error).name === "AbortError") {
+      throw new Error(
+        `${url} did not respond within ${Math.round(timeoutMs / 1000)}s — the ` +
+        "server may be slow, stuck, or unreachable. Nothing was lost; retry when ready.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
+
+//: Batch, multi-stage calls — visual planning, script drafting, and
+//: rendering (design + TTS + judge) across every workflow in one request —
+//: measured to legitimately take several minutes per short even one at a
+//: time (see shorts/tts.py's Chatterbox path, ~2-3 min to load the model
+//: alone). DEFAULT_TIMEOUT_MS would abort these mid-flight on a normal run,
+//: not just a stuck one.
+const LONG_TIMEOUT_MS = 20 * 60_000;
 
 async function detail(res: Response): Promise<string> {
   try {
@@ -72,7 +112,37 @@ export type BatchResult = {
  *  `approvals` is Step 3's gate, keyed by topic id — see makeScript. */
 export const makeScripts = (doc_id: string, topics: Topic[],
                             approvals?: Record<string, QuestionApproval>) =>
-  post<BatchResult>("/api/scripts", { doc_id, topics, approvals });
+  post<BatchResult>("/api/scripts", { doc_id, topics, approvals }, LONG_TIMEOUT_MS);
+
+// ------------------------------------------------- Step 8-9: workflow-aware scripts
+
+export type WorkflowScriptResult = {
+  topic: Topic;
+  section_id?: string;
+  qa?: QA;
+  graders?: GraderResult[];
+  /** The review-time verdict, present only when the free graders all passed
+   *  and JUDGE_AT_REVIEW is on — see server.py's _review_judge. */
+  judge?: Judge | null;
+  /** Carries the framing and (auto-approved) teaching approach the script
+   *  was actually written from — see StepReview, which keeps this per card
+   *  so a later regeneration keeps following the same approach. */
+  workflow?: QuestionWorkflow;
+  error?: string;
+};
+
+export type WorkflowBatchResult = {
+  results: WorkflowScriptResult[];
+  usage: UsageTotals;
+  total: UsageTotals;
+};
+
+/** Draft a script for every workflow at once, through the WORKFLOW-AWARE
+ *  path — framing, a teaching approach, then write_script_for_workflow —
+ *  instead of makeScripts's bare write_script. See POST
+ *  /api/workflow/scripts for why this is a separate endpoint. */
+export const makeWorkflowScripts = (doc_id: string, workflows: QuestionWorkflow[]) =>
+  post<WorkflowBatchResult>("/api/workflow/scripts", { doc_id, workflows }, LONG_TIMEOUT_MS);
 
 // ------------------------------------------------- Step 3: question approval gate
 
@@ -93,10 +163,16 @@ export const regenerateSelection = (doc_id: string, workflow: QuestionWorkflow, 
 
 // ------------------------------------------------- Step 6: teaching approach gate
 
-/** Approve a workflow's teaching approach as it currently stands (the LLM's
- *  original decision, or the latest regeneration). */
-export const approveTeachingApproach = (doc_id: string, workflow: QuestionWorkflow, note?: string) =>
-  post<{ workflow: QuestionWorkflow }>("/api/teaching-approach/approve", { doc_id, workflow, note });
+/** Approve a workflow's teaching approach — the LLM's recommendation as it
+ *  stands (omit `override`), or a human's direct pick of a different
+ *  TeachingApproachKind (`override`), with NO extra LLM call either way. See
+ *  POST /api/teaching-approach/approve's own `override` field: sending the
+ *  same kind as the current recommendation is treated as a plain approve. */
+export const approveTeachingApproach = (
+  doc_id: string, workflow: QuestionWorkflow, note?: string, override?: TeachingApproachKind,
+) =>
+  post<{ workflow: QuestionWorkflow }>(
+    "/api/teaching-approach/approve", { doc_id, workflow, note, override });
 
 /** Ask the LLM to reconsider the teaching approach from a human's reason.
  *  There is no way to send a replacement primary/combined_with/alternatives/
@@ -129,7 +205,7 @@ export const regenerateVisualPlan = (doc_id: string, workflow: QuestionWorkflow,
  *  comes back unchanged, at no extra cost (see WorkflowProgress). */
 export const advanceWorkflows = (doc_id: string, workflows: QuestionWorkflow[]) =>
   post<{ results: WorkflowProgress[]; usage: UsageTotals; total: UsageTotals }>(
-    "/api/workflow/advance", { doc_id, workflows });
+    "/api/workflow/advance", { doc_id, workflows }, LONG_TIMEOUT_MS);
 
 export const regenerate = (
   doc_id: string,
@@ -138,9 +214,14 @@ export const regenerate = (
   target: "question" | "answer" | "script",
   /** The script on screen — without it the model rewrites from scratch. */
   qa?: QA,
+  /** The workflow this script was drafted from (via makeWorkflowScripts), so
+   *  the regeneration keeps following its approved teaching approach too —
+   *  omitting it falls back to the plain write_script path. */
+  workflow?: QuestionWorkflow,
 ) =>
-  post<{ topic: Topic; qa: QA; graders: GraderResult[]; usage: UsageTotals; total: UsageTotals }>("/api/regenerate", {
-    doc_id, topic, instruction, target, qa,
+  post<{ topic: Topic; qa: QA; graders: GraderResult[]; usage: UsageTotals; total: UsageTotals;
+        workflow?: QuestionWorkflow }>("/api/regenerate", {
+    doc_id, topic, instruction, target, qa, workflow,
   });
 
 export type FinalizeResult = {
@@ -161,8 +242,15 @@ export type FinalizeResult = {
   total: UsageTotals;
 };
 
-export const finalize = (doc_id: string, approved: { topic: Topic; qa: QA }[]) =>
-  post<FinalizeResult>("/api/finalize", { doc_id, approved });
+export const finalize = (
+  doc_id: string,
+  /** `workflow` carries the human-approved visual plan (and teaching
+   *  approach) through to rendering — see POST /api/finalize, which draws
+   *  from workflow.approved_visual_strategy instead of silently re-planning
+   *  its own when one is present. */
+  approved: { topic: Topic; qa: QA; workflow?: QuestionWorkflow }[],
+) =>
+  post<FinalizeResult>("/api/finalize", { doc_id, approved }, LONG_TIMEOUT_MS);
 
 export type RevisualResult = {
   short: Unit | null;

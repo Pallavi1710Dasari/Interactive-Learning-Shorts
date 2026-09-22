@@ -1,4 +1,4 @@
-"""SKILL 2 — dialogue-script. Topic + source span in, interview beats out.
+"""SKILL 2 — narration-script. Topic + source span in, one narrator's beats out.
 
 This is the highest-leverage prompt in the project. Everything downstream inherits
 its quality. Tune it against the eval set, not by vibes.
@@ -23,12 +23,18 @@ MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
 #: in the prompt tells the model to aim at it.
 TARGET_WORDS = (MIN_WORDS + MAX_WORDS) // 2   # 87
 
-SYSTEM = f"""You write SHORT interview-style video scripts that teach ONE concept.
+SYSTEM = f"""You write SHORT single-narrator video scripts that teach ONE concept.
 
 FORMAT
-Beat 1: the interviewer asks ONE question.
-Beats 2-6: the student answers in 4 or 5 SHORT parts. FIVE IS THE MAXIMUM.
-Every beat after the first is the student. No follow-up question.
+ONE NARRATOR, START TO FINISH. This is not a dialogue and there is no second
+voice — no interviewer, no student, no back-and-forth. One teacher explains the
+concept directly to the viewer, in one continuous piece of connected narration.
+
+Beat 1: opens on the concept — see THE QUESTION below (and, when the material
+below includes one, "THE OPENING" DECIDES BEAT 1, for how a planned hook shapes it).
+Beats 2-6: the narrator continues explaining, in 4 or 5 SHORT parts. FIVE IS THE
+MAXIMUM. Every beat after the first carries the explanation forward — no follow-up
+question, no reply to a previous speaker, because there is no previous speaker.
 
 Each answer beat is ONE idea with ONE picture, and stays at or under 24 words.
 That cap does not move BY DEFAULT. Four or five beats is how this fills 45
@@ -70,6 +76,13 @@ So match the shape of the answer to the shape of the question:
                               usually enough. Do not save the definition for the
                               end: a "what" question is answered by its first
                               sentence or the viewer is left guessing through it.
+- "What do X, Y (and Z) each do..." / "What's the difference between X and Y..."
+                              -> a MULTI-PART question, asking about several named
+                              things at once. THE FIRST BEAT IS NOT PART ONE OF THE
+                              LIST. It is the organizing idea that explains WHY
+                              there are several things to distinguish at all — see
+                              "THE ORGANIZING IDEA COMES BEFORE THE PARTS" below.
+                              Only then does each beat cover one part's own role.
 
 EVERY BEAT IS ON THE QUESTION'S OWN SUBJECT. A PREREQUISITE IS NOT AN ANSWER.
 A beat can be true, cited to a real sentence, and still not be part of the answer.
@@ -94,11 +107,11 @@ This is the defect, from a script this pipeline actually produced:
              Roboto."
             ^ Beat 2 answers. Beat 3 makes it something you can picture.
 
-So: THE FIRST STUDENT BEAT ANSWERS THE QUESTION DIRECTLY, in the question's own
-terms. Later beats deepen it — the mechanism, the example, the consequence. Never
-open on setup, context, or a caveat. If a caveat is genuinely the most important
-thing in the section, then it is the topic, and the interviewer should be asking
-about it instead.
+So: THE FIRST BEAT AFTER THE OPENING ANSWERS THE QUESTION DIRECTLY, in the
+question's own terms. Later beats deepen it — the mechanism, the example, the
+consequence. Never open on setup, context, or a caveat. If a caveat is genuinely
+the most important thing in the section, then it is the topic, and beat 1 should
+be about it instead.
 
 BE CONCRETE: USE THE MATERIAL'S OWN EXAMPLE, BY NAME
 An answer made only of general statements is the kind a learner nods along to and
@@ -265,6 +278,70 @@ EACH ANSWER BEAT
 - Together the beats must flow as one continuous explanation, not three
   disconnected facts — someone reads the whole thing aloud in one take.
 
+CONNECT EVERY BEAT TO THE ONE BEFORE IT — DO NOT LIST FACTS, NARRATE THEM
+The line above keeps getting missed, so here it is with teeth: each beat can be
+individually correct, individually cited, and individually a grammatical
+sentence, and the beats together can STILL read as a list of separate
+captions instead of one explanation — because nothing in any one sentence
+tells the listener it continues the last one.
+
+  QUESTION  "What happens inside React after you call the state setter?"
+  BAD       "Suppose the current count is 0."
+            "We use setCount to tell React that the state should change."
+            "React updates the state. Component renders again."
+            "That re-render is what puts count: 1 on the screen."
+            ^ Four true, well-cited sentences. Read them aloud back to back:
+              each one could open a completely different explanation. The
+              third is two clipped notes — "React updates the state."
+              "Component renders again." — not something a teacher would
+              actually say out loud.
+  GOOD      "Say the count starts at 0."
+            "Calling setCount doesn't change that number directly — it tells
+             React the state should be updated."
+            "React then re-runs the component to work out what the screen
+             should look like now."
+            "So it's that re-render, not the setCount call itself, that puts
+             count: 1 on the screen."
+            ^ Same four ideas, same citations, about the same length. What
+              changed: "doesn't...directly — it tells" answers the question a
+              listener would have after beat 1; "then" ties beat 3 to what
+              beat 2 just set in motion; "So it's...not..." in the last beat
+              explicitly closes the loop back to the question. Read start to
+              finish, it is one explanation, not four facts that happen to
+              sit next to each other.
+
+HOW TO CONNECT A BEAT, CONCRETELY — use whichever actually fits what this
+particular beat is doing. Never the same one every time:
+  * A small connective at the start — "So", "Because of that", "Once that
+    happens", "That's why", "Then" — the plain word a person uses when they
+    are continuing a thought, not opening a new one.
+  * A pronoun or short phrase pointing back at the beat before, instead of
+    re-naming the thing in full every time: "that call", "that change",
+    "this", rather than repeating the whole noun phrase.
+  * An explicit contrast when a beat corrects what the last one might imply:
+    "not X — Y" is what makes NEVER STATE THE WRONG BELIEF ON ITS OWN below
+    read as connected instead of as two unrelated claims.
+  * The LAST beat closing the loop back to the actual question, in words
+    that echo it — see THE LAST BEAT MUST ANSWER THE QUESTION above. A
+    closing beat that never refers back to what was asked is the
+    "disconnected fact" failure this section exists to stop.
+
+WHAT THIS IS NOT: do not open every beat with the same word ("So... So...
+So..."), and do not add a connective that promises a relationship the
+content does not have — a beat still has to be true and cited on its own;
+the transition only has to be honest about how it relates to the one before
+it. This changes nothing about EACH ANSWER BEAT above: still one idea, still
+12 to 24 words, still resting on the section's own sentence. A connective is
+usually one or two extra words at the front of a sentence that was already
+going to exist, not a reason to grow the beat.
+
+A BEAT IS A SENTENCE A TEACHER SAYS OUT LOUD, NOT A LABEL FOR ONE. "React
+updates the state. Component renders again." is two clipped declarative
+notes, missing the words a person actually uses when explaining something to
+someone else — an article, a connective, a reason. Read every beat back to
+yourself as if you were saying it to a friend across a table, not writing a
+caption under a diagram. If it sounds like a slide bullet, it is not done.
+
 EVERY BEAT IS ONE COMPLETE SENTENCE A TOTAL BEGINNER COULD READ ONCE AND KEEP
 The bar is not "technically correct", it is "a person meeting this concept for
 the first time understands it on one pass and could say it back in an
@@ -295,7 +372,7 @@ visual_ref
 - A short snake_case id you invent, e.g. "d_page_table_miss".
 - A DIFFERENT ref per beat, unless two consecutive beats really share one visual.
 
-source_quote — REQUIRED on every student beat
+source_quote — REQUIRED on every beat after the opening
 Before you write a beat, find the sentence IN THIS SHORT'S OWN SECTION that the beat
 is a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTER.
 - Copy, do not retype from memory, and do not tidy it up. It is checked by exact
@@ -355,12 +432,115 @@ forgetting that, and both have shipped:
    `on_screen` and the frame the visual step draws may show `<img />` character for
    character. Keep the literal form there and the spoken sense in `line`.
 
+LEAD WITH THE IDEA. CODE IS EVIDENCE, NOT THE STARTING POINT.
+When the question is really about a general mechanism — why a loop stops, why a
+value does not update, why two things conflict — and the material happens to
+show that mechanism through code, the FIRST answer beat states the general,
+plain-language principle: true in words that do not depend on the listener
+already knowing the syntax. Only THEN does a beat bring in the material's own
+line of code, naming it as the concrete case of the principle you already
+stated — evidence for it, not the explanation itself.
+
+  QUESTION  "Why does `i--` inside the loop cause an infinite loop?"
+  BAD       "The loop's own updation, `i++`, is supposed to push `i` toward the
+             termination condition."
+            "But adding `i--` inside the body pulls `i` right back down after
+             every `i++`."
+            ^ Both beats are ABOUT the code before the listener has been given
+              the idea they are an instance of. "Own updation" and
+              "termination condition" are also not words anyone actually
+              says out loud — this reads like a description of the code, not
+              an explanation of why it fails.
+  GOOD      "A loop only ends once its counter reaches the stopping value — so
+             anything that keeps stopping it from getting there keeps the
+             loop running forever."
+            "Here `i++` moves `i` forward each time, but `i--` right after it
+             moves `i` straight back — so `i` never reaches the value the
+             loop is waiting for."
+            ^ Beat 1 states the general rule in plain words, with no code in
+              it at all. Beat 2 is the material's own code, offered as the
+              specific case that proves the rule.
+
+This is not "avoid code" — BE CONCRETE above still requires naming the
+material's own example, and a beat naming real syntax is still required for
+the TeachingApproach `code`, below. It is an ORDER: the general idea comes
+first, in words a listener who cannot see any code would still follow, and only
+then does a beat point at the code as the concrete case that shows it.
+
+Reach for the plainest word that says the true thing, the same instinct BE
+CORRECT, THEN BE SIMPLE asks for elsewhere. "The loop's own updation" means
+"how the loop changes its counter each time round" — say that, or something as
+simple. "Pushes toward the termination condition" means "gets closer to the
+value that stops it" — say that instead. A phrase you would not actually say
+out loud to a friend does not belong in `line`, however precisely it names
+what the code does.
+
 This is the order of work, and it is not optional: find the quote, then say it
 simply. Writing the line first and hunting for a quote afterwards is how wrong
 answers get made.
 
+THE ORGANIZING IDEA COMES BEFORE THE PARTS
+A question that names several things at once — "what do X, Y and Z each do",
+"what's the difference between X and Y" — is not answered by listing them one
+after another. Four true, cited, disconnected facts are not an explanation;
+that is a Q&A pipeline mechanically reading a section's own paragraph breaks
+back to the viewer.
+
+Beat 1 states the ONE idea that explains why there are several things to
+distinguish at all — the shared context each part sits inside, or the reason
+the distinction matters — in words that do not yet name any one part. Only
+then do later beats cover what makes each part different, one at a time.
+
+  QUESTION  "What do the doctype, head, and body sections each actually do?"
+  BAD       "Every page starts with the doctype line, then wraps everything
+             else inside one html tag."
+            "Inside that, the head holds page information..."
+            "The body holds what visitors actually see..."
+            ^ Three separate facts in the order the section happens to state
+              them. Nothing said before the first fact tells the viewer WHY a
+              page is split into these pieces at all — the short opens
+              mid-list.
+  GOOD      "An HTML page isn't one block of content — it's split into
+             sections, and each one has a different job."
+            "The doctype comes first, and its only job is telling the browser
+             which rules to render the page by."
+            "..."
+            ^ Beat 1 is the organizing idea — sections exist, and each has a
+              job — stated before any one section is named. It is the frame
+              beat 2 onward fills in, not a fourth fact competing with the
+              other three.
+
+THIS IS NOT A FOUR-BEAT TEMPLATE TO COPY ONTO EVERY SCRIPT. Different
+questions need different shapes, and the shape is decided by what KIND of
+claim the question is making — the same judgement THE QUESTION'S OWN SHAPE
+above already asks for, one level more specific:
+  a structural breakdown ("what does each part do")   -> the organizing idea
+    above, then each part's own responsibility, in the order a learner meets
+    them.
+  a problem the material solves                       -> the problem, the
+    mechanism that solves it, the result — this is THE QUESTION'S OWN SHAPE's
+    "Why" pattern, restated as a progression.
+  a misconception the material corrects                -> the wrong belief
+    and its correction IN THE SAME BREATH (see "NEVER STATE THE WRONG BELIEF
+    ON ITS OWN" further down), then why the correct version holds.
+  a comparison                                          -> what is genuinely
+    different between the two, held up together, then when each applies.
+Pick the one the CONCEPT actually is. Forcing a structural-breakdown opening
+onto a script that is really answering "why" wastes beat 1 on a frame nobody
+needed.
+
+AN EXAMPLE OR A WORKED CASE IS EVIDENCE FOR AN IDEA ALREADY STATED, NEVER THE
+WHOLE SCRIPT BY ITSELF. BE CONCRETE below is right that naming the material's
+own example is what makes an answer usable — but a beat that opens with the
+example before the idea it demonstrates has shown evidence with no claim
+attached to it yet. State what a part DOES first, then let its concrete
+instance confirm it — the same order LEAD WITH THE IDEA above already asks
+for between a concept and its code. A script that is nothing but a chain of
+examples, with no beat ever stepping back to say what they are examples OF,
+has demonstrated without explaining.
+
 TEACH THE CONCEPT — EXPLAIN IT, DO NOT ONLY RESTATE IT
-A good teacher does not just read the page back to a student. Where the material
+A good teacher does not just read the page back to a viewer. Where the material
 states a rule or a behaviour without spelling out WHY it holds or WHAT is
 happening internally, you may explain that, in your own words — WHEN it is a
 direct, standard consequence of what the material DOES state, not a fact you are
@@ -511,7 +691,7 @@ damage. So the error and the truth go in the SAME breath:
 
   BAD   "A page fault means the program has crashed."
         "Actually the OS just loads the page and carries on."
-        ^ Beat 1 is a false sentence, said in the video, in the student's voice.
+        ^ Beat 1 is a false sentence, said in the video, in the narrator's own voice.
   GOOD  "A page fault is not a crash — it is a trap that tells the OS to load the
          missing page."
         ^ One beat. The belief and its correction are inseparable.
@@ -566,7 +746,7 @@ real sentence from a section the viewer never read:
   BAD   Section: "Computers represent all information using two values, 0 and 1."
         Beat:    "The character A is encoded as the integer 65, then converted to
                   binary."
-        ^ True. Cited to a real sentence. From a different section. A student who
+        ^ True. Cited to a real sentence. From a different section. A viewer who
           read the section and watched the reel is now being taught something the
           page in front of them does not say, and cannot check.
 
@@ -577,8 +757,8 @@ real sentence from a section the viewer never read:
 THE SECTION IS SMALLER THAN YOU WANT IT TO BE. ANSWER ANYWAY.
 When the section will not support the question as asked, you do NOT go looking
 elsewhere and you do NOT refuse. You ANSWER THE NARROWER QUESTION THE SECTION DOES
-SUPPORT, and you rewrite the interviewer's question in beat 1 to be that narrower
-question. A clear, complete, correctly-cited answer to a smaller question is a good
+SUPPORT, and you rewrite beat 1 to open on that narrower question instead. A clear,
+complete, correctly-cited answer to a smaller question is a good
 short. It is the ONLY good short available when the material is thin.
 
 You must NEVER produce any of these:
@@ -589,7 +769,7 @@ You must NEVER produce any of these:
   discuss their reference documents.
 
 If the SECTION genuinely answers a NARROWER version of the question, answer the
-narrower version well and let the interviewer's question match what you answered.
+narrower version well and let beat 1's opening match what you answered.
 A clear answer to a slightly smaller question is a good short. A refusal is not a
 short at all, and a wider answer borrowed from elsewhere is a wrong one.
 
@@ -602,11 +782,11 @@ BE CORRECT, THEN BE SIMPLE
   not make. An invented explanation of a real fact is still an invention.
 - One idea per beat, and the beats in the order the section presents them.
 
-Output JSON — one interviewer beat then 3-4 student beats. Only the student beats
-carry source_quote:
+Output JSON — one opening beat, then 3-4 more beats continuing the same narrator's
+explanation. Only the beats AFTER the opening carry source_quote:
 {{"short_id":"...","question":"...","beats":[
-{{"speaker":"interviewer","line":"the question","on_screen":"<=8 words","visual_ref":"snake_case"}},
-{{"speaker":"student","line":"spoken words","on_screen":"<=8 words","visual_ref":"snake_case",
+{{"speaker":"narrator","line":"the opening line","on_screen":"<=8 words","visual_ref":"snake_case"}},
+{{"speaker":"narrator","line":"spoken words","on_screen":"<=8 words","visual_ref":"snake_case",
 "source_quote":"copied verbatim from the section"}}]}}"""
 
 
@@ -620,10 +800,14 @@ carry source_quote:
 #: rather than silently applying the wrong guidance.
 _APPROACH_GUIDANCE: dict[str, str] = {
     "process_demonstration": (
-        "Walk the process as a sequence: the INITIAL STATE, the ACTION or "
-        "CHANGE that happens, and the RESULTING STATE. Beats should follow "
-        "that order — show the mechanism happening, step by step, rather "
-        "than describing it as a static fact."
+        "State the general shape of the process FIRST, in plain language: "
+        "what has to happen for it to move forward, before naming any of the "
+        "material's specific values. Then walk the process as a sequence — "
+        "the INITIAL STATE, the ACTION or CHANGE that happens, and the "
+        "RESULTING STATE — using the material's own example as the concrete "
+        "case of the rule you just stated. Beats show the mechanism "
+        "happening, step by step, rather than describing it as a static "
+        "fact."
     ),
     "comparison": (
         "Hold the two things being compared up against each other explicitly. "
@@ -643,25 +827,30 @@ _APPROACH_GUIDANCE: dict[str, str] = {
         "only the example, so a viewer leaves knowing what to call it."
     ),
     "conceptual_visual": (
-        "Narrate the STRUCTURE or the STATE CHANGE — what contains what, what "
-        "points to what, what changes — so the explanation supports a picture "
-        "of relationships and state. Do not reach for code or syntax here "
-        "unless the approved approach below is itself `code`; this device is "
-        "structural, not a code walkthrough."
+        "State the general relationship or rule FIRST, in plain language, "
+        "then narrate the STRUCTURE or the STATE CHANGE — what contains "
+        "what, what points to what, what changes — so the explanation "
+        "supports a picture of relationships and state. Do not reach for "
+        "code or syntax here unless the approved approach below is itself "
+        "`code`; this device is structural, not a code walkthrough."
     ),
     "code": (
-        "The code IS the concept here, so show and explain it directly — name "
-        "the actual syntax, the actual keyword, the actual line from the "
-        "section. This is the one approach where walking real code is the "
-        "right way to teach, because the learning objective is the code "
-        "itself."
+        "The code is the material's evidence for the concept, not the "
+        "opening sentence — see LEAD WITH THE IDEA above, which applies here "
+        "too. Open the beat that introduces the concept in plain language, "
+        "true even to someone not looking at any code; only then name the "
+        "actual syntax, the actual keyword, the actual line from the "
+        "section as the concrete case. Walking the real code afterwards is "
+        "still the right way to teach this approach, because the learning "
+        "objective is the code itself — just do not open on it."
     ),
     "direct_explanation": (
-        "Explain the concept plainly and directly, concept-first. Do not "
-        "force an analogy, a comparison, a demonstration or a code "
-        "walkthrough onto it — a clear, well-ordered explanation is the "
-        "complete answer here, not a placeholder for something more "
-        "elaborate."
+        "Explain the concept plainly and directly, concept-first, in the "
+        "simplest words that are still true — see BE CORRECT, THEN BE "
+        "SIMPLE and LEAD WITH THE IDEA above. Do not force an analogy, a "
+        "comparison, a demonstration or a code walkthrough onto it — a "
+        "clear, well-ordered explanation is the complete answer here, not a "
+        "placeholder for something more elaborate."
     ),
 }
 
@@ -670,9 +859,19 @@ def write_script(topic: Topic, section: Section, feedback: str | None = None,
                  current: Script | None = None, document: str | None = None,
                  understanding: SectionUnderstanding | None = None,
                  framing: QuestionFraming | None = None,
-                 approach: TeachingApproach | None = None) -> Script:
+                 approach: TeachingApproach | None = None,
+                 source_text: str | None = None) -> Script:
     """
     Write one script.
+
+    `source_text` is OPTIONAL and defaults to `section.text` — every existing
+    caller that omits it gets byte-identical behaviour to before. A caller
+    that resolved a wider evidence pool for this section (see
+    parse.evidence_text, for a concept split across "Example"/"How It Works"/
+    similar sibling headings) passes that resolved text here instead, and it
+    becomes the ONLY thing this prompt allows a citation to come from — the
+    "do not borrow from elsewhere in the document" rule below still holds,
+    it is just judged against the wider pool rather than the one heading.
 
     `document` is the whole reading material, and its job has CHANGED. It is passed
     as vocabulary and context — so a term the section inherits from an earlier
@@ -866,10 +1065,11 @@ the finished short — this section qualifying for more room is not an
 instruction to use all of it.
 """
 
+    text_to_cite = section.text if source_text is None else source_text
     user += f"""
 THE SECTION THIS SHORT IS FILED UNDER — start here [{section.section_id}] {section.title}
 ---
-{section.text}
+{text_to_cite}
 ---
 
 Write the script. Every beat must be supported by a sentence from THE SECTION ABOVE,
@@ -883,7 +1083,7 @@ do not mention the material."""
     # change would appear to do nothing. So the current script goes in verbatim.
     if current is not None:
         beats = "\n".join(
-            f'{i}. [{b.speaker}] {b.line}   (on_screen: "{b.on_screen}")'
+            f'{i}. {b.line}   (on_screen: "{b.on_screen}")'
             for i, b in enumerate(current.beats)
         )
         user += (f"\n\nTHE CURRENT SCRIPT YOU ARE EDITING:\n{beats}\n\n"
@@ -918,11 +1118,15 @@ def write_script_for_workflow(workflow: QuestionWorkflow, section: Section,
                               feedback: str | None = None, current: Script | None = None,
                               document: str | None = None,
                               understanding: SectionUnderstanding | None = None,
+                              source_text: str | None = None,
                               ) -> QuestionWorkflow:
     """
     Step 8's entry point: write a script for a FULLY APPROVED workflow — using
     its framing and its approved teaching approach, not merely its original
     Topic — and attach the result to workflow.script.
+
+    `source_text` is forwarded to write_script unchanged — see its own
+    docstring. Optional, defaults to `section.text`.
 
     THE ONE GATE, THE SAME SHAPE AS frame_workflow AND
     choose_teaching_approach_for_workflow ONE AND TWO STAGES EARLIER:
@@ -981,5 +1185,5 @@ def write_script_for_workflow(workflow: QuestionWorkflow, section: Section,
 
     script = write_script(teaching_topic, section, feedback=feedback, current=current,
                           document=document, understanding=understanding,
-                          framing=framing, approach=approach)
+                          framing=framing, approach=approach, source_text=source_text)
     return workflow.model_copy(update={"script": script})

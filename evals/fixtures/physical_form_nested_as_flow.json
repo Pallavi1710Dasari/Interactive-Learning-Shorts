@@ -1,0 +1,50 @@
+{
+  "short_id": "physical_form_nested_as_flow",
+  "session_id": "eval",
+  "source_section_id": "7.4",
+  "question": "How do the operating system, the applications and the hardware relate?",
+  "estimated_seconds": 20.0,
+  "beats": [
+    {
+      "speaker": "interviewer",
+      "line": "How do the operating system, the applications and the hardware relate?",
+      "on_screen": "Layers of a system",
+      "visual_ref": "d_layers"
+    },
+    {
+      "speaker": "student",
+      "line": "Applications run on top of the operating system, which itself runs on top of the hardware.",
+      "on_screen": "Apps on OS on hardware",
+      "visual_ref": "d_layers",
+      "source_quote": "applications run on top of the operating system, which runs on top of the hardware"
+    }
+  ],
+  "visuals": {
+    "d_layers": {
+      "ref": "d_layers",
+      "type": "diagram",
+      "spec": "three layers, each resting on the one below",
+      "frame": {
+        "template": "flow",
+        "title": "Applications, OS, hardware",
+        "flow_orientation": "horizontal",
+        "flow_terminator": "null",
+        "steps": [
+          {"label": "Applications", "role": "hero"},
+          {"label": "Operating system", "role": "plain"},
+          {"label": "Hardware", "role": "plain"}
+        ]
+      },
+      "strategy": {
+        "ref": "d_layers",
+        "concept": "applications rest on the OS, which rests on the hardware",
+        "relationship": "structure",
+        "physical_form": "nested_levels",
+        "must_see": "three levels stacked, each one resting on the level below it",
+        "changes_from_previous": "",
+        "focus": "the operating system as the middle layer"
+      }
+    }
+  },
+  "status": "draft"
+}

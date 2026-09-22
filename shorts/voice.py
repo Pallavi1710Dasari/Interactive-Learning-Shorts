@@ -26,6 +26,27 @@ from .schema import Script, Audio, WordTiming, BeatSpan
 from . import config, providers, tts
 
 
+def warm() -> None:
+    """
+    Pay whatever one-time startup cost the ACTIVE provider has, now — before
+    the first real build needs it. See providers.Provider.warm(): a no-op for
+    every provider except Chatterbox, whose ~150-190s CPU model load
+    otherwise gets charged against the first short's own VOICE_BUILD_TIMEOUT
+    and, in practice, blows through it. Called once from server.py at process
+    startup.
+
+    providers.get() (not providers.chain()[0]) so this warms whichever
+    provider a voice "kept" in the UI actually selected — see get()'s own
+    docstring on why a kept voice outranks .env.
+
+    Never raises: a build must not depend on this having run.
+    """
+    try:
+        providers.get().warm()
+    except Exception as e:
+        print(f"  ! voice warm-up skipped: {type(e).__name__}: {e}")
+
+
 def audio_dir(short_id: str) -> Path:
     return config.OUTPUT_DIR / short_id
 
@@ -78,7 +99,7 @@ def synthesize(script: Script) -> Audio | None:
             # change from a genuine cache hit.
             try:
                 (audio_dir(script.short_id) / "voice.json").write_text(
-                    _stamp_for(provider))
+                    _stamp_for(provider), encoding="utf-8")
             except OSError:
                 pass          # a missing stamp only costs a re-record
             return audio
@@ -99,7 +120,7 @@ def synthesize(script: Script) -> Audio | None:
 def _voice_stamp(directory: Path) -> str:
     """What voice made the track in `directory`, or "" if it predates stamping."""
     try:
-        return (directory / "voice.json").read_text().strip()
+        return (directory / "voice.json").read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
@@ -160,9 +181,9 @@ def _from_cache(script: Script) -> Audio | None:
     if _voice_stamp(directory) != _current_voice_stamp():
         return None
     try:
-        words = [WordTiming(**w) for w in json.loads(timings.read_text())]
+        words = [WordTiming(**w) for w in json.loads(timings.read_text(encoding="utf-8"))]
         spans_file = directory / "spans.json"
-        spans = ([BeatSpan(**s) for s in json.loads(spans_file.read_text())]
+        spans = ([BeatSpan(**s) for s in json.loads(spans_file.read_text(encoding="utf-8"))]
                  if spans_file.exists() else [])
     except Exception:
         return None
@@ -244,13 +265,9 @@ def _audition(clip: str) -> int:
 
     out_dir = config.OUTPUT_DIR / "voice-auditions" / src.stem
     out_dir.mkdir(parents=True, exist_ok=True)
-    # The first beat must be the interviewer — Script validates that, and it is the
-    # right shape anyway: both refs point at the clip being auditioned, so this
-    # speaks the sample line in that one voice regardless of who is nominally
-    # talking.
     script = Script(short_id=f"audition_{src.stem}",
                     question=_AUDITION_LINE,
-                    beats=[Beat(speaker="interviewer", line=_AUDITION_LINE,
+                    beats=[Beat(line=_AUDITION_LINE,
                                 on_screen="audition", visual_ref="v")])
     print(f"auditioning {src} — the model loads once, this takes a couple of minutes")
     # The clip is BOTH voices: an audition is about one speaker at a time. Passed
@@ -313,7 +330,7 @@ def main():
             print(f"  ! {path.name}: no such unit")
             failed += 1
             continue
-        unit = ShortUnit(**json.loads(path.read_text()))
+        unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
         script = Script(short_id=unit.short_id, question=unit.question, beats=unit.beats)
 
         if args.force:
@@ -334,7 +351,7 @@ def main():
             failed += 1
             continue
         unit.audio = audio
-        path.write_text(unit.model_dump_json(indent=2))
+        path.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
         print(f"    -> {audio.duration_seconds}s, {len(audio.word_timings)} word timings")
         done += 1
 

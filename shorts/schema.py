@@ -150,6 +150,32 @@ class Topic(BaseModel):
     # three shorts asking the same thing three ways out of one deck.
     concept: Optional[str] = None
 
+    # Whether SELECTION ITSELF judged this concept to be one other candidate
+    # concepts in the SAME material depend on — decided by comparing every
+    # candidate against every other one in a single pass, before any topic is
+    # cut. This is a DIFFERENT, EARLIER signal from SectionUnderstanding's own
+    # core_idea/teaching_sequence (see select.py's _foundational_reason): that
+    # one reads a single section in isolation, in detail, after a topic is
+    # already approved; this one is the selection model's own cross-document
+    # comparison, made while every candidate is still in view, which is
+    # exactly the comparison keep_most_important's tie-break needs and did not
+    # have. See select.py's SYSTEM prompt for the rubric.
+    #
+    # Optional and defaults to None/unset rather than False, the same reason
+    # importance and answer_quote are optional: an older topics.json, or a
+    # model that skipped the field, means "the comparison was not made," not
+    # "compared and found not foundational" — those are different claims and
+    # collapsing them would make every pre-existing topic silently outrank
+    # nothing.
+    is_foundational: Optional[bool] = None
+
+    # One clause: which other candidate concept(s) this one is a prerequisite
+    # for, or why it stands on its own. Read by build_question_selections to
+    # explain a foundational tie-break to a human reviewer instead of leaving
+    # is_foundational as an unexplained flag. Blank when is_foundational is
+    # None.
+    foundational_note: str = ""
+
 
 class TopicList(BaseModel):
     topics: list[Topic]
@@ -185,6 +211,15 @@ SelectionReasonCategory = Literal[
     "concrete_and_answerable", # the section gives a clean, checkable answer
     "distinct_angle",          # asks about the concept from an angle its
                                # siblings in the same TopicList do not
+    "candidate_comparison",    # a FACTUAL statement of how this topic compared
+                               # against the OTHER candidates in the same
+                               # material — see select.py's
+                               # _candidate_comparison_reason. Exists so a
+                               # human never has to take "5/5" on faith: it
+                               # names the runner-up and its own score/
+                               # foundational status, stated plainly rather
+                               # than argued for, so nothing here is invented
+                               # beyond what the ranking itself already knows.
     "other",
 ]
 
@@ -230,10 +265,23 @@ class QuestionSelection(BaseModel):
             raise ValueError("a QuestionSelection needs at least one SelectionReason "
                              "— a question surfaced with no explanation cannot be "
                              "reviewed")
-        if not any((r.explanation or "").strip() for r in v):
+        # BLANK ENTRIES ARE DROPPED, NOT MERELY TOLERATED. This used to only
+        # check that AT LEAST ONE reason had real text, which let a blank
+        # SelectionReason ride along in the list next to a real one — every
+        # builder in select.py happens not to construct one today, but
+        # nothing enforced that, and the web UI renders every entry in
+        # `reasons` as its own bullet with no blank-check of its own (see
+        # StepApprove.tsx's "Why this question was selected" list). A blank
+        # entry there is not a weaker bullet, it is an empty one with just a
+        # category tag — the defect a reviewer actually hit. Filtering here
+        # makes "every reason a human sees has real text" a schema guarantee
+        # instead of a convention every future reason-builder has to
+        # remember on its own.
+        cleaned = [r for r in v if (r.explanation or "").strip()]
+        if not cleaned:
             raise ValueError("every SelectionReason here has a blank explanation — "
                              "at least one must say something a human can read")
-        return v
+        return cleaned
 
 
 class RegenerationAttempt(BaseModel):
@@ -330,7 +378,7 @@ class QuestionApproval(BaseModel):
 
 #: What job a framed question does in the reel it becomes. "primary" is the
 #: ordinary case: one question drives one reel, matching Script's existing
-#: one-question-per-short shape (Script.starts_with_interviewer).
+#: one-question-per-short shape (Script.has_beats, Script.question).
 QuestionRole = Literal[
     "primary", "hook", "reinforcement", "misconception_check", "transition",
 ]
@@ -452,24 +500,37 @@ class TeachingApproachRegenerationAttempt(BaseModel):
 class TeachingApproachApproval(BaseModel):
     """The human gate on the LLM-selected TeachingApproach.
 
-    NO DIRECT OVERRIDES. `override` (below) predates regeneration — it let a
-    human hand-write a replacement TeachingApproach, the same shape of
-    shortcut QuestionApproval.edited_question once was for questions. Step 6's
-    own CLI and API never write it: a human who wants a different approach
-    requests a REGENERATION instead (see TeachingApproachRegenerationAttempt),
-    which asks the LLM to reconsider the COMPLETE decision — primary,
-    combined_with, alternatives and rationale together — grounded in the same
-    framing and section, never a field the human fills in by hand. This is
-    the exact same product decision QuestionApproval's "NO DIRECT EDITING"
-    makes for questions, and for the same reason: a hand-picked `primary` with
-    nothing checking it against the concept or the section is precisely the
-    unguided choice this whole step exists to replace.
+    THREE HUMAN ACTIONS, NOT TWO. review.approve_teaching_approach keeps the
+    LLM's own decision (whichever is currently in effect) exactly as it
+    stands. review.regenerate_teaching_approach asks the LLM to reconsider
+    the COMPLETE decision from a stated reason (see
+    TeachingApproachRegenerationAttempt) — still the only way to get a FRESH
+    pedagogical judgement grounded in the framing and section. And
+    review.select_teaching_approach (below) lets a human pick a DIFFERENT
+    approach directly from the fixed set of TeachingApproachKind values —
+    written to `override` — with NO LLM call: the reviewer isn't asking the
+    model to reconsider anything, they are simply preferring a different one
+    of the same seven devices the model already had available. This exists
+    because a reviewer who finds the LLM's REASONING acceptable but prefers a
+    different DEVICE should not have to spend a regeneration call just to say
+    so.
 
-    COMPLETE DECISIONS ONLY, NEVER A FIELD PATCH. There is no way to ask this
-    model — or a human — to change just `primary` while leaving
+    `override` PREVIOUSLY MEANT SOMETHING ELSE — a hand-written replacement
+    TeachingApproach, from before regeneration existed, and unused by any
+    caller since. select_teaching_approach is the field's only writer now;
+    see its own docstring for exactly what it puts there (primary changed,
+    combined_with cleared, rationale replaced with an honest "a human chose
+    this instead" note — never a hand-typed pedagogical judgement).
+
+    COMPLETE DECISIONS ONLY, NEVER A FIELD PATCH — still true of regeneration.
+    There is no way to ask the LLM to change just `primary` while leaving
     `combined_with`/`alternatives`/`rationale` as they were, because those
     fields are not independent facts, they are one pedagogical judgement
-    expressed in four parts. Regenerating always replaces all four together.
+    expressed in four parts; regenerating always replaces all four together.
+    A direct selection is different in kind, not a loophole in this rule: the
+    human is not asking for a new pedagogical judgement, only picking among
+    the seven fixed devices themselves, so there is nothing for the model to
+    reconsider.
     """
     #: "regenerating" is TRANSIENT AND CALLER-SET, exactly like
     #: QuestionApproval.status's own "regenerating" — review.py's
@@ -485,15 +546,20 @@ class TeachingApproachApproval(BaseModel):
     status: Literal["pending", "approved", "modified", "regenerating"] = "pending"
     note: Optional[str] = None
 
-    #: LEGACY. A hand-written replacement TeachingApproach, from before
-    #: regeneration existed. None means nothing here; Step 6 never sets this
-    #: field — see "NO DIRECT OVERRIDES" above.
+    #: A human's DIRECT choice of a different TeachingApproachKind — see
+    #: review.select_teaching_approach, the only writer. None means nothing
+    #: here. CLEARED BY EVERY REGENERATION (review.regenerate_teaching_approach
+    #: sets it back to None) so a fresh LLM recommendation is never masked by
+    #: a stale earlier pick — see QuestionWorkflow.effective_teaching_approach
+    #: for the full priority order this participates in.
     override: Optional[TeachingApproach] = None
 
     #: The most recent LLM regeneration, once at least one has completed.
-    #: None until then. This is what
-    #: QuestionWorkflow.effective_teaching_approach prefers over `override` —
-    #: see there for the full priority order.
+    #: None until then. QuestionWorkflow.effective_teaching_approach checks
+    #: `override` FIRST, ahead of this — a human's direct pick, being the
+    #: LATER decision, wins over whichever LLM decision (original or
+    #: regenerated) it was made against. See there for the full priority
+    #: order.
     regenerated_approach: Optional[TeachingApproach] = None
 
     #: Every completed regeneration, oldest first. See
@@ -649,7 +715,7 @@ class ConfusionPlan(BaseModel):
 class HookPlan(BaseModel):
     """How this short should OPEN, decided from the section rather than from habit.
 
-    WHY THIS IS A DECISION TOO. Beat 1 is the interviewer's question and it is the
+    WHY THIS IS A DECISION TOO. Beat 1 is the narrator's opening line and it is the
     thing a viewer decides on, so it attracts every bad instinct in short-form
     video: the manufactured stake, the invented statistic, the "most people get
     this wrong" that nothing supports. The brief already forbids that in prose, and
@@ -672,7 +738,7 @@ class HookPlan(BaseModel):
                  concept itself is the clearest possible opening, and a hook bolted
                  onto it costs seconds the explanation needed.
 
-    EVERY FORM IS GROUNDED. A hook is the first thing said, in the student's own
+    EVERY FORM IS GROUNDED. A hook is the first thing said, in the narrator's own
     voice, and an ungrounded one poisons the short before it starts — see
     checks.check_hook_plan, which verifies problem and surprise against the section
     as claims, and requires a question's subject to be the section's.
@@ -968,7 +1034,20 @@ class Beat(BaseModel):
     you can no longer write an eval case for the failure. Enforcement lives in
     checks.check_overlays().
     """
-    speaker: Literal["interviewer", "student"]
+    #: WHO IS TALKING. Every reel has exactly one narrator now — see Script's own
+    #: docstring — so every beat this pipeline writes carries "narrator" here.
+    #:
+    #: A PLAIN STRING, NOT A Literal, and deliberately so: this field used to be
+    #: `Literal["interviewer", "student"]`, back when a reel was a two-person
+    #: dialogue and beat 0 was one role and every beat after it the other. Units
+    #: already on disk, and their saved Script/Audio JSON, still carry those two
+    #: values, and a Literal that no longer named them would fail to LOAD every
+    #: one of those files rather than merely fail to grade them — an old short a
+    #: viewer could watch yesterday would 500 today. Loosening the type keeps them
+    #: loading; nothing downstream keys structural behaviour off this value any
+    #: more (see Script.opening_beat/body_beats below), so an old "interviewer"/
+    #: "student" tag is now read the same as "narrator" everywhere it matters.
+    speaker: str = "narrator"
     line: str
     on_screen: str
     visual_ref: str
@@ -984,10 +1063,42 @@ class Beat(BaseModel):
 
 
 class Script(BaseModel):
-    """Output of Skill 2."""
+    """Output of Skill 2 — a single narrator's connected explanation of one concept.
+
+    ONE VOICE, NOT A DIALOGUE. This used to be a scripted interview: beat 0 was an
+    "interviewer" asking `question` and every beat after it a "student" answering.
+    That two-role shape is gone — every beat is the same narrator, continuing the
+    same explanation — but the SEGMENTATION it produced is worth keeping, because
+    it is still exactly the shape a good explanation has: one beat that opens on
+    the concept, then a short run of beats that build the explanation to its
+    conclusion. `opening_beat` and `body_beats` below name that shape without
+    naming a second speaker.
+
+    `question` STAYS. It is not spoken dialogue — nothing requires the opening
+    beat to be phrased as a literal question any more (see schema.HookPlan, which
+    already offers `problem`/`surprise`/`direct` openings alongside `question`) —
+    it is the concept this script exists to explain, the same string
+    skills/select.py and skills/framing.py have always produced, and checks.py
+    still grades the SHORT against it (check_question_grounded, FOCUS in
+    check_follows_teaching_sequence, and so on).
+    """
     short_id: str
     question: str
     beats: list[Beat]
+
+    @property
+    def opening_beat(self) -> Beat:
+        """Beat 0 — the hook, or the plain start of the explanation. Never spoken
+        by a second character; see Script's own docstring."""
+        return self.beats[0]
+
+    @property
+    def body_beats(self) -> list[Beat]:
+        """Every beat after the opening — the explanation itself, in speaking
+        order. What checks.py used to find by filtering `speaker == "student"`;
+        now just "everything after beat 0", because there is no longer a second
+        speaker to filter by."""
+        return self.beats[1:]
 
     @property
     def word_count(self) -> int:
@@ -997,13 +1108,40 @@ class Script(BaseModel):
     def estimated_seconds(self) -> float:
         return round(self.word_count / WORDS_PER_SECOND, 1)
 
+    @property
+    def full_narration(self) -> str:
+        """
+        The complete script as ONE continuous piece of narration, in speaking
+        order — every beat's `line`, joined with a single space.
+
+        NOT A SEPARATE GENERATED FIELD, and deliberately so. The beats already
+        ARE the script; this exists so "the whole thing, read aloud" is
+        something a caller (a test, a future review screen) can ask for
+        directly instead of re-joining script.beats itself every time — and so
+        it can never drift out of sync with the beats, since it is computed
+        from them rather than written alongside them by a second LLM call.
+
+        Same pattern as word_count/estimated_seconds directly above: a plain
+        property, not a pydantic computed_field, so it is not added to
+        model_dump()'s output and the wire format to the frontend/API is
+        unchanged. Every beat's line is already sent to the frontend today
+        (StepReview.tsx renders each one); this is a convenience for Python
+        callers, not a new payload shape.
+        """
+        return " ".join(b.line.strip() for b in self.beats if b.line.strip())
+
     @field_validator("beats")
     @classmethod
-    def starts_with_interviewer(cls, v):
+    def has_beats(cls, v):
+        # THE SCHEMA'S OWN JOB, same as every other "can this be represented"
+        # validator in this file — not "is this a good script", which is
+        # checks.check_narration_shape's job. This used to also require
+        # beats[0].speaker == "interviewer" (starts_with_interviewer); that
+        # requirement is gone along with the two-speaker structure it was
+        # guarding — see Script's own docstring — but a script with no beats at
+        # all is still not a script.
         if not v:
             raise ValueError("script has no beats")
-        if v[0].speaker != "interviewer":
-            raise ValueError("first beat must be the interviewer asking the question")
         return v
 
 
@@ -1972,12 +2110,21 @@ class QuestionWorkflow(BaseModel):
         """
         The TeachingApproach downstream stages should actually use.
 
-        SAME PRIORITY SHAPE AS effective_question, one stage later:
-          1. teaching_approach_approval.regenerated_approach — the latest LLM
-             regeneration, when at least one has completed.
-          2. teaching_approach_approval.override — LEGACY COMPATIBILITY ONLY,
-             from before regeneration existed (see TeachingApproachApproval's
-             "NO DIRECT OVERRIDES"). Step 6's own CLI and API never write it.
+        NOT THE SAME PRIORITY SHAPE AS effective_question ANY MORE — a human
+        DIRECT SELECTION outranks an LLM regeneration, because it is always
+        the LATER decision when both exist (review.select_teaching_approach
+        is only ever called on a workflow that already has a recommendation,
+        regenerated or original) and a human choosing among the fixed devices
+        is not "less considered" than the model reconsidering its own pick:
+          1. teaching_approach_approval.override — a human's direct pick of a
+             different TeachingApproachKind, with no LLM call. See
+             review.select_teaching_approach, the only writer, and
+             TeachingApproachApproval's own docstring for why this now
+             outranks a regeneration rather than the reverse.
+          2. teaching_approach_approval.regenerated_approach — the latest LLM
+             regeneration, when at least one has completed and no direct
+             selection has been made since (regeneration always clears
+             `override` — see review.regenerate_teaching_approach).
           3. self.teaching_approach — the LLM's original decision, when
              neither of the above is set.
 
@@ -1986,10 +2133,10 @@ class QuestionWorkflow(BaseModel):
         skills.teaching_approach has ever run on this workflow.
         """
         approval = self.teaching_approach_approval
-        if approval.regenerated_approach is not None:
-            return approval.regenerated_approach
         if approval.override is not None:
             return approval.override
+        if approval.regenerated_approach is not None:
+            return approval.regenerated_approach
         return self.teaching_approach
 
     @property

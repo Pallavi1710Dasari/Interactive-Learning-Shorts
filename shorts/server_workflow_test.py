@@ -25,7 +25,7 @@ from shorts import review
 from shorts.skills import framing, teaching_approach
 from shorts.skills.script import write_script_for_workflow
 from shorts.skills.strategy import plan_strategy_for_workflow
-from shorts.schema import QuestionWorkflow
+from shorts.schema import QuestionWorkflow, Topic
 
 
 SAMPLE_MATERIAL = """## 3.1 Why paging exists
@@ -484,6 +484,48 @@ def test_advance_endpoint_generates_script_and_visual_plan():
     print("   ok — POST /api/workflow/advance generates a script and a "
           "visual plan for an approved teaching approach, and stops at the "
           "visual-plan gate")
+
+
+def test_workflow_scripts_endpoint_realigns_a_drifted_teaching_question():
+    # REGRESSION for the gap found reviewing a real held-back reel
+    # (usestate_hook_mechanism): make_script and make_scripts already ran
+    # checks.check_topic_matches_understanding + run._realign_topic before
+    # writing a script — /api/workflow/scripts, the endpoint StepReview.tsx
+    # actually calls, did not. A framing whose teaching_question has drifted
+    # from the section's own core idea used to reach write_script_for_workflow
+    # unreconciled here, and only the paid judge ever caught it.
+    client = _client()
+    data = _material(client)
+    doc_id = data["doc_id"]
+    wf = _workflow_with_teaching_approach(doc_id, data)
+    wf = review.approve_teaching_approach(QuestionWorkflow(**wf)).model_dump()
+
+    # Corrupt the APPROVED FRAMING's teaching_question — not the original
+    # topic — because write_script_for_workflow builds beat 1 from
+    # framing.teaching_question, never from approved_topic.topic directly
+    # (see its own docstring: "THE TEACHING QUESTION DRIVES THE SCRIPT, NOT
+    # THE RAW APPROVED QUESTION"). SAMPLE_MATERIAL is entirely about paging;
+    # this shares no stem with it at all, so
+    # checks.check_topic_matches_understanding is guaranteed to reject it.
+    wf["framing"]["teaching_question"] = (
+        "How does a hash table resolve a collision between two keys?")
+
+    realigned_topic_text = "Why does an OS use paging instead of contiguous allocation?"
+    with patch("shorts.server._realign_topic") as mock_realign:
+        mock_realign.return_value = Topic(
+            id=wf["selection"]["topic"]["id"], topic=realigned_topic_text,
+            why_it_matters="m", source_section_id="3.1", difficulty="medium")
+        r = client.post("/api/workflow/scripts", json={"doc_id": doc_id, "workflows": [wf]})
+
+    assert r.status_code == 200, r.text
+    result = r.json()["results"][0]
+    assert not result.get("error"), result
+    assert mock_realign.called, "check_topic_matches_understanding should have rejected the drifted question"
+    assert result["qa"]["question"] == realigned_topic_text, result["qa"]["question"]
+    assert result["workflow"]["framing"]["teaching_question"] == realigned_topic_text
+    print("   ok — POST /api/workflow/scripts realigns a teaching_question that "
+          "drifted from the section's core idea before writing the script, the "
+          "same reconciliation make_script/make_scripts already had")
 
 
 def main():

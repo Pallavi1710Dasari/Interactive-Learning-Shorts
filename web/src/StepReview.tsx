@@ -1,47 +1,46 @@
 import { useEffect, useState } from "react";
-import { finalize, makeScripts, regenerate, release, type MaterialResult, type UsageTotals } from "./api";
+import { makeWorkflowScripts, regenerate, type MaterialResult, type UsageTotals } from "./api";
 import { Spinner } from "./Spinner";
 import { money, tokens } from "./CostPill";
-import { Interviewer, Student } from "./Avatars";
-import type { QA, ReviewItem, Unit } from "./types";
+import { Interviewer } from "./Avatars";
+import { describeApproach, effectiveTeachingApproach,
+         type QuestionWorkflow, type ReviewItem } from "./types";
 
 /**
- * Step 2 — the human gate, on one question and one answer.
+ * Step 8-9 of the question workflow: draft a script for each question WHOSE
+ * TEACHING APPROACH A HUMAN HAS ALREADY APPROVED (see StepTeachingApproach,
+ * the step before this one), and let a human read it before anything is
+ * drawn or rendered.
  *
- * Scripts are drafted one topic at a time so a slow or failing topic never blocks
- * reviewing the others, and nothing is generated for a topic the reviewer drops.
- * Regeneration takes a free-text note; that note is the whole point of the step.
+ * Every script here is drafted through the WORKFLOW-AWARE path — framing, the
+ * APPROVED teaching approach, then write_script_for_workflow — via
+ * POST /api/workflow/scripts, not the plain write_script make_scripts used to
+ * call. See that endpoint's own docstring: it now refuses a workflow whose
+ * teaching approach is not approved, rather than deciding or approving one
+ * itself — that decision belongs entirely to StepTeachingApproach.
+ *
+ * Scripts are drafted one workflow at a time so a slow or failing one never
+ * blocks reviewing the others, and nothing is generated for a workflow the
+ * reviewer drops. Regeneration takes a free-text note; that note is the whole
+ * point of the step. Approved scripts are handed to StepVisualPlan next —
+ * rendering does not happen here.
  */
 export function StepReview({
-  material, onDone, onSpend, onWatchHeld,
+  material, workflows, onDone, onSpend,
 }: {
   material: MaterialResult;
-  onDone: (shorts: Unit[]) => void;
+  /** Step 6's gate output — workflows whose teaching approach is approved. */
+  workflows: QuestionWorkflow[];
+  onDone: (workflows: QuestionWorkflow[]) => void;
   onSpend: (delta: UsageTotals, total: UsageTotals) => void;
-  /** Open one held short in the player. It is left out of the ordinary feed, so
-   *  this is the only way to actually look at what the judge complained about. */
-  onWatchHeld: (short_id: string) => void;
 }) {
-  // Held shorts the reviewer has published over the judge, so the row can say so
-  // rather than still offering a button that has already been pressed.
-  const [released, setReleased] = useState<string[]>([]);
-  const [releaseErr, setReleaseErr] = useState<string | null>(null);
   const [items, setItems] = useState<ReviewItem[]>(
-    material.topics.map((topic) => ({
-      topic, qa: null, graders: [], state: "loading", note: "", target: "script",
-      spent: undefined,
+    workflows.map((workflow) => ({
+      workflow, topic: workflow.selection.topic, qa: null, graders: [], judge: undefined,
+      state: "loading", note: "", target: "script", spent: undefined,
     })),
   );
-  const [building, setBuilding] = useState(false);
   const [drafting, setDrafting] = useState(true);
-  const [buildError, setBuildError] = useState<string | null>(null);
-  // Shorts that BUILT but failed a diagram grader. Separate from buildError: the
-  // reel exists and is watchable, its picture is just weaker than it should be.
-  const [buildWarnings, setBuildWarnings] = useState<string[]>([]);
-  // Shorts the judge scored under the bar. They exist and are paid for, but
-  // feed.collect keeps them out of the reel — so this step is the only place the
-  // reviewer can be told they happened, and why.
-  const [held, setHeld] = useState<Unit[]>([]);
 
   const patch = (i: number, next: Partial<ReviewItem>) =>
     setItems((prev) => prev.map((it, k) => (k === i ? { ...it, ...next } : it)));
@@ -54,14 +53,19 @@ export function StepReview({
     let alive = true;
     (async () => {
       try {
-        const r = await makeScripts(material.doc_id, material.topics);
+        const r = await makeWorkflowScripts(material.doc_id, workflows);
         if (!alive) return;
         onSpend(r.usage, r.total);
         setItems((prev) => prev.map((it) => {
           const hit = r.results.find((x) => x.topic.id === it.topic.id);
           if (!hit) return { ...it, state: "error", error: "no result returned" };
           if (hit.error || !hit.qa) return { ...it, state: "error", error: hit.error ?? "no script" };
-          return { ...it, qa: hit.qa, graders: hit.graders ?? [], state: "ready" };
+          // hit.topic is the workflow's approved_topic (regenerated wording
+          // already substituted, if any) — the same effective text the
+          // script was actually drafted from, not the original suggestion.
+          return { ...it, topic: hit.topic, qa: hit.qa, graders: hit.graders ?? [],
+                   judge: hit.judge ?? null,
+                   state: "ready", workflow: hit.workflow ?? it.workflow };
         }));
       } catch (e) {
         if (!alive) return;
@@ -78,11 +82,13 @@ export function StepReview({
   async function generate(i: number) {
     patch(i, { state: "loading", error: undefined });
     try {
-      const r = await makeScripts(material.doc_id, [items[i].topic]);
+      const r = await makeWorkflowScripts(material.doc_id, [items[i].workflow]);
       onSpend(r.usage, r.total);
       const hit = r.results[0];
       if (!hit || hit.error || !hit.qa) throw new Error(hit?.error ?? "no script returned");
-      patch(i, { qa: hit.qa, graders: hit.graders ?? [], state: "ready", spent: r.usage });
+      patch(i, { topic: hit.topic, qa: hit.qa, graders: hit.graders ?? [],
+                 judge: hit.judge ?? null, state: "ready",
+                 spent: r.usage, workflow: hit.workflow ?? items[i].workflow });
     } catch (e) {
       patch(i, { state: "error", error: (e as Error).message });
     }
@@ -93,11 +99,16 @@ export function StepReview({
     if (!it.note.trim()) return patch(i, { error: "Say what to change first." });
     patch(i, { state: "loading", error: undefined });
     try {
+      // it.workflow carries the framing + approved teaching approach the
+      // script was drafted from, so the regeneration keeps following it too.
       const r = await regenerate(material.doc_id, it.topic, it.note, it.target,
-                                 it.qa ?? undefined);
+                                 it.qa ?? undefined, it.workflow);
       onSpend(r.usage, r.total);
-      patch(i, { qa: r.qa, graders: r.graders, state: "ready", note: "",
-                 spent: addUsage(it.spent, r.usage) });
+      // /api/regenerate does not run the review judge (see server.py) — the old
+      // verdict was for the script this just replaced, so drop it rather than
+      // show a stale score against new wording.
+      patch(i, { qa: r.qa, graders: r.graders, judge: undefined, state: "ready", note: "",
+                 spent: addUsage(it.spent, r.usage), workflow: r.workflow ?? it.workflow });
     } catch (e) {
       patch(i, { state: "error", error: (e as Error).message });
     }
@@ -105,56 +116,19 @@ export function StepReview({
 
   const approved = items.filter((it) => it.state === "approved" && it.qa);
   const undecided = items.filter((it) => it.state === "ready" || it.state === "loading");
-  // "after all accepted then generate the reels" — so nothing may still be
-  // waiting on a decision. Skipping is a decision; leaving it open is not.
-  const canBuild = approved.length > 0 && undecided.length === 0 && !drafting;
-
-  async function build() {
-    setBuilding(true);
-    setBuildError(null);
-    setHeld([]);
-    try {
-      const r = await finalize(
-        material.doc_id,
-        approved.map((it) => ({ topic: it.topic, qa: it.qa as QA })),
-      );
-      onSpend(r.usage, r.total);
-      if (r.failed.length) {
-        setBuildError(r.failed.map((f) => `${f.topic_id}: ${f.error}`).join("; "));
-      }
-      setBuildWarnings(
-        Object.entries(r.warnings ?? {}).map(([id, ws]) => `${id} — ${ws.join("; ")}`),
-      );
-      setHeld(r.quarantined ?? []);
-
-      // ONLY LEAVE THIS STEP IF THERE IS SOMETHING TO WATCH.
-      //
-      // onDone() was called unconditionally, and onDone switches App to step 3 —
-      // which unmounts this component and takes every message set above it down
-      // with it. So the run where the judge quarantined all five shorts set
-      // buildError, set the warnings, and then destroyed both before a single
-      // frame rendered them. What the reviewer saw was step 3 reading "No reels
-      // yet. Paste material in step 1, approve some answers in step 2", which is
-      // both wrong and unactionable: the material was pasted, the answers were
-      // approved, the shorts were built, and they are on disk.
-      //
-      // Nothing playable means staying here, where the reasons are.
-      if (r.shorts.length) onDone(r.shorts);
-    } catch (e) {
-      setBuildError((e as Error).message);
-    } finally {
-      setBuilding(false);
-    }
-  }
+  // "after all accepted then continue" — so nothing may still be waiting on a
+  // decision. Skipping is a decision; leaving it open is not.
+  const canContinue = approved.length > 0 && undecided.length === 0 && !drafting;
 
   return (
     <div className="panel wide">
-      <h1>Review the questions &amp; answers</h1>
+      <h1>Review the narration</h1>
       <p className="lede">
         {material.sections.length} sections · {items.length} question{items.length === 1 ? "" : "s"}.
-        Each is answered in 3&ndash;4 short parts. Approve the ones that read well, regenerate
-        the ones that don&rsquo;t, skip any you don&rsquo;t want. Reels are built once every
-        question is decided.
+        Each is explained by a single narrator in 3&ndash;4 connected short parts, written
+        using the teaching approach you already approved. Approve the ones that read
+        well, regenerate the ones that don&rsquo;t, skip any you don&rsquo;t want. The
+        visual plan is reviewed next, once every question here is decided.
       </p>
       {material.notes && material.notes.length > 0 && (
         <div className="notes">
@@ -187,63 +161,16 @@ export function StepReview({
         <span className="hintline">
           {undecided.length > 0
             ? "approve or skip every question first"
-            : "building draws the diagrams and runs the judge"}
+            : "plans what each beat must show, next"}
         </span>
-        <button className="primary" disabled={!canBuild || building} onClick={build}>
-          {building
-            ? <Spinner label="Drawing diagrams & grading…" />
-            : `Build ${approved.length} reel${approved.length === 1 ? "" : "s"} →`}
+        <button
+          className="primary"
+          disabled={!canContinue}
+          onClick={() => onDone(approved.map((it) => it.workflow))}
+        >
+          Continue to visual plan →
         </button>
       </div>
-      {buildError && <div className="error">{buildError}</div>}
-      {held.length > 0 && (
-        <div className="warn">
-          <b>
-            {held.length} short{held.length === 1 ? " was" : "s were"} built but held
-            out of the reel — the judge scored {held.length === 1 ? "it" : "them"} under the bar
-          </b>
-          <span>
-            {held.length === 1 ? "It is" : "They are"} on disk with the verdict attached.
-            Watch {held.length === 1 ? "it" : "them"} and redraw the pictures from a
-            note on the reel itself, or leave {held.length === 1 ? "it" : "them"} —
-            nothing is lost.
-          </span>
-          {held.map((u) => (
-            <span key={u.short_id}>
-              <b>{u.short_id}</b>
-              {u.judge && ` — faithfulness ${u.judge.faithfulness}/5, clarity ${u.judge.clarity}/5, pace ${u.judge.pace}/5`}
-              {u.judge?.problems?.length ? `: ${u.judge.problems.join(" · ")}` : ""}
-              {" "}
-              <button className="ghost sm" onClick={() => onWatchHeld(u.short_id)}>
-                Watch it →
-              </button>
-              {" "}
-              {released.includes(u.short_id)
-                ? <em>published — it is in the reel now</em>
-                : (
-                  <button
-                    className="ghost sm"
-                    title="publish it anyway; the judge's verdict is kept on the short"
-                    onClick={() => {
-                      setReleaseErr(null);
-                      release(u.short_id)
-                        .then(() => setReleased((r) => [...r, u.short_id]))
-                        .catch((e) => setReleaseErr((e as Error).message));
-                    }}>
-                    Publish anyway
-                  </button>
-                )}
-            </span>
-          ))}
-          {releaseErr && <span className="error">{releaseErr}</span>}
-        </div>
-      )}
-      {buildWarnings.length > 0 && (
-        <div className="warn">
-          <b>Built, but the diagrams need work</b>
-          {buildWarnings.map((w, i) => <span key={i}>{w}</span>)}
-        </div>
-      )}
     </div>
   );
 }
@@ -261,8 +188,15 @@ function ReviewCard({
   onTarget: (t: "question" | "answer" | "script") => void;
   onRedo: () => void;
 }) {
-  const { topic, qa, graders, state } = item;
+  const { topic, qa, graders, judge, state, workflow } = item;
   const failing = graders.filter((g) => !g.passed);
+  const approach = effectiveTeachingApproach(workflow);
+  // Below 4/5 is the same "must not be weaker" bar config.py documents for the
+  // judge role generally — a script this thin on faithfulness is exactly what
+  // slipped through review unseen before this warning existed (faithfulness
+  // 2/5 on a script built from a headings-only section, approved without a
+  // second look because nothing on this card said otherwise).
+  const weakJudge = judge && judge.faithfulness < 4;
 
   return (
     <div className={`card${state === "approved" ? " approved" : ""}${state === "skipped" ? " skipped" : ""}`}>
@@ -270,6 +204,11 @@ function ReviewCard({
         <div>
           <span className="tag">§{topic.source_section_id}</span>{" "}
           <span className="tag dim">{topic.difficulty}</span>
+          {approach && (
+            <span className="tag dim" title={approach.rationale || undefined}>
+              taught via: {describeApproach(approach)}
+            </span>
+          )}
           <div className="topic">{topic.topic}</div>
           <div className="why">{topic.why_it_matters}</div>
         </div>
@@ -296,28 +235,31 @@ function ReviewCard({
 
       {qa && (
         <>
-          <div className="qa">
-            <div className="qaline">
-              <span className="label">Asks</span>
-              <span className="avatarcell"><Interviewer size={34} /></span>
-              <span className="body">{qa.question}</span>
-            </div>
-            {qa.answers.map((a, k) => (
-              <div className="qaline" key={a.index}>
-                <span className="label">{k === 0 ? "Answers" : ""}</span>
+          {/* ONE NARRATOR, ONE CONNECTED EXPLANATION — not a question-and-answer
+              exchange. qa.beats[0] is the opening line; every beat after it
+              continues the same narrator's explanation, in speaking order. See
+              shorts/schema.py's Script.opening_beat / .body_beats. The topic
+              itself (qa.question) is already shown above in .topic/.why —
+              this list is the narration that explains it, start to finish. */}
+          <div className="qa narration">
+            {qa.beats.map((b, k) => (
+              <div className="qaline" key={k}>
+                <span className="label">{k === 0 ? "Narrates" : ""}</span>
                 <span className="avatarcell">
-                  {k === 0 ? <Student size={34} /> : <span className="stepdot">{k + 1}</span>}
+                  {k === 0 ? <Interviewer size={34} /> : <span className="stepdot">{k + 1}</span>}
                 </span>
                 <span className="body">
-                  {a.line}
-                  <span className="os">on screen: {a.on_screen}</span>
-                  {/* The sentence this answer restates, checked against the section
+                  {b.line}
+                  <span className="os">on screen: {b.on_screen}</span>
+                  {/* The sentence this beat restates, checked against the section
                       by substring match server-side. Shown so the reviewer can
-                      confirm the answer against the material without leaving the
-                      page — that comparison is the whole job of this step. */}
-                  {a.source_quote && (
+                      confirm the line against the material without leaving the
+                      page — that comparison is the whole job of this step. Never
+                      present on the opening beat by design (see checks.py's
+                      check_question_grounded, which checks that one instead). */}
+                  {b.source_quote && (
                     <span className="cited" title="verified present in the source section">
-                      “{a.source_quote}”
+                      “{b.source_quote}”
                     </span>
                   )}
                 </span>
@@ -331,6 +273,15 @@ function ReviewCard({
                 {g.passed ? "✓" : "✕"} {g.name}
               </span>
             ))}
+            {judge && (
+              <span
+                className={`chip ${weakJudge ? "bad" : "ok"}`}
+                title={judge.problems.join(" · ") || "no problems reported"}
+              >
+                {weakJudge ? "✕" : "✓"} judge: faithfulness {judge.faithfulness}/5,
+                clarity {judge.clarity}/5, pace {judge.pace}/5
+              </span>
+            )}
             <span className="chip dim">{qa.words} words · {qa.seconds}s</span>
             {item.spent && (
               <span className="chip dim" title={`${item.spent.calls} model calls`}>
@@ -341,6 +292,18 @@ function ReviewCard({
           {failing.map((g) => (
             <div className="error sm" key={g.name}>{g.name}: {g.reason}</div>
           ))}
+          {/* The code graders above only check that the script is well FORMED —
+              length, citations present, no repetition. This is the one signal
+              that checks whether it is actually TRUE to the section, and it is
+              exactly the thing a reviewer approved blind before this existed:
+              a script built from a headings-only section passed every code
+              grader and scored faithfulness 2/5 here. */}
+          {weakJudge && (
+            <div className="error sm">
+              <b>Judge flags this as weakly grounded (faithfulness {judge!.faithfulness}/5)</b>
+              {judge!.problems.map((p, k) => <div key={k}>{p}</div>)}
+            </div>
+          )}
 
           <div className="redo">
             <select value={item.target} onChange={(e) => onTarget(e.target.value as never)}>

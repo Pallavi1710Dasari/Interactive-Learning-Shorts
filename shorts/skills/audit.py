@@ -79,7 +79,7 @@ def judge_script(script: Script, source_text: str,
     well-formed, on-vocabulary, and about the wrong thing.
     """
     beats = "\n".join(
-        f"{i}. [{b.speaker}] {b.line}\n   on_screen: {b.on_screen}"
+        f"{i}. {b.line}\n   on_screen: {b.on_screen}"
         + (f"\n   cites: {b.source_quote!r}" if b.source_quote else "")
         for i, b in enumerate(script.beats)
     )

@@ -61,7 +61,7 @@ def _is_unit(path: Path) -> bool:
     ends in a wall of pydantic errors about a topics file that was never a unit.
     """
     try:
-        doc = json.loads(path.read_text())
+        doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
     return isinstance(doc, dict) and "beats" in doc and "visuals" in doc
@@ -146,7 +146,7 @@ def redesign(path: Path, write: bool) -> tuple[int, list[str]]:
     from .skills.visuals import design_visuals
     from .schema import Script
 
-    unit = ShortUnit(**json.loads(path.read_text()))
+    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
     section = _section_for(unit)
     script = Script(short_id=unit.short_id, question=unit.question, beats=unit.beats)
 
@@ -164,13 +164,13 @@ def redesign(path: Path, write: bool) -> tuple[int, list[str]]:
 
     problems = _design_problems(unit)
     if write:
-        path.write_text(json.dumps(unit.model_dump(), indent=2))
+        path.write_text(json.dumps(unit.model_dump(), indent=2), encoding="utf-8")
     return len(visuals), problems
 
 
 def redraw(path: Path, write: bool) -> tuple[int, int, list[str]]:
     """Re-render one unit. Returns (frames redrawn, frames changed, design problems)."""
-    unit = ShortUnit(**json.loads(path.read_text()))
+    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
 
     drawn = changed = 0
     for visual in unit.visuals.values():
@@ -187,7 +187,7 @@ def redraw(path: Path, write: bool) -> tuple[int, int, list[str]]:
     problems = _design_problems(unit)
 
     if write and changed:
-        path.write_text(json.dumps(unit.model_dump(), indent=2))
+        path.write_text(json.dumps(unit.model_dump(), indent=2), encoding="utf-8")
     return drawn, changed, problems
 
 
@@ -274,7 +274,7 @@ def _judge_one(path: Path) -> str:
     from .schema import Script
     from .skills.audit import judge_script
 
-    unit = ShortUnit(**json.loads(path.read_text()))
+    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
     section = _section_for(unit)
     if section is None:
         return "no source on disk — cannot judge"
@@ -285,7 +285,7 @@ def _judge_one(path: Path) -> str:
     # Same status rule run.py uses, so a unit graded here and a unit graded during a
     # build cannot end up meaning different things.
     unit.status = "audited" if report.passed else "rejected"
-    path.write_text(json.dumps(unit.model_dump(), indent=2))
+    path.write_text(json.dumps(unit.model_dump(), indent=2), encoding="utf-8")
 
     verdict = "PASS" if report.passed else "REJECT"
     detail = (f"faith={report.faithfulness} clarity={report.clarity} "
@@ -301,7 +301,7 @@ def _redesign_all(paths: list[Path], every: bool = False, judge: bool = False) -
     todo = []
     for path in paths:
         try:
-            unit = ShortUnit(**json.loads(path.read_text()))
+            unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
         except Exception as e:
             print(f"  ! {path.stem}: {type(e).__name__}: {e}")
             continue
@@ -328,7 +328,7 @@ def _redesign_all(paths: list[Path], every: bool = False, judge: bool = False) -
         # progress. Code graders measure whether a frame is structurally a picture;
         # only the judge reads it against the source. When they disagree about a
         # replacement, the version a human already had is the safer one to keep.
-        was = path.read_text()
+        was = path.read_text(encoding="utf-8")
         try:
             before = ShortUnit(**json.loads(was)).eval
         except Exception:
@@ -350,10 +350,10 @@ def _redesign_all(paths: list[Path], every: bool = False, judge: bool = False) -
         if judge:
             try:
                 print(f"       judge: {_judge_one(path)}")
-                after = ShortUnit(**json.loads(path.read_text())).eval
+                after = ShortUnit(**json.loads(path.read_text(encoding="utf-8"))).eval
                 if (before is not None and after is not None
                         and before.passed and not after.passed):
-                    path.write_text(was)
+                    path.write_text(was, encoding="utf-8")
                     reverted += 1
                     if problems:
                         still_bad -= 1

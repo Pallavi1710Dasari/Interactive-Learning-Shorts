@@ -111,16 +111,29 @@ def synthesize(script: Script, out_dir: Path | None = None,
     gap = config.VOICE_BEAT_GAP if gap is None else gap
 
     voices = voices or provider.resolve()
-    missing = [k for k, v in voices.items() if not v]
-    if missing:
-        raise RuntimeError(f"{provider.name}: no voice configured for "
-                           f"{', '.join(missing)}")
+
+    # ONE NARRATOR, ONE VOICE. `voices` still carries two keys — resolve() and
+    # the whole Voice Lab (server.py's /api/voice/* endpoints, voicesample.py)
+    # still deal in an "interviewer" and a "student" slot, and that machinery is
+    # untouched — but a reel is no longer a two-person dialogue (see
+    # schema.Script's own docstring), so every beat is now spoken in the SAME
+    # voice: whichever one is configured under the "interviewer" slot. Only that
+    # one voice has to be configured; a deployment that never bothered setting
+    # the "student" slot, now unused here, does not fail a build over it.
+    narrator_voice = voices.get("interviewer") or next((v for v in voices.values() if v), None)
+    if not narrator_voice:
+        raise RuntimeError(f"{provider.name}: no narrator voice configured")
 
     parts, spans, all_words, cursor = [], [], [], 0.0
 
     for i, beat in enumerate(script.beats):
         spoken = speech.conversational(beat.line)
-        raw = provider.synth(spoken, voices[beat.speaker], beat.speaker)
+        # `role` is a DELIVERY preset, not a second voice — see above. Beat 0 is
+        # still the opening and gets the slightly livelier "asking" settings each
+        # provider already has for it; every beat after it gets the steadier
+        # "explaining" settings. Same speaker throughout either way.
+        role = "interviewer" if i == 0 else "student"
+        raw = provider.synth(spoken, narrator_voice, role)
 
         chunk = out_dir / f"beat_{i:02d}.wav"
         duration = _to_wav(raw, provider.suffix, chunk, exe)
@@ -134,9 +147,9 @@ def synthesize(script: Script, out_dir: Path | None = None,
     _join(parts, combined, gap, exe)
 
     (out_dir / "spans.json").write_text(
-        json.dumps([s.model_dump() for s in spans], indent=2))
+        json.dumps([s.model_dump() for s in spans], indent=2), encoding="utf-8")
     (out_dir / "timings.json").write_text(
-        json.dumps([w.model_dump() for w in all_words], indent=2))
+        json.dumps([w.model_dump() for w in all_words], indent=2), encoding="utf-8")
 
     # The trailing gap is silence after the last word; the track ends with the words.
     duration = round(max(cursor - gap, 0.0), 2)
@@ -205,7 +218,8 @@ def probe(provider: providers.Provider | None = None) -> tuple[bool, str]:
         return False, why
     try:
         voices = provider.resolve()
-        raw = provider.synth("Hello there.", voices["student"], "student")
+        narrator_voice = voices.get("interviewer") or next((v for v in voices.values() if v), None)
+        raw = provider.synth("Hello there.", narrator_voice, "interviewer")
     except AccountBlocked as e:
         return False, str(e)
     except Exception as e:

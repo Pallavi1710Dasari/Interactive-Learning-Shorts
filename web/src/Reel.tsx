@@ -88,8 +88,6 @@ export function Reel({
     return () => window.removeEventListener("keydown", onKey);
   }, [active, n, unit, onDownload]);
 
-  const isAsking = beat.speaker === "interviewer";
-
   return (
     <div className={`reel${active ? " live" : ""}`} style={{ ["--hue" as string]: hue }}>
       {/* ReelStage owns .stage; clicking the picture pauses, and pausing
@@ -112,7 +110,8 @@ export function Reel({
           solo-study tool that social-engagement chrome read as a kids' app rather
           than exam prep. */}
       <div className="rail">
-        <div className="whocell" title={isAsking ? "interviewer asking" : "student answering"}>
+        {/* One narrator throughout — see ReelStage's own note. */}
+        <div className="whocell" title="narrating">
           <Avatar speaker={beat.speaker} speaking={n.speaking} size={34} />
         </div>
 

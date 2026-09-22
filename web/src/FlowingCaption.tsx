@@ -25,7 +25,10 @@ export function FlowingCaption({ line, words, time, speaker }: {
   words: CaptionWord[] | undefined;
   /** Position of the narration, in seconds from the start of the short. */
   time: number;
-  speaker: "interviewer" | "student";
+  /** A plain string now, not the old two-value union — see shorts/schema.py's
+   *  Beat.speaker. Used only for a CSS class (`flow ${speaker}`); an unknown
+   *  value simply picks up no speaker-specific style. */
+  speaker: string;
 }) {
   // No timings (an older unit, or a payload from before feed.py grew them) still
   // has to render: fall back to the plain sentence rather than an empty bubble.

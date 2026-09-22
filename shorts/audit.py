@@ -65,7 +65,7 @@ def audit(paths: list[Path]) -> dict:
 
     for path in paths:
         try:
-            unit = json.loads(path.read_text())
+            unit = json.loads(path.read_text(encoding="utf-8"))
         except Exception as e:
             print(f"  skipping {path.name}: {type(e).__name__}")
             continue
@@ -149,8 +149,7 @@ def contact_sheet(result: dict, out: Path) -> Path:
         # Which beats play over each visual, in beat order.
         said: dict[str, list[str]] = {}
         for beat in unit["beats"]:
-            said.setdefault(beat["visual_ref"], []).append(
-                f"<b>{beat['speaker']}:</b> {_esc(beat['line'])}")
+            said.setdefault(beat["visual_ref"], []).append(_esc(beat["line"]))
 
         cards = []
         for ref, visual in unit["visuals"].items():

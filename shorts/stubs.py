@@ -84,6 +84,28 @@ def _overlay(text: str) -> str:
     return " ".join(words[:MAX_OVERLAY]) or "detail"
 
 
+def _terminate(line: str) -> str:
+    """
+    `line`, guaranteed to end in real terminal punctuation.
+
+    checks.check_narration_sentence_form checks EVERY beat for one, opening
+    beat included (it used to skip beat 0 because that was always the
+    interviewer's own, separately-worded question; see that check's own
+    docstring). Any word-count trim in this file — cutting a long section
+    sentence to MAX_BEAT_WORDS, or the total-length last resort further down
+    — can land mid-clause, leaving a beat like "...the number of id
+    selectors, and the", which is exactly the fragment that check exists to
+    catch. Every trim in this file goes through this before it becomes a
+    beat's `line`.
+    """
+    return line if line.endswith((".", "!", "?")) else line + "."
+
+
+def _truncate(text: str, max_words: int) -> str:
+    """The first `max_words` words of `text`, terminated — see _terminate."""
+    return _terminate(" ".join(text.split()[:max_words]))
+
+
 def _topics(user: str) -> dict:
     """One topic per section, read straight out of the prompt block."""
     found = re.findall(r"\[section_id: ([^\]]+)\]\s*(.*)", user)
@@ -160,7 +182,7 @@ def _teaching_approach(user: str) -> dict:
 
 def _script(user: str) -> dict:
     """
-    Build an interview out of the section's own sentences.
+    Build a single narrator's script out of the section's own sentences.
 
     Sentences are cycled if the section is short, because a real section is often
     under the 75-word floor and we want the timing grader to pass honestly.
@@ -190,7 +212,7 @@ def _script(user: str) -> dict:
     # Capped by the sentences available, NOT floored at MIN_ANSWERS. Forcing four
     # beats out of a three-sentence section is what the cycling did, and it is the
     # padding check_beats_develop rejects — better to emit three and fail
-    # dialogue_shape honestly than to emit four that repeat.
+    # narration_shape honestly than to emit four that repeat.
     n_beats = min(BEATS, len(spans), len(sentences))
 
     # ONE DISTINCT SENTENCE PER BEAT, IN DOCUMENT ORDER. No cycling.
@@ -213,12 +235,12 @@ def _script(user: str) -> dict:
     # failure is the honest report: 4-5 beats that each say something new need a
     # section with 4-5 things to say. content/css_specificity.md is sized for it;
     # the thinner sample documents are not, and should fail here.
-    beats = [{"speaker": "interviewer", "line": topic,
+    beats = [{"speaker": "narrator", "line": topic,
               "on_screen": _overlay(topic), "visual_ref": "v_question"}]
     for n in range(1, n_beats + 1):
         source = sentences[(n - 1) % len(sentences)]
-        line = " ".join(source.split()[:MAX_BEAT_WORDS])
-        beats.append({"speaker": "student", "line": line,
+        line = _truncate(source, MAX_BEAT_WORDS)
+        beats.append({"speaker": "narrator", "line": line,
                       "on_screen": _overlay(line), "visual_ref": f"v_step_{n}",
                       # Verbatim by construction, and now the span the beat was
                       # actually built from rather than one cycled separately — so
@@ -244,7 +266,7 @@ def _script(user: str) -> dict:
     # The source_quote is left as the cycled span: still a verbatim span of the
     # section, still distinct per beat, and never coupled to the assembled lines.
     if len(beats) > 1 and spans:
-        landing = " ".join(spans[-1].split()[:MAX_BEAT_WORDS])
+        landing = _truncate(spans[-1], MAX_BEAT_WORDS)
         # Guard for a section so thin that its last span IS its first sentence:
         # duplicating a beat to satisfy one grader while failing another is not a
         # trade worth making, so the cycled line stays.
@@ -279,7 +301,8 @@ def _script(user: str) -> dict:
     if total > MAX_WORDS:
         tail = beats[-1]["line"].split()
         keep = max(5, len(tail) - (total - MAX_WORDS) - 1)
-        beats[-1]["line"] = " ".join(tail[:keep])
+        beats[-1]["line"] = _terminate(" ".join(tail[:keep]))
+        beats[-1]["on_screen"] = _overlay(beats[-1]["line"])
 
     return {"short_id": short_id, "question": topic, "beats": beats}
 

@@ -106,14 +106,18 @@ export function jitter(seed: string): number {
 export type VoiceProfile = { rate: number; pitch: number };
 
 /**
- * Per-speaker delivery, plus per-phrase drift.
+ * Per-beat delivery, plus per-phrase drift.
  *
- * The interviewer asks, so a touch quicker and brighter; the student explains, so
- * a touch slower. The drift is ±0.04 — enough that consecutive phrases are not
- * identical, small enough that it never sounds like a pitch effect.
+ * `speaker` is a plain string now, not the old two-value union — see
+ * shorts/schema.py's Beat.speaker. There is one narrator, but the opening beat
+ * (still tagged "interviewer" by callers, as a DELIVERY preset — see
+ * tts.py's synthesize()) is asked a touch quicker and brighter; every other
+ * beat explains, so a touch slower. The drift is ±0.04 — enough that
+ * consecutive phrases are not identical, small enough that it never sounds
+ * like a pitch effect.
  */
 export function profile(
-  speaker: "interviewer" | "student", phrase: string, rate: number,
+  speaker: string, phrase: string, rate: number,
 ): VoiceProfile {
   const drift = (jitter(phrase) - 0.5) * 0.08;
   const asking = speaker === "interviewer";

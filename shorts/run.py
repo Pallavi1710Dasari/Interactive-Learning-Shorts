@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .schema import ShortUnit, TopicList, QuestionWorkflow
-from .parse import parse_markdown, find_section
+from .parse import parse_markdown, find_section, evidence_text
 from .skills.select import select_topics_with_selections
 from .skills.script import write_script
 from .skills.understanding import understanding_for
@@ -71,7 +71,8 @@ MAX_BUILD_WORKERS = 5
 _TTS_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="tts")
 
 
-def _save_rejected(topic, section, attempt: int, script, results) -> Path:
+def _save_rejected(topic, section, attempt: int, script, results,
+                   source_text: str | None = None) -> Path:
     """
     Freeze a failed script attempt so it can become an eval fixture.
 
@@ -105,16 +106,21 @@ def _save_rejected(topic, section, attempt: int, script, results) -> Path:
                    for r in results if not r.passed],
         "passed": [r.name for r in results if r.passed],
         "script": script.model_dump(),
-        "source_text": section.text,
-    }, indent=2))
+        "source_text": section.text if source_text is None else source_text,
+    }, indent=2), encoding="utf-8")
     return path
 
 
-def _realign_topic(topic, section, understanding, document):
+def _realign_topic(topic, section, understanding, document, source_text: str | None = None):
     """
     Rewrite a topic's question (and concept) to match the section's own core
     idea, when checks.check_topic_matches_understanding found the two talking
     about different things.
+
+    `source_text` is forwarded to write_script unchanged (optional, defaults
+    to `section.text`) purely so the realignment call sees the same evidence
+    pool the real script will — it is not graded either way, since none of
+    this call's beats are kept (see below).
 
     REUSES write_script ITSELF — the same underlying function server.py's
     POST /api/regenerate calls for a human's "change only the question" edit —
@@ -142,7 +148,7 @@ def _realign_topic(topic, section, understanding, document):
     """
     instruction = (
         "This topic's question may be drifting from what its own section "
-        "actually teaches. Write the interviewer's question so it asks about "
+        "actually teaches. Write beat 1's opening so it asks about "
         f"the section's real central idea instead: {understanding.core_idea}\n"
         "Keep it one plain question a beginner could repeat back, following the "
         "same rules as any other question here: start with What/Why/How/Which/"
@@ -150,7 +156,8 @@ def _realign_topic(topic, section, understanding, document):
     )
     try:
         realigned = write_script(topic, section, instruction,
-                                 document=document, understanding=understanding)
+                                 document=document, understanding=understanding,
+                                 source_text=source_text)
     except Exception as e:
         print(f"      ! could not realign {topic.id} to the section's core idea "
               f"({type(e).__name__}: {e}) — writing from the original question")
@@ -166,8 +173,15 @@ def _realign_topic(topic, section, understanding, document):
 def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
               document: str | None = None,
               router: _StdoutRouter | None = None,
-              buf=None) -> ShortUnit | None:
+              buf=None, source_text: str | None = None) -> ShortUnit | None:
     """
+    `source_text` is OPTIONAL and defaults to `section.text` — the caller may
+    instead pass the resolved evidence pool from parse.evidence_text, when
+    this section has sibling headings ("Example", "How It Works", ...) that
+    elaborate it. It becomes the ONE text richness, write_script, grading and
+    the final audit are all judged against, so a beat legitimately grounded in
+    a sibling section is never graded as having strayed from "its own" text.
+
     `router`/`buf` are optional and exist for exactly one reason: TTS now runs on
     a _TTS_POOL thread rather than this one (see below), and that thread has never
     called router.route(), so anything it prints falls through to the real stdout
@@ -180,13 +194,15 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
     """
     print(f"\n=== {topic.id} — {topic.topic[:60]}")
 
+    source_text = section.text if source_text is None else source_text
+
     # FREE AND FIRST. Does the section have enough distinct sentences to cite,
     # whatever it turns out to teach? Answerable from the raw text with no model
     # call, so it runs before the understanding call below spends the first of what
     # would otherwise be four paid calls (one reading, three script attempts) on a
     # section that was never going to satisfy check_source_quotes' distinctness
     # rule. See checks.check_section_richness for the real case that motivated it.
-    richness = checks.check_section_richness(section.text)
+    richness = checks.check_section_richness(source_text)
     if not richness.passed:
         print(f"    skipping {topic.id} — {richness.reason}")
         return None
@@ -208,7 +224,7 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
     # settled question at the price of another call. Cached per section too, so a
     # deck with several shorts filed under one section pays for one reading.
     # None when the reading failed; write_script then behaves exactly as before.
-    understanding = understanding_for(section, document=document)
+    understanding = understanding_for(section, document=document, source_text=source_text)
     if understanding:
         print(f"    understood: {understanding.core_idea[:74]}")
         print(f"      teaching: "
@@ -241,18 +257,19 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
         match = checks.check_topic_matches_understanding(topic, understanding)
         if not match.passed:
             print(f"      ~ {match.reason}")
-            topic = _realign_topic(topic, section, understanding, document)
+            topic = _realign_topic(topic, section, understanding, document,
+                                   source_text=source_text)
     else:
         print(f"    understanding for {topic.id} unavailable "
               f"— writing from the section alone")
 
     for attempt in range(1, MAX_SCRIPT_RETRIES + 1):
         script = write_script(topic, section, feedback, document=document,
-                              understanding=understanding)
+                              understanding=understanding, source_text=source_text)
         # The SAME understanding that wrote the script grades it. Both sides of the
         # loop read one object, so a retry is judged against the plan it was shown.
-        results = checks.run_script_graders(script, section.text, doc_text=document,
-                                            understanding=understanding)
+        results = checks.run_script_graders(script, source_text, doc_text=document,
+                                            understanding=understanding, topic=topic)
         for r in results:
             print(f"    {r}")
 
@@ -260,7 +277,8 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
             break
 
         # Every failed attempt is frozen, including the last one before we give up.
-        saved = _save_rejected(topic, section, attempt, script, results)
+        saved = _save_rejected(topic, section, attempt, script, results,
+                               source_text=source_text)
         # Grouped by revision area, correctness first, with the parts that already
         # work named as things to keep. Same results, same retry count — see
         # shorts/revision.py for why the flat list was costing attempts.
@@ -325,7 +343,11 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
         if unit.audio:
             print(f"    audio: {unit.audio.duration_seconds}s real duration")
 
-    grader_results, report = audit(script, section.text, unit)
+    # SAME source_text AS THE RETRY LOOP ABOVE — audit() re-runs run_script_graders
+    # (source_quotes, answers_its_section, ...) on the attempt that survived, and
+    # re-checking it against a NARROWER text than it was actually written and
+    # graded against would fail a script here that the loop just accepted.
+    grader_results, report = audit(script, source_text, unit)
     for r in grader_results:
         print(f"    {r}")
     if report:
@@ -411,7 +433,7 @@ def main():
         # decided every topic in it belongs, so every one is built. This is the
         # explicit, documented way to skip Step 3's gate entirely (requirement
         # G's "existing automatic behavior remains available explicitly").
-        topic_list = TopicList(**json.loads(Path(args.topics_file).read_text()))
+        topic_list = TopicList(**json.loads(Path(args.topics_file).read_text(encoding="utf-8")))
         print(f"loaded {len(topic_list.topics)} approved topics from {args.topics_file}")
         for t in topic_list.topics:
             print(f"  [{t.source_section_id}] {t.id}: {t.topic}")
@@ -422,7 +444,7 @@ def main():
         # — see schema.QuestionWorkflow.approved_topic, the one gate every
         # caller of this file (CLI, server) shares. A pending or rejected entry
         # is reported, never built.
-        raw = json.loads(Path(args.selections_file).read_text())
+        raw = json.loads(Path(args.selections_file).read_text(encoding="utf-8"))
         workflows = [QuestionWorkflow(**w) for w in raw]
         topics = [t for wf in workflows if (t := wf.approved_topic) is not None]
         skipped = len(workflows) - len(topics)
@@ -445,7 +467,7 @@ def main():
         topic_list, _notes, selections = select_topics_with_selections(
             sections, target=args.topics)
         print(f"selected {len(topic_list.topics)} topics")
-        topics_path.write_text(topic_list.model_dump_json(indent=2))
+        topics_path.write_text(topic_list.model_dump_json(indent=2), encoding="utf-8")
         for t in topic_list.topics:
             print(f"  [{t.source_section_id}] {t.id}: {t.topic}")
 
@@ -469,7 +491,7 @@ def main():
             workflows = review.run_question_gate(workflows, sections,
                                                  interactive=interactive)
             selections_path.write_text(
-                json.dumps([w.model_dump() for w in workflows], indent=2))
+                json.dumps([w.model_dump() for w in workflows], indent=2), encoding="utf-8")
 
             if not interactive:
                 print(f"\nwrote {selections_path}")
@@ -517,7 +539,7 @@ def main():
                 workflows = review.run_teaching_approach_gate(
                     workflows, sections, interactive=interactive)
                 selections_path.write_text(
-                    json.dumps([w.model_dump() for w in workflows], indent=2))
+                    json.dumps([w.model_dump() for w in workflows], indent=2), encoding="utf-8")
 
                 if not args.gate_visual_plan:
                     ready = [w for w in workflows if w.approved_teaching_approach is not None]
@@ -546,7 +568,7 @@ def main():
                 workflows = review.run_visual_plan_gate(
                     workflows, sections, interactive=interactive)
                 selections_path.write_text(
-                    json.dumps([w.model_dump() for w in workflows], indent=2))
+                    json.dumps([w.model_dump() for w in workflows], indent=2), encoding="utf-8")
 
                 ready = [w for w in workflows if w.approved_visual_strategy is not None]
                 print(f"\nwrote {selections_path}")
@@ -589,7 +611,8 @@ def main():
             section = find_section(sections, topic.source_section_id)
             unit = build_one(topic, section, session_id, not args.no_tts,
                              not args.no_svg, document=doc_text,
-                             router=router, buf=buf)
+                             router=router, buf=buf,
+                             source_text=evidence_text(sections, topic.source_section_id))
         except KeyError as e:
             return topic, None, f"  skipping {topic.id}: {e}\n"
         except Exception as e:
@@ -615,12 +638,12 @@ def main():
 
     outdir = config.OUTPUT_DIR
     for u in units:
-        (outdir / f"{u.short_id}.json").write_text(u.model_dump_json(indent=2))
+        (outdir / f"{u.short_id}.json").write_text(u.model_dump_json(indent=2), encoding="utf-8")
 
     manifest = outdir / "manifest.json"
     manifest.write_text(json.dumps(
         [{"short_id": u.short_id, "question": u.question, "status": u.status,
-          "seconds": u.estimated_seconds} for u in units], indent=2))
+          "seconds": u.estimated_seconds} for u in units], indent=2), encoding="utf-8")
 
     print(f"\nwrote {len(units)} unit(s) to {outdir}")
     print("REVIEW THESE BEFORE RENDERING. Nothing renders until you set status=approved.")

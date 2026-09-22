@@ -55,8 +55,6 @@ export function ReelStage({
     [unit.beats],
   );
 
-  const isAsking = beat.speaker === "interviewer";
-
   return (
     <>
       <div className="reelbg" />
@@ -79,10 +77,14 @@ export function ReelStage({
         ))}
       </div>
 
+      {/* ONE NARRATOR, EVERY BEAT — no more "Asking"/"Answering" split (that was
+          the old interviewer/student dialogue; see shorts/schema.py's Beat
+          docstring). This chip no longer has two states to distinguish, so it
+          reports one, constant thing: a short is being narrated. */}
       <header className="reelhead">
         <div className="who">
-          <span className="mode" aria-hidden="true">{isAsking ? "🤔" : "📖"}</span>
-          {isAsking ? "Asking" : "Answering"}
+          <span className="mode" aria-hidden="true">🎙️</span>
+          Narrating
         </div>
       </header>
 
@@ -109,7 +111,11 @@ export function ReelStage({
         </div>
       </div>
 
-      <div className={`bubble ${isAsking ? "left" : "right"}`}>
+      {/* Always "right" now — there is no second speaker to anchor "left"
+          against any more. Kept as a literal class, not a ternary on nothing,
+          so the caption's position does not silently depend on `beat.speaker`
+          again later. */}
+      <div className="bubble right">
         <FlowingCaption line={beat.line} words={beat.words} time={time}
                         speaker={beat.speaker} />
       </div>

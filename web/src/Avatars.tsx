@@ -119,7 +119,15 @@ function avatarClass(speaking: boolean, dim: boolean) {
   return ["avatar", speaking ? "speaking" : "", dim ? "dim" : ""].filter(Boolean).join(" ");
 }
 
-/** Pick the right character for a beat. */
-export function Avatar({ speaker, ...rest }: Props & { speaker: "interviewer" | "student" }) {
+/** Pick the right character for a beat.
+ *
+ *  `speaker` is a plain string, not the old two-value union — every reel now
+ *  has one narrator (see shorts/schema.py's Beat.speaker), so a beat's own
+ *  value here is no longer "which of two people is this", only "was this
+ *  beat asking or explaining". Only the literal legacy value "interviewer"
+ *  (still present on units recorded before this change) picks that pose;
+ *  everything else, including the new "narrator" value, renders the same
+ *  "explaining" figure. */
+export function Avatar({ speaker, ...rest }: Props & { speaker: string }) {
   return speaker === "interviewer" ? <Interviewer {...rest} /> : <Student {...rest} />;
 }

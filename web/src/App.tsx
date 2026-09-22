@@ -5,13 +5,25 @@ import { CostPill } from "./CostPill";
 import { Reel } from "./Reel";
 import { StepMaterial } from "./StepMaterial";
 import { StepApprove } from "./StepApprove";
+import { StepTeachingApproach } from "./StepTeachingApproach";
 import { StepReview } from "./StepReview";
+import { StepBuild } from "./StepBuild";
 import { VoiceLab } from "./VoiceLab";
 import { CaptureStage } from "./CaptureStage";
 import { pickVoices, useVoices } from "./useNarration";
-import type { Feedback, Topic, Unit } from "./types";
+import type { Feedback, QuestionWorkflow, Unit } from "./types";
 
-type Step = "material" | "approve" | "review" | "reels";
+// THE LIVE PRODUCT FLOW, IN ORDER. EXACTLY TWO STAGES ARE HUMAN GATES:
+//   material -> approve (QUESTION, human gate) -> approach (TEACHING
+//   APPROACH, human gate) -> review (script, human gate — see StepReview's
+//   own docstring for why this one stayed) -> building (visual plan +
+//   render, FULLY AUTOMATIC — see StepBuild) -> reels
+// "building" carries no crumb of its own: the visual plan is a decision the
+// system executes on an already-approved teaching approach, not a new one
+// that needs its own review — see StepBuild's docstring. The backend's
+// visual-plan approve/regenerate endpoints are untouched and still directly
+// callable; StepBuild just never stops on a click waiting for them.
+type Step = "material" | "approve" | "approach" | "review" | "building" | "reels";
 
 export default function App() {
   // #capture/<short_id> — the MP4 renderer's entry point, and deliberately the
@@ -94,10 +106,15 @@ function Workspace() {
   // Re-read when the studio closes: that is the only thing that can change it.
   useEffect(() => { if (!voiceOpen) readVoice(); }, [voiceOpen, readVoice]);
   const [material, setMaterial] = useState<MaterialResult | null>(null);
-  // Step 3's gate output: ONLY the topics a human approved (with regenerated
-  // wording already substituted in — see StepApprove's onDone). StepReview is
-  // handed these instead of material.topics, unmodified otherwise.
-  const [approvedTopics, setApprovedTopics] = useState<Topic[] | null>(null);
+  // Each stage's own gate output — the FULL QuestionWorkflow record, never a
+  // reconstructed Topic, so the next screen always has the framing/approach/
+  // script/visual-plan the previous human gate actually approved:
+  //   approvedWorkflows        Step 3 — question approved, nothing decided yet
+  //   taughtWorkflows          Step 6 — teaching approach approved
+  //   scriptedWorkflows        Step 8 — script drafted and approved
+  const [approvedWorkflows, setApprovedWorkflows] = useState<QuestionWorkflow[] | null>(null);
+  const [taughtWorkflows, setTaughtWorkflows] = useState<QuestionWorkflow[] | null>(null);
+  const [scriptedWorkflows, setScriptedWorkflows] = useState<QuestionWorkflow[] | null>(null);
   const [shorts, setShorts] = useState<Unit[]>([]);
   const [health, setHealth] = useState<Awaited<ReturnType<typeof getHealth>> | null>(null);
   const [total, setTotal] = useState<UsageTotals | null>(null);
@@ -146,12 +163,17 @@ function Workspace() {
         <nav className="steps">
           <Crumb n={1} label="Material" on={step === "material"} done={!!material}
                  onClick={() => setStep("material")} />
-          <Crumb n={2} label="Approve" on={step === "approve"} done={!!approvedTopics}
+          <Crumb n={2} label="Approve" on={step === "approve"} done={!!approvedWorkflows}
                  disabled={!material} onClick={() => setStep("approve")} />
-          <Crumb n={3} label="Review Q&amp;A" on={step === "review"} done={shorts.length > 0}
-                 disabled={!approvedTopics} onClick={() => setStep("review")} />
-          <Crumb n={4} label="Reels" on={step === "reels"} done={false}
-                 disabled={!shorts.length} onClick={() => setStep("reels")} />
+          <Crumb n={3} label="Teaching approach" on={step === "approach"} done={!!taughtWorkflows}
+                 disabled={!approvedWorkflows} onClick={() => setStep("approach")} />
+          <Crumb n={4} label="Review Q&amp;A" on={step === "review"} done={!!scriptedWorkflows}
+                 disabled={!taughtWorkflows} onClick={() => setStep("review")} />
+          {/* "building" (visual plan + render) has no crumb of its own — it
+              is automatic, not a stage a human navigates back to. The Reels
+              crumb lights up while it runs so the nav still shows progress. */}
+          <Crumb n={5} label="Reels" on={step === "reels" || step === "building"} done={false}
+                 disabled={!shorts.length && step !== "building"} onClick={() => setStep("reels")} />
         </nav>
         <span className="spacer" />
         {total && costOpen && <CostPill total={total} delta={delta} />}
@@ -186,7 +208,10 @@ function Workspace() {
           onDone={(r) => {
             onSpend(r.usage, r.total);
             setMaterial(r);
-            setApprovedTopics(null);   // a fresh material means a fresh approval pass
+            // A fresh material means a fresh pass through every later gate.
+            setApprovedWorkflows(null);
+            setTaughtWorkflows(null);
+            setScriptedWorkflows(null);
             setStep("approve");
           }}
         />
@@ -195,12 +220,47 @@ function Workspace() {
         <StepApprove
           material={material}
           onSpend={onSpend}
-          onDone={(topics) => { setApprovedTopics(topics); setStep("review"); }}
+          onDone={(workflows) => {
+            setApprovedWorkflows(workflows);
+            setTaughtWorkflows(null);      // re-approving questions means re-deciding this too
+            setStep("approach");
+          }}
         />
       )}
-      {step === "review" && material && approvedTopics && (
-        <StepReview
-          material={{ ...material, topics: approvedTopics }}
+      {step === "approach" && material && approvedWorkflows && (
+        <StepTeachingApproach
+          material={material}
+          workflows={approvedWorkflows}
+          onSpend={onSpend}
+          onDone={(workflows) => {
+            setTaughtWorkflows(workflows);
+            setScriptedWorkflows(null);    // a re-approved approach means a fresh script pass
+            setStep("review");
+          }}
+        />
+      )}
+      {/* STAYS MOUNTED THROUGH "building" TOO — this used to unmount in favour of
+          StepBuild's own blank, centered spinner screen, which read as an empty
+          page between the reviewer's decision and the reel. Now the review cards
+          the reviewer just approved/skipped stay on screen, locked (see the
+          `reviewlocked` wrapper below), while StepBuild renders as a fixed bar
+          over them instead of replacing them — the loading state lives on THIS
+          page, and `onDone` below still jumps straight to the reel, so there is
+          no page in between at all. */}
+      {(step === "review" || step === "building") && material && taughtWorkflows && (
+        <div className={step === "building" ? "reviewlocked" : undefined}>
+          <StepReview
+            material={material}
+            workflows={taughtWorkflows}
+            onSpend={onSpend}
+            onDone={(workflows) => { setScriptedWorkflows(workflows); setStep("building"); }}
+          />
+        </div>
+      )}
+      {step === "building" && material && scriptedWorkflows && (
+        <StepBuild
+          material={material}
+          workflows={scriptedWorkflows}
           onSpend={onSpend}
           onDone={(s) => { setShorts(s); setStep("reels"); }}
           // A held short is kept out of the feed, so open the feed that includes it

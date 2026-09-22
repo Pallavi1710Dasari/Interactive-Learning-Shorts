@@ -10,7 +10,7 @@ from math import ceil
 from dataclasses import dataclass, field
 from .schema import (
     Script, ShortUnit, Section, QuestionSelection, QuestionFraming, QuestionWorkflow,
-    TeachingApproach, VisualStrategy, MIN_SECONDS, MAX_SECONDS, HARD_MAX_SECONDS,
+    TeachingApproach, VisualStrategy, Topic, MIN_SECONDS, MAX_SECONDS, HARD_MAX_SECONDS,
     MAX_OVERLAY_WORDS, WORDS_PER_SECOND,
 )
 
@@ -123,9 +123,18 @@ MAX_ANSWER_WORDS = 24
 MAX_ANSWER_WORDS_EXTENDED = 30
 
 
-def check_dialogue_shape(script: Script, max_answer_words: int | None = None) -> GraderResult:
+def check_narration_shape(script: Script, max_answer_words: int | None = None) -> GraderResult:
     """
-    One question, then the answer in 2 or 3 short parts.
+    One opening beat, then the explanation in 2 or 3 short parts.
+
+    FORMERLY check_dialogue_shape, back when a script was two roles — an
+    "interviewer" asking beat 0 and a "student" answering everything after it —
+    and this checked that shape by counting each Literal value. There is only one
+    narrator now (see Script's own docstring), so there is nothing left to count
+    by role; the split this grader still cares about is POSITIONAL — beat 0 is
+    the opening, script.body_beats is everything after it — and that split is
+    exactly as reliable as the old one, because beat 0 was always exactly the
+    "first beat" and the old student count was always exactly `len(beats) - 1`.
 
     A single continuous answer was tried and rejected in review: it read as a wall
     of text, left one diagram on screen for ~40 seconds, and gave the model enough
@@ -143,45 +152,48 @@ def check_dialogue_shape(script: Script, max_answer_words: int | None = None) ->
     section's material earns it — see that constant's own comment.
     """
     cap = MAX_ANSWER_WORDS if max_answer_words is None else max_answer_words
-    speakers = [b.speaker for b in script.beats]
-    if speakers[0] != "interviewer":
-        return GraderResult("dialogue_shape", False, "first beat is not the interviewer")
-    if speakers.count("interviewer") != 1:
-        return GraderResult("dialogue_shape", False,
-            f"{speakers.count('interviewer')} interviewer beats — ask exactly one question")
+    if not script.beats:
+        return GraderResult("narration_shape", False, "script has no beats")
 
-    answers = speakers.count("student")
-    if answers < MIN_ANSWERS:
-        return GraderResult("dialogue_shape", False,
-            f"only {answers} answer beat(s) — split the answer into at least {MIN_ANSWERS} "
-            "so each idea gets its own visual")
-    if answers > MAX_ANSWERS:
-        return GraderResult("dialogue_shape", False,
-            f"{answers} answer beats is too choppy — use at most {MAX_ANSWERS}")
+    answers = script.body_beats
+    if len(answers) < MIN_ANSWERS:
+        return GraderResult("narration_shape", False,
+            f"only {len(answers)} answer beat(s) — split the answer into at least "
+            f"{MIN_ANSWERS} so each idea gets its own visual")
+    if len(answers) > MAX_ANSWERS:
+        return GraderResult("narration_shape", False,
+            f"{len(answers)} answer beats is too choppy — use at most {MAX_ANSWERS}")
 
     # A "split" answer with one giant beat is still a wall of text.
-    long_beats = [(i, len(b.line.split())) for i, b in enumerate(script.beats)
-                  if b.speaker == "student" and len(b.line.split()) > cap]
+    long_beats = [(i, len(b.line.split())) for i, b in enumerate(answers, start=1)
+                  if len(b.line.split()) > cap]
     if long_beats:
         worst = ", ".join(f"beat {i}: {n} words" for i, n in long_beats)
-        return GraderResult("dialogue_shape", False,
+        return GraderResult("narration_shape", False,
             f"{len(long_beats)} answer beat(s) over {cap} words ({worst}) — "
             "keep each one to a single idea")
 
-    return GraderResult("dialogue_shape", True, f"{answers} answer beats, all concise")
+    return GraderResult("narration_shape", True, f"{len(answers)} answer beats, all concise")
 
 
-def check_qa_sentence_form(script: Script) -> GraderResult:
+def check_narration_sentence_form(script: Script) -> GraderResult:
     """
-    The question is phrased as ONE question, and every answer beat is a whole
-    sentence — not "simple" or "memorable", which no free check can judge, but the
+    The concept is phrased as ONE question, and every beat is a whole sentence —
+    not "simple" or "memorable", which no free check can judge, but the
     structural floor those actually need: a fragment can't be simple to read and a
     stapled-together double question can't be memorable, because there's no ONE
     thing to remember. See SYSTEM in select.py and script.py for the prose rules
     this can't enforce in code.
 
+    FORMERLY check_qa_sentence_form. `script.question` is unchanged by the move to
+    a single narrator — see Script's own docstring — so the first two rules below
+    are unchanged too. The third rule USED to skip beat 0 because it was always
+    the interviewer's own question and so always ended in "?" by construction;
+    with one narrator there is no beat exempt from being a real sentence, so it
+    now runs over every beat, beat 0 included.
+
     Three narrow, structural failures, each one a script that reads as unfinished
-    rather than as a sentence a student could hold in their mind:
+    rather than as a sentence a viewer could hold in their mind:
 
       script.question has no "?" — select.py's SYSTEM already bans yes/no
       questions and demands What/Why/How/Which/When/Where, but nothing stopped
@@ -190,10 +202,10 @@ def check_qa_sentence_form(script: Script) -> GraderResult:
 
       script.question has MORE than one "?" — two questions stapled into one
       turns "one concept per short" (select.py's own rule) into two, and a viewer
-      cannot tell which one the answer is actually answering.
+      cannot tell which one the short is actually explaining.
 
-      a student beat's line does not end in ".", "!" or "?" — the line just
-      trails off, which is a sentence fragment however short and on-topic it is.
+      a beat's line does not end in ".", "!" or "?" — the line just trails off,
+      which is a sentence fragment however short and on-topic it is.
     """
     problems: list[str] = []
 
@@ -207,17 +219,74 @@ def check_qa_sentence_form(script: Script) -> GraderResult:
             f'together, not one: "{question}"')
 
     for i, b in enumerate(script.beats):
-        if b.speaker != "student":
-            continue
         line = b.line.strip()
         if not line.endswith((".", "!", "?")):
             problems.append(f'beat {i} trails off with no terminal punctuation: "{line}"')
 
     if problems:
-        return GraderResult("qa_sentence_form", False, "; ".join(problems),
+        return GraderResult("narration_sentence_form", False, "; ".join(problems),
                             {"problems": problems})
-    return GraderResult("qa_sentence_form", True,
+    return GraderResult("narration_sentence_form", True,
                         "question is a single question and every beat is a complete sentence")
+
+
+#: A beat's `line` is read aloud by a TTS voice — see script.py's SYSTEM,
+#: "HOW TO TALK ABOUT CODE" and "A BEAT IS A SENTENCE A TEACHER SAYS OUT
+#: LOUD, NOT A LABEL FOR ONE". These are the shapes a STORYBOARD NOTE takes
+#: instead of a spoken sentence, caught before that note ever reaches a
+#: voice:
+#:   - bracketed direction, "[cut to state diagram]", "(zoom on count)"
+#:   - a leading label naming the beat/field itself, "Beat 3:", "Scene 2 -",
+#:     "Visual:", "On screen:", "Narrator:" — the sentence never actually
+#:     starts, it just announces what kind of thing follows
+#:   - a leading camera/editing verb, "Cut to...", "Fade to...", "Zoom on..."
+#: Deliberately narrow: matched only at the START of the line (a beat that
+#: happens to mention "cut" or "scene" mid-sentence, as English words, is not
+#: a stage direction) so this cannot flag ordinary prose, only the specific
+#: shapes a note takes.
+_STAGE_DIRECTION = re.compile(
+    r"""^\s*(
+        [\[(]                                         # bracketed/parenthetical direction
+      | beat\s*\d+\s*[:.\-]                            # "Beat 3:"
+      | scene\s*\d+\s*[:.\-]                           # "Scene 2:"
+      | (visual|screen|on[\s-]?screen|narrator|voice[\s-]?over|caption)\s*[:\-]
+      | (cut|fade|zoom|pan|dissolve)\s+(to|on|in|out)\b
+    )""",
+    re.I | re.X,
+)
+
+
+def check_no_stage_directions(script: Script) -> GraderResult:
+    """
+    No beat's spoken `line` may open as a storyboard note, a bracketed
+    direction, or a camera instruction instead of an actual spoken sentence.
+
+    WHY THIS EXISTS: screen text and visual direction already have their own
+    fields — on_screen and visual_ref — and script.py's SYSTEM says so at
+    length. But nothing enforced it: a beat like "[React re-renders]" or
+    "Beat 3: the state updates" validates cleanly against every other
+    grader (right length, ends in punctuation once a period is added,
+    correctly cited) while reading as an instruction to whoever builds the
+    frame, not as something a person would say out loud to a TTS voice.
+
+    Checked on EVERY beat — the opening line is read aloud too, and a hook
+    accidentally written as a stage direction is exactly the same defect.
+    """
+    hits = []
+    for i, b in enumerate(script.beats):
+        line = (b.line or "").strip()
+        if m := _STAGE_DIRECTION.match(line):
+            hits.append(f'beat {i} opens like a stage direction, not a '
+                       f'spoken sentence: "{line[:60]}"')
+
+    if hits:
+        return GraderResult("no_stage_directions", False,
+            "; ".join(hits) + ". `line` is read aloud by a TTS voice — write what a "
+            "teacher would actually SAY, not a note about what the beat shows. "
+            "Screen text belongs in on_screen, not in line.",
+            {"hits": hits})
+    return GraderResult("no_stage_directions", True,
+                        "every beat reads as spoken narration, not a storyboard note")
 
 
 # --------------------------------------------------------------------- grounding
@@ -319,6 +388,24 @@ _STOP_WORDS = {
     "nope","yeah","yep","okay","sure","hey","listen","anyway","honestly","literally",
     "total","include","includes","including","fall","falls","short","shorter","scale",
     "scales","whole","full","half","part","parts","kind","sort","lot","bunch","stuff",
+    # generic explanatory/meta vocabulary surfaced by documentation-style material
+    # (HTML structure, markup, page anatomy) — the same class of fix as the first
+    # real run above, one domain later. These describe HOW something is being
+    # talked about (a generic containment/description/position verb, a
+    # self-reference, a generic structural noun) rather than naming a fact from
+    # the source, so a faithful paraphrase reaches for them constantly:
+    #   "the head HOLDS information" / "the head CONTAINS metadata" — same claim
+    #   "it DESCRIBES the page" — a meta-verb, not a fact
+    #   "stays HIDDEN" / "never appears ITSELF" / "inside that SECTION" / "the
+    #   doctype LINE" / "STARTS with" / "STAYING invisible" — position, self-
+    #   reference, and structural-unit words, the same class "part"/"parts"
+    #   above already covers.
+    # Measured the same way as every other entry here: false positives on a real
+    # run (a script explaining doctype/head/body), never on invented facts.
+    "describe","describes","everything","holds","hold","inside","itself","line","lines",
+    "section","sections","starts","start","staying","stay","stays","information","info",
+    "hidden","visible","shown","displays","display","displayed",
+    "visitor","visitors","user","users","viewer","viewers","reader","readers",
 }
 
 
@@ -458,6 +545,60 @@ def _is_code_quote(raw: str) -> bool:
     return bool(_CODE_MARKS.search(text))
 
 
+#: First flattened word of a span that marks it as a TOPIC LABEL rather than a
+#: statement — a chapter heading, an FAQ-style bullet, or an indirect-question
+#: title ("How props help in passing data between components.") that reads as a
+#: complete sentence by punctuation alone but asserts nothing a beat could cite.
+#: See _is_heading_like.
+#: "when"/"where" are deliberately excluded even though they can open a
+#: heading ("When to use props") — they far more often open a real subordinate
+#: clause in ordinary prose ("When the MMU reads a page table entry whose
+#: valid bit is clear, it raises a page fault trap..."), and a false positive
+#: there rejects a section for the opposite of the reason this exists to
+#: catch. "what"/"why"/"how"/"which"/"who" essentially never open a
+#: declarative sentence, so they carry the signal without that risk.
+_HEADING_LEAD_WORDS = frozenset({
+    "what", "why", "how", "which", "who", "whom", "whose",
+    "understanding", "difference", "differences", "comparison", "overview",
+    "introduction", "types",
+})
+
+
+def _is_heading_like(span: str) -> bool:
+    """
+    Does this span read as a topic label or a question a syllabus ASKS, rather
+    than a statement the document MAKES?
+
+    THE GAP THIS CLOSES. _is_whole_sentence only checks "ends in . ! or ?, at
+    least two words" — a bare list of chapter headings passes that easily:
+    "* What are props in React?", "* Understanding the relationship between
+    parent and child components.", "* Difference between props and regular
+    JavaScript function parameters." are each a complete, punctuated,
+    multi-word "sentence" by that rule, and none of them establishes a single
+    fact. A real short built from a section that is entirely bullets like
+    these has nothing to cite and nothing to teach, however many such bullets
+    it has — check_section_richness counting them as citable spans is exactly
+    how a syllabus-shaped document (output/uploads/f98b3cd50d78.md's
+    "Introduction" bullets are the real case this guards) got past the free
+    pre-gate and produced a script the judge scored 2/5 for faithfulness,
+    inventing an explanation for every heading it was handed.
+
+    Two signals, deliberately simple rather than a full parse:
+      - Ends with "?" — a literal question.
+      - Starts with a heading-lead word (an interrogative used as a title even
+        without the "?", or a gerund/noun-phrase opener like "Understanding",
+        "Difference", "Overview") — these are the words that open a syllabus
+        entry, not a sentence explaining something. "Paging splits memory
+        into frames" does not start with one of these, so ordinary prose is
+        unaffected even when its subject happens to end in "-ing".
+    """
+    text = span.strip()
+    if text.endswith("?"):
+        return True
+    words = _flatten(text).split()
+    return bool(words) and words[0] in _HEADING_LEAD_WORDS
+
+
 def _is_whole_sentence(raw: str) -> bool:
     """
     Is this a COMPLETE sentence, however short?
@@ -582,7 +723,7 @@ def check_source_quotes(script: Script, source_text: str,
     """
     haystack = _flatten(source_text)
     elsewhere = _flatten(doc_text) if doc_text else ""
-    answers = [(i, b) for i, b in enumerate(script.beats) if b.speaker == "student"]
+    answers = list(enumerate(script.beats))[1:]
     if not answers:
         return GraderResult("source_quotes", False, "no answer beats to check")
 
@@ -638,7 +779,7 @@ def check_source_quotes(script: Script, source_text: str,
     # answer: it needed 2 distinct quotes from 2 beats, which is zero repeats — the
     # one thing the comment says is allowed. And the failure was unescapable, because
     # the advice it printed ("or use fewer beats") means going to ONE answer beat,
-    # which check_dialogue_shape rejects. A short whose section carries one strong
+    # which check_narration_shape rejects. A short whose section carries one strong
     # sentence had nothing it could do but fail:
     #
     #   source_quotes: 2 answer beats rest on only 1 distinct sentence(s)
@@ -687,12 +828,12 @@ def check_answers_its_section(script: Script, section_text: str) -> GraderResult
     that actually answers it.
     """
     section = _flatten(section_text)
-    answers = [b for b in script.beats if b.speaker == "student"]
+    answers = script.body_beats
     if not answers:
         return GraderResult("on_topic", False, "no answer beats to check")
 
     strays = [i for i, b in enumerate(script.beats)
-              if b.speaker == "student"
+              if i > 0
               and not (b.source_quote and _flatten(b.source_quote) in section)]
 
     if strays:
@@ -1025,7 +1166,7 @@ def check_diagram_matches_narration(unit: ShortUnit,
     # The visuals are deliberately one composition that builds, so frame 1 draws
     # objects beat 4 will name and every frame carries the shared scaffolding. Scoped
     # per-beat this flagged "frame" and "fault" as foreign to a page-fault short,
-    # because that frame belongs to the interviewer's question and the words arrive
+    # because that frame belongs to the opening line and the words arrive
     # two beats later. What is being caught is a diagram about a DIFFERENT SUBJECT,
     # and the subject is the short, not the beat.
     allowed = set(_stems(
@@ -2779,8 +2920,8 @@ def check_ends_on_answer(unit: ShortUnit) -> GraderResult:
     """
     The short's LAST frame must visually land on the answer, not trail off.
 
-    schema.Script.starts_with_interviewer already guarantees the OPEN is right —
-    beat 0 is always the question. Nothing guaranteed the CLOSE was: a short
+    schema.Script.has_beats already guarantees the OPEN is right —
+    beat 0 is always the opening. Nothing guaranteed the CLOSE was: a short
     could walk through every step of a mechanism and end on a frame that is
     still describing the process rather than emphasising the resolved answer,
     which reads as the video stopping mid-thought rather than concluding.
@@ -3161,7 +3302,11 @@ def _citable_spans(section_text: str) -> list[str]:
     # floor is, even though it means this and check_source_quotes can disagree at
     # the margin — better to warn early on a borderline section than to pass one
     # that only clears the letter of the rule.
-    spans = [s for s in sentences if _is_whole_sentence(s) or _is_code_quote(s)]
+    #
+    # NOT HEADING-LIKE, ON TOP OF THAT — see _is_heading_like. A code quote is
+    # never a heading, so this only ever excludes a prose "sentence".
+    spans = [s for s in sentences
+            if (_is_whole_sentence(s) or _is_code_quote(s)) and not _is_heading_like(s)]
 
     for block in fenced:
         for line in block.strip("`").splitlines():
@@ -3185,6 +3330,25 @@ def _citable_spans(section_text: str) -> list[str]:
     return out
 
 
+def _heading_like_spans(section_text: str) -> list[str]:
+    """
+    The prose "sentences" _citable_spans just excluded for reading as topic
+    labels rather than statements — see _is_heading_like. Recomputed rather
+    than threaded out of _citable_spans so that function's return contract
+    (every other caller wants ONLY the real, citable spans) stays unchanged;
+    this exists purely so check_section_richness can tell a reviewer WHY a
+    section came up thin when the reason is "this is a syllabus", not merely
+    "there is not much text here".
+    """
+    prose = re.sub(r"```.*?```", " ", section_text, flags=re.S)
+    _, prose = _table_rows(prose)
+    paragraphs = re.split(r"\n\s*\n", prose)
+    sentences = [s for para in paragraphs
+                for s in re.split(r"(?<=[.!?])\s+", " ".join(para.split()))
+                if s.strip()]
+    return [s for s in sentences if _is_whole_sentence(s) and _is_heading_like(s)]
+
+
 def check_section_richness(section_text: str, min_answers: int = MIN_ANSWERS) -> GraderResult:
     """
     Before anything is written or even read: does this section have enough
@@ -3205,6 +3369,21 @@ def check_section_richness(section_text: str, min_answers: int = MIN_ANSWERS) ->
     spans = _citable_spans(section_text)
     if len(spans) < needed:
         shown = "; ".join(f'{s[:60]!r}' for s in spans[:3]) or "none"
+        headings = _heading_like_spans(section_text)
+        if headings:
+            # A SYLLABUS, NOT THIN PROSE — a different failure with a different
+            # fix. "Add explanatory prose" is the wrong instruction when the
+            # section already has plenty of bullets and none of them assert
+            # anything; the fix is to WRITE the section, not lengthen it.
+            shown_h = "; ".join(f'{s[:60]!r}' for s in headings[:3])
+            return GraderResult("section_richness", False,
+                f"{len(headings)} of this section's spans are topic headings or "
+                f"questions, not statements ({shown_h}) — only {len(spans)} real "
+                f"citable sentence(s) remain, need {needed} for a {min_answers}-beat "
+                f"script. This reads as a list of subjects to cover rather than an "
+                f"explanation of them — rewrite it as prose that actually answers "
+                f"its own headings before generating a short from it.",
+                {"spans": len(spans), "needed": needed, "heading_like": len(headings)})
         return GraderResult("section_richness", False,
             f"only {len(spans)} distinct citable sentence(s) in this section "
             f"({shown}), need {needed} for a {min_answers}-beat script. Every beat "
@@ -3473,7 +3652,8 @@ def _covered_steps(steps, beat_stems: list[set], all_stems: set):
 
 
 def check_follows_teaching_sequence(script: Script, understanding=None,
-                                    source_text: str | None = None) -> GraderResult:
+                                    source_text: str | None = None,
+                                    topic: Topic | None = None) -> GraderResult:
     """
     Did this script take the teaching sequence it was given?
 
@@ -3485,23 +3665,28 @@ def check_follows_teaching_sequence(script: Script, understanding=None,
       ORDER      of the steps that can be located unambiguously, none appears before
                  a step that was planned earlier. Ties pass — that is a merged beat.
       FOCUS      the narration shares enough of core_idea's vocabulary to be about
-                 the objective at all.
+                 the objective at all — OR ENOUGH OF `topic.why_it_matters`'s, when
+                 `topic` is given. See its own comment below for why.
       LANDING    the last answer beat reaches the final step OR the objective. This
                  is the same rule the script brief spends a page on — the short must
                  not stop one sentence before the answer — asked against the plan.
 
     Skips clean, passing, when there is no understanding or its sequence is empty
     (absent, or quarantined by check_teaching_sequence). Never raises.
+
+    `topic` IS OPTIONAL AND ADDITIVE — see FOCUS's own comment. Every existing
+    caller that omits it (the eval harness, smoke_test) gets byte-identical
+    behaviour to before.
     """
     steps = list(getattr(understanding, "teaching_sequence", None) or [])
     if not steps:
         return GraderResult("follows_sequence", True,
             "no teaching sequence — skipped", {"steps": 0, "skipped": True})
 
-    answers = [b for b in script.beats if b.speaker == "student"]
+    answers = script.body_beats
     if not answers:
         return GraderResult("follows_sequence", False,
-            "no student beats to compare against the teaching sequence")
+            "no answer beats to compare against the teaching sequence")
 
     beat_stems = [set(_stems(b.line)) for b in answers]
     all_stems = set().union(*beat_stems) if beat_stems else set()
@@ -3541,35 +3726,53 @@ def check_follows_teaching_sequence(script: Script, understanding=None,
     # --- FOCUS --------------------------------------------------------------
     #
     # THE QUESTION'S OWN WORDS COUNT TOO, and this is scoped narrowly to FOCUS
-    # alone — COVERAGE and ORDER above stay read against student beats only,
+    # alone — COVERAGE and ORDER above stay read against the answer beats only,
     # because those ask whether the ANSWER walks the plan, which is specifically
-    # about the speaker who is supposed to be doing that walking.
+    # about the beats that are supposed to be doing that walking.
     #
     # FOCUS asks a different question: is this SHORT about its objective at all. A
-    # viewer hears the interviewer's question immediately before the answer, and a
+    # viewer hears the opening line immediately before the answer, and a
     # word the question already put in play does not need to be repeated to be
     # understood — "How does a promise CHAIN move..." then an answer that walks
     # the mechanism without saying "chain" again has not gone anywhere else, the
-    # topic was set one breath earlier. Scoring that against student beats alone
+    # topic was set one breath earlier. Scoring that against the answer beats alone
     # measured a stricter question than the one this check is supposed to ask.
     question_stems = set()
-    if script.beats and script.beats[0].speaker == "interviewer":
+    if script.beats:
         question_stems = set(_stems(script.beats[0].line))
     focus_stems = all_stems | question_stems
 
-    objective = {s: w for s, w in _stems(getattr(understanding, "core_idea", "") or "").items()
-                 if len(s) > 3}
-    if objective:
+    # THE APPROVED QUESTION'S OWN SCOPE COUNTS TOO, ALONGSIDE THE SECTION'S.
+    # understanding.core_idea is computed ONCE per SECTION and shared across
+    # every topic/question filed under it (see skills/understanding_for's own
+    # docstring) — it has no way to know how narrow the question a human
+    # actually approved was. A short that fully explains its OWN approved
+    # scope should not be required to ALSO cover whatever else the section
+    # happens to teach; `topic.why_it_matters` is that scope, already written
+    # in one sentence at selection time, so reading it here costs nothing.
+    # PASSES ON EITHER — a script only needs to be about ONE of "what the
+    # section as a whole teaches" or "what this specific approved question
+    # covers", never told to satisfy the broader one when the narrower one
+    # was what a human actually signed off on.
+    core_idea_text = getattr(understanding, "core_idea", "") or ""
+    objective = {s: w for s, w in _stems(core_idea_text).items() if len(s) > 3}
+    narrow_text = (getattr(topic, "why_it_matters", "") or "") if topic is not None else ""
+    narrow_objective = {s: w for s, w in _stems(narrow_text).items() if len(s) > 3}
+    if objective or narrow_objective:
         hit = [s for s in objective if _grounded(s, focus_stems)]
-        focus = len(hit) / len(objective)
-        if focus < MIN_OBJECTIVE_FOCUS:
+        focus = len(hit) / len(objective) if objective else 1.0
+        narrow_hit = [s for s in narrow_objective if _grounded(s, focus_stems)]
+        narrow_focus = len(narrow_hit) / len(narrow_objective) if narrow_objective else 0.0
+        if focus < MIN_OBJECTIVE_FOCUS and narrow_focus < MIN_OBJECTIVE_FOCUS:
             absent = sorted(objective[s] for s in objective if s not in hit)
+            narrow_note = (f" (and only {narrow_focus:.0%} of the approved question's own "
+                          f"scope, {narrow_text[:70]!r})" if narrow_objective else "")
             return GraderResult("follows_sequence", False,
-                f"the answer touches only {focus:.0%} of the objective's own vocabulary "
-                f"— it is not about {getattr(understanding, 'core_idea', '')[:70]!r}. "
+                f"the answer touches only {focus:.0%} of the section's objective's own "
+                f"vocabulary{narrow_note} — it is not about {core_idea_text[:70]!r}. "
                 f"Never mentioned: {absent[:8]}. Rewrite the answer so it explains that "
                 f"idea, and make beat 1 ask about it.",
-                {"focus": focus, "absent": absent})
+                {"focus": focus, "narrow_focus": narrow_focus, "absent": absent})
 
     # --- LANDING ------------------------------------------------------------
     #
@@ -3797,7 +4000,7 @@ def check_uses_planned_example(script: Script, understanding=None,
 
     Never raises. Skips clean when there is nothing to check.
     """
-    answers = [b for b in script.beats if b.speaker == "student"]
+    answers = script.body_beats
     plan = getattr(understanding, "example_plan", None)
     need = getattr(plan, "need", None) if plan is not None else None
     example = ((getattr(plan, "example", "") or "").strip() if plan is not None else "")
@@ -4070,7 +4273,7 @@ def check_handles_confusion(script: Script, understanding=None,
     need = getattr(plan, "need", "not_needed")
     confusion = (getattr(plan, "confusion", "") or "").strip()
     correction = (getattr(plan, "correct_understanding", "") or "").strip()
-    answers = [b for b in script.beats if b.speaker == "student"]
+    answers = script.body_beats
 
     # --- ASSERTED AS FACT ---------------------------------------------------
     if confusion and correction:
@@ -4325,7 +4528,7 @@ def check_opening_follows_hook(script: Script, understanding=None,
         return GraderResult("opening_hook", True, "no beats — skipped", {"skipped": True})
 
     opening = beats[0].line
-    answers = [b for b in beats if b.speaker == "student"]
+    answers = beats[1:]
 
     # --- CLICKBAIT ----------------------------------------------------------
     for i, beat in enumerate(beats):
@@ -4495,7 +4698,8 @@ def _verdict(results, name: str):
     return None
 
 
-def check_reaches_objective(script: Script, understanding=None) -> GraderResult:
+def check_reaches_objective(script: Script, understanding=None,
+                            topic: Topic | None = None) -> GraderResult:
     """
     Does the answer actually arrive at the core idea, and END there?
 
@@ -4511,25 +4715,39 @@ def check_reaches_objective(script: Script, understanding=None) -> GraderResult:
       LANDING   the LAST answer beat carries some of it, so the short ends on the
                 idea rather than trailing off into a detail.
 
-    Stems throughout, so no phrasing is prescribed. Skips clean with no core_idea.
+    EACH HALF PASSES AGAINST EITHER THE SECTION'S core_idea OR
+    `topic.why_it_matters`, when `topic` is given — same reasoning as
+    check_follows_teaching_sequence's FOCUS rule (see its own comment):
+    core_idea is section-wide and shared across every question filed under
+    it, so a human-approved question that only covers part of the section
+    should be judged against its OWN approved scope too, not only the
+    whole section's. `topic` is optional and additive — every existing
+    caller that omits it gets byte-identical behaviour to before.
+
+    Stems throughout, so no phrasing is prescribed. Skips clean with no
+    core_idea AND no topic.why_it_matters either.
     """
     objective = (getattr(understanding, "core_idea", "") or "").strip()
-    if not objective:
+    narrow_objective = (getattr(topic, "why_it_matters", "") or "").strip() if topic is not None else ""
+    if not objective and not narrow_objective:
         return GraderResult("reaches_objective", True,
             "no stated objective — skipped", {"skipped": True})
 
-    answers = [b for b in script.beats if b.speaker == "student"]
+    answers = script.body_beats
     if not answers:
         return GraderResult("reaches_objective", False, "no answer beats at all")
 
     whole = " ".join(b.line for b in answers)
-    coverage = _grounded_share_of(objective, whole)
-    if coverage < MIN_OBJECTIVE_COVERAGE:
+    coverage = _grounded_share_of(objective, whole) if objective else 0.0
+    narrow_coverage = _grounded_share_of(narrow_objective, whole) if narrow_objective else 0.0
+    if coverage < MIN_OBJECTIVE_COVERAGE and narrow_coverage < MIN_OBJECTIVE_COVERAGE:
+        narrow_note = (f" ({narrow_coverage:.0%} of the approved question's own scope, "
+                       f"{narrow_objective[:80]!r})" if narrow_objective else "")
         return GraderResult("reaches_objective", False,
-            f"the answer covers only {coverage:.0%} of the objective ({objective[:80]!r}) — "
-            f"whatever else it does, it does not teach that. Rewrite the answer beats to "
-            f"explain the idea itself.",
-            {"coverage": coverage, "objective": objective[:80]})
+            f"the answer covers only {coverage:.0%} of the objective ({objective[:80]!r})"
+            f"{narrow_note} — whatever else it does, it does not teach that. Rewrite the "
+            f"answer beats to explain the idea itself.",
+            {"coverage": coverage, "narrow_coverage": narrow_coverage, "objective": objective[:80]})
 
     # LANDING, with one alternative: the plan's own final step.
     #
@@ -4561,8 +4779,10 @@ def check_reaches_objective(script: Script, understanding=None) -> GraderResult:
     # because follows_sequence does not run when the sequence was quarantined; with
     # no sequence there is no alternative to fall back on and the objective is
     # required, which is the case the strictness was written for.
-    landing = _grounded_share_of(objective, answers[-1].line)
-    if landing < MIN_OBJECTIVE_LANDING:
+    landing = _grounded_share_of(objective, answers[-1].line) if objective else 0.0
+    narrow_landing = _grounded_share_of(narrow_objective, answers[-1].line) if narrow_objective else 0.0
+    effective_landing = max(landing, narrow_landing)
+    if effective_landing < MIN_OBJECTIVE_LANDING:
         steps = list(getattr(understanding, "teaching_sequence", None) or [])
         landed_on_plan = False
         if steps:
@@ -4571,26 +4791,31 @@ def check_reaches_objective(script: Script, understanding=None) -> GraderResult:
                 f"{final.concept} {final.explanation_goal}",
                 answers[-1].line) >= MIN_OBJECTIVE_LANDING
         if not landed_on_plan:
+            target = objective or narrow_objective
             return GraderResult("reaches_objective", False,
-                f"the last beat has almost nothing of the objective in it ({landing:.0%}) "
-                f"and does not land the final planned step either — the short explains "
-                f"its way toward {objective[:70]!r} and then ends on a detail. Make the "
-                f"final beat land the idea, or the result the plan ends on.",
-                {"coverage": coverage, "landing": landing})
+                f"the last beat has almost nothing of the objective in it "
+                f"({effective_landing:.0%}) and does not land the final planned step "
+                f"either — the short explains its way toward {target[:70]!r} and then "
+                f"ends on a detail. Make the final beat land the idea, or the result the "
+                f"plan ends on.",
+                {"coverage": coverage, "narrow_coverage": narrow_coverage, "landing": effective_landing})
         return GraderResult("reaches_objective", True,
-            f"the answer reaches the objective ({coverage:.0%}) and ends on the final "
-            f"planned step ({steps[-1].concept!r}) rather than on the objective's own "
-            f"words — allowed, the plan says that is where the explanation ends",
-            {"coverage": coverage, "landing": landing, "via": "final_step"})
+            f"the answer reaches the objective ({max(coverage, narrow_coverage):.0%}) and "
+            f"ends on the final planned step ({steps[-1].concept!r}) rather than on the "
+            f"objective's own words — allowed, the plan says that is where the "
+            f"explanation ends",
+            {"coverage": coverage, "narrow_coverage": narrow_coverage,
+             "landing": effective_landing, "via": "final_step"})
 
     return GraderResult("reaches_objective", True,
-        f"the answer reaches the objective ({coverage:.0%}) and ends on it ({landing:.0%})",
-        {"coverage": coverage, "landing": landing})
+        f"the answer reaches the objective ({max(coverage, narrow_coverage):.0%}) and "
+        f"ends on it ({effective_landing:.0%})",
+        {"coverage": coverage, "narrow_coverage": narrow_coverage, "landing": effective_landing})
 
 
 def evaluate_learning_outcome(script: Script, understanding=None,
                               source_text: str | None = None,
-                              results=None) -> LearningOutcome:
+                              results=None, topic: Topic | None = None) -> LearningOutcome:
     """
     Does this short look like it teaches its objective? Deterministic, no model.
 
@@ -4598,7 +4823,10 @@ def evaluate_learning_outcome(script: Script, understanding=None,
     normal path and the reason this is cheap: every requirement except the veto is
     a verdict that has already been computed, and reading it costs nothing. When it
     is omitted the graders it needs are run here instead, so the function is usable
-    on its own.
+    on its own — `topic`, also optional, is threaded to those (check_reaches_objective,
+    check_follows_teaching_sequence) for that standalone path; when `results` is
+    supplied, `topic` is ignored here because it was already used to compute those
+    verdicts wherever `results` came from — see run_script_graders's own docstring.
 
     A requirement whose grader is absent from `results` — because there was no
     source text, or no plan of that kind — is recorded as UNAVAILABLE and left
@@ -4608,7 +4836,7 @@ def evaluate_learning_outcome(script: Script, understanding=None,
 
     # --- THE VETO, computed here because nothing else asks it -----------------
     reaches = _verdict(results, "reaches_objective") or \
-        check_reaches_objective(script, understanding)
+        check_reaches_objective(script, understanding, topic)
     if reaches.details.get("skipped"):
         outcome.unavailable.append("objective_reached (no core_idea in the understanding)")
     elif not reaches.passed:
@@ -4626,7 +4854,7 @@ def evaluate_learning_outcome(script: Script, understanding=None,
     # is the stake — that the failure is a LEARNING failure and not a nit.
     reused = [
         ("teaching_sequence_covered", "follows_sequence",
-         lambda: check_follows_teaching_sequence(script, understanding, source_text),
+         lambda: check_follows_teaching_sequence(script, understanding, source_text, topic),
          "the explanation does not carry enough of the planned teaching progression"),
         ("required_example_satisfied", "uses_example",
          lambda: check_uses_planned_example(script, understanding, source_text),
@@ -4671,7 +4899,7 @@ def evaluate_learning_outcome(script: Script, understanding=None,
 
 def check_learning_outcome(script: Script, understanding=None,
                            source_text: str | None = None,
-                           results=None) -> GraderResult:
+                           results=None, topic: Topic | None = None) -> GraderResult:
     """evaluate_learning_outcome as a grader, so it rides the existing retry path.
 
     Deliberately LAST in the list and deliberately terse: the specific instructions
@@ -4680,7 +4908,7 @@ def check_learning_outcome(script: Script, understanding=None,
     green and the objective never reached — is the case this whole step exists for,
     and then the reason carries the full explanation because nothing else did.
     """
-    outcome = evaluate_learning_outcome(script, understanding, source_text, results)
+    outcome = evaluate_learning_outcome(script, understanding, source_text, results, topic)
     detail = outcome.as_dict()
 
     if outcome.passed:
@@ -4749,7 +4977,7 @@ MIN_BEAT_NOVELTY = 0.4
 #: And it must be restating one PARTICULAR earlier beat, not merely reusing the
 #: short's shared vocabulary. Both conditions are required before failing, so a
 #: beat that is thin but not a copy of anything is left alone — that is
-#: check_dialogue_shape's business, not this one.
+#: check_narration_shape's business, not this one.
 MIN_RESTATEMENT_OVERLAP = 0.5
 
 #: Below this many content words a beat carries too little signal to judge. A
@@ -4776,7 +5004,7 @@ def check_beats_develop(script: Script) -> GraderResult:
     reuses the subject's nouns to say something new clears the first test; a beat
     that is merely brief clears the second.
     """
-    answers = [b for b in script.beats if b.speaker == "student"]
+    answers = script.body_beats
     if len(answers) < 2:
         return GraderResult("no_repetition", True, "nothing to repeat")
 
@@ -4842,7 +5070,7 @@ def check_beats_develop(script: Script) -> GraderResult:
 #: points) and failed below two of them. That number was picked for an 87-word
 #: floor, and when the floor came down to 62 it started flagging the very shape the
 #: 25-30s band exists to allow. Worse, it never asked the question that actually
-#: matters: check_dialogue_shape requires MIN_ANSWERS answer beats, each one idea,
+#: matters: check_narration_shape requires MIN_ANSWERS answer beats, each one idea,
 #: and none of them allowed to restate another. So a plan is deep enough exactly
 #: when it holds MIN_ANSWERS things to say.
 #:
@@ -5223,14 +5451,13 @@ def check_script_matches_teaching_approach(script: Script,
       alongside prose ones is not the defect; code as the script's dominant
       evidence despite a non-code approval is.
 
-    Silent (passes, `skipped`) when there are no student beats to check —
+    Silent (passes, `skipped`) when there are no answer beats to check —
     nothing here to contradict an approach that was never exercised.
     """
-    student_quotes = [b.source_quote for b in script.beats
-                      if b.speaker == "student" and b.source_quote]
+    student_quotes = [b.source_quote for b in script.body_beats if b.source_quote]
     if not student_quotes:
         return GraderResult("script_matches_teaching_approach", True,
-            "no cited student beats to check", {"skipped": True})
+            "no cited answer beats to check", {"skipped": True})
 
     code_quotes = [q for q in student_quotes if _is_code_quote(q)]
     approved_code = approach.primary == "code" or "code" in approach.combined_with
@@ -5417,10 +5644,10 @@ def check_topic_matches_understanding(topic, understanding) -> GraderResult:
 
 def check_question_grounded(script: Script, source_text: str) -> GraderResult:
     """
-    Is the interviewer's question answerable from this section, and claim-free?
+    Is the opening question answerable from this section, and claim-free?
 
-    THE ONE BEAT NOTHING CHECKED. source_quote lives on student beats only, so beat
-    1 — the first thing heard and the thing a viewer decides on — could say
+    THE ONE BEAT NOTHING CHECKED. source_quote lives on the answer beats only, so
+    beat 1 — the first thing heard and the thing a viewer decides on — could say
     anything. Seen in real output: a section reading "The basic structure of any
     HTML document is as follows" produced "What's the REQUIRED basic structure...",
     and required is a claim the material never makes. Harmless there; the same hole
@@ -5474,8 +5701,20 @@ def check_question_grounded(script: Script, source_text: str) -> GraderResult:
         {"grounding": share})
 
 
-SCRIPT_GRADERS = [check_timing, check_overlays, check_dialogue_shape, check_no_refusal,
-                  check_beats_develop]
+#: check_narration_sentence_form (formerly check_qa_sentence_form) EXISTED BUT WAS
+#: NEVER WIRED IN — a real gap, found while investigating fragmented, note-like
+#: narration: it was registered in evals/run_evals.py's grader map (used only by
+#: eval cases) but never reached a real script written by run.py/server.py's
+#: retry loop, because neither called it and this list is the only thing they
+#: call. It is cheap, structural (every beat ends in real punctuation, the
+#: question is exactly one question), and exactly the kind of floor "not a
+#: storyboard note" needs — so it is added here rather than left dead.
+#:
+#: check_no_stage_directions is NEW, for the other half of that same defect:
+#: a beat that opens as a bracketed direction or a "Beat 3:" label rather
+#: than a spoken sentence. See its own docstring.
+SCRIPT_GRADERS = [check_timing, check_overlays, check_narration_shape, check_no_refusal,
+                  check_beats_develop, check_narration_sentence_form, check_no_stage_directions]
 
 #: Unit graders that need only the unit.
 UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
@@ -5510,7 +5749,7 @@ def run_unit_graders(unit: ShortUnit, source_text: str | None = None) -> list[Gr
 
 def run_script_graders(script: Script, source_text: str | None = None,
                        doc_text: str | None = None,
-                       understanding=None) -> list[GraderResult]:
+                       understanding=None, topic: Topic | None = None) -> list[GraderResult]:
     """
     Every script grader, plus the ones that need something beyond the script.
 
@@ -5520,6 +5759,15 @@ def run_script_graders(script: Script, source_text: str | None = None,
     check_follows_teaching_sequence, which itself skips clean when the sequence is
     absent or was quarantined, so there are two independent ways for this to be a
     no-op and neither is an error.
+
+    `topic` IS OPTIONAL AND ADDITIVE, threaded only into check_follows_teaching_sequence
+    and check_reaches_objective (and, through `results`, check_learning_outcome) —
+    see their own docstrings for why: `understanding.core_idea` is shared across
+    every question filed under one section, so grading against it ALONE can fail a
+    faithful answer to a narrower, human-approved question. Passing `topic` lets
+    those two graders also accept `topic.why_it_matters` — the approved question's
+    OWN scope — as a valid target. Every existing caller that omits it (the eval
+    harness, smoke_test) gets byte-identical behaviour to before.
 
     IT MUST BE THE SAME UNDERSTANDING ON EVERY ATTEMPT. The retry loops read the
     section once, before the loop (see skills/understanding.understanding_for), and
@@ -5541,7 +5789,7 @@ def run_script_graders(script: Script, source_text: str | None = None,
     _, max_seconds = duration_budget(understanding)
     max_answer_words = MAX_ANSWER_WORDS_EXTENDED if max_seconds > MAX_SECONDS else MAX_ANSWER_WORDS
     results = [check_timing(script, max_seconds=max_seconds) if g is check_timing else
-               check_dialogue_shape(script, max_answer_words=max_answer_words) if g is check_dialogue_shape else
+               check_narration_shape(script, max_answer_words=max_answer_words) if g is check_narration_shape else
                g(script)
                for g in SCRIPT_GRADERS]
     if source_text:
@@ -5550,14 +5798,14 @@ def run_script_graders(script: Script, source_text: str | None = None,
         results.append(check_grounding(script, source_text, doc_text=doc_text))
         results.append(check_question_grounded(script, source_text))
     if understanding is not None:
-        results.append(check_follows_teaching_sequence(script, understanding, source_text))
+        results.append(check_follows_teaching_sequence(script, understanding, source_text, topic))
         results.append(check_uses_planned_example(script, understanding, source_text))
         results.append(check_handles_confusion(script, understanding, source_text))
         results.append(check_opening_follows_hook(script, understanding, source_text))
-        results.append(check_reaches_objective(script, understanding))
+        results.append(check_reaches_objective(script, understanding, topic))
         # LAST, and it reads `results` rather than recomputing them — it is an
         # orchestration of the verdicts above, so it has to come after all of them.
-        results.append(check_learning_outcome(script, understanding, source_text, results))
+        results.append(check_learning_outcome(script, understanding, source_text, results, topic))
     return results
 
 

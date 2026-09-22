@@ -235,7 +235,7 @@ The beats are one continuous explanation, so the scenes are one continuous scene
 that develops. Two constraints follow and both are checked downstream:
   * Never describe a scene you have already described. Not just the previous beat
     — ANY earlier beat. A short that goes A, B, A ends where it started.
-  * The first beat is the interviewer's QUESTION, and its scene draws the SUBJECT
+  * The first beat is the opening QUESTION, and its scene draws the SUBJECT
     as an object — the thing being asked about. It is not a title card, it is not
     "what is being asked", and it is not the answer's code shown early.
 
@@ -401,7 +401,7 @@ def plan_strategy(script: Script, section: Section | None = None,
             seen.add(b.visual_ref)
             refs.append(b.visual_ref)
 
-    beats = "\n".join(f"[{b.visual_ref}] {b.speaker}: {b.line}" for b in script.beats)
+    beats = "\n".join(f"[{b.visual_ref}] {b.line}" for b in script.beats)
     user = f"QUESTION: {script.question}\n\nBEATS, in order:\n{beats}\n"
 
     if understanding is not None:
@@ -532,7 +532,7 @@ def reconsider_visual_strategy(workflow: QuestionWorkflow, section: Section,
             seen.add(b.visual_ref)
             refs.append(b.visual_ref)
 
-    beats = "\n".join(f"[{b.visual_ref}] {b.speaker}: {b.line}" for b in script.beats)
+    beats = "\n".join(f"[{b.visual_ref}] {b.line}" for b in script.beats)
     user = f"QUESTION: {script.question}\n\nBEATS, in order:\n{beats}\n"
 
     if understanding is not None:

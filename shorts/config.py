@@ -427,7 +427,7 @@ def voice_settings() -> dict:
     """What the UI has chosen, or {} if it has chosen nothing."""
     try:
         import json
-        return json.loads(VOICE_SETTINGS.read_text())
+        return json.loads(VOICE_SETTINGS.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -442,6 +442,18 @@ CHATTERBOX_CFG_WEIGHT   = _f_late("CHATTERBOX_CFG_WEIGHT", 0.5)
 # it before the first beat is asked for.
 CHATTERBOX_START_TIMEOUT = _f_late("CHATTERBOX_START_TIMEOUT", 420.0)
 CHATTERBOX_SYNTH_TIMEOUT = _f_late("CHATTERBOX_SYNTH_TIMEOUT", 300.0)
+
+# THE BUILD-LEVEL CAP ON WAITING FOR A RECORDED TRACK, in /api/finalize —
+# separate from CHATTERBOX_SYNTH_TIMEOUT above, which is a per-beat ceiling
+# the PROVIDER enforces on itself. A local CPU-only provider (Chatterbox
+# with no GPU) can legitimately take several minutes once model load and
+# several beats are added up, and a build must not block the whole HTTP
+# response on that indefinitely — past this many seconds, the short ships
+# without its recorded track (the browser voice narrates instead, at zero
+# cost — see FinalizeIn.do_voice) while synthesis keeps running in the
+# background; a later rebuild's cache check (see voice._from_cache) picks
+# up the finished recording for free once it lands.
+VOICE_BUILD_TIMEOUT = _f_late("VOICE_BUILD_TIMEOUT", 240.0)
 
 # --- piper (local, offline, free)
 PIPER_DATA_DIR = os.getenv("PIPER_DATA_DIR", str(ROOT / "output" / "piper-voices")).strip()

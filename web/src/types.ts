@@ -6,13 +6,19 @@
 export type CaptionWord = { w: string; s: number; e: number };
 
 export type Beat = {
-  speaker: "interviewer" | "student";
+  /** Always "narrator" now — one voice for the whole reel. Kept as a plain
+   *  string, not a union, because units saved before this change still carry
+   *  the old "interviewer" / "student" values and still have to load. Nothing
+   *  in the app keys behaviour off this value any more; see shorts/schema.py's
+   *  Beat.speaker for the full story. */
+  speaker: string;
   line: string;
   on_screen: string;
   visual_ref: string;
   /** Word-by-word timings for the flowing caption. See shorts/feed.py. */
   words?: CaptionWord[];
-  /** The sentence of the source this beat restates; student beats only. */
+  /** The sentence of the source this beat restates; never present on the
+   *  opening beat (index 0). */
   source_quote?: string | null;
   /** Inline SVG, already stripped of <script> and on* handlers in Python. */
   svg?: string | null;
@@ -34,13 +40,19 @@ export type Topic = {
   importance?: number | null;
   concept?: string | null;
   answer_quote?: string | null;
+  /** Selection's own cross-candidate comparison: does another selected
+   *  concept in this material depend on this one first? See shorts/
+   *  skills/select.py's SYSTEM prompt and Topic.is_foundational. */
+  is_foundational?: boolean | null;
+  foundational_note?: string | null;
 };
 
 /** Step 3 — one structured reason a question was selected. See
  *  shorts/schema.py's SelectionReason. */
 export type SelectionReason = {
   category: "importance" | "foundational" | "commonly_confused" |
-            "concrete_and_answerable" | "distinct_angle" | "other";
+            "concrete_and_answerable" | "distinct_angle" |
+            "candidate_comparison" | "other";
   explanation: string;
 };
 
@@ -86,12 +98,38 @@ export type TeachingApproachKind =
   "analogy" | "real_world_example" | "code" | "conceptual_visual" |
   "process_demonstration" | "comparison" | "direct_explanation";
 
+/** Every fixed device a human can pick directly on the teaching-approach
+ *  review screen — see StepTeachingApproach.tsx. Not derived from any one
+ *  workflow's `alternatives`: the picker always offers the full fixed set
+ *  shorts/schema.py's TeachingApproachKind defines, the same seven the LLM
+ *  itself chooses from. */
+export const TEACHING_APPROACH_KINDS: TeachingApproachKind[] = [
+  "conceptual_visual", "process_demonstration", "comparison", "analogy",
+  "real_world_example", "code", "direct_explanation",
+];
+
 export type TeachingApproach = {
   primary: TeachingApproachKind;
   combined_with: TeachingApproachKind[];
   alternatives: TeachingApproachKind[];
   rationale: string;
 };
+
+/** "process_demonstration" -> "process demonstration". Human-facing label,
+ *  never the raw enum value — used by StepTeachingApproach and StepReview's
+ *  own small "taught via" chip. */
+export function describeApproachKind(kind: TeachingApproachKind): string {
+  return kind.replace(/_/g, " ");
+}
+
+/** "Process demonstration, combined with conceptual visual" — the one-line
+ *  human-facing summary of a TeachingApproach. No rubric, no scores. */
+export function describeApproach(approach: TeachingApproach): string {
+  const line = describeApproachKind(approach.primary);
+  return approach.combined_with.length
+    ? `${line}, combined with ${approach.combined_with.map(describeApproachKind).join(", ")}`
+    : line;
+}
 
 /** Step 6 — one completed LLM reconsideration of a TeachingApproach. Always a
  *  COMPLETE decision, never a patch to one field — see
@@ -105,8 +143,10 @@ export type TeachingApproachRegenerationAttempt = {
 export type TeachingApproachApproval = {
   status: "pending" | "approved" | "modified" | "regenerating";
   note?: string | null;
-  /** Legacy — Step 6's own UI never sets this; see "NO DIRECT OVERRIDES" in
-   *  shorts/schema.py's TeachingApproachApproval. */
+  /** A human's direct pick of a different TeachingApproachKind, written (and
+   *  approved) by POST /api/teaching-approach/approve's `override` field —
+   *  see shorts/review.select_teaching_approach. Cleared by every
+   *  regeneration; see effectiveTeachingApproach's own priority order. */
   override?: TeachingApproach | null;
   regenerated_approach?: TeachingApproach | null;
   regeneration_history: TeachingApproachRegenerationAttempt[];
@@ -160,18 +200,27 @@ export type VisualPlanApproval = {
   regeneration_history: VisualStrategyRegenerationAttempt[];
 };
 
+/** Output of Skill 2 — shorts/schema.py's Script. */
+export type Script = {
+  short_id: string;
+  question: string;
+  beats: Beat[];
+};
+
 /** The full record for one candidate question, Steps 3-11 — what
  *  /api/material returns per topic (selection + question_approval only, at
  *  that point), and what /api/selections/*, /api/teaching-approach/*,
- *  /api/workflow/advance (Step 7), /api/visual-plan/* (Step 11) all take and
- *  return as it fills in. `script` is intentionally not modeled here yet —
- *  no frontend flow reads it. */
+ *  /api/workflow/advance (Step 7), /api/workflow/scripts (Step 8-9),
+ *  /api/visual-plan/* (Step 11) all take and return as it fills in. */
 export type QuestionWorkflow = {
   selection: QuestionSelection;
   question_approval: QuestionApproval;
   framing?: QuestionFraming | null;
   teaching_approach?: TeachingApproach | null;
   teaching_approach_approval: TeachingApproachApproval;
+  /** Step 8-9 — set once /api/workflow/scripts has drafted this workflow's
+   *  script through write_script_for_workflow. */
+  script?: Script | null;
   visual_strategy?: VisualStrategy | null;
   visual_plan_approval: VisualPlanApproval;
 };
@@ -184,12 +233,36 @@ export function effectiveQuestion(wf: QuestionWorkflow): string {
   return qa.regenerated_question || qa.edited_question || wf.selection.topic.topic;
 }
 
-/** Mirrors shorts/schema.py's QuestionWorkflow.effective_teaching_approach:
- *  the latest regeneration, else a legacy override, else the original
- *  LLM decision — or null if no teaching_approach has been chosen at all. */
+/** Mirrors shorts/schema.py's QuestionWorkflow.approved_topic: the
+ *  selection's Topic with its `.topic` text replaced by the approved
+ *  wording — or null unless question_approval.status is exactly "approved". */
+export function approvedTopic(wf: QuestionWorkflow): Topic | null {
+  if (wf.question_approval.status !== "approved") return null;
+  return { ...wf.selection.topic, topic: effectiveQuestion(wf) };
+}
+
+/** workflow.script, as the QA shape StepReview/StepVisualPlan/finalize use
+ *  for display and for POST /api/finalize. The server only ever reads
+ *  `.question` and `.beats` off this (see server.py's build_one) — `seconds`/
+ *  `words` are derived here purely for on-screen display, mirroring
+ *  shorts/schema.py's Script.word_count / .estimated_seconds. */
+export function scriptToQA(script: Script): QA {
+  const words = script.beats.reduce(
+    (n, b) => n + b.line.split(/\s+/).filter(Boolean).length, 0);
+  return {
+    short_id: script.short_id, question: script.question,
+    beats: script.beats, seconds: Math.round((words / 2.5) * 10) / 10, words,
+  };
+}
+
+/** Mirrors shorts/schema.py's QuestionWorkflow.effective_teaching_approach: a
+ *  human's DIRECT selection outranks an LLM regeneration (it is always the
+ *  LATER decision when both exist, and regeneration clears `override` — see
+ *  shorts/review.regenerate_teaching_approach), which outranks the original
+ *  LLM decision. Null if no teaching_approach has been chosen at all. */
 export function effectiveTeachingApproach(wf: QuestionWorkflow): TeachingApproach | null {
   const a = wf.teaching_approach_approval;
-  return a.regenerated_approach ?? a.override ?? wf.teaching_approach ?? null;
+  return a.override ?? a.regenerated_approach ?? wf.teaching_approach ?? null;
 }
 
 /** Mirrors shorts/schema.py's QuestionWorkflow.approved_teaching_approach:
@@ -197,6 +270,16 @@ export function effectiveTeachingApproach(wf: QuestionWorkflow): TeachingApproac
 export function approvedTeachingApproach(wf: QuestionWorkflow): TeachingApproach | null {
   return wf.teaching_approach_approval.status === "approved"
     ? effectiveTeachingApproach(wf) : null;
+}
+
+/** The AI's OWN current recommendation — the latest regeneration, else its
+ *  original decision — deliberately IGNORING any human `override`. This is
+ *  what StepTeachingApproach shows as "Recommended approach" and defaults
+ *  the picker to, so a reviewer always sees what the AI actually
+ *  recommends, not a stale earlier pick of their own. */
+export function llmRecommendedApproach(wf: QuestionWorkflow): TeachingApproach | null {
+  const a = wf.teaching_approach_approval;
+  return a.regenerated_approach ?? wf.teaching_approach ?? null;
 }
 
 /** Mirrors shorts/schema.py's QuestionWorkflow.effective_visual_strategy:
@@ -230,15 +313,17 @@ export type WorkflowProgress = {
 
 export type GraderResult = { name: string; passed: boolean; reason: string };
 
-/** The review view's shape: a question plus the student answers. */
+/** The review view's shape: one narrator's connected explanation of `question`,
+ *  in speaking order. `beats[0]` is the opening; every beat after it is the
+ *  answer, one idea each — see shorts/schema.py's Script.opening_beat /
+ *  .body_beats. THE WIRE KEY AND FIELD NAMES STAY AS THEY ARE (see
+ *  shorts/server.py's `_as_qa` docstring for why): this used to also carry a
+ *  separate `answers` list, a filtered copy of `beats` for beats spoken by a
+ *  second "student" role — there is only one narrator now, so `beats` alone
+ *  is the whole script and `answers` is gone. */
 export type QA = {
   short_id: string;
   question: string;
-  answers: {
-    index: number; line: string; on_screen: string; visual_ref: string;
-    /** The sentence of the source this answer restates. Verified server-side. */
-    source_quote?: string | null;
-  }[];
   beats: Beat[];
   seconds: number;
   words: number;
@@ -249,6 +334,9 @@ export type Judge = {
   clarity: number;
   pace: number;
   problems: string[];
+  /** Present on the review-time verdict (server._review_judge); absent on the
+   *  finalized Unit's judge, which is scored against the audit bar elsewhere. */
+  passed?: boolean;
 };
 
 export type Unit = {
@@ -272,11 +360,19 @@ export type Feedback = {
   dropped_at?: number;
 };
 
-/** One row in the review step: a topic, its script, and the human's verdict. */
+/** One row in the review step: a workflow, its script, and the human's verdict. */
 export type ReviewItem = {
+  /** Step 3-9's full record — framing and the (auto-approved) teaching
+   *  approach that governed this card's script, kept so a later
+   *  regeneration (see api.ts's regenerate) keeps following it too. */
+  workflow: QuestionWorkflow;
   topic: Topic;
   qa: QA | null;
   graders: GraderResult[];
+  /** The review-time judge verdict (server._review_judge) — null when the free
+   *  graders didn't all pass yet (nothing to ask a paid model about) or
+   *  JUDGE_AT_REVIEW is off; undefined before the first draft comes back. */
+  judge?: Judge | null;
   state: "idle" | "loading" | "ready" | "error" | "approved" | "skipped";
   error?: string;
   note: string;

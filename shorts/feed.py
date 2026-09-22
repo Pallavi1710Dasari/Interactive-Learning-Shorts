@@ -179,7 +179,7 @@ def collect(include_quarantined: bool = False) -> list[dict]:
         if path.name in SIDECARS:
             continue
         try:
-            unit = ShortUnit(**json.loads(path.read_text()))
+            unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
         except Exception as e:
             # Not a short. Skipping beats taking down every caller of this
             # function — which includes the endpoint that has just spent money
@@ -191,6 +191,7 @@ def collect(include_quarantined: bool = False) -> list[dict]:
         if unit.status in QUARANTINED and not include_quarantined:
             continue
         beats, total = _timeline(unit)
+        audio_path = config.OUTPUT_DIR / unit.short_id / "audio.mp3"
         units.append({
             "short_id": unit.short_id,
             "question": unit.question,
@@ -199,9 +200,18 @@ def collect(include_quarantined: bool = False) -> list[dict]:
             "seconds": total,
             # Present only when a recorded neural track exists on disk. The player
             # prefers it over browser speech; absent, it narrates in the browser.
-            "audio_url": (f"/api/audio/{unit.short_id}"
-                          if (config.OUTPUT_DIR / unit.short_id / "audio.mp3").exists()
-                          else None),
+            #
+            # `?v=<mtime>`, NOT A BARE PATH. A rebuilt short (after adopting a
+            # new voice, say) overwrites this SAME audio.mp3, but an <audio>
+            # element that already loaded the old URL this page session has
+            # no reason to fetch it again — a browser's media element only
+            # refetches a SRC it has not already resolved, regardless of
+            # Cache-Control (see /api/audio/{short_id}'s own note on the
+            # header, which only helps a fresh network request, not an
+            # already-loaded element). The mtime changes on every rewrite, so
+            # the URL itself changes and a stale element is never reused.
+            "audio_url": (f"/api/audio/{unit.short_id}?v={int(audio_path.stat().st_mtime)}"
+                          if audio_path.exists() else None),
             "judge": ({"faithfulness": unit.eval.faithfulness,
                        "clarity": unit.eval.clarity,
                        "pace": unit.eval.pace,

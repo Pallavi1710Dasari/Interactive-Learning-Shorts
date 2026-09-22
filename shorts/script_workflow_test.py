@@ -400,7 +400,7 @@ def test_existing_topic_based_write_script_unchanged():
     sections = _rich_sections()
     section = find_section(sections, "3.1")
     import json
-    data = json.loads((ROOT / "evals/fixtures/concise_but_complete.json").read_text())
+    data = json.loads((ROOT / "evals/fixtures/concise_but_complete.json").read_text(encoding="utf-8"))
     sc = Script(**data)
     results = checks.run_script_graders(sc, section.text)
     assert checks.all_passed(results), [r for r in results if not r.passed]

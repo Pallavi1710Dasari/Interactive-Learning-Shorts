@@ -181,7 +181,7 @@ def _save_locked() -> None:
     try:
         STORE.write_text(json.dumps(
             {"calls": [asdict(c) for c in _calls], "totals": asdict(_sum(_calls))},
-            indent=2))
+            indent=2), encoding="utf-8")
     except Exception:
         pass
 
@@ -195,7 +195,7 @@ def _load_locked() -> None:
     if not STORE.exists():
         return
     try:
-        data = json.loads(STORE.read_text())
+        data = json.loads(STORE.read_text(encoding="utf-8"))
         _calls.clear()
         _calls.extend(Call(**c) for c in data.get("calls", []))
     except Exception:

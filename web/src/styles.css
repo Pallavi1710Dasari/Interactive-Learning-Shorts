@@ -135,6 +135,59 @@ kbd {
 .topic { font-size: 15px; font-weight: 640; margin-top: 8px; line-height: 1.4; letter-spacing: -0.01em; }
 .why { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.5; }
 
+.qlabel {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); margin-top: 14px;
+}
+.qlabel:first-child { margin-top: 0; }
+.outcome { font-size: 13px; line-height: 1.55; color: var(--cream); margin-top: 4px; }
+.why.onereason { font-style: italic; }
+.advanced { margin-top: 12px; }
+.advanced summary {
+  cursor: pointer; font-size: 11px; color: var(--muted); list-style: none;
+}
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary::before { content: "▸ "; }
+.advanced[open] summary::before { content: "▾ "; }
+.advanced summary:hover { color: var(--teal-hi); }
+.advanced .reasons { margin-top: 8px; }
+
+/* StepTeachingApproach's device picker — a plain set of toggle buttons, the
+   recommendation marked but never forced; see StepTeachingApproach.tsx. */
+.approachpicker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pill {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, 0.04); color: var(--cream);
+  border: 1px solid var(--line); border-radius: 99px;
+  padding: 7px 13px; font: inherit; font-size: 12.5px; cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.pill:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
+.pill:disabled { cursor: not-allowed; opacity: 0.55; }
+.pill.on {
+  background: rgba(29, 158, 117, 0.16); border-color: rgba(47, 211, 155, 0.45);
+  color: var(--teal-hi); font-weight: 600;
+}
+.pilltag {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted); font-weight: 700;
+}
+.pill.on .pilltag { color: var(--teal-hi); }
+
+/* StepVisualPlan's per-beat cards — deliberately plain: concept, what the
+   learner sees, why it helps. No relationship/physical_form/focus fields —
+   those stay internal to shorts/skills/strategy.py. */
+.beatplan {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px; margin-top: 14px;
+}
+.beatplancard {
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 13px;
+}
+.beatconcept { font-size: 13px; font-weight: 600; color: var(--cream); margin-top: 3px; line-height: 1.4; }
+.beatplancard .why { margin-top: 8px; }
+
 .qa { margin-top: 15px; border-top: 1px solid var(--line); padding-top: 14px; }
 .qaline { display: flex; gap: 12px; margin-bottom: 13px; }
 .qaline:last-child { margin-bottom: 0; }
@@ -177,6 +230,27 @@ kbd {
   background: rgba(8, 12, 14, 0.93); border: 1px solid var(--line);
   backdrop-filter: blur(10px); font-size: 12.5px;
 }
+
+/* Build progress (StepBuild), pinned over the locked review screen instead of
+   replacing it with a blank page — see App.tsx's "building" step and
+   StepBuild's own docstring. Fixed, not sticky: it must stay visible over
+   .reviewlocked's dimmed/non-interactive content regardless of scroll. */
+.buildbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  max-height: 40vh; overflow-y: auto;
+  padding: 14px 18px; display: flex; flex-direction: column; gap: 4px;
+  background: rgba(8, 12, 14, 0.97); border-top: 1px solid var(--line);
+  backdrop-filter: blur(12px); box-shadow: var(--shadow);
+}
+.buildbar > div { max-width: 960px; margin: 0 auto; width: 100%; }
+.buildbar .error, .buildbar .warn { margin-top: 10px; }
+
+/* The review screen, still visible but frozen, while StepBuild's .buildbar
+   runs over it — see App.tsx's "building" step. Not unmounted: the reviewer's
+   approved/skipped cards stay exactly as they left them, they just can't be
+   touched again mid-build. Padding-bottom keeps the last cards from sitting
+   underneath the fixed bar above. */
+.reviewlocked { pointer-events: none; opacity: 0.55; padding-bottom: 30vh; }
 
 /* ==========================================================================
    REELS

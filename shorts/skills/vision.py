@@ -260,7 +260,7 @@ def judge_frames(script: Script, visuals: dict[str, Visual],
     by_ref = strategy.by_ref() if strategy else {}
     lines_by_ref: dict[str, list[str]] = {}
     for beat in script.beats:
-        lines_by_ref.setdefault(beat.visual_ref, []).append(f"{beat.speaker}: {beat.line}")
+        lines_by_ref.setdefault(beat.visual_ref, []).append(beat.line)
 
     blocks = []
     for i, ref in enumerate(shown, 1):

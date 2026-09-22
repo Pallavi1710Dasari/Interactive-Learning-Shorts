@@ -118,7 +118,7 @@ def sample_script(short_id: str | None) -> Script:
         path = config.OUTPUT_DIR / f"{short_id}.json"
         if not path.exists():
             raise SystemExit(f"no unit {short_id!r} in output/")
-        unit = ShortUnit(**json.loads(path.read_text()))
+        unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
         return Script(short_id=unit.short_id, question=unit.question, beats=unit.beats)
 
     from . import feed
@@ -126,7 +126,7 @@ def sample_script(short_id: str | None) -> Script:
         if candidate.name in feed.SIDECARS:
             continue
         try:
-            unit = ShortUnit(**json.loads(candidate.read_text()))
+            unit = ShortUnit(**json.loads(candidate.read_text(encoding="utf-8")))
         except Exception:
             continue
         return Script(short_id=unit.short_id, question=unit.question, beats=unit.beats)
@@ -206,7 +206,7 @@ def render(script: Script, only: str | None = None, force: bool = False) -> list
              config.KOKORO_VOICE_INTERVIEWER, config.KOKORO_VOICE_STUDENT,
              config.KOKORO_LANG) = saved
 
-    (SAMPLES / "results.json").write_text(json.dumps(results, indent=2))
+    (SAMPLES / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     return results
 
 

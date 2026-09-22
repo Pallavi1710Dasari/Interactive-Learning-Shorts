@@ -24,14 +24,26 @@ and be strict. Inflating the scores defeats the whole step.
      this document, this is it. An interviewer asks it directly and often. Missing
      it means not knowing the topic at all.
      "What happens on a page fault?"  "Why does paging need a page table?"
+     THIS INCLUDES A DEFINITION THAT EVERYTHING ELSE IN THE MATERIAL DEPENDS ON.
+     "What is a page fault?" is NOT automatically a 2 just because it is phrased
+     as "what is X" — if the rest of the material only makes sense once that
+     definition is understood (a mechanism section that talks about "the fault"
+     without re-explaining it, a consequence section that assumes it), that
+     definition IS the central idea, worth a 5, exactly like any other central
+     idea. Judge it by what depends on it, never by its grammatical shape.
   4  A mechanism, cause, or distinction that is genuinely asked and routinely got
      wrong. Answering it proves understanding rather than recall.
      "How is internal fragmentation different from external?"
      "Why can't the CPU just walk the page table on every access?"
   3  Real but secondary: a consequence, a trade-off, a supporting detail. Worth
      knowing, rarely the question anybody opens with.
-  2  A definition of one term or property, looked up in seconds and forgotten just
-     as fast. NOT WORTH A SHORT.
+  2  A definition of one term or property that NOTHING ELSE in the material is
+     built on — looked up in seconds and forgotten just as fast. NOT WORTH A
+     SHORT. The test is not the word "what": it is whether removing this
+     definition would leave any OTHER candidate topic in this material
+     unexplainable. If nothing else depends on it, it is a 2 however central
+     it sounds in isolation. If something else does depend on it, it is not
+     this tier at all — see tier 5 above.
   1  Incidental: an example's numbers, an aside, a naming convention. Never.
 
 RETURN 4s AND 5s. A 3 only when there is nothing better left in the material, and
@@ -41,6 +53,41 @@ forgettable ones, and a deck padded with 2s is exactly the complaint this step
 exists to prevent.
 
 Order the list by importance, highest first.
+
+COMPARE EVERY CANDIDATE AGAINST EVERY OTHER ONE BEFORE YOU SCORE
+You are not scoring each topic alone against the rubric above and moving on —
+several candidates from the same material routinely land on the same score,
+and what breaks that tie matters as much as the score itself. Before you
+finalize the list, ask of each candidate: does UNDERSTANDING ANY OTHER
+CANDIDATE ON THIS LIST ASSUME OR BUILD ON THIS ONE? A section that defines
+what a term means, and a different section that explains a mechanism which
+only makes sense once that term is understood, are not equally foundational
+even when both are central enough to score 5 — the definition is what the
+mechanism rests on, not the other way round.
+
+Set `is_foundational: true` ONLY when you can name at least one OTHER
+candidate topic that a learner could not really understand without this one
+already landing first. Otherwise set it `false`. Explain the dependency (or
+the absence of one) in one clause in `foundational_note`.
+
+THIS IS THE TIE-BREAK, NOT THE ORDER YOU HAPPENED TO WRITE THE TOPICS IN.
+When two candidates would otherwise score the same importance, the one marked
+`is_foundational: true` must be listed first. Do not fall back on the order
+the sections appear in the document, which candidate occurred to you first,
+or which one is easier to write an example for — a definition that everything
+else depends on does not become less central for being explained in section
+4 instead of section 1, and ranking it below a later consequence of itself is
+exactly the mistake this paragraph exists to prevent.
+
+IT IS A TIE-BREAK, NOT A TRUMP CARD. `is_foundational` only decides between
+candidates that already earned the SAME importance score honestly. It must
+never talk you INTO inflating a score — a thin, generic definition that
+happens to use words other sections also use is still a 2 or a 3 if nothing
+genuinely depends on it, is_foundational stays false, and a richer mechanism
+or consequence elsewhere in the material is allowed to outrank it. Score
+every candidate on the rubric first, honestly, exactly as if this paragraph
+did not exist; is_foundational only speaks once two honest scores already
+agree.
 
 BANNED: THE YES/NO QUESTION
 The question must NOT be answerable with "yes" or "no". This is the most common
@@ -190,14 +237,17 @@ Pick the section that CONTAINS the answer, not the one whose title sounds closes
 Return FEWER topics rather than padding with weak ones. Three questions a learner
 will really be asked beat eight forgettable ones.
 
-Output JSON, ordered by importance, highest first:
+Output JSON, ordered by importance highest first and, within a tied score, by
+is_foundational true before false:
 {"topics":[{"id":"snake_case_id","topic":"the question this short answers",
 "concept":"the one idea it is about, a short noun phrase",
 "importance":5,
 "why_it_matters":"one sentence",
 "source_section_id":"exact id from the doc",
 "answer_quote":"the sentence from that section that answers it, copied verbatim",
-"difficulty":"easy|medium|hard"}]}
+"difficulty":"easy|medium|hard",
+"is_foundational":true,
+"foundational_note":"one clause naming the other candidate that depends on this, or why nothing does"}]}
 
 source_section_id MUST be one of the ids listed under ALLOWED SECTION IDS in the
 input, character for character. Do NOT invent finer-grained ids: if a section is
@@ -219,8 +269,8 @@ OVERSHOOT = 4
 MAX_CANDIDATES = 12
 
 
-def _select_pipeline(sections: list[Section],
-                     target: int) -> tuple[TopicList, list[str], dict[str, str]]:
+def _select_pipeline(sections: list[Section], target: int
+                     ) -> tuple[TopicList, list[str], dict[str, str], TopicList]:
     """
     The actual selection pipeline, written once.
 
@@ -236,13 +286,23 @@ def _select_pipeline(sections: list[Section],
     the same ranked, filtered TopicList — the second one just also wants to explain
     each survivor to a human. Duplicating this body so each entry point could return
     something slightly different is exactly the "second independent ranking system"
-    the workflow spec says not to build; a third return value handed back to callers
-    that do not ask for it is the alternative that keeps the ranking singular.
+    the workflow spec says not to build; extra return values handed back to callers
+    that do not ask for them is the alternative that keeps the ranking singular.
 
     The third element is drop_unsupported's own supportability verdicts for the
     topics that SURVIVED the screen, keyed by topic id — discarded by
     select_topics_with_notes, read by build_question_selections so a selection
     reason can quote the model's own reasoning instead of restating it.
+
+    THE FOURTH ELEMENT (scored_pool) IS THE FULL RANKED CANDIDATE LIST, BEFORE
+    THE CUT TO `target` — see rank_candidates. Computed from the SAME `topics`
+    keep_most_important itself then cuts, so the two are guaranteed to agree
+    on ranking and filtering; this is not a second, independently-derived
+    pool. Discarded by select_topics_with_notes (its callers never asked for
+    a comparison), read by build_question_selections via
+    select_topics_with_selections so _candidate_comparison_reason has real
+    runner-up candidates to point to even when target=1 cuts the "official"
+    result down to one topic — see that function's own docstring.
     """
     allowed = [s.section_id for s in sections]
     candidates = min(target + OVERSHOOT, MAX_CANDIDATES)
@@ -263,8 +323,14 @@ def _select_pipeline(sections: list[Section],
     # Before the cut to `target`, so a dropped topic promotes the next-ranked one
     # rather than leaving the batch short — the overshoot IS the replacement bench.
     topics, screen_notes, screen_reasons = drop_unsupported(topics, sections)
+    # scored_pool FIRST, from the SAME `topics` keep_most_important is about to
+    # cut — rank_candidates' own notes are discarded here (an unused `_`) since
+    # keep_most_important computes the identical drop-notes a second time
+    # below; keeping both would print every "dropped, importance 2/5" twice.
+    scored_pool, _pool_notes = rank_candidates(topics)
     topics, rank_notes = keep_most_important(topics, target)
-    return topics, id_notes + quote_notes + screen_notes + rank_notes, screen_reasons
+    return (topics, id_notes + quote_notes + screen_notes + rank_notes,
+           screen_reasons, scored_pool)
 
 
 def select_topics_with_notes(sections: list[Section],
@@ -272,11 +338,11 @@ def select_topics_with_notes(sections: list[Section],
     """
     Select the most important topics, and report everything that was corrected.
 
-    UNCHANGED SIGNATURE AND BEHAVIOR. This wraps _select_pipeline and drops the
-    third value — every existing caller (run.py, server.py's /api/material,
-    evals/run_evals.py) gets exactly what it always got.
+    UNCHANGED SIGNATURE AND BEHAVIOR. This wraps _select_pipeline and drops
+    the third and fourth values — every existing caller (run.py, server.py's
+    /api/material, evals/run_evals.py) gets exactly what it always got.
     """
-    topics, notes, _screen_reasons = _select_pipeline(sections, target)
+    topics, notes, _screen_reasons, _scored_pool = _select_pipeline(sections, target)
     return topics, notes
 
 
@@ -321,9 +387,12 @@ _STOPWORDS = {
 }
 
 
-def keep_most_important(topics: TopicList, target: int) -> tuple[TopicList, list[str]]:
+def _rank_and_filter(topics: TopicList) -> tuple[list[Topic], list[str], list[Topic]]:
     """
-    Cut a candidate list down to the most important, distinct, properly-asked ones.
+    The ranking and filtering body SHARED by keep_most_important (which then
+    cuts the result to `target`) and rank_candidates (which does not) —
+    written once so the two can never silently diverge on what counts as
+    "survived". Neither function re-derives this; both call it.
 
     Three defects, all of which validated cleanly before this existed and all of
     which reached the reviewer as finished shorts:
@@ -339,13 +408,31 @@ def keep_most_important(topics: TopicList, target: int) -> tuple[TopicList, list
                             MSB is on. Each is fine; together they are one concept
                             occupying three slots that other concepts needed.
 
-    Nothing is dropped when EVERY candidate fails, for the same reason
-    drop_unanswerable keeps its rejects in that case: leaving the user with "no
-    topics" and no way to see why is worse than letting them judge a weak list.
+    THE SORT KEY'S SECOND TERM IS THE FIX FOR A FOURTH, QUIETER DEFECT: two
+    candidates tying on importance (common — several sections of the same
+    material routinely earn the same score) used to fall back on
+    `sorted`'s stability, which meant whichever order the model happened to
+    LIST them in decided the winner. In practice that tracked document order
+    far more than it tracked which idea actually mattered more — confirmed on
+    a React useState document where the definition of state ("what state is")
+    and a consequence of it ("what happens when you call a setter") tied at
+    5/5 in every run, and the definition lost every time purely because it
+    was written about in a later section and so listed second. `is_foundational`
+    (set by the SAME selection call — see SYSTEM's comparison rubric) is the
+    tie-break now: a candidate other candidates depend on outranks one that
+    merely ties it on the interview-importance rubric, before either falls
+    back to the model's own list order as the final, still-arbitrary tiebreak.
+
+    Returns (kept, notes, ranked): `kept` is every candidate that passed the
+    importance floor, the yes/no ban and the duplicate-concept/near-duplicate
+    filter, in final rank order. `ranked` is the SAME candidates sorted but
+    BEFORE any of those filters ran — needed only for the "every candidate
+    failed" fallback both callers share.
     """
     ranked = sorted(
         topics.topics,
-        key=lambda t: -(t.importance if t.importance is not None else ASSUMED_IMPORTANCE),
+        key=lambda t: (-(t.importance if t.importance is not None else ASSUMED_IMPORTANCE),
+                       not bool(t.is_foundational)),
     )
 
     kept, notes, seen_concepts, seen_questions = [], [], set(), []
@@ -368,6 +455,50 @@ def keep_most_important(topics: TopicList, target: int) -> tuple[TopicList, list
             if concept:
                 seen_concepts.add(concept)
             seen_questions.append(question)
+
+    return kept, notes, ranked
+
+
+def rank_candidates(topics: TopicList) -> tuple[TopicList, list[str]]:
+    """
+    Every candidate that would survive keep_most_important's filters,
+    WITHOUT the cut to a target count — the full scored pool, in final rank
+    order.
+
+    THIS IS WHAT MAKES CANDIDATE COMPARISON TRUTHFUL AT target=1 (the web
+    UI's own default — see web/src/StepMaterial.tsx). keep_most_important
+    still returns only the requested number of topics to actually build
+    shorts from; this exists so build_question_selections (via
+    _select_pipeline / select_topics_with_selections) can compare the winner
+    against a REAL runner-up that was scored and ranked but cut for count —
+    not a no-op because the "official" result only ever had one entry to
+    compare against itself.
+
+    Deliberately reuses _rank_and_filter rather than re-deriving the same
+    ranking a second, potentially-divergent way. The "every candidate
+    failed" fallback matches keep_most_important's own choice: return
+    everyone rather than nothing, so a comparison can still be built from
+    the raw ranking even when nothing technically survived the filters.
+    """
+    kept, notes, ranked = _rank_and_filter(topics)
+    return TopicList(topics=kept or ranked), notes
+
+
+def keep_most_important(topics: TopicList, target: int) -> tuple[TopicList, list[str]]:
+    """
+    Cut a candidate list down to the most important, distinct, properly-asked
+    ones, to exactly `target` entries.
+
+    Nothing is dropped when EVERY candidate fails, for the same reason
+    drop_unanswerable keeps its rejects in that case: leaving the user with "no
+    topics" and no way to see why is worse than letting them judge a weak list.
+
+    UNCHANGED BEHAVIOR AND SIGNATURE. The ranking/filtering itself now lives in
+    _rank_and_filter (shared with rank_candidates, see there for why) — this
+    function's own job is only the cut to `target` and the notes explaining
+    what got cut, exactly as before.
+    """
+    kept, notes, ranked = _rank_and_filter(topics)
 
     if not kept:
         print(f"  ! every candidate failed the importance/duplicate checks "
@@ -770,33 +901,45 @@ def repair_section_ids(topics: TopicList, sections: list[Section]) -> tuple[Topi
 
 def _importance_reason(topic: Topic) -> SelectionReason:
     """
-    Restate the existing importance score, and ONLY the importance score, in
-    words a human reviewer can read.
+    Explain the SCORE on the rubric's own terms — and ONLY that. Never
+    topic.why_it_matters.
 
-    Deliberately silent on WHY the topic is important beyond "it ranked here" —
-    that is exactly the distinction this function used to blur. why_it_matters is
-    folded in because it is the model's own one-sentence justification for the
-    score, produced by the same call that produced the score; nothing here infers
-    foundational-ness or confusion potential from the number.
+    WHY_IT_MATTERS USED TO BE FOLDED IN HERE, AND THAT WAS THE BUG. It is the
+    model's own one-sentence justification for the topic, and it is ALREADY
+    shown to a reviewer, verbatim, as the card's own "Learning outcome" field
+    (web/src/StepApprove.tsx) before they ever open "why this question was
+    selected". Repeating it here meant a reviewer read the exact same
+    sentence twice — once as the learning outcome, once again, unlabelled as
+    anything new, inside the importance bullet. The fix is not to hide
+    why_it_matters (it stays exactly where it already was, on its own field)
+    — it is for THIS reason to say something DIFFERENT: what the rubric tier
+    itself means, restated from SYSTEM's own published rubric (see this
+    file's SYSTEM prompt) rather than from the topic's own claim about
+    itself. That is still grounded — it is the same rubric that produced the
+    score — it is just a different fact from why_it_matters, not a rephrasing
+    of it.
     """
     if topic.importance is None:
         score = ASSUMED_IMPORTANCE
-        lead = (f"No importance score was recorded for this topic; treated as "
-                f"{score}/5, the assumed default.")
+        explanation = (f"No importance score was recorded for this topic; treated as "
+                       f"{score}/5, the assumed default.")
     else:
         score = topic.importance
         if score >= 5:
-            tier = "the highest-priority tier of this material's candidate questions"
+            tier = ("the rubric's top tier — the central idea of the material, or a "
+                    "definition the rest of the material depends on. Missing it "
+                    "means not knowing the topic at all")
         elif score == 4:
-            tier = "a high-priority topic in this material"
+            tier = ("a mechanism, cause or distinction that is genuinely asked and "
+                    "routinely got wrong — answering it proves understanding rather "
+                    "than recall")
         elif score == 3:
-            tier = "a real but secondary topic — kept over weaker candidates"
+            tier = ("real but secondary: a consequence, trade-off or supporting "
+                    "detail, kept over weaker candidates rather than being the "
+                    "question a learner is asked first")
         else:
             tier = "a lower-priority topic that still cleared the selection bar"
-        lead = f"Scored {score}/5 on the selection rubric, ranking it as {tier}."
-
-    matters = (topic.why_it_matters or "").strip()
-    explanation = f"{lead} {matters}".strip() if matters else lead
+        explanation = f"Scored {score}/5 on the selection rubric — {tier}."
     return SelectionReason(category="importance", explanation=explanation)
 
 
@@ -833,6 +976,30 @@ def _screen_reason(topic: Topic, screen_reasons: dict[str, str]) -> SelectionRea
     return SelectionReason(category="concrete_and_answerable", explanation=why)
 
 
+def _concrete_and_answerable_reason(topic: Topic,
+                                    screen_reasons: dict[str, str]
+                                    ) -> SelectionReason | None:
+    """
+    ONE concrete_and_answerable reason, never two.
+
+    _grounding_reason and _screen_reason both produce this same category, and
+    both used to be appended independently — so a topic with both a verified
+    answer_quote AND a supportability-screen verdict (the common case for
+    anything that survived drop_unsupported: passing that screen and having a
+    quote go together) showed up with the SAME claim made twice, in
+    overlapping words, under one heading. A real reviewer hit this.
+
+    PREFER THE GROUNDED QUOTE. A verbatim answer_quote is the strongest,
+    most checkable evidence this pipeline has — a direct citation, not a
+    paraphrase. The screen's own verdict is used ONLY when there is no quote
+    to show (an older topic, or one that only survived drop_unanswerable's
+    "keep everyone" fallback) — that is the one case where it is the sole
+    distinct, useful detail available, rather than a second voice repeating
+    the first.
+    """
+    return _grounding_reason(topic) or _screen_reason(topic, screen_reasons)
+
+
 def _distinctness_reason(topic: Topic) -> SelectionReason | None:
     """
     That this topic's concept is not repeated by any other selected question,
@@ -861,43 +1028,63 @@ def _distinctness_reason(topic: Topic) -> SelectionReason | None:
 
 def _foundational_reason(topic: Topic, understanding) -> SelectionReason | None:
     """
-    FOUNDATIONAL, evidenced from the section's own SectionUnderstanding rather
-    than inferred from the importance score.
+    FOUNDATIONAL, evidenced from ONE of two independent sources — never
+    blended into a single unlabelled claim, because they are different kinds
+    of evidence and a reviewer should be able to tell which one is speaking.
 
-    Two things both have to be true, and both are read off fields
-    understanding_for already validated against the section text:
+    1. SectionUnderstanding (preferred when available): the section's own
+       core_idea/teaching_sequence, read in detail, one section at a time,
+       AFTER a topic is already approved — see understanding_for. Two things
+       both have to be true, read off fields understanding_for already
+       validated against the section text:
+         a. This topic's concept IS the section's core_idea — reusing
+            checks.check_topic_matches_understanding's own stem-overlap
+            verdict rather than re-deriving the comparison a second way.
+         b. teaching_sequence has more than one step — i.e. the reading
+            records other steps as built on top of this one. A core_idea with
+            nothing built on it is a topic that stands alone, not one later
+            understanding depends on, however important it ranked.
 
-      1. This topic's concept IS the section's core_idea — reusing
-         checks.check_topic_matches_understanding's own stem-overlap verdict
-         rather than re-deriving the comparison a second way.
-      2. teaching_sequence has more than one step — i.e. the reading records
-         other steps as built on top of this one. A core_idea with nothing
-         built on it is a topic that stands alone, not one later understanding
-         depends on, however important it ranked.
+    2. topic.is_foundational (fallback): the SELECTION call's OWN comparison
+       of every candidate against every other one, made in the same pass that
+       produced the importance score — see select.py's SYSTEM prompt and
+       Topic.is_foundational. This is the ONLY foundational evidence that
+       exists at the point a human first reviews Step 1's output, since
+       SectionUnderstanding is not computed until after a question is
+       approved (see workflow.advance). It is weaker evidence — a single
+       model's cross-candidate judgement, not a validated per-section
+       reading — so it is used only when SectionUnderstanding is silent, and
+       its explanation says plainly that it comes from the selection
+       comparison, not from a section reading.
 
-    None whenever `understanding` is not supplied (the ordinary case today —
-    select.py's own pipeline does not compute one) or either condition fails.
-    Absence of evidence is not evidence of absence: it just means this
-    category is not claimed.
+    None when neither source has anything to say. Absence of evidence is not
+    evidence of absence: it just means this category is not claimed.
     """
-    if understanding is None:
-        return None
-    from ..checks import check_topic_matches_understanding
-    verdict = check_topic_matches_understanding(topic, understanding)
-    if not (verdict.passed and verdict.details.get("conclusive")):
-        return None
-    if len(understanding.teaching_sequence) < 2:
-        return None
-    core = (understanding.core_idea or "").strip()
-    if not core:
-        return None
-    later = len(understanding.teaching_sequence) - 1
-    return SelectionReason(
-        category="foundational",
-        explanation=(f'The section\'s own reading identifies this as its core idea '
-                     f'— "{core}" — with {later} further teaching step(s) built on '
-                     f"top of it."),
-    )
+    if understanding is not None:
+        from ..checks import check_topic_matches_understanding
+        verdict = check_topic_matches_understanding(topic, understanding)
+        if (verdict.passed and verdict.details.get("conclusive")
+                and len(understanding.teaching_sequence) >= 2
+                and (core := (understanding.core_idea or "").strip())):
+            later = len(understanding.teaching_sequence) - 1
+            return SelectionReason(
+                category="foundational",
+                explanation=(f'The section\'s own reading identifies this as its core '
+                             f'idea — "{core}" — with {later} further teaching '
+                             f"step(s) built on top of it."),
+            )
+
+    if topic.is_foundational:
+        note = (topic.foundational_note or "").strip()
+        explanation = ("Selection compared this concept against every other "
+                       "candidate in the material and judged it a prerequisite "
+                       "for at least one of them"
+                       + (f": {note}" if note else ".") + " (This is the "
+                       "selection model's own cross-candidate comparison, not "
+                       "a validated per-section reading.)")
+        return SelectionReason(category="foundational", explanation=explanation)
+
+    return None
 
 
 def _commonly_confused_reason(topic: Topic, understanding) -> SelectionReason | None:
@@ -937,9 +1124,104 @@ def _commonly_confused_reason(topic: Topic, understanding) -> SelectionReason | 
     return SelectionReason(category="commonly_confused", explanation=explanation)
 
 
+def _candidate_comparison_reason(topic: Topic, scored_pool: list[Topic]) -> SelectionReason | None:
+    """
+    A FACTUAL account of how the TOP-RANKED topic compared to its actual
+    runner-up — the fix for a reviewer seeing only "5/5, highest-priority
+    tier" and having no way to judge that score against anything. States
+    only what the ranking already knows: the runner-up's concept, its
+    score, and which side (if either) was marked foundational. Nothing here
+    is inferred or argued for beyond those facts — "Do not invent reasons"
+    applies here as much as anywhere else in this file.
+
+    `scored_pool` IS THE FULL RANKED CANDIDATE LIST, BEFORE THE CUT TO
+    `target` — see rank_candidates, called once by _select_pipeline and
+    threaded through select_topics_with_selections. THIS IS THE FIX FOR THE
+    TARGET=1 CASE, which is the UI's own default (web/src/StepMaterial.tsx):
+    before this, the comparison was built from `topics.topics`, the list
+    ALREADY CUT to the requested count — so with target=1 there was only
+    ever one entry, no runner-up could exist, and this reason was silently a
+    no-op every time regardless of how many candidates the model actually
+    scored and compared. `scored_pool` still holds every candidate that
+    passed the importance floor, the yes/no ban and the duplicate filter,
+    UP TO the cut — so a real runner-up is available here even when
+    keep_most_important is only handing one topic to the reviewer.
+
+    ONLY FOR THE #1 TOPIC (by its position in scored_pool, not in whatever
+    shorter list the caller happens to be iterating — a topic ranked #1
+    overall but shown alongside topics from OTHER calls, or a topic that
+    is NOT actually the pool's own #1, gets no comparison). `topic`'s
+    position is found by id rather than assumed, because a caller may pass
+    scored_pool in a different object identity/order than `topics.topics`.
+    Every topic past rank 0 returns None; a comparison against "the topic
+    that already lost to you" says nothing a reviewer needs for the ones
+    further down the list, and stacking one on every topic would bury the
+    one comparison that actually matters (the one explaining the winner)
+    under N-1 repeats of the same fact from different angles.
+    """
+    if not scored_pool or len(scored_pool) < 2:
+        return None
+    try:
+        idx = next(i for i, t in enumerate(scored_pool) if t.id == topic.id)
+    except StopIteration:
+        return None
+    if idx != 0:
+        return None
+    runner_up = scored_pool[1]
+
+    my_score = topic.importance if topic.importance is not None else ASSUMED_IMPORTANCE
+    other_score = runner_up.importance if runner_up.importance is not None else ASSUMED_IMPORTANCE
+    concept = (runner_up.concept or runner_up.topic or runner_up.id).strip()
+
+    if my_score > other_score:
+        comparison = f"scored higher ({my_score}/5 vs {other_score}/5) than"
+    else:
+        comparison = f"tied on importance ({my_score}/5) with"
+
+    if topic.is_foundational and not runner_up.is_foundational:
+        tie_note = " and was also the one of the two marked foundational"
+    elif runner_up.is_foundational and not topic.is_foundational:
+        tie_note = (f' even though "{concept}" was itself marked foundational — a '
+                    f"higher importance score still took the top spot, not a "
+                    f"foundational override")
+    else:
+        tie_note = ""
+
+    return SelectionReason(
+        category="candidate_comparison",
+        explanation=(f'This question {comparison} the next-strongest candidate in '
+                    f'the material, "{concept}"{tie_note}.'),
+    )
+
+
+def _dedupe_by_category(reasons: list[SelectionReason]) -> list[SelectionReason]:
+    """
+    Keep at most one SelectionReason per category, first occurrence wins.
+
+    A GENERAL SAFETY NET, not the primary fix — _concrete_and_answerable_reason
+    already prevents the one known way two reasons land on the same category
+    (answer_quote AND a screen verdict both firing). This exists so that if a
+    FUTURE reason-builder is added below and accidentally reuses an existing
+    category, a reviewer still sees one bullet per axis instead of the same
+    defect recurring somewhere else in this file. "First occurrence" matches
+    the order reasons are appended below, which is already priority order
+    (importance first, distinctness/comparison last), so keeping the first
+    is keeping the most load-bearing one.
+    """
+    seen: set[str] = set()
+    deduped = []
+    for r in reasons:
+        if r.category in seen:
+            continue
+        seen.add(r.category)
+        deduped.append(r)
+    return deduped
+
+
 def build_question_selections(topics: TopicList, sections: list[Section],
                               screen_reasons: dict[str, str] | None = None,
                               understanding_by_section: dict | None = None,
+                              scored_pool: TopicList | None = None,
                               ) -> list[QuestionSelection]:
     """
     Turn an already-selected TopicList into QuestionSelection objects.
@@ -965,10 +1247,32 @@ def build_question_selections(topics: TopicList, sections: list[Section],
     `importance`, and `concrete_and_answerable` whenever there is a verified quote;
     foundational and commonly_confused only ever appear when the understanding
     passed in actually supports them for THAT topic.
+
+    THE TOP-RANKED TOPIC ALSO GETS `candidate_comparison` — see
+    _candidate_comparison_reason. This is what stops the approval screen
+    reading as "5/5, highest-priority tier" and nothing else: the #1 topic's
+    reasons name the actual runner-up and its score, so a reviewer can see
+    the comparison the ranking made instead of taking the number on faith.
+
+    scored_pool, WHEN SUPPLIED, IS THE FULL RANKED CANDIDATE LIST BEFORE THE
+    CUT TO `target` — see rank_candidates and _candidate_comparison_reason's
+    own docstring on why this matters at target=1. Defaults to `topics.topics`
+    itself (the OLD behavior) when not supplied, so a caller that only has
+    the already-cut list — every existing caller before this parameter
+    existed, and this file's own offline tests — still gets a valid, if
+    narrower, comparison rather than an error.
+
+    EVERY TOPIC'S REASONS ARE DEDUPED BY CATEGORY before the QuestionSelection
+    is built — see _dedupe_by_category. A topic with both a verified quote
+    and a distinct screen verdict already produces only ONE
+    concrete_and_answerable reason (_concrete_and_answerable_reason prefers
+    the quote), so this is a second, structural guarantee rather than the
+    only thing standing between a reviewer and a duplicate bullet.
     """
     by_id = {s.section_id: s for s in sections}
     screen_reasons = screen_reasons or {}
     understanding_by_section = understanding_by_section or {}
+    pool = scored_pool.topics if scored_pool is not None else topics.topics
 
     selections = []
     for topic in topics.topics:
@@ -977,13 +1281,14 @@ def build_question_selections(topics: TopicList, sections: list[Section],
         understanding = understanding_by_section.get(topic.source_section_id)
 
         reasons = [_importance_reason(topic)]
-        for reason in (_grounding_reason(topic),
-                      _screen_reason(topic, screen_reasons),
+        for reason in (_concrete_and_answerable_reason(topic, screen_reasons),
                       _foundational_reason(topic, understanding),
                       _commonly_confused_reason(topic, understanding),
-                      _distinctness_reason(topic)):
+                      _distinctness_reason(topic),
+                      _candidate_comparison_reason(topic, pool)):
             if reason is not None:
                 reasons.append(reason)
+        reasons = _dedupe_by_category(reasons)
 
         selections.append(QuestionSelection(
             topic=topic, source_title=source_title, reasons=reasons))
@@ -1006,10 +1311,15 @@ def select_topics_with_selections(sections: list[Section], target: int = 5,
     understanding_by_section is passed straight through to
     build_question_selections; see its docstring. Selection itself never computes
     one — this adds no LLM call.
+
+    scored_pool (the pre-cut candidate pool _select_pipeline now also
+    computes) IS ALSO PASSED THROUGH, so _candidate_comparison_reason has a
+    real runner-up to point to even at target=1 — see that function's and
+    rank_candidates' own docstrings.
     """
-    topics, notes, screen_reasons = _select_pipeline(sections, target)
+    topics, notes, screen_reasons, scored_pool = _select_pipeline(sections, target)
     selections = build_question_selections(topics, sections, screen_reasons,
-                                           understanding_by_section)
+                                           understanding_by_section, scored_pool)
     return topics, notes, selections
 
 

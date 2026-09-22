@@ -51,10 +51,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .schema import Script, Topic, Section, ShortUnit, QuestionApproval, QuestionWorkflow
-from .parse import parse_markdown, find_section
+from .schema import (Script, Topic, Section, ShortUnit, QuestionApproval,
+                     QuestionWorkflow, TeachingApproachKind)
+from .parse import parse_markdown, find_section, evidence_text
 from .skills.select import select_topics_with_selections
-from .skills.script import write_script
+from .skills.script import write_script, write_script_for_workflow
 from .skills.understanding import understanding_for
 from .skills.visuals import design_visuals, render_diagrams
 from . import raster
@@ -68,6 +69,13 @@ usage.load()   # cumulative across restarts
 
 for _warning in config.model_warnings():
     print(f"!! {_warning}")
+
+# Pay the active voice provider's one-time startup cost (Chatterbox's ~150-190s
+# CPU model load, specifically) now, in the background, rather than letting it
+# eat the first build's VOICE_BUILD_TIMEOUT budget — see voice.warm()'s and
+# providers.Chatterbox.warm()'s own docstrings for the failure this fixes.
+# Non-blocking: returns immediately, the load itself continues on its own thread.
+voice.warm()
 
 # Judge calls are launched from inside a build worker and collected by the same
 # worker, so they need a pool of their own — submitting to the pool you are running
@@ -145,7 +153,8 @@ def _sections(doc_id: str) -> list[Section]:
 
 
 def _graders(script: Script, section: Section, doc_text: str | None = None,
-             understanding=None) -> list[dict]:
+             understanding=None, topic: Topic | None = None,
+             source_text: str | None = None) -> list[dict]:
     """The grader chips the review UI shows, as plain dicts.
 
     `understanding` is threaded through rather than looked up here, and that is the
@@ -154,19 +163,35 @@ def _graders(script: Script, section: Section, doc_text: str | None = None,
     against the plan it was actually given. Omitting it — as the callers that have
     no understanding do — simply leaves the alignment check out of the list.
     """
-    return _chips(_grade(script, section, doc_text, understanding=understanding))
+    return _chips(_grade(script, section, doc_text, understanding=understanding,
+                         topic=topic, source_text=source_text))
 
 
 def _grade(script: Script, section: Section, doc_text: str | None = None,
-           understanding=None):
+           understanding=None, topic: Topic | None = None,
+           source_text: str | None = None):
     """The raw GraderResults. The retry loops need these, not the chips.
 
     revision.route reads GraderResult.details to tell a grader that SKIPPED from one
     that passed — a distinction the UI dicts drop, and the one that decides whether
     an area is reported as working or left out of the revision brief entirely.
+
+    `topic` IS OPTIONAL AND ADDITIVE — see run_script_graders's own docstring: it
+    lets reaches_objective/follows_sequence/learning_outcome also accept the
+    approved question's OWN scope (topic.why_it_matters), not only the
+    section-wide understanding.core_idea every topic filed under that section
+    shares. Every call site below has a `topic` in scope already; passing it
+    costs nothing extra.
+
+    `source_text` IS OPTIONAL AND OVERRIDES `section.text` — the same resolved
+    evidence write_script was handed (see parse.evidence_text), so a script
+    that legitimately cited a sibling "Example"/"How It Works" section is not
+    graded as having strayed from its own material. Omitted, this grades
+    against `section.text` exactly as it always has.
     """
-    return checks.run_script_graders(script, section.text, doc_text=doc_text,
-                                     understanding=understanding)
+    text = section.text if source_text is None else source_text
+    return checks.run_script_graders(script, text, doc_text=doc_text,
+                                     understanding=understanding, topic=topic)
 
 
 def _chips(results) -> list[dict]:
@@ -174,7 +199,8 @@ def _chips(results) -> list[dict]:
     return [{"name": r.name, "passed": r.passed, "reason": r.reason} for r in results]
 
 
-def _review_judge(script: Script, section: Section, results) -> dict | None:
+def _review_judge(script: Script, section: Section, results,
+                  source_text: str | None = None) -> dict | None:
     """The judge's verdict on a drafted script, for the reviewer to see BEFORE approving.
 
     WHY IT IS HERE AND NOT ONLY AT FINALIZE. Every grader that runs for free answers
@@ -190,13 +216,22 @@ def _review_judge(script: Script, section: Section, results) -> dict | None:
 
     NEVER RAISES. A judge that has a bad minute must not cost the reviewer a draft
     they could otherwise have read — the score is an extra, not a gate.
+
+    `source_text` IS OPTIONAL AND OVERRIDES `section.text` — the SAME resolved
+    evidence pool (see parse.evidence_text) write_script and the code graders
+    were judged against just above. Without this, a script whose beats
+    legitimately cite a sibling "Example"/"How It Works" section would pass
+    every code grader here and then have the judge mark it unfaithful for
+    citing material it was never shown — the exact failure mode this
+    parameter closes, one call downstream of _grade.
     """
     if not config.JUDGE_AT_REVIEW or script is None:
         return None
     if not checks.all_passed(results):
         return None
+    text = section.text if source_text is None else source_text
     try:
-        report = judge_script(script, section.text)
+        report = judge_script(script, text)
     except Exception as e:
         print(f"!! review judge {script.short_id}: {type(e).__name__}: {e}")
         return None
@@ -207,18 +242,27 @@ def _review_judge(script: Script, section: Section, results) -> dict | None:
 
 def _as_qa(script: Script) -> dict:
     """
-    The review view thinks in questions and answers, not beats.
+    The review view, as one narrator's connected explanation — not a Q&A.
 
-    The first beat is the interviewer's question; the student beats are the answer,
-    one paragraph each. Keeping the mapping in one place means the UI never has to
-    know about beat mechanics.
+    THE WIRE KEY STAYS "qa" AND THE FUNCTION NAME STAYS `_as_qa`, and both are
+    stale on purpose rather than renamed: `finalize` below reconstructs a
+    Script straight back out of `item["qa"]["beats"]`, and
+    server_workflow_test.py asserts `r.json()["qa"]["question"]` — this is a
+    wire contract other code depends on, and renaming it buys nothing a reader
+    of this docstring does not already get for free.
+
+    WHAT CHANGED: there used to be a second list here, "answers" — every beat
+    after beat 0, because that used to be a different SPEAKER (see schema.Beat's
+    own docstring). There is only one narrator now, so "answers" was a filtered
+    copy of exactly the same beats "beats" already carries, existing only so
+    StepReview.tsx did not have to know beat 0 is the opening — it now reads
+    that directly off `beats[0]` instead. `beats` is unchanged: every field
+    model_dump() gives a Beat, in speaking order, which is what `finalize`
+    needs to round-trip a Script back out of this dict.
     """
     return {
         "short_id": script.short_id,
         "question": script.question,
-        "answers": [{"index": i, "line": b.line, "on_screen": b.on_screen,
-                     "visual_ref": b.visual_ref, "source_quote": b.source_quote}
-                    for i, b in enumerate(script.beats) if b.speaker == "student"],
         "beats": [b.model_dump() for b in script.beats],
         "seconds": script.estimated_seconds,
         "words": script.word_count,
@@ -385,21 +429,40 @@ def regenerate_selection(body: SelectionRegenerateIn):
 #
 # SAME STATELESS SHAPE AS THE SELECTION ENDPOINTS ABOVE, one stage later: the
 # caller already holds a QuestionWorkflow (approved, framed, with a
-# teaching_approach — nothing here computes any of those; see skills/framing.py
-# and skills/teaching_approach.py, neither wired into an orchestration path yet)
-# and gets back the updated one. review.approve_teaching_approach /
-# regenerate_teaching_approach do all the work; these two routes are thin.
+# teaching_approach — computed by /api/workflow/advance, not here) and gets
+# back the updated one. review.approve_teaching_approach /
+# select_teaching_approach / regenerate_teaching_approach do all the work;
+# these routes are thin.
 
 class TeachingApproachApproveIn(BaseModel):
     doc_id: str
     workflow: QuestionWorkflow
     note: str | None = None
+    #: OPTIONAL — a human choosing a DIFFERENT approach directly, with no
+    #: LLM call. Omitted (the common case: keeping the recommendation),
+    #: this endpoint behaves exactly as it always has. Sent, and different
+    #: from the workflow's current recommendation, this calls
+    #: review.select_teaching_approach instead of review.approve_teaching_approach
+    #: — see that function's own docstring for exactly what gets written and
+    #: why. Sent but IDENTICAL to the current recommendation is treated the
+    #: same as omitting it, so a UI that always sends the picker's current
+    #: value (whether or not the reviewer touched it) never writes a needless
+    #: override recording a "change" that never happened.
+    override: TeachingApproachKind | None = None
 
 
 @app.post("/api/teaching-approach/approve")
 def approve_teaching_approach_endpoint(body: TeachingApproachApproveIn):
     try:
-        updated = review.approve_teaching_approach(body.workflow, note=body.note)
+        chosen = body.override
+        if chosen is not None:
+            current = body.workflow.effective_teaching_approach
+            if current is not None and chosen == current.primary:
+                chosen = None   # picked the recommendation itself — plain approve
+        if chosen is not None:
+            updated = review.select_teaching_approach(body.workflow, chosen, note=body.note)
+        else:
+            updated = review.approve_teaching_approach(body.workflow, note=body.note)
     except ValueError as e:
         raise HTTPException(409, str(e))
     return {"workflow": updated.model_dump()}
@@ -590,7 +653,16 @@ def make_script(body: ScriptIn):
     except KeyError as e:
         raise HTTPException(422, str(e))
 
-    richness = checks.check_section_richness(section.text)
+    # THE RESOLVED EVIDENCE POOL FOR THIS TOPIC — its own section, plus any
+    # sibling sections (an "Example", "How It Works", etc.) that
+    # parse.group_sections_by_concept recognises as elaborating it. See
+    # parse.evidence_text: a section with no such neighbours gets back exactly
+    # section.text, so this is a no-op for every document that does not use
+    # that authoring pattern. Computed ONCE and threaded through richness,
+    # write_script and grading below so all three judge the same text.
+    source_text = evidence_text(sections, topic.source_section_id)
+
+    richness = checks.check_section_richness(source_text)
     if not richness.passed:
         raise HTTPException(422, richness.reason)
 
@@ -600,7 +672,9 @@ def make_script(body: ScriptIn):
     script = None
     # Once, before the loop — the same rule the CLI follows in run.build_one. The
     # three attempts differ by a grader's complaint, not by what the section says.
-    understanding = understanding_for(section, document=doc_text)
+    # `source_text` so a widened evidence pool (see parse.evidence_text) reads
+    # AND is verified against the same text write_script cites from below.
+    understanding = understanding_for(section, document=doc_text, source_text=source_text)
     # Same reconciliation as /api/scripts and run.build_one — see the comment
     # there. This endpoint is the per-card "Retry" path, so a topic that has
     # already drifted from its section's core_idea gets the same one-call
@@ -608,11 +682,13 @@ def make_script(body: ScriptIn):
     if understanding:
         match = checks.check_topic_matches_understanding(topic, understanding)
         if not match.passed:
-            topic = _realign_topic(topic, section, understanding, doc_text)
+            topic = _realign_topic(topic, section, understanding, doc_text,
+                                   source_text=source_text)
     for attempt in range(1, 4):
         script = write_script(topic, section, feedback, document=doc_text,
-                              understanding=understanding)
-        results = _grade(script, section, doc_text, understanding=understanding)
+                              understanding=understanding, source_text=source_text)
+        results = _grade(script, section, doc_text, understanding=understanding,
+                         topic=topic, source_text=source_text)
         graders = _chips(results)
         attempts.append({"attempt": attempt, "graders": graders})
         if checks.all_passed(results):
@@ -621,7 +697,7 @@ def make_script(body: ScriptIn):
 
     # The judge runs on the attempt that survived, so the reviewer decides with
     # the same information finalize used to gather afterwards.
-    judge = _review_judge(script, section, results)
+    judge = _review_judge(script, section, results, source_text=source_text)
 
     return {"topic": topic.model_dump(), "section_id": section.section_id,
             "qa": _as_qa(script), "attempts": attempts,
@@ -674,6 +750,11 @@ def make_scripts(body: ScriptsIn):
         except KeyError as e:
             return {"topic": topic.model_dump(), "error": str(e)}
 
+        # THE RESOLVED EVIDENCE POOL — see make_script's identical comment and
+        # parse.evidence_text. A section with no elaborating siblings ("Example",
+        # "How It Works", ...) gets back exactly section.text.
+        source_text = evidence_text(sections, topic.source_section_id)
+
         # FREE, BEFORE ANYTHING PAID. A section that came back as three bullet
         # points and a code fence — "HTML elements like `<img />` are called void
         # elements because they don't require an end tag" was its only real
@@ -683,17 +764,18 @@ def make_scripts(body: ScriptsIn):
         # so beats reused the one real sentence and invented prose to fill the
         # rest. That was fully predictable from the section text alone, with no
         # model call, so it is checked here first and reported the way a KeyError
-        # already is — as a per-card error the reviewer can read and act on
-        # (merge the section with a neighbour, or add prose to the source) instead
-        # of a checklist of red x's with no diagnosis attached.
-        richness = checks.check_section_richness(section.text)
+        # already is — as a per-card error the reviewer can read and act on (add
+        # explanatory prose to the source, or reword a heading so
+        # parse.group_sections_by_concept can recognise it as elaborating the
+        # thin one) instead of a checklist of red x's with no diagnosis attached.
+        richness = checks.check_section_richness(source_text)
         if not richness.passed:
             return {"topic": topic.model_dump(), "error": richness.reason}
 
         # Before the loop, and shared across the whole batch by section — several
         # topics filed under one section wait on one reading rather than each
         # paying for their own. See understanding_for, which does the sharing.
-        understanding = understanding_for(section, document=doc_text)
+        understanding = understanding_for(section, document=doc_text, source_text=source_text)
 
         # THE RECONCILIATION CHECK, HERE TOO. This endpoint used to duplicate
         # run.build_one's script-writing loop without duplicating the check right
@@ -705,14 +787,16 @@ def make_scripts(body: ScriptsIn):
         if understanding:
             match = checks.check_topic_matches_understanding(topic, understanding)
             if not match.passed:
-                topic = _realign_topic(topic, section, understanding, doc_text)
+                topic = _realign_topic(topic, section, understanding, doc_text,
+                                       source_text=source_text)
 
         feedback, script, graders = None, None, []
         try:
             for _ in range(3):
                 script = write_script(topic, section, feedback, document=doc_text,
-                                      understanding=understanding)
-                results = _grade(script, section, doc_text, understanding=understanding)
+                                      understanding=understanding, source_text=source_text)
+                results = _grade(script, section, doc_text, understanding=understanding,
+                                 topic=topic, source_text=source_text)
                 graders = _chips(results)
                 if checks.all_passed(results):
                     break
@@ -723,7 +807,7 @@ def make_scripts(body: ScriptsIn):
 
         return {"topic": topic.model_dump(), "section_id": section.section_id,
                 "qa": _as_qa(script), "graders": graders,
-                "judge": _review_judge(script, section, results)}
+                "judge": _review_judge(script, section, results, source_text=source_text)}
 
     # All topics at once. The cap of 6 serialised anything larger into a second
     # round, so asking for 10 shorts took twice as long as asking for 5 for no
@@ -734,12 +818,144 @@ def make_scripts(body: ScriptsIn):
     return {"results": results, "usage": usage.since(cursor), "total": usage.totals()}
 
 
+class WorkflowScriptsIn(BaseModel):
+    doc_id: str
+    workflows: list[QuestionWorkflow]
+
+
+@app.post("/api/workflow/scripts")
+def make_workflow_scripts(body: WorkflowScriptsIn):
+    """
+    Draft a script for every workflow whose teaching approach a HUMAN HAS
+    ALREADY APPROVED, through the WORKFLOW-AWARE path — write_script_for_workflow,
+    which threads that approved approach and framing into the prompt —
+    instead of make_scripts()'s bare write_script.
+
+    WHY THIS EXISTS SEPARATELY FROM make_scripts. make_scripts (and
+    /api/script) call write_script(topic, ...) directly, which never sees
+    framing or a teaching approach — that is the bug this endpoint fixes.
+    Nothing about make_scripts itself changes: run.py, rescript.py and any
+    caller that still hands this server a bare Topic keep working exactly as
+    they did.
+
+    NO AUTO-APPROVAL HERE, ON PURPOSE — THIS ENDPOINT USED TO DO ONE. It
+    used to generate framing and a teaching approach itself and then
+    auto-approve the LLM's own choice, because the web UI had no screen for
+    a human to review it. That screen now exists — StepTeachingApproach.tsx —
+    and reaches this stage only through the real human gate, via the
+    existing /api/workflow/advance (framing + a recommended approach) and
+    /api/teaching-approach/approve|regenerate (the human's decision). So
+    every workflow handed to this endpoint is expected to already have
+    workflow.approved_teaching_approach set; one that does not is refused as
+    a per-card error rather than silently decided here.
+
+    WHY IT DOES NOT CALL shorts/workflow.py's advance() FOR THE SCRIPT
+    ITSELF. advance() makes exactly ONE script attempt with no grader retry
+    loop. This endpoint adds the SAME retry loop make_scripts already runs —
+    a quality safeguard around generation, not a second approval gate — and
+    stops once the script exists. It never generates the visual plan: the
+    NEXT /api/workflow/advance call (from StepVisualPlan.tsx) sees
+    workflow.script already set and generates only what is still missing.
+    """
+    cursor = usage.mark()
+    sections = _sections(body.doc_id)
+    doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
+
+    def one(workflow: QuestionWorkflow) -> dict:
+        raw_topic = workflow.selection.topic
+        if workflow.approved_topic is None:
+            return {"topic": raw_topic.model_dump(),
+                    "error": f"question is not approved "
+                             f"(status={workflow.question_approval.status!r})"}
+        if workflow.framing is None:
+            return {"topic": raw_topic.model_dump(),
+                    "error": "this workflow has no framing yet — call "
+                             "/api/workflow/advance before drafting a script"}
+        if workflow.approved_teaching_approach is None:
+            return {"topic": raw_topic.model_dump(),
+                    "error": f"the teaching approach is not approved "
+                             f"(status={workflow.teaching_approach_approval.status!r}) "
+                             f"— a human must approve it on the teaching-approach "
+                             f"review screen before a script is written"}
+        try:
+            section = find_section(sections, raw_topic.source_section_id)
+        except KeyError as e:
+            return {"topic": raw_topic.model_dump(), "error": str(e)}
+
+        # THE RESOLVED EVIDENCE POOL — see make_script's identical comment and
+        # parse.evidence_text.
+        source_text = evidence_text(sections, raw_topic.source_section_id)
+
+        richness = checks.check_section_richness(source_text)
+        if not richness.passed:
+            return {"topic": raw_topic.model_dump(), "error": richness.reason}
+
+        understanding = understanding_for(section, document=doc_text, source_text=source_text)
+        wf = workflow
+
+        # SAME RECONCILIATION AS make_script/make_scripts — see make_script's
+        # identical comment — and it was MISSING HERE, which is the gap this
+        # closes. write_script_for_workflow does not build its beat 1 from
+        # wf.approved_topic.topic; it builds it from wf.framing.teaching_question
+        # (see that function's own "THE TEACHING QUESTION DRIVES THE SCRIPT, NOT
+        # THE RAW APPROVED QUESTION"), so THAT is the text that has to agree with
+        # this section's own core idea — a topic whose original wording was fine
+        # can still drift once framing has reworded it for teaching. Realigning
+        # here, before the retry loop below spends its first script call, is the
+        # same one-call repair make_script already gets; without it this endpoint
+        # — the one StepReview.tsx actually calls — silently skipped the check
+        # both older, less-used endpoints already had.
+        if understanding and wf.approved_topic is not None and wf.framing is not None:
+            effective = wf.approved_topic.model_copy(
+                update={"topic": wf.framing.teaching_question})
+            match = checks.check_topic_matches_understanding(effective, understanding)
+            if not match.passed:
+                realigned = _realign_topic(effective, section, understanding, doc_text,
+                                           source_text=source_text)
+                if realigned.topic != effective.topic:
+                    wf = wf.model_copy(update={"framing": wf.framing.model_copy(
+                        update={"teaching_question": realigned.topic})})
+
+        feedback, graders, results = None, [], []
+        try:
+            for _ in range(3):
+                wf = write_script_for_workflow(wf, section, feedback=feedback,
+                                               document=doc_text, understanding=understanding,
+                                               source_text=source_text)
+                results = _grade(wf.script, section, doc_text, understanding=understanding,
+                                 topic=wf.approved_topic, source_text=source_text)
+                graders = _chips(results)
+                if checks.all_passed(results):
+                    break
+                feedback = revision.feedback_for(results)
+        except Exception as e:
+            return {"topic": wf.approved_topic.model_dump(),
+                    "section_id": section.section_id, "error": f"{type(e).__name__}: {e}"}
+
+        return {"topic": wf.approved_topic.model_dump(), "section_id": section.section_id,
+                "qa": _as_qa(wf.script), "graders": graders,
+                "judge": _review_judge(wf.script, section, results, source_text=source_text),
+                "workflow": wf.model_dump()}
+
+    with ThreadPoolExecutor(max_workers=max(1, len(body.workflows))) as pool:
+        results = list(pool.map(one, body.workflows))
+
+    return {"results": results, "usage": usage.since(cursor), "total": usage.totals()}
+
+
 class RegenerateIn(BaseModel):
     doc_id: str
     topic: Topic
     instruction: str
     target: str = "script"          # "question" | "answer" | "script"
     qa: dict | None = None          # the script on screen, so edits are targeted
+    #: OPTIONAL. When the script on screen was drafted through
+    #: /api/workflow/scripts, the caller sends the same workflow back here
+    #: (framing + approved teaching approach already on it) so a
+    #: reviewer's regeneration keeps following that approach too — omitting
+    #: it would silently fall back to generic narration on the very first
+    #: "Regenerate" click. Absent, this endpoint behaves exactly as before.
+    workflow: QuestionWorkflow | None = None
 
 
 @app.post("/api/regenerate")
@@ -763,10 +979,16 @@ def regenerate(body: RegenerateIn):
     except KeyError as e:
         raise HTTPException(422, str(e))
 
+    # THE RESOLVED EVIDENCE POOL — see make_script's identical comment and
+    # parse.evidence_text. A regenerate is still the review step's own script
+    # generation, so it must judge itself against the same evidence the
+    # original draft was written and graded against.
+    source_text = evidence_text(sections, body.topic.source_section_id)
+
     where = {
-        "question": "Change ONLY the interviewer's question. Leave every answer beat "
+        "question": "Change ONLY the opening beat (beat 1). Leave every answer beat "
                     "word-for-word as it is.",
-        "answer": "Change ONLY the answer beats. Leave the interviewer's question "
+        "answer": "Change ONLY the answer beats. Leave the opening beat (beat 1) "
                   "word-for-word as it is.",
     }.get(body.target, "Revise the whole script as directed.")
 
@@ -795,11 +1017,28 @@ def regenerate(body: RegenerateIn):
     # A reviewer's note changes what to say about the section, not what the section
     # teaches — so the reading is unchanged, and on a section already drafted this
     # turn it is a cache hit and costs nothing at all.
-    understanding = understanding_for(section, document=doc_text)
+    understanding = understanding_for(section, document=doc_text, source_text=source_text)
+
+    # WORKFLOW-AWARE, WHEN THE CALLER HAS ONE — see WorkflowScriptsIn.workflow's
+    # own note. A script drafted by /api/workflow/scripts keeps following its
+    # approved framing and teaching approach through every regeneration too,
+    # not only its first draft.
+    wf = body.workflow
+    use_workflow = wf is not None and wf.approved_teaching_approach is not None
+
     for _ in range(3):
-        script = write_script(body.topic, section, feedback, current=current,
-                              document=doc_text, understanding=understanding)
-        results = _grade(script, section, doc_text, understanding=understanding)
+        if use_workflow:
+            wf = write_script_for_workflow(wf, section, feedback=feedback, current=current,
+                                           document=doc_text, understanding=understanding,
+                                           source_text=source_text)
+            script = wf.script
+        else:
+            script = write_script(body.topic, section, feedback, current=current,
+                                  document=doc_text, understanding=understanding,
+                                  source_text=source_text)
+        grading_topic = wf.approved_topic if use_workflow else body.topic
+        results = _grade(script, section, doc_text, understanding=understanding,
+                         topic=grading_topic, source_text=source_text)
         graders = _chips(results)
         if checks.all_passed(results):
             break
@@ -810,8 +1049,11 @@ def regenerate(body: RegenerateIn):
             f"{base}\n\nYour previous attempt also broke the hard rules below. Fix them "
             f"WITHOUT losing the reviewer's change above."))
 
-    return {"topic": body.topic.model_dump(), "qa": _as_qa(script), "graders": graders,
-            "usage": usage.since(cursor), "total": usage.totals()}
+    out = {"topic": body.topic.model_dump(), "qa": _as_qa(script), "graders": graders,
+           "usage": usage.since(cursor), "total": usage.totals()}
+    if use_workflow:
+        out["workflow"] = wf.model_dump()
+    return out
 
 
 # ---------------------------------------------------- step 3: visuals, judge, reels
@@ -932,6 +1174,27 @@ def finalize(body: FinalizeIn):
         except Exception as e:
             return None, {"topic_id": item.get("topic", {}).get("id"), "error": str(e)}, []
 
+        # THE HUMAN-APPROVED VISUAL PLAN, WHEN THE CALLER SENT ONE — the same
+        # bug class this whole workflow-aware pass exists to close. Without
+        # this, design_visuals below silently plans its OWN strategy (see its
+        # own docstring: "planned once and reused across attempts") and the
+        # Visual Plan review screen's approval would be decorative — the
+        # reviewer's approved plan, and the approved teaching approach that
+        # shaped it, never actually reaching what gets drawn. `None` for
+        # either (a caller with no workflow, or one whose visual plan was
+        # never approved) reproduces this function's exact previous
+        # behaviour — design_visuals plans its own, as it always has.
+        workflow_data = item.get("workflow")
+        strategy = approach = None
+        if workflow_data:
+            try:
+                wf = QuestionWorkflow(**workflow_data)
+                strategy = wf.approved_visual_strategy
+                approach = wf.approved_teaching_approach
+            except Exception as e:
+                print(f"    ! {topic.id}: could not read its workflow "
+                      f"({type(e).__name__}: {e}) — planning visuals fresh instead")
+
         try:
             # The voice depends only on the words, so it records while the visuals
             # are being designed rather than after them.
@@ -953,9 +1216,19 @@ def finalize(body: FinalizeIn):
             # closes.
             understanding = understanding_for(section, document=doc_text)
             vision_scores: dict = {}
+            # `vision=body.do_judge`, NOT THE DEFAULT — without this,
+            # design_visuals's own `vision: bool = True` default applied
+            # unconditionally, so `do_judge=False` silently left the
+            # multimodal vision judge (Opus-tier, one call per design
+            # attempt) running anyway. `do_judge` is the one flag a caller
+            # has for "skip the expensive judging", and it must actually
+            # cover both judges, not just the text one below.
             visuals, design_problems = design_visuals(script, section,
                                                       draw=body.do_svg,
+                                                      vision=body.do_judge,
                                                       scores_out=vision_scores,
+                                                      strategy=strategy,
+                                                      approach=approach,
                                                       understanding=understanding)
 
             unit = ShortUnit(
@@ -1027,7 +1300,19 @@ def finalize(body: FinalizeIn):
 
             if recording is not None:
                 try:
-                    unit.audio = recording.result()
+                    # BOUNDED, NOT INDEFINITE — see config.VOICE_BUILD_TIMEOUT's
+                    # own note. A slow local CPU provider (Chatterbox with no
+                    # GPU) can genuinely take longer than this per short, and a
+                    # build must not hold the whole HTTP response hostage to
+                    # that: past the cap this raises TimeoutError, caught
+                    # below exactly like any other voice failure — the short
+                    # ships with no recorded track and the browser voice
+                    # narrates instead. The background thread is NOT
+                    # cancelled (Python cannot forcibly stop it, and there is
+                    # no reason to want to): it keeps synthesizing, and
+                    # voice._from_cache picks the result up for free on the
+                    # next build of this short.
+                    unit.audio = recording.result(timeout=config.VOICE_BUILD_TIMEOUT)
                 except Exception as e:
                     # Includes tts.AccountBlocked, which voice.synthesize re-raises
                     # so batch CLIs can stop early. A build must not: the short is
@@ -1054,7 +1339,7 @@ def finalize(body: FinalizeIn):
                 print(f"    ! {unit.short_id}: {warning}")
 
             (config.OUTPUT_DIR / f"{unit.short_id}.json").write_text(
-                unit.model_dump_json(indent=2))
+                unit.model_dump_json(indent=2), encoding="utf-8")
             return unit.short_id, None, warnings
         except Exception as e:
             # One bad short must not lose the others in the batch — they have
@@ -1151,7 +1436,7 @@ def revisual(body: RevisualIn):
     path = config.OUTPUT_DIR / f"{body.short_id}.json"
     if not path.exists():
         raise HTTPException(404, f"no such short: {body.short_id}")
-    unit = ShortUnit(**json.loads(path.read_text()))
+    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
 
     from .redraw import _section_for
     section = _section_for(unit)
@@ -1173,7 +1458,7 @@ def revisual(body: RevisualIn):
 
     warnings = [f"{r.name}: {r.reason}"
                 for r in checks.run_unit_graders(unit, section.text) if not r.passed]
-    path.write_text(unit.model_dump_json(indent=2))
+    path.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
 
     # The cached MP4 was rendered from the frames this just replaced.
     stale = config.OUTPUT_DIR / unit.short_id / "reel.mp4"
@@ -1222,12 +1507,12 @@ def release(body: ReleaseIn):
     path = config.OUTPUT_DIR / f"{body.short_id}.json"
     if not path.exists():
         raise HTTPException(404, f"no such short: {body.short_id}")
-    unit = ShortUnit(**json.loads(path.read_text()))
+    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
     if unit.status not in feed.QUARANTINED:
         raise HTTPException(400, f"{body.short_id} is already in the reel "
                                  f"(status {unit.status})")
     unit.status = "audited"
-    path.write_text(unit.model_dump_json(indent=2))
+    path.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
     print(f"    {unit.short_id} RELEASED by the reviewer over the judge's verdict")
     fresh = [u for u in feed.collect() if u["short_id"] == unit.short_id]
     return {"short": fresh[0] if fresh else None}
@@ -1254,13 +1539,25 @@ def audio(short_id: str):
 
     Same id validation as _doc_path: short_id lands in a filesystem path, so
     anything that is not a plain id is refused rather than resolved.
+
+    NO CACHING, ANYWHERE ALONG THE WAY — this URL is the same
+    "/api/audio/{short_id}" every time, with no version or content hash in
+    it, and rebuilding a short after adopting a new voice writes fresh bytes
+    to the SAME path. Without an explicit no-store, a browser (or an
+    intermediate cache) is free to keep serving the OLD recording under that
+    URL — heuristic freshness lets it do that without even asking the server
+    again — so a reviewer who just adopted a new voice and rebuilt hears the
+    old one and reasonably concludes the new voice did not take, exactly the
+    failure mode voice.py's own _from_cache fix (see its docstring) already
+    solved server-side. This is that same fix one layer further out.
     """
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", short_id):
         raise HTTPException(400, "bad short_id")
     track = voice.existing(short_id)
     if not track:
         raise HTTPException(404, "no recorded narration for this short")
-    return FileResponse(track, media_type="audio/mpeg")
+    return FileResponse(track, media_type="audio/mpeg",
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/voice")
@@ -1515,8 +1812,9 @@ async def voice_speak(
     if not refs:
         raise HTTPException(400, "upload a voice for at least one speaker")
 
-    # In beat order, and the interviewer must go first — Script validates that, and
-    # it is the order a reel is heard in anyway.
+    # In beat order, and the interviewer slot goes first — this is the Voice Lab's
+    # own two-slot audition convention (see this endpoint's docstring), not a
+    # schema requirement: Script no longer validates beat order by role.
     lines: list[tuple[str, str]] = []
     if text_interviewer.strip():
         lines.append(("interviewer", text_interviewer.strip()))
@@ -1590,7 +1888,7 @@ def voice_adopt(job_id: str = Form(...)):
         other = "student" if adopted[0] == "interviewer" else "interviewer"
         settings.setdefault(other, settings[adopted[0]])
     settings["provider"] = "chatterbox"
-    config.VOICE_SETTINGS.write_text(json.dumps(settings, indent=2))
+    config.VOICE_SETTINGS.write_text(json.dumps(settings, indent=2), encoding="utf-8")
     config.TTS_PROVIDER = "chatterbox"
     return {"ok": True, "adopted": adopted, **_voice_state()}
 
@@ -1646,7 +1944,7 @@ async def voice_keep(
         other = "student" if kept[0] == "interviewer" else "interviewer"
         settings[other] = settings[kept[0]]
     settings["provider"] = "chatterbox"
-    config.VOICE_SETTINGS.write_text(json.dumps(settings, indent=2))
+    config.VOICE_SETTINGS.write_text(json.dumps(settings, indent=2), encoding="utf-8")
     config.TTS_PROVIDER = "chatterbox"
     return {"ok": True, "kept": kept, **_voice_state()}
 

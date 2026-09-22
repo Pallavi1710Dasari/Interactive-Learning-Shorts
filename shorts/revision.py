@@ -63,7 +63,7 @@ AREA_PRESERVED = {
     "opening":       "the opening is grounded in the section and leads into the topic",
     "example":       "the required example is used where it belongs",
     "confusion":     "the misconception is corrected without ever being stated as fact",
-    "other":         "length, overlay text and dialogue shape are within limits",
+    "other":         "length, overlay text and narration shape are within limits",
 }
 
 #: Grader name -> revision area. Anything not listed lands in "other", which is
@@ -85,7 +85,7 @@ GRADER_AREA = {
     "handles_confusion": "confusion",
     "timing":            "other",
     "overlays":          "other",
-    "dialogue_shape":    "other",
+    "narration_shape":   "other",
     "no_refusal":        "other",
 }
 

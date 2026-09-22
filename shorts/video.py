@@ -146,7 +146,7 @@ def _stamp_matches(stamp: Path, fingerprint: str, unit: Path) -> bool:
     """Is the cached video current for both this renderer and this unit?"""
     if not stamp.exists():
         return False
-    parts = stamp.read_text().split()
+    parts = stamp.read_text(encoding="utf-8").split()
     if len(parts) != 2 or parts[0] != fingerprint:
         return False
     try:
@@ -372,7 +372,7 @@ def render(short_id: str, force: bool = False,
     path = config.OUTPUT_DIR / f"{short_id}.json"
     if not path.exists():
         raise FileNotFoundError(f"no such short: {short_id}")
-    unit = ShortUnit(**json.loads(path.read_text()))
+    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
 
     outdir = config.OUTPUT_DIR / short_id
     outdir.mkdir(parents=True, exist_ok=True)
@@ -494,8 +494,8 @@ def render(short_id: str, force: bool = False,
     # The stamp now records the unit mtime it was built FROM, written last, so the
     # comparison is against a number rather than a race.
     unit.video_path = str(mp4.relative_to(config.ROOT))
-    path.write_text(unit.model_dump_json(indent=2))
-    stamp.write_text(f"{fingerprint} {path.stat().st_mtime_ns}")
+    path.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
+    stamp.write_text(f"{fingerprint} {path.stat().st_mtime_ns}", encoding="utf-8")
     return mp4
 
 

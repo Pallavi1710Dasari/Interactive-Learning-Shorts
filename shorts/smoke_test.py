@@ -31,7 +31,7 @@ def main():
                 ("good_page_fault.json", "3.3", "mechanism + misconception, 30-38s")]
     scripts = []
     for name, section_id, note in fixtures:
-        data = json.loads((ROOT / f"evals/fixtures/{name}").read_text())
+        data = json.loads((ROOT / f"evals/fixtures/{name}").read_text(encoding="utf-8"))
         sc = Script(**data)
         scripts.append((sc, section_id, note))
         print(f"   ok — {name}: {sc.word_count} words, {sc.estimated_seconds}s ({note})")
@@ -67,7 +67,7 @@ def main():
 
     out = ROOT / "output" / "smoke_unit.json"
     out.parent.mkdir(exist_ok=True)
-    out.write_text(unit.model_dump_json(indent=2))
+    out.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
     print(f"\nALL OFFLINE CHECKS PASSED. Wrote {out.relative_to(ROOT)}")
     print("Next: add your ANTHROPIC_API_KEY to .env and run step 6 in the README.")
 

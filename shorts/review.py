@@ -15,7 +15,7 @@ earlier, not a second review framework — see approve_question / reject_questio
 import json, sys
 from pathlib import Path
 from .schema import (ShortUnit, QuestionWorkflow, RegenerationAttempt,
-                     TeachingApproachRegenerationAttempt,
+                     TeachingApproachKind, TeachingApproachRegenerationAttempt,
                      VisualStrategyRegenerationAttempt, Section)
 from .parse import find_section
 from .skills.select import regenerate_question
@@ -213,10 +213,12 @@ def run_question_gate(workflows: list[QuestionWorkflow], sections: list[Section]
 # MAX_QUESTION_REGENERATIONS) and its own gate — never folded into
 # approve_question/regenerate above. See schema.TeachingApproachRegenerationAttempt.
 #
-# ONLY TWO HUMAN ACTIONS EXIST HERE: approve, or request regeneration. There is
-# no reject — an approach a reviewer dislikes is not a reason to drop the
+# THREE HUMAN ACTIONS EXIST HERE: approve, request regeneration, or select a
+# different approach directly (see select_teaching_approach below) — never a
+# reject. An approach a reviewer dislikes is not a reason to drop the
 # QUESTION, only to ask for a different DEVICE, so the only paths out of
-# "pending" are "approved" or "another regeneration".
+# "pending" are "approved" (as recommended, or as directly selected) or
+# "another regeneration".
 
 def _require_teaching_approach_reviewable(workflow: QuestionWorkflow) -> None:
     """
@@ -253,6 +255,69 @@ def approve_teaching_approach(workflow: QuestionWorkflow,
     _require_teaching_approach_reviewable(workflow)
     approval = workflow.teaching_approach_approval.model_copy(update={
         "status": "approved",
+        "note": note if note is not None else workflow.teaching_approach_approval.note,
+    })
+    return workflow.model_copy(update={"teaching_approach_approval": approval})
+
+
+def select_teaching_approach(workflow: QuestionWorkflow, chosen: TeachingApproachKind,
+                             note: str | None = None) -> QuestionWorkflow:
+    """
+    The human picks a DIFFERENT TeachingApproachKind directly from the fixed
+    set of seven, with NO LLM call, and approves it in the same action —
+    Step 6's third human action alongside approve_teaching_approach and
+    regenerate_teaching_approach.
+
+    WHY THIS IS NOT A REGENERATION. Regeneration asks the LLM to reconsider
+    the whole pedagogical judgement from a stated reason — the right tool
+    when the reviewer thinks the DECISION itself is wrong for this concept.
+    This function is for the different, and common, case where the LLM's
+    reasoning is perfectly fine but the reviewer simply prefers one of the
+    other six devices it already had available — spending a call to ask the
+    model to re-derive a conclusion the human has already reached themselves
+    would be pure waste.
+
+    WHAT GETS WRITTEN, AND WHY IT IS NOT A HAND-TYPED JUDGEMENT. Only
+    `primary` is genuinely a human decision; everything else in the stored
+    TeachingApproach is mechanical, not authored:
+      - `combined_with` is cleared — a combination the LLM chose to support
+        its OWN primary is not known to make sense against a different one,
+        and keeping it would misrepresent the human's choice as broader than
+        it was.
+      - `alternatives` is carried over unchanged from the approach being
+        replaced — still an honest record of what the LLM considered.
+      - `rationale` is replaced with a short, honest, MECHANICALLY GENERATED
+        note that a human chose this over the LLM's recommendation — never a
+        free-text field the human fills in (that would be exactly the
+        unguided hand-editing schema.TeachingApproachApproval's docstring
+        warns against), and it still flows into write_script_for_workflow's
+        prompt so the script step knows why this device was chosen.
+
+    APPROVES IMMEDIATELY, MATCHING THE UI'S SINGLE "Approve" BUTTON — see
+    server.py's /api/teaching-approach/approve, which calls this instead of
+    approve_teaching_approach exactly when the reviewer's selection differs
+    from the current recommendation, and calls approve_teaching_approach
+    (unchanged) when it does not. There is no separate "selected but not yet
+    approved" state; picking a different approach IS the approval.
+
+    NEVER CALL THIS WITH `chosen` EQUAL TO THE CURRENT RECOMMENDATION'S
+    primary — that is what approve_teaching_approach is for, and calling this
+    instead would write a needless override recording a "change" that never
+    happened. Server.py's own dispatch already keeps this distinction; this
+    function does not re-derive it.
+    """
+    _require_teaching_approach_reviewable(workflow)
+    current = workflow.effective_teaching_approach
+    chosen_approach = current.model_copy(update={
+        "primary": chosen,
+        "combined_with": [],
+        "rationale": (
+            f"A human reviewer chose to teach this with {chosen.replace('_', ' ')} "
+            f"instead of the AI's recommended {current.primary.replace('_', ' ')}."),
+    })
+    approval = workflow.teaching_approach_approval.model_copy(update={
+        "status": "approved",
+        "override": chosen_approach,
         "note": note if note is not None else workflow.teaching_approach_approval.note,
     })
     return workflow.model_copy(update={"teaching_approach_approval": approval})
@@ -321,6 +386,16 @@ def regenerate_teaching_approach(workflow: QuestionWorkflow, reason: str,
         regenerated_approach=new_approach)
     approval = approval.model_copy(update={
         "status": "pending",
+        # CLEARED, NOT CARRIED FORWARD. A prior direct selection (see
+        # select_teaching_approach) was a preference against the OLD
+        # recommendation — once the LLM has reconsidered and produced a new
+        # one, that old preference no longer means anything in particular,
+        # and effective_teaching_approach checks `override` before
+        # `regenerated_approach` (see its own docstring), so leaving it set
+        # would silently hide the fresh recommendation this call just paid
+        # for behind a stale pick. The reviewer sees the new recommendation
+        # and, if they still want a different device, selects again.
+        "override": None,
         "regenerated_approach": new_approach,
         "regeneration_history": approval.regeneration_history + [attempt],
     })
@@ -632,7 +707,7 @@ def main():
         return
 
     for f in files:
-        unit = ShortUnit(**json.loads(f.read_text()))
+        unit = ShortUnit(**json.loads(f.read_text(encoding="utf-8")))
         if unit.status in ("approved", "rendered"):
             continue
 
@@ -641,8 +716,7 @@ def main():
         print(f"Q: {unit.question}")
         print("-" * 78)
         for i, b in enumerate(unit.beats):
-            who = "INT" if b.speaker == "interviewer" else "STU"
-            print(f"{i}. [{who}] {b.line}")
+            print(f"{i}. {b.line}")
             print(f"        screen: \"{b.on_screen}\"   visual: {b.visual_ref}")
         print("-" * 78)
         for ref, v in unit.visuals.items():
@@ -664,7 +738,7 @@ def main():
             unit.status = "rejected"
         else:
             continue
-        f.write_text(unit.model_dump_json(indent=2))
+        f.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
         print(f"  -> {unit.status}")
 
 

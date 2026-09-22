@@ -88,7 +88,7 @@ def rescript(path: Path, write: bool = True) -> tuple[str, bool]:
     from .skills.visuals import design_visuals
     from .skills.audit import judge_script
 
-    unit = ShortUnit(**json.loads(path.read_text()))
+    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
     section = _section_for(unit)
     if section is None:
         return "no source document on disk — cannot re-script or verify", False
@@ -183,7 +183,7 @@ beat 1 ask the narrower one.""")
 
     candidate_unit.status = "audited" if after.passed else "rejected"
     if write:
-        path.write_text(json.dumps(candidate_unit.model_dump(), indent=2))
+        path.write_text(json.dumps(candidate_unit.model_dump(), indent=2), encoding="utf-8")
     msg = (f"f={before.faithfulness if before else '-'}->{after.faithfulness} "
            f"c={before.clarity if before else '-'}->{after.clarity} "
            f"beats {len(unit.beats)}->{len(fixed.beats)} "
@@ -209,7 +209,7 @@ def main() -> int:
     todo = []
     for path in paths:
         try:
-            unit = ShortUnit(**json.loads(path.read_text()))
+            unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
         except Exception as e:
             print(f"  ! {path.stem}: {type(e).__name__}: {e}")
             continue

@@ -144,6 +144,126 @@ def find_section(sections: list[Section], section_id: str) -> Section:
     raise KeyError(f"no section with id {section_id!r}. Have: {[s.section_id for s in sections]}")
 
 
+# ---------------------------------------------------- evidence grouping (Step 4)
+#
+# WHY THIS EXISTS. parse_markdown cuts a new Section at every heading, which is
+# right for keeping unrelated material apart and wrong for a very common
+# authoring style: a concept stated in one or two sentences under its own
+# heading, then elaborated under separate sibling headings — "## Example",
+# "## How It Works", "## Script" — each individually too thin to cite for a
+# multi-beat script even though the concept, read as the small cluster it
+# actually is, plainly is not. checks.check_section_richness, check_source_
+# quotes and check_answers_its_section all judge exactly one Section's raw
+# text, and write_script's own prompt is explicit that it may not borrow from
+# "elsewhere in the document" — so a topic filed under the thin heading alone
+# can never see its own document's best evidence, however adjacent it is.
+#
+# THE FIX IS NOT "MERGE THIN NEIGHBOURS" — that was tried and rejected. Two
+# short, unrelated concept sections sitting next to each other ("## What are
+# Props?" then "## What is State?") must never be pooled just because both are
+# thin: that is exactly the cross-topic contamination check_answers_its_section
+# exists to stop. Thinness is not a relevance signal.
+#
+# THE SIGNAL USED INSTEAD is the heading's own ROLE. "Example", "How It Works"
+# and "Script" do not name a subject a reader would look up on its own — they
+# name a generic part a chunk of material plays FOR WHATEVER CONCEPT CAME RIGHT
+# BEFORE IT, in any document, on any topic. A heading that names an actual
+# concept is never in this set, however short its own body is.
+
+#: Normalized (lowercase, punctuation stripped) headings that elaborate the
+#: concept named by the section immediately before them, rather than
+#: introducing a concept of their own. Deliberately generic and deliberately
+#: short: every entry is a role a section can play in ANY subject's write-up,
+#: never a word tied to one topic or document.
+_ELABORATION_TITLES = {
+    "example", "examples", "sample", "sample code", "code", "code example",
+    "demo", "demonstration",
+    "how it works", "how does it work", "how this works", "under the hood",
+    "walkthrough", "step by step",
+    "explanation", "explained",
+    "output", "result", "results",
+    "summary", "recap", "in practice",
+    "script", "narration",
+}
+
+
+def _normalize_title(title: str) -> str:
+    """"6.2 Example", "Example:" and "EXAMPLE" all reduce to "example", so the
+    lookup above matches on the heading's wording, not its numbering or case."""
+    return re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
+
+
+def _is_elaboration_title(title: str) -> bool:
+    return _normalize_title(title) in _ELABORATION_TITLES
+
+
+def group_sections_by_concept(sections: list[Section]) -> dict[str, list[Section]]:
+    """
+    Map every section id to the small cluster of CONSECUTIVE sections that
+    together hold one concept's evidence: the section itself, plus any run of
+    sections right after it whose heading is a generic elaboration of what
+    came before (see _ELABORATION_TITLES), chained for as long as that holds.
+
+    CONSERVATIVE BY CONSTRUCTION. A section whose own title is not a
+    recognised elaboration role always starts a NEW group, however short its
+    body is — so two thin, adjacent, unrelated concepts are never pooled
+    together; only a heading that names a generic role (not a subject)
+    attaches backward. A document that elaborates a concept under an
+    idiosyncratically-worded heading ("## What that looks like in code") is
+    simply not recognised, and that section is graded on its own, exactly as
+    every section was graded before this function existed. That is a missed
+    merge, not a wrong one — the safe failure direction for something guarding
+    against citing unrelated material.
+
+    A leading elaboration-titled section (nothing before it to attach to)
+    stands alone rather than being dropped, so it is still addressable.
+
+    Every section id appears exactly once as a key. A section with no
+    elaborating neighbours maps to a single-element list containing only
+    itself, so evidence_text below is byte-identical to plain section.text
+    for every document that does not use this authoring pattern.
+    """
+    groups: list[list[Section]] = []
+    for s in sections:
+        if groups and _is_elaboration_title(s.title):
+            groups[-1].append(s)
+        else:
+            groups.append([s])
+
+    by_id: dict[str, list[Section]] = {}
+    for group in groups:
+        for s in group:
+            by_id[s.section_id] = group
+    return by_id
+
+
+def evidence_text(sections: list[Section], section_id: str) -> str:
+    """
+    The text a topic filed under `section_id` may honestly cite from: its own
+    section, plus any sections group_sections_by_concept groups with it.
+
+    THE ONE RESOLVER, SHARED BY EVERY CONSUMER THAT NEEDS TO AGREE ON WHAT
+    "THE SECTION" MEANS FOR A TOPIC — check_section_richness (before a script
+    is even attempted), write_script's own prompt (what it may cite from),
+    check_source_quotes and check_answers_its_section (what a citation is
+    verified against). Computing it once here rather than in each caller is
+    what keeps those four from silently drifting into judging different text.
+    """
+    section = find_section(sections, section_id)
+    group = group_sections_by_concept(sections).get(section_id, [section])
+    if len(group) == 1:
+        return section.text
+    return "\n\n".join(s.text for s in group)
+
+
+def evidence_section_ids(sections: list[Section], section_id: str) -> list[str]:
+    """Which section ids contributed to evidence_text(sections, section_id) —
+    for traceability: showing a reviewer, or a test, which headings a short's
+    grounding actually drew on."""
+    group = group_sections_by_concept(sections).get(section_id)
+    return [s.section_id for s in group] if group else [section_id]
+
+
 if __name__ == "__main__":
     import sys
     for s in parse_markdown(sys.argv[1]):

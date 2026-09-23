@@ -55,7 +55,7 @@ from .schema import (Script, Topic, Section, ShortUnit, QuestionApproval,
                      QuestionWorkflow, TeachingApproachKind)
 from .parse import parse_markdown, find_section, evidence_text
 from .skills.select import select_topics_with_selections
-from .skills.script import write_script, write_script_for_workflow
+from .skills.script import write_script, write_and_grade_script_for_workflow
 from .skills.understanding import understanding_for
 from .skills.visuals import design_visuals, render_diagrams
 from . import raster
@@ -154,7 +154,7 @@ def _sections(doc_id: str) -> list[Section]:
 
 def _graders(script: Script, section: Section, doc_text: str | None = None,
              understanding=None, topic: Topic | None = None,
-             source_text: str | None = None) -> list[dict]:
+             source_text: str | None = None, approach=None) -> list[dict]:
     """The grader chips the review UI shows, as plain dicts.
 
     `understanding` is threaded through rather than looked up here, and that is the
@@ -162,14 +162,19 @@ def _graders(script: Script, section: Section, doc_text: str | None = None,
     and passes the same object to write_script and to this, so an attempt is graded
     against the plan it was actually given. Omitting it — as the callers that have
     no understanding do — simply leaves the alignment check out of the list.
+
+    `approach` IS OPTIONAL AND ADDITIVE, same contract as `topic` below — see
+    checks.run_script_graders's own docstring. Only the /api/workflow/scripts
+    path has an approved TeachingApproach in scope; every other caller omits
+    it and gets exactly the chip list it got before.
     """
     return _chips(_grade(script, section, doc_text, understanding=understanding,
-                         topic=topic, source_text=source_text))
+                         topic=topic, source_text=source_text, approach=approach))
 
 
 def _grade(script: Script, section: Section, doc_text: str | None = None,
            understanding=None, topic: Topic | None = None,
-           source_text: str | None = None):
+           source_text: str | None = None, approach=None):
     """The raw GraderResults. The retry loops need these, not the chips.
 
     revision.route reads GraderResult.details to tell a grader that SKIPPED from one
@@ -188,10 +193,14 @@ def _grade(script: Script, section: Section, doc_text: str | None = None,
     that legitimately cited a sibling "Example"/"How It Works" section is not
     graded as having strayed from its own material. Omitted, this grades
     against `section.text` exactly as it always has.
+
+    `approach` IS OPTIONAL AND ADDITIVE — adds check_script_matches_teaching_approach
+    when the caller has an approved TeachingApproach in scope.
     """
     text = section.text if source_text is None else source_text
     return checks.run_script_graders(script, text, doc_text=doc_text,
-                                     understanding=understanding, topic=topic)
+                                     understanding=understanding, topic=topic,
+                                     approach=approach, selected_question=topic.topic)
 
 
 def _chips(results) -> list[dict]:
@@ -849,13 +858,16 @@ def make_workflow_scripts(body: WorkflowScriptsIn):
     workflow.approved_teaching_approach set; one that does not is refused as
     a per-card error rather than silently decided here.
 
-    WHY IT DOES NOT CALL shorts/workflow.py's advance() FOR THE SCRIPT
-    ITSELF. advance() makes exactly ONE script attempt with no grader retry
-    loop. This endpoint adds the SAME retry loop make_scripts already runs —
-    a quality safeguard around generation, not a second approval gate — and
-    stops once the script exists. It never generates the visual plan: the
-    NEXT /api/workflow/advance call (from StepVisualPlan.tsx) sees
-    workflow.script already set and generates only what is still missing.
+    WHY IT DOES NOT CALL shorts/workflow.py's advance() FOR THE SCRIPT ITSELF.
+    Not because advance() lacks grading any more — Step 5 fixed that, and
+    advance() now calls the exact same skills.script.write_and_grade_script_
+    for_workflow this endpoint does — but because advance() also tries to
+    generate the NEXT stage (the visual plan) once a script exists, and
+    StepReview.tsx, this endpoint's own caller, wants the script drafted and
+    reviewed on its own screen before that happens. It never generates the
+    visual plan itself: the NEXT /api/workflow/advance call (from
+    StepVisualPlan.tsx) sees workflow.script already set and generates only
+    what is still missing.
     """
     cursor = usage.mark()
     sections = _sections(body.doc_id)
@@ -916,18 +928,16 @@ def make_workflow_scripts(body: WorkflowScriptsIn):
                     wf = wf.model_copy(update={"framing": wf.framing.model_copy(
                         update={"teaching_question": realigned.topic})})
 
-        feedback, graders, results = None, [], []
         try:
-            for _ in range(3):
-                wf = write_script_for_workflow(wf, section, feedback=feedback,
-                                               document=doc_text, understanding=understanding,
-                                               source_text=source_text)
-                results = _grade(wf.script, section, doc_text, understanding=understanding,
-                                 topic=wf.approved_topic, source_text=source_text)
-                graders = _chips(results)
-                if checks.all_passed(results):
-                    break
-                feedback = revision.feedback_for(results)
+            # STEP 5: THE ONE AUTHORITATIVE, GRADED WORKFLOW SCRIPT PATH — see
+            # write_and_grade_script_for_workflow's own docstring. This used to
+            # be this endpoint's OWN 3-attempt loop, hand-written; it is now
+            # the same function advance() calls, so the two can never grade a
+            # workflow script differently depending on which one drafted it.
+            wf, results = write_and_grade_script_for_workflow(
+                wf, section, document=doc_text, understanding=understanding,
+                source_text=source_text)
+            graders = _chips(results)
         except Exception as e:
             return {"topic": wf.approved_topic.model_dump(),
                     "section_id": section.section_id, "error": f"{type(e).__name__}: {e}"}
@@ -1013,7 +1023,6 @@ def regenerate(body: RegenerateIn):
     # failure is only reported if it survives every attempt.
     cursor = usage.mark()
     doc_text = _doc_path(body.doc_id).read_text(encoding="utf-8")
-    script, graders, feedback = None, [], base
     # A reviewer's note changes what to say about the section, not what the section
     # teaches — so the reading is unchanged, and on a section already drafted this
     # turn it is a cache hit and costs nothing at all.
@@ -1026,28 +1035,35 @@ def regenerate(body: RegenerateIn):
     wf = body.workflow
     use_workflow = wf is not None and wf.approved_teaching_approach is not None
 
-    for _ in range(3):
-        if use_workflow:
-            wf = write_script_for_workflow(wf, section, feedback=feedback, current=current,
-                                           document=doc_text, understanding=understanding,
-                                           source_text=source_text)
-            script = wf.script
-        else:
+    # The reviewer's note is the PREFIX on every retry, so it stays above the
+    # routed grader complaint and keeps governing — the note is why this call
+    # exists, and a grader complaint must never displace it.
+    retry_prefix = (f"{base}\n\nYour previous attempt also broke the hard rules below. "
+                    f"Fix them WITHOUT losing the reviewer's change above.")
+
+    if use_workflow:
+        # STEP 5: THE SAME AUTHORITATIVE, GRADED PATH advance() and
+        # /api/workflow/scripts use — see write_and_grade_script_for_workflow's
+        # own docstring. `initial_feedback`/`retry_prefix` carry the human's
+        # note through exactly as this endpoint's own hand-written loop did.
+        wf, results = write_and_grade_script_for_workflow(
+            wf, section, document=doc_text, understanding=understanding,
+            source_text=source_text, current=current,
+            initial_feedback=base, retry_prefix=retry_prefix)
+        script = wf.script
+        graders = _chips(results)
+    else:
+        script, graders, feedback = None, [], base
+        for _ in range(3):
             script = write_script(body.topic, section, feedback, current=current,
                                   document=doc_text, understanding=understanding,
                                   source_text=source_text)
-        grading_topic = wf.approved_topic if use_workflow else body.topic
-        results = _grade(script, section, doc_text, understanding=understanding,
-                         topic=grading_topic, source_text=source_text)
-        graders = _chips(results)
-        if checks.all_passed(results):
-            break
-        # The reviewer's note is the PREFIX, so it stays above the routed block and
-        # keeps governing — the note is why this call exists, and a grader complaint
-        # must never displace it.
-        feedback = revision.feedback_for(results, prefix=(
-            f"{base}\n\nYour previous attempt also broke the hard rules below. Fix them "
-            f"WITHOUT losing the reviewer's change above."))
+            results = _grade(script, section, doc_text, understanding=understanding,
+                             topic=body.topic, source_text=source_text)
+            graders = _chips(results)
+            if checks.all_passed(results):
+                break
+            feedback = revision.feedback_for(results, prefix=retry_prefix)
 
     out = {"topic": body.topic.model_dump(), "qa": _as_qa(script), "graders": graders,
            "usage": usage.since(cursor), "total": usage.totals()}
@@ -1189,11 +1205,72 @@ def finalize(body: FinalizeIn):
         if workflow_data:
             try:
                 wf = QuestionWorkflow(**workflow_data)
-                strategy = wf.approved_visual_strategy
-                approach = wf.approved_teaching_approach
             except Exception as e:
-                print(f"    ! {topic.id}: could not read its workflow "
-                      f"({type(e).__name__}: {e}) — planning visuals fresh instead")
+                return None, {"topic_id": topic.id,
+                               "error": f"invalid workflow: {type(e).__name__}: {e}"}, []
+
+            # STEP 6: THE WORKFLOW'S OWN FIELDS ARE THE AUTHORITY, NOT A
+            # SEPARATE "is this approved" FLAG THE CALLER COULD SEND
+            # ALONGSIDE IT. Every *_for_workflow / review.* function in this
+            # codebase only ever produces a workflow whose approval chain is
+            # internally consistent (question approved before teaching
+            # approach can be, teaching approach approved before a script
+            # exists, ...) — but a workflow arriving here is client-supplied
+            # JSON (no server-side store — see QuestionWorkflow's own module
+            # docstring), so nothing stops a stale or hand-edited snapshot
+            # from claiming an approval its own other fields contradict.
+            # approval_chain_problems() is exactly that cross-check; see its
+            # own docstring for why the status-gated approved_* properties
+            # below are not enough on their own to catch this.
+            problems = wf.approval_chain_problems()
+            if problems:
+                return None, {"topic_id": topic.id,
+                               "error": "workflow approval chain is inconsistent: "
+                                        + "; ".join(problems)}, []
+
+            # A workflow was attached at all, so this finalize is being
+            # claimed as a workflow-reviewed result — that claim must be
+            # true. This is stricter than the visual-plan case just below:
+            # an unapproved visual plan silently falls back to design_visuals
+            # planning its own (a normal, still-supported path — see the
+            # comment there), but an unapproved or missing teaching approach
+            # is Step 6 Part 4's own requirement: it must not be finalized as
+            # though it were approved.
+            if wf.approved_topic is None:
+                return None, {"topic_id": topic.id,
+                               "error": "workflow's question_approval is not 'approved' "
+                                        "— cannot finalize as an approved workflow result"}, []
+            if wf.approved_teaching_approach is None:
+                return None, {"topic_id": topic.id,
+                               "error": "workflow's teaching_approach_approval is not "
+                                        "'approved' — cannot finalize as an approved "
+                                        "workflow result"}, []
+
+            # THE SUBMITTED SCRIPT MUST BE THE WORKFLOW'S OWN SCRIPT, not a
+            # different one riding along beside a validly-approved workflow —
+            # otherwise an approved-but-stale workflow snapshot could be used
+            # to wave through content it never actually graded or approved.
+            if wf.script is not None and (
+                    script.question != wf.script.question
+                    or [b.model_dump() for b in script.beats]
+                       != [b.model_dump() for b in wf.script.beats]):
+                return None, {"topic_id": topic.id,
+                               "error": "submitted script does not match the approved "
+                                        "workflow's own script — refusing a stale or "
+                                        "altered submission"}, []
+
+            # THE HUMAN-APPROVED VISUAL PLAN, WHEN THE CALLER SENT ONE — the same
+            # bug class this whole workflow-aware pass exists to close. Without
+            # this, design_visuals below silently plans its OWN strategy (see its
+            # own docstring: "planned once and reused across attempts") and the
+            # Visual Plan review screen's approval would be decorative — the
+            # reviewer's approved plan, and the approved teaching approach that
+            # shaped it, never actually reaching what gets drawn. `None` for a
+            # visual plan that was never approved reproduces this function's
+            # exact previous behaviour — design_visuals plans its own, as it
+            # always has.
+            strategy = wf.approved_visual_strategy
+            approach = wf.approved_teaching_approach
 
         try:
             # The voice depends only on the words, so it records while the visuals
@@ -1223,13 +1300,36 @@ def finalize(body: FinalizeIn):
             # attempt) running anyway. `do_judge` is the one flag a caller
             # has for "skip the expensive judging", and it must actually
             # cover both judges, not just the text one below.
+            strategy_out: dict = {}
             visuals, design_problems = design_visuals(script, section,
                                                       draw=body.do_svg,
                                                       vision=body.do_judge,
                                                       scores_out=vision_scores,
                                                       strategy=strategy,
                                                       approach=approach,
-                                                      understanding=understanding)
+                                                      understanding=understanding,
+                                                      strategy_out=strategy_out)
+
+            # STEP 8: THE APPROVED VISUAL PLAN, RE-CHECKED AGAINST WHAT WAS
+            # ACTUALLY DRAWN. design_visuals legitimately re-plans `strategy`
+            # when the vision judge rejects a frame's concept_communication
+            # (see its own docstring) — that mechanism must keep working, so
+            # this does NOT require the final strategy to equal the approved
+            # one field-by-field. It only requires the two to still be
+            # VisualStrategy.compatible_with each other (same subject, same
+            # beats covered) — a re-plan that drifted onto a different
+            # composition than the one a human approved is not something a
+            # workflow-attached finalize may ship silently as "approved".
+            if strategy is not None:
+                final_strategy = strategy_out.get("strategy")
+                if final_strategy is None or not final_strategy.compatible_with(strategy):
+                    return None, {"topic_id": topic.id,
+                                   "error": "the visuals actually drawn came from a strategy "
+                                            "that no longer matches the approved visual plan "
+                                            "(subject or beat coverage changed) — the approved "
+                                            "visual-plan approval no longer describes what "
+                                            "would ship; re-review and re-approve the visual "
+                                            "plan before finalizing"}, []
 
             unit = ShortUnit(
                 short_id=script.short_id,

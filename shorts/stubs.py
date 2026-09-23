@@ -235,7 +235,32 @@ def _script(user: str) -> dict:
     # failure is the honest report: 4-5 beats that each say something new need a
     # section with 4-5 things to say. content/css_specificity.md is sized for it;
     # the thinner sample documents are not, and should fail here.
-    beats = [{"speaker": "narrator", "line": topic,
+    # MIRRORS _understanding's OWN STEP COUNT, without calling it — see that
+    # function's docstring on why the two stay independent. _understanding
+    # builds a 1-step sequence ("concept") when there is only one span, or a
+    # 2-step sequence ("concept" then "result") otherwise; the same condition,
+    # applied here, is what lets relates_to_step point at a step that will
+    # actually exist once _understanding runs on this same section.
+    step_count = 1 if len(spans) <= 1 else 2
+
+    # STEP: continuous-narration opening, NOT the raw topic/selected-question
+    # echoed verbatim. The topic is very often phrased as a WH-question
+    # ("Why does...", "What are...") — this pipeline's own selected question
+    # is an internal teaching objective, never beat 1 itself (see script.py's
+    # SYSTEM: "NEVER JUST CONVERT THE SELECTED QUESTION INTO A SENTENCE") — so
+    # a stub that spoke it verbatim, as a question, modelled exactly the
+    # interviewer/Q&A defect checks.check_no_interview_structure now exists to
+    # reject, and every stub-mode test exercising the full grader list would
+    # fail on the stub's OWN shape rather than on anything real being tested.
+    # Stripping the trailing "?" is the minimal fix: check_no_interview_structure's
+    # interrogative-lead detection requires a beat to actually END in "?" to be
+    # read as a posed question (see its own docstring on why this is not a
+    # blanket ban on the word "why"/"how") — a declarative sentence that
+    # happens to start with one of those words is not itself an interview.
+    opening = topic.strip()
+    if opening.endswith("?"):
+        opening = opening[:-1] + "."
+    beats = [{"speaker": "narrator", "line": opening,
               "on_screen": _overlay(topic), "visual_ref": "v_question"}]
     for n in range(1, n_beats + 1):
         source = sentences[(n - 1) % len(sentences)]
@@ -245,7 +270,12 @@ def _script(user: str) -> dict:
                       # Verbatim by construction, and now the span the beat was
                       # actually built from rather than one cycled separately — so
                       # the citation cannot drift away from the line it supports.
-                      "source_quote": spans[(n - 1) % len(spans)]})
+                      "source_quote": spans[(n - 1) % len(spans)],
+                      # Every beat but the last relates to step 1 ("concept");
+                      # the last beat is about to be overwritten to land on the
+                      # SAME span step 2 ("result") describes, below — see that
+                      # block's own comment.
+                      "relates_to_step": step_count if n == n_beats and step_count > 1 else 1})
 
     # THE LAST BEAT LANDS THE OBJECTIVE, because _understanding reports one and
     # check_reaches_objective asks whether the short ENDS on it. Without this the
@@ -349,12 +379,23 @@ def _understanding(user: str) -> dict:
     # `purpose` and `explanation_goal` are fixed phrases carrying no claim about
     # the material — the stub is proving the plumbing, and inventing a reason a
     # step is needed would put words in the document's mouth.
+    # `stage` FOLLOWS THE SAME STRUCTURAL HONESTY AS THE REST OF THIS FUNCTION.
+    # Step 0 is spans[0] — the section's own opening idea, so "concept" is the
+    # only stage a stub can claim without inventing a judgement. Step 1, when
+    # present, is spans[-1] — the SAME span the final beat lands on (see the
+    # docstring above and _script's matching note) — so "result" is likewise
+    # structural, not guessed. Neither "mechanism" nor "example" nor "hook" is
+    # ever claimed here: a stub cannot tell a mechanism from a definition
+    # without reading the section, and check_teaching_sequence does not ask it
+    # to — this two-step sequence is honest about being the shape it actually is.
+    stages = ["concept", "result"]
     sequence = []
     for i, concept in enumerate(spans[:1] + spans[-1:] if len(spans) > 1 else spans[:1]):
         sequence.append({
             "concept": " ".join(concept.split()[:6]),
             "purpose": f"stub step {i + 1}: establish what the section states here",
             "explanation_goal": "learner can follow the next step",
+            "stage": stages[i],
         })
 
     return {

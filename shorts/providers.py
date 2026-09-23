@@ -26,7 +26,7 @@ A provider reports its own availability rather than being probed from outside, s
 """
 from __future__ import annotations
 
-import base64, json, subprocess, tempfile, threading, time
+import base64, json, re, subprocess, tempfile, threading, time
 from pathlib import Path
 
 import requests
@@ -521,11 +521,43 @@ class Chatterbox(Provider):
         # command-line setup keeps working untouched.
         chosen = config.voice_settings()
         return {
-            "interviewer": (chosen.get("interviewer")
-                            or config.CHATTERBOX_VOICE_INTERVIEWER),
-            "student": (chosen.get("student")
-                        or config.CHATTERBOX_VOICE_STUDENT),
+            "interviewer": self._portable(chosen.get("interviewer"))
+                            or config.CHATTERBOX_VOICE_INTERVIEWER,
+            "student": self._portable(chosen.get("student"))
+                       or config.CHATTERBOX_VOICE_STUDENT,
         }
+
+    @staticmethod
+    def _portable(stored: str | None) -> str | None:
+        """
+        The stored clip path, or the SAME FILENAME inside config.VOICE_DIR when
+        the stored path itself does not exist on this machine.
+
+        /api/voice/adopt (server.py) always writes the clip to
+        `config.VOICE_DIR / f"{who}{suffix}"` and then stores that path's STRING
+        form — an absolute path baked in at adopt time. voices/settings.json is
+        git-tracked (so a team can share an adopted voice at all), which means
+        the SAME adopted voice is used on a different machine, or a different
+        OS, than the one that ran /api/voice/adopt — and an absolute Windows
+        path is never a valid POSIX one. Without this, the clip silently
+        "does not exist" on every other machine even though the exact same
+        file, under the exact same name, is sitting in this machine's own
+        voices/ directory — and Chatterbox.available() then reports False with
+        no indication the file is right there under a different prefix.
+        """
+        if not stored:
+            return stored
+        if Path(stored).exists():
+            return stored
+        # NOT Path(stored).name — `stored` may be a WINDOWS path written on a
+        # different machine, and pathlib.Path on POSIX does not treat `\` as a
+        # separator, so `Path(stored).name` would return the entire string
+        # unchanged. Split on both slash kinds by hand instead.
+        basename = re.split(r"[\\/]", stored)[-1]
+        candidate = config.VOICE_DIR / basename
+        if candidate.exists():
+            return str(candidate)
+        return stored
 
     def voices(self) -> list[str]:
         """The configured reference clips. There is no catalogue to list."""
@@ -752,6 +784,11 @@ def is_explicit() -> bool:
     return (config.TTS_PROVIDER or "auto").strip().lower() != "auto"
 
 
+#: Names already warned about this run, so a broken adopted voice prints once
+#: per process instead of once per short — same reasoning as `_blocked` above.
+_adopted_unavailable_warned: set[str] = set()
+
+
 def get(name: str | None = None) -> Provider:
     """
     The provider to use.
@@ -768,13 +805,30 @@ def get(name: str | None = None) -> Provider:
     records the provider too; honour it, or the button does not mean what it says.
 
     `revert to .env` deletes the store, which is how you get back.
+
+    THE ADOPTED PROVIDER BEING UNAVAILABLE IS PRINTED, NEVER SILENT. It used to
+    fall straight through to whatever `.env`/`auto` resolved to with no signal
+    at all — so a Chatterbox voice adopted on one machine (its reference clips
+    live at an absolute path, see providers.Chatterbox.resolve) silently became
+    a DIFFERENT provider's DIFFERENT voice on another, and the only trace was
+    the finished reel itself sounding wrong. This does not raise — synthesize()
+    below has its own "never raises" contract, because a voice failure must not
+    lose a short a human already approved — but it is no longer quiet about
+    which voice actually spoke and why the adopted one did not.
     """
     if name is None:
         chosen = config.voice_settings().get("provider")
         if chosen and chosen in _REGISTRY:
-            ok, _ = _REGISTRY[chosen].available()
+            ok, why = _REGISTRY[chosen].available()
             if ok:
                 return _REGISTRY[chosen]
+            if chosen not in _adopted_unavailable_warned:
+                _adopted_unavailable_warned.add(chosen)
+                print(f"  ! adopted voice provider {chosen!r} (voices/settings.json) "
+                      f"is unavailable ({why}) — falling back to "
+                      f"TTS_PROVIDER={config.TTS_PROVIDER or 'auto'!r} instead of "
+                      f"the voice you kept. Fix or re-adopt the {chosen} voice, or "
+                      f"POST /api/voice/revert to stop trying it.")
     name = (name or config.TTS_PROVIDER or "auto").strip().lower()
 
     if name != "auto":

@@ -5,7 +5,7 @@ Every grader takes an object and returns a GraderResult. Never raise — a grade
 that crashes tells you nothing; a grader that returns passed=False with a reason
 tells you what to fix.
 """
-import html, re
+import difflib, html, re
 from math import ceil
 from dataclasses import dataclass, field
 from .schema import (
@@ -178,45 +178,54 @@ def check_narration_shape(script: Script, max_answer_words: int | None = None) -
 
 def check_narration_sentence_form(script: Script) -> GraderResult:
     """
-    The concept is phrased as ONE question, and every beat is a whole sentence —
+    The script is built around ONE concept, and every beat is a whole sentence —
     not "simple" or "memorable", which no free check can judge, but the
     structural floor those actually need: a fragment can't be simple to read and a
-    stapled-together double question can't be memorable, because there's no ONE
+    stapled-together double concept can't be memorable, because there's no ONE
     thing to remember. See SYSTEM in select.py and script.py for the prose rules
     this can't enforce in code.
 
-    FORMERLY check_qa_sentence_form. `script.question` is unchanged by the move to
-    a single narrator — see Script's own docstring — so the first two rules below
-    are unchanged too. The third rule USED to skip beat 0 because it was always
-    the interviewer's own question and so always ended in "?" by construction;
-    with one narrator there is no beat exempt from being a real sentence, so it
-    now runs over every beat, beat 0 included.
+    FORMERLY check_qa_sentence_form, back when `script.question` was necessarily
+    a literal spoken question (the interviewer's own line) and beat 0 was exempt
+    from the sentence-form rule because it was that question by construction. Two
+    things changed since: there is no second speaker any more, so no beat is
+    exempt from being a real sentence — and `script.question` is now the internal
+    LEARNING OBJECTIVE this short is built to teach (see script.py's THE HOOK),
+    not something the model is required to phrase as a question or to speak
+    aloud. Demanding a "?" in it would fail every honestly-written script under
+    the new brief, which is exactly the conflict this rewrite exists to resolve —
+    the fix generalizes the ORIGINAL concern (one concept, not two stapled
+    together) instead of dropping it.
 
-    Three narrow, structural failures, each one a script that reads as unfinished
-    rather than as a sentence a viewer could hold in their mind:
+    Two narrow, structural failures, each one a script that reads as unfinished
+    or unfocused rather than as a sentence a viewer could hold in their mind:
 
-      script.question has no "?" — select.py's SYSTEM already bans yes/no
-      questions and demands What/Why/How/Which/When/Where, but nothing stopped
-      the topic string itself surviving into the short as a bare noun phrase
-      ("The reason paging beats contiguous allocation") instead of a question.
-
-      script.question has MORE than one "?" — two questions stapled into one
-      turns "one concept per short" (select.py's own rule) into two, and a viewer
-      cannot tell which one the short is actually explaining.
+      script.question is empty, or contains MORE than one sentence-terminal mark
+      (".", "!" or "?", counted wherever they occur, not just at the end) — one
+      concept, however it is phrased, ends with at most one of them. Two means
+      two objectives stapled into one short — "one concept per short" (select.py's
+      own rule) has become two, and a viewer cannot tell which one the short is
+      actually explaining. Zero terminal marks (a bare phrase, e.g. "why paging
+      beats contiguous allocation") is fine — the objective is internal context,
+      not spoken narration, and is not required to read as a complete sentence.
 
       a beat's line does not end in ".", "!" or "?" — the line just trails off,
-      which is a sentence fragment however short and on-topic it is.
+      which is a sentence fragment however short and on-topic it is. This DOES
+      still run over every beat, beat 0 (the hook) included: a hook can be a
+      statement, an observation, or a question, but whichever it is, it must
+      still be a complete spoken sentence.
     """
     problems: list[str] = []
 
     question = script.question.strip()
-    marks = question.count("?")
-    if marks == 0:
-        problems.append(f'question is not phrased as a question: "{question}"')
-    elif marks > 1:
-        problems.append(
-            f'question contains {marks} "?"s — that is two questions stapled '
-            f'together, not one: "{question}"')
+    if not question:
+        problems.append("the learning objective (script.question) is empty")
+    else:
+        marks = sum(question.count(c) for c in ".!?")
+        if marks > 1:
+            problems.append(
+                f'the learning objective contains {marks} sentence-terminal marks — that is '
+                f'two concepts stapled together, not one: "{question}"')
 
     for i, b in enumerate(script.beats):
         line = b.line.strip()
@@ -227,7 +236,7 @@ def check_narration_sentence_form(script: Script) -> GraderResult:
         return GraderResult("narration_sentence_form", False, "; ".join(problems),
                             {"problems": problems})
     return GraderResult("narration_sentence_form", True,
-                        "question is a single question and every beat is a complete sentence")
+                        "the objective is a single focused concept and every beat is a complete sentence")
 
 
 #: A beat's `line` is read aloud by a TTS voice — see script.py's SYSTEM,
@@ -287,6 +296,146 @@ def check_no_stage_directions(script: Script) -> GraderResult:
             {"hits": hits})
     return GraderResult("no_stage_directions", True,
                         "every beat reads as spoken narration, not a storyboard note")
+
+
+# --------------------------------------------------------- interviewer / Q&A shape
+#
+# THE FAILURE THIS CLOSES. THE HOOK's own prose rules (script.py's SYSTEM) already
+# say the selected question is an internal objective, never the opening line —
+# "NEVER JUST CONVERT THE SELECTED QUESTION INTO A SENTENCE" — and that this is
+# not a dialogue: "no interviewer, no student, no back-and-forth". Neither rule
+# was ever checked. A script whose beat 1 asks "How does a parent component
+# actually hand data down to its child?" and beat 2 answers "Props are values
+# passed from a parent component to a child component..." reads exactly like the
+# two-role interview format this pipeline was rebuilt away from, and nothing
+# before this caught it — every existing grader here is about LENGTH, GROUNDING,
+# or STAGE DIRECTIONS, none of them about NARRATIVE SHAPE.
+
+#: Classic closed-form factual questions — "How does X work", "What is X",
+#: "Why does X happen", "Can you guess X", "Who/When is X" — the shape an
+#: interviewer asks and a single answer beat directly resolves. Deliberately
+#: NOT "any sentence ending in a question mark" — see _is_heading_like's own
+#: precedent for narrow, evidenced lead-word lists over a blanket ban, and
+#: this check's own docstring for why a blanket ban on "?" would reject a
+#: genuine curiosity hook the format explicitly still allows.
+_INTERVIEW_LEAD = re.compile(
+    r"""^\s*(?:so\s+|now\s+|but\s+)?(
+        how\s+(does|do|can|did|would|could|might)\b
+      | what\s+(is|are|does|do|was|were)\b
+      | why\s+(does|do|is|are|did|would|can)\b
+      | who\s+(is|are)\b
+      | when\s+(does|do|is|are)\b
+      | can\s+you\s+guess\b
+      | have\s+you\s+ever\s+wondered\b
+    )""",
+    re.I | re.X,
+)
+
+#: A Q&A SET-UP PHRASE THAT NEVER NEEDS A "?" TO FUNCTION AS ONE — "Let's find
+#: out" only ever means "a question is coming", the same interviewer shape as
+#: the lead-word list above, just without its own punctuation to catch it.
+_QA_SETUP_PHRASE = re.compile(r"\blet'?s\s+find\s+out\b", re.I)
+
+#: Speaker/role labels — the two-person-dialogue format this pipeline no
+#: longer uses (see schema.Beat.role's own docstring), still checked because
+#: nothing stops a model from reverting to it in the TEXT even though the
+#: schema itself no longer models two roles. "narrator"/"voice-over"/etc. are
+#: already caught by _STAGE_DIRECTION above; this adds the ones specific to
+#: an INTERVIEW rather than a stage direction.
+_ROLE_LABEL = re.compile(r"^\s*(interviewer|student|teacher|answer|question|q|a)\s*[:\-]", re.I)
+
+
+def check_no_interview_structure(script: Script,
+                                 selected_question: str | None = None) -> GraderResult:
+    """
+    Does this script read as ONE continuous narrator teaching a concept, or as
+    an interviewer asking the selected question and a second voice answering it?
+
+    `selected_question` IS OPTIONAL AND ADDITIVE — a caller that omits it (every
+    caller before this check existed) still gets full role-label and
+    interviewer-question detection; only the SPECIFIC "beat 1 restates the
+    selected question" message needs it, to name the exact defect rather than
+    the more generic "opens with an interviewer-style question" one. Passing it
+    never makes an otherwise-clean script fail — see below, it only sharpens
+    which message a genuine failure gets.
+
+    FOUR THINGS ARE CHECKED, EACH FOR THE SAME UNDERLYING DEFECT — narration
+    shaped as a question-and-answer EXCHANGE rather than a single explanation:
+
+      1. Role labels anywhere ("Interviewer:", "Student:", "Teacher:",
+         "Question:", "Answer:") — the two-person format this pipeline no
+         longer uses, however it got there.
+      2. Beat 1 phrased as a closed-form interviewer question (_INTERVIEW_LEAD
+         or _QA_SETUP_PHRASE) — the opening this whole check exists for.
+      3. Any LATER beat phrased the same way — a mid-script "and how does the
+         browser actually apply that?" is the identical defect one beat later.
+      4. More than one such beat — reported as a pattern, not a single slip.
+
+    NOT A BLANKET BAN ON "?". A hook is allowed to end in a question mark — see
+    script.py's own THE OPENING, the "question"/"problem"/"surprise" shapes,
+    none of which this rejects on their own. What is checked is the SHAPE of a
+    small, evidenced list of closed-form leads ("how does", "what is", "why
+    does", "can you guess", "have you ever wondered") that this format's own
+    brief names as the specific defect — a beat asking "Ever wondered why X
+    happens?" and then teaching X immediately afterward is exactly the pattern
+    those four words describe, and the fix belongs in the prompt (write a
+    problem/surprise hook that does not open on one of these leads), not in
+    loosening this check to ignore punctuation that happens to look like one.
+    """
+    problems: list[str] = []
+    beats = script.beats
+    opening = (beats[0].line or "").strip() if beats else ""
+
+    role_hits = [i for i, b in enumerate(beats) if _ROLE_LABEL.match((b.line or "").strip())]
+    if role_hits:
+        problems.append(
+            f"script contains interviewer-style narration — beat(s) {role_hits} "
+            f"open with a speaker/role label (Interviewer:/Student:/Teacher:/"
+            f"Question:/Answer:) instead of one narrator's continuous sentence")
+
+    def _is_interview_lead(line: str) -> bool:
+        return bool(_QA_SETUP_PHRASE.search(line)
+                    or (line.endswith("?") and _INTERVIEW_LEAD.match(line)))
+
+    qa_hits = [i for i, b in enumerate(beats) if _is_interview_lead((b.line or "").strip())]
+
+    if 0 in qa_hits:
+        restates = False
+        if selected_question and selected_question.strip():
+            ratio = difflib.SequenceMatcher(
+                None, _flatten(opening), _flatten(selected_question)).ratio()
+            restates = ratio >= 0.5
+        if restates:
+            problems.append(
+                "script opens by asking the selected question instead of "
+                f'teaching the concept directly: "{opening[:80]}" — the selected '
+                f"question is the internal teaching objective, never the "
+                f"opening line itself")
+        else:
+            problems.append(
+                f'script opens with an interviewer-style question instead of '
+                f'teaching the concept directly: "{opening[:80]}"')
+
+    later = [i for i in qa_hits if i != 0]
+    if len(later) == 1:
+        i = later[0]
+        line = (beats[i].line or "").strip()
+        problems.append(
+            f'script contains a question-answer exchange: beat {i} asks '
+            f'"{line[:70]}" as though a second voice will answer it, breaking '
+            f"the single continuous narration")
+    elif len(later) > 1:
+        problems.append(
+            f"script contains {len(later)} question-answer exchanges (beats "
+            f"{later}), reading as a repeated interview pattern rather than one "
+            f"continuous explanation")
+
+    if problems:
+        return GraderResult("no_interview_structure", False, "; ".join(problems),
+                            {"role_hits": role_hits, "qa_hits": qa_hits})
+    return GraderResult("no_interview_structure", True,
+                        "reads as one continuous narrator's explanation, not an "
+                        "interviewer/question-answer exchange")
 
 
 # --------------------------------------------------------------------- grounding
@@ -3061,6 +3210,118 @@ def check_motion_concept_not_static(unit: ShortUnit) -> GraderResult:
         {"templates": templates, "relationships": relationships})
 
 
+def check_mechanism_stage_shows_change(unit: ShortUnit, understanding=None) -> GraderResult:
+    """
+    A beat tagged the MECHANISM stage, whose own strategy calls it a process,
+    a data movement or a cause and effect, has to show something changing —
+    not name the mechanism, not hold a decorative object still, not repeat the
+    resting state it started on.
+
+    THE ONE GAP check_motion_concept_not_static DOES NOT CLOSE. That check asks
+    whether the WHOLE SHORT ever leaves the static shelf — it can pass a reel
+    where the one beat that actually needed to move never did, as long as some
+    OTHER beat elsewhere moved instead (see its own docstring). This asks the
+    narrower, per-beat question: THIS beat, the one Beat.relates_to_step says
+    is the mechanism, on its own frame.
+
+    STAGE ALONE DOES NOT TRIGGER THIS — RELATIONSHIP DOES. A mechanism-stage
+    beat whose strategy calls it "structure", "comparison", "hierarchy",
+    "effect" or "quantity" is a genuinely STILL conceptual relationship (why
+    the OS sits between hardware and applications, say) and is not required to
+    move — see _MOTION_RELATIONSHIPS, the same set check_motion_concept_not_static
+    already trusts for exactly this distinction. Only "process", "data_movement"
+    and "cause_effect" — claims that something HAPPENS — are held to this.
+
+    USES ONLY FIELDS THAT ALREADY EXIST. `state` is checked through Slot.state
+    (any slot "arriving"/"leaving") and Store.pointer_at_previous — the exact
+    machinery schema.Store's own docstring describes as "the literal
+    'disconnecting and reconnecting'". `icons` is checked through its own
+    `arrows` flag — SPEC_SYSTEM already tells the design step "icons... WITH
+    ARROWS=TRUE" is what shows a sequence rather than a static set. No new
+    schema field is added for any of this.
+
+    EVERY OTHER TEMPLATE IN _STATIC_TEMPLATES (bar, compare, table, split,
+    mapping) fails outright for a motion-relationship mechanism beat — none of
+    them can show an arrival, a departure, or a retargeted pointer, whatever
+    their fields say. Every template OUTSIDE that set (flow, cause_effect,
+    analogy, code, graph, hierarchy, and so on) is trusted the same way
+    check_frames_match_strategy's own allow-lists already trust it for a
+    motion relationship — this check only adds the field-level scrutiny for
+    the two templates precise enough to have one.
+
+    Skipped, not failed, when there is nothing to compare: no teaching
+    sequence to resolve a stage from, no mechanism-stage beat with a rendered
+    frame, or a mechanism-stage beat whose strategy was never recorded (both
+    are "we cannot judge this", not "this failed").
+    """
+    steps = list(getattr(understanding, "teaching_sequence", None) or [])
+    if not steps:
+        return GraderResult("mechanism_stage_shows_change", True,
+            "no teaching sequence — cannot resolve any beat's stage", {"skipped": True})
+
+    offenders: list[str] = []
+    checked = 0
+    for i, beat in enumerate(unit.beats, 1):
+        stage, _problem = _resolve_beat_stage(beat, steps)
+        if stage != "mechanism":
+            continue
+
+        visual = unit.visuals.get(beat.visual_ref)
+        if visual is None or visual.frame is None:
+            continue
+
+        strategy = visual.strategy
+        if strategy is None or strategy.relationship not in _MOTION_RELATIONSHIPS:
+            continue  # a genuinely static conceptual mechanism — nothing required
+
+        checked += 1
+        frame = visual.frame
+        template = frame.template
+
+        if template in _STATIC_TEMPLATES and template != "icons":
+            offenders.append(
+                f"beat {i} ({beat.visual_ref}): the mechanism/{strategy.relationship} "
+                f"beat is drawn as '{template}', which can only ever NAME the change, "
+                f"never show it happening")
+            continue
+
+        if template == "icons":
+            if not frame.arrows:
+                offenders.append(
+                    f"beat {i} ({beat.visual_ref}): the mechanism/{strategy.relationship} "
+                    f"beat is drawn as 'icons' with arrows=false — a static set, not the "
+                    f"sequence this beat needs")
+            continue
+
+        if template == "state":
+            store = frame.store
+            slot_moved = bool(store) and any(
+                s.state in ("arriving", "leaving") for s in store.slots)
+            pointer_moved = bool(store) and store.pointer_at_previous is not None
+            if not (slot_moved or pointer_moved):
+                offenders.append(
+                    f"beat {i} ({beat.visual_ref}): the mechanism/{strategy.relationship} "
+                    f"beat is drawn as 'state' with every slot resting and no pointer "
+                    f"retargeting — the container exists but nothing in it arrives, "
+                    f"leaves, or moves")
+            continue
+
+        # Every other template a motion relationship's own allow-list permits
+        # (flow, cause_effect, analogy, code, graph, ...) is trusted the same
+        # way check_frames_match_strategy already trusts it — no field here is
+        # precise enough to refine further without inventing a new one.
+
+    if checked == 0:
+        return GraderResult("mechanism_stage_shows_change", True,
+            "no mechanism-stage, motion-relationship beat with a recorded strategy to check",
+            {"checked": 0})
+    if offenders:
+        return GraderResult("mechanism_stage_shows_change", False, "; ".join(offenders),
+                            {"offenders": offenders, "checked": checked})
+    return GraderResult("mechanism_stage_shows_change", True,
+        f"{checked} mechanism-stage beat(s) show a genuine change", {"checked": checked})
+
+
 #: The specific family check_motion_concept_not_static's own docstring names as
 #: "static" in the no-movement sense, minus "icons" — a pictogram is a drawn
 #: picture of a real thing, not text sitting in a rounded rectangle, and does
@@ -3197,6 +3458,12 @@ MIN_CONCEPT_OVERLAP = 0.5
 #: whether the table has two columns or six, spaces around the dashes or not.
 _TABLE_SEPARATOR = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 
+#: One markdown list item — "- ", "* ", "+ ", or "1. "/"1) " leading a line,
+#: with real content after it. Deliberately line-anchored, the same way
+#: _TABLE_SEPARATOR is content-anchored rather than requiring a fixed
+#: position: a list can start at any indent, inside any section.
+_LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(.+\S)\s*$")
+
 
 def _table_rows(text: str) -> tuple[list[str], str]:
     """
@@ -3248,6 +3515,54 @@ def _table_rows(text: str) -> tuple[list[str], str]:
     return rows, remaining
 
 
+def _bullet_items(text: str) -> tuple[list[str], str]:
+    """
+    Pull every markdown list item out of `text`, returning each one as its
+    own candidate citable span, plus the text with those lines removed.
+
+    THE GAP THIS CLOSES, THE SAME SHAPE AS _table_rows JUST ABOVE. A list
+    item is a complete, standalone claim exactly as citable as a sentence
+    ending in a full stop — "Fetching data from an API" is not a fragment,
+    it is one of the section's own worked examples — but _is_whole_sentence's
+    terminal-punctuation rule (deliberately strict on purpose — see its own
+    docstring, guarding against heading fragments) refuses every one of them,
+    because a list item is conventionally written with no closing period.
+    Worse, the paragraph splitter above joins blank-line-free lines with a
+    single space before that check ever runs, so a five-item list glues into
+    ONE run-on line with no sentence-ending punctuation anywhere in it —
+    "Fetching data from an API Updating the document title Starting a timer
+    ..." — and the whole list is refused as a single fragment, not even
+    counted as one span. A real section — five bulleted examples of a side
+    effect, the ONLY elaboration of the concept the document gives beyond two
+    short definition sentences — registered as ZERO additional citable spans
+    this way, and check_section_richness rejected the section as too thin to
+    script from a concept it had, in fact, illustrated five separate ways.
+
+    Each item is checked against the SAME minimum-content floor
+    _table_rows uses (MIN_QUOTE_CHARS) and the SAME _is_heading_like filter
+    _citable_spans already applies to prose sentences below — a bulleted
+    outline of topic labels ("- Understanding useEffect", "- Why hooks
+    exist") is exactly as uncitable as a prose heading, and must be refused
+    for the same reason, not accepted just because it happens to use `-`
+    instead of a full stop. This does NOT loosen what counts as grounded —
+    it only stops a real, distinct, individually-true statement from being
+    invisible to this count purely because of how the source formatted it.
+    """
+    lines = text.splitlines()
+    keep = [True] * len(lines)
+    items: list[str] = []
+    for i, line in enumerate(lines):
+        m = _LIST_ITEM.match(line)
+        if not m:
+            continue
+        item = m.group(1).strip()
+        if len(_flatten(item)) >= MIN_QUOTE_CHARS and not _is_heading_like(item):
+            keep[i] = False
+            items.append(item)
+    remaining = "\n".join(line for line, kept in zip(lines, keep) if kept)
+    return items, remaining
+
+
 def _citable_spans(section_text: str) -> list[str]:
     """
     Distinct verbatim spans of a section that could honestly support ONE beat's
@@ -3275,10 +3590,16 @@ def _citable_spans(section_text: str) -> list[str]:
     and a section's most citable content is often its code rather than its prose —
     exactly the case here, where the fence is the second span this finds. Markdown
     tables are pulled out the same way, for the same reason — see _table_rows.
+    Bullet/numbered list items are pulled out THIRD, before any paragraph
+    splitting — see _bullet_items — because each one is exactly as citable as
+    a full-stopped sentence and, left in the prose path, several of them glue
+    into one unpunctuated run-on line and vanish from the count entirely
+    rather than merely under-counting.
     """
     fenced = re.findall(r"```.*?```", section_text, flags=re.S)
     prose = re.sub(r"```.*?```", " ", section_text, flags=re.S)
     table_rows, prose = _table_rows(prose)
+    bullet_items, prose = _bullet_items(prose)
 
     # Split on blank lines too, not just sentence punctuation: bullet-note material
     # like this section separates its points with a blank line rather than a full
@@ -3317,6 +3638,7 @@ def _citable_spans(section_text: str) -> list[str]:
                     spans.append(line)
 
     spans.extend(table_rows)
+    spans.extend(bullet_items)
 
     # Deduplicated by flattened text: the same sentence quoted by two different
     # spans (a heading repeating a body sentence, say) is one piece of evidence,
@@ -3396,11 +3718,122 @@ def check_section_richness(section_text: str, min_answers: int = MIN_ANSWERS) ->
         {"spans": len(spans), "needed": needed})
 
 
-def check_teaching_sequence(understanding, section_text: str | None = None) -> GraderResult:
+def _resolve_beat_stage(beat, steps: list) -> tuple[object, str | None]:
+    """Resolve one beat's TeachingStage through Beat.relates_to_step -> steps[i-1].stage.
+
+    Returns (stage_or_None, problem_or_None). Exactly one of the two is set,
+    except when the beat has no relates_to_step at all, where both are None —
+    that beat simply has nothing to resolve, which is not itself a problem
+    (relates_to_step is optional, and beat 0's hook is normally unset — see
+    Beat's own docstring).
+
+    THE ONE PLACE THIS RESOLUTION HAPPENS. check_teaching_sequence's own stage
+    check and check_mechanism_stage_shows_change both call this rather than
+    each re-deriving it, so "how a beat's stage is looked up" has one answer
+    across both — see schema.TeachingStage's own docstring on why the value
+    is never duplicated onto Beat or BeatStrategy in the first place.
+    """
+    ref = getattr(beat, "relates_to_step", None)
+    if ref is None:
+        return None, None
+    if not (1 <= ref <= len(steps)):
+        return None, f"relates_to_step {ref} is out of range for {len(steps)} step(s)"
+    stage = getattr(steps[ref - 1], "stage", None)
+    if stage is None:
+        return None, f"relates_to_step {ref} points at step {ref}, which has no stage set"
+    return stage, None
+
+
+#: Stages a script actually has to REACH for the plan to count as more than a
+#: definition, when the plan itself contains one. "hook" and "concept" are
+#: deliberately absent: a script that only ever introduces the concept is
+#: exactly the "Hook -> definition -> definition -> definition -> conclusion"
+#: shape this exists to catch, and "result" is already protected elsewhere
+#: (check_follows_teaching_sequence's LANDING rule, check_reaches_objective) —
+#: this set is scoped to the gap neither of those checks closes.
+_STAGES_A_SCRIPT_MUST_REACH = {"mechanism", "example"}
+
+
+def _stage_progression_problems(steps: list, script,
+                                strict_stage_references: bool = False) -> list[str]:
+    """Does the SCRIPT'S OWN relates_to_step data show a real progression, or
+    did it stay at the concept stage while the plan offered more?
+
+    INCONCLUSIVE, NOT A FAILURE, WHEN THERE IS NOTHING TO JUDGE BY — UNLESS
+    `strict_stage_references` SAYS OTHERWISE. Two independent reasons this
+    returns [] rather than a verdict when the flag is left at its default:
+      - no step in the plan carries a stage at all (a reading from before
+        TeachingStep.stage existed, or one a caller never asked to tag);
+      - no beat in the script carries a relates_to_step at all (a script from
+        before Beat.relates_to_step existed, or from a caller not yet
+        threading it through write_script's prompt).
+    Both are "we were never given the data", not "the data says this failed" —
+    the same distinction every other conclusive/inconclusive grader in this
+    file already draws (see check_framing_stays_on_concept, for one).
+
+    STEP 8: `strict_stage_references=True`, SET ONLY BY run_script_graders
+    WHEN write_and_grade_script_for_workflow ITSELF CALLED IT — see that
+    function's own docstring — turns off the SECOND escape above (the first,
+    "no step in the plan has a stage at all", is a fact about the PLAN this
+    grader has no control over either way, and is left alone). write_script_
+    for_workflow's own prompt already instructs the model to set
+    relates_to_step on every body beat (skills/script.py), so for a workflow
+    generation "no beat set one" is not missing data any more, it is the
+    model not complying — exactly the failure this grader exists to catch,
+    not to wave through. Under this flag, EVERY body beat is required to
+    resolve (a beat with no relates_to_step is itself a problem, not merely
+    skipped), so a single unlinked beat among otherwise-linked ones fails
+    too, not only a script with none at all.
+
+    Legacy/other callers — understanding_for()'s own plan-only call (never
+    passes `script` at all, so never reaches this function), the eval
+    harness, smoke_test, a caller re-grading an old saved script — never set
+    this flag, and get byte-identical inconclusive-pass behaviour to before.
+    """
+    if not any(getattr(s, "stage", None) for s in steps):
+        return []
+
+    beats = list(getattr(script, "body_beats", None) or [])
+    any_reference = any(getattr(b, "relates_to_step", None) is not None for b in beats)
+    if not any_reference and not strict_stage_references:
+        return []
+
+    problems: list[str] = []
+    resolved_stages: set[str] = set()
+    for i, beat in enumerate(beats, 1):
+        ref = getattr(beat, "relates_to_step", None)
+        if ref is None:
+            if strict_stage_references:
+                problems.append(
+                    f"beat {i} has no relates_to_step — every body beat in a newly "
+                    f"generated workflow script must reference the teaching step it "
+                    f"is teaching")
+            continue
+        stage, problem = _resolve_beat_stage(beat, steps)
+        if problem is not None:
+            problems.append(f"beat {i}'s {problem}")
+        elif stage is not None:
+            resolved_stages.add(stage)
+
+    plan_stages = {s.stage for s in steps if getattr(s, "stage", None)}
+    needed = plan_stages & _STAGES_A_SCRIPT_MUST_REACH
+    if needed and not (resolved_stages & _STAGES_A_SCRIPT_MUST_REACH):
+        problems.append(
+            f"the plan includes a {'/'.join(sorted(needed))} step, but no beat's "
+            f"relates_to_step ever reaches one — every resolvable beat stayed at "
+            f"{sorted(resolved_stages) or 'the concept stage'}. A script that only "
+            f"ever introduces the concept has not taught the mechanism/example the "
+            f"plan already offers.")
+    return problems
+
+
+def check_teaching_sequence(understanding, section_text: str | None = None,
+                           script=None, strict_stage_references: bool = False) -> GraderResult:
     """
     Is this teaching sequence usable as the spine of a short?
 
-    Four questions, in the order they are worth asking:
+    Four questions about the PLAN, in the order they are worth asking, plus a
+    fifth about the SCRIPT when the caller has one:
 
       1. IS THERE ONE, and is it short enough to be a plan for the script's own
          beat budget (MAX_TEACHING_STEPS, derived from MAX_ANSWERS) rather than a
@@ -3415,6 +3848,17 @@ def check_teaching_sequence(understanding, section_text: str | None = None) -> G
          and against the section itself when the caller has it. This is the rule
          that stops the sequence becoming a second source of claims: a step naming
          something nothing else in the reading mentions was not read off the page.
+      5. DID THE SCRIPT ACTUALLY REACH THE STAGES THE PLAN OFFERS — see
+         _stage_progression_problems. ONLY ASKED WHEN `script` IS GIVEN.
+
+    `script` IS OPTIONAL AND ADDITIVE, the same contract as `section_text`: every
+    existing caller — understanding_for(), which grades this PLAN before any
+    script exists and quarantines it on failure (see this function's own "NO
+    LANDING CHECK HERE" note further down) — omits it and gets byte-identical
+    behaviour. The only caller that passes one is run_script_graders, where a
+    failure here retries the SCRIPT like any other script grader, never the
+    plan; that difference in consequence is why this is a fifth, separate
+    question rather than folded into question 3's objective check.
 
     Never raises, like every grader here — a malformed understanding returns
     passed=False with a reason rather than taking down the step that called it.
@@ -3510,6 +3954,21 @@ def check_teaching_sequence(understanding, section_text: str | None = None) -> G
     # outright: the final beat must carry the idea, and follows_sequence explicitly
     # permits ending on the objective instead of on the final planned step. The
     # plan orders the explanation; the script decides where to stop.
+    #
+    # 5. THIS ONE IS DIFFERENT FROM THE LANDING CHECK ABOVE IN THE ONE WAY THAT
+    #    MATTERS: it never runs from understanding_for()'s own call, which has
+    #    no script and never passes one — so it cannot quarantine the plan the
+    #    way the rejected landing check would have. It only runs from
+    #    run_script_graders, where a failure here is read exactly like any
+    #    other script-grader failure: retry the SCRIPT with this feedback, the
+    #    plan stays exactly as it was.
+    if script is not None:
+        stage_problems = _stage_progression_problems(
+            steps, script, strict_stage_references=strict_stage_references)
+        if stage_problems:
+            return GraderResult("teaching_sequence", False, "; ".join(stage_problems),
+                                {"steps": len(steps), "stage_problems": stage_problems})
+
     return GraderResult("teaching_sequence", True,
         f"{len(steps)} step(s), complete, on the objective, from the section's own concepts",
         {"steps": len(steps)})
@@ -3703,7 +4162,7 @@ def check_follows_teaching_sequence(script: Script, understanding=None,
             f"the answer covers {len(covered)} of {len(steps)} planned steps, and needs "
             f"at least {need}. Not reached: {'; '.join(missing)}. Build the answer "
             f"beats along the teaching sequence — or, if the section cannot support "
-            f"a step, drop it AND narrow the question in beat 1 to match what is left.",
+            f"a step, drop it AND narrow the objective beat 1 opens on to match what is left.",
             {"covered": sorted(covered), "needed": need, "steps": len(steps)})
 
     # --- ORDER --------------------------------------------------------------
@@ -3771,7 +4230,7 @@ def check_follows_teaching_sequence(script: Script, understanding=None,
                 f"the answer touches only {focus:.0%} of the section's objective's own "
                 f"vocabulary{narrow_note} — it is not about {core_idea_text[:70]!r}. "
                 f"Never mentioned: {absent[:8]}. Rewrite the answer so it explains that "
-                f"idea, and make beat 1 ask about it.",
+                f"idea, and open beat 1 on it.",
                 {"focus": focus, "narrow_focus": narrow_focus, "absent": absent})
 
     # --- LANDING ------------------------------------------------------------
@@ -5728,7 +6187,14 @@ UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_one_hero_per_frame, check_template_data_present,
                   check_samples_differ, check_code_frames_quote_source,
                   check_icons_are_pictures, check_diagram_matches_narration,
-                  check_code_not_overused, check_generic_boxes_not_overused]
+                  check_code_not_overused, check_generic_boxes_not_overused,
+                  check_motion_concept_not_static,
+                  # STEP 8: wired in — fully implemented (reuses
+                  # _frame_role_collections, same as check_one_hero_per_frame
+                  # right above) but never actually registered anywhere
+                  # before this, so a short could ship trailing off on a
+                  # neutral frame instead of landing on its own answer.
+                  check_ends_on_answer]
 
 #: Unit graders that read the reading material as well as the unit.
 _NEEDS_SOURCE = {check_diagram_matches_narration, check_code_frames_quote_source}
@@ -5749,9 +6215,44 @@ def run_unit_graders(unit: ShortUnit, source_text: str | None = None) -> list[Gr
 
 def run_script_graders(script: Script, source_text: str | None = None,
                        doc_text: str | None = None,
-                       understanding=None, topic: Topic | None = None) -> list[GraderResult]:
+                       understanding=None, topic: Topic | None = None,
+                       approach: TeachingApproach | None = None,
+                       strict_stage_references: bool = False,
+                       selected_question: str | None = None) -> list[GraderResult]:
     """
     Every script grader, plus the ones that need something beyond the script.
+
+    `strict_stage_references` IS OPTIONAL, DEFAULTS FALSE, AND ADDITIVE, same
+    contract as every other extra argument here: every existing caller
+    (the eval harness, smoke_test, run.py, server.py's legacy bare-Topic
+    endpoints, rescript.py) omits it and gets byte-identical behaviour —
+    _stage_progression_problems' own inconclusive-pass for a script with no
+    relates_to_step data at all is untouched for them. Only skills.script.
+    write_and_grade_script_for_workflow (Step 5's one authoritative NEW-
+    workflow script path) passes True — see its own call site and
+    _stage_progression_problems' own docstring for why that ONE caller, and
+    only that one, must not treat a total absence of stage references as
+    "we were never given the data".
+
+    `selected_question` IS OPTIONAL AND ADDITIVE, but check_no_interview_structure
+    ITSELF IS NOT OPTIONAL — unlike every other grader on this list, it runs
+    UNCONDITIONALLY, for every caller, workflow-aware or not: the requirement
+    it enforces ("the final narration is continuous single-narrator teaching,
+    never an interviewer asking the selected question") applies to every
+    reel this pipeline will ever produce, not only ones a workflow happens to
+    supply extra context for. Passing `selected_question` only sharpens ONE
+    of its messages (naming the exact defect when beat 1 restates it) — a
+    caller that omits it still gets full role-label and interviewer-question
+    detection, byte-identical otherwise.
+
+    `approach` IS OPTIONAL AND ADDITIVE, the same contract every other extra
+    argument here already has: a caller that omits it (every existing caller
+    before this parameter existed) gets byte-identical behaviour. Passing the
+    workflow's approved TeachingApproach adds check_script_matches_teaching_approach
+    — written and unit-tested against exactly this signature, but never
+    actually called from a real run before this, so a script written under an
+    approved `code` device with no code shown (or the reverse) was never
+    caught outside a test file.
 
     `understanding` is OPTIONAL and stays optional: a caller without one — the eval
     harness, smoke_test, audit.py — gets exactly the list it got before, and the
@@ -5792,12 +6293,25 @@ def run_script_graders(script: Script, source_text: str | None = None,
                check_narration_shape(script, max_answer_words=max_answer_words) if g is check_narration_shape else
                g(script)
                for g in SCRIPT_GRADERS]
+    # UNCONDITIONAL, UNLIKE EVERY OTHER APPEND BELOW — see this function's own
+    # docstring for why the interview/Q&A shape check runs for every caller
+    # regardless of what extra context it was given.
+    results.append(check_no_interview_structure(script, selected_question=selected_question))
     if source_text:
         results.append(check_source_quotes(script, source_text, doc_text=doc_text))
         results.append(check_answers_its_section(script, source_text))
         results.append(check_grounding(script, source_text, doc_text=doc_text))
         results.append(check_question_grounded(script, source_text))
+    if approach is not None:
+        results.append(check_script_matches_teaching_approach(script, approach))
     if understanding is not None:
+        # PASSED `script=script` HERE, AND ONLY HERE. check_teaching_sequence's
+        # own docstring explains why this is safe where a landing check on the
+        # bare plan was not: a failure here retries the script, through this
+        # same retry loop, and never touches understanding_for()'s own
+        # quarantine gate (which never passes a script at all).
+        results.append(check_teaching_sequence(understanding, source_text, script=script,
+                                               strict_stage_references=strict_stage_references))
         results.append(check_follows_teaching_sequence(script, understanding, source_text, topic))
         results.append(check_uses_planned_example(script, understanding, source_text))
         results.append(check_handles_confusion(script, understanding, source_text))

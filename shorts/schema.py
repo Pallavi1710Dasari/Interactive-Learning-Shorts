@@ -575,11 +575,36 @@ class TeachingApproachApproval(BaseModel):
         return len(self.regeneration_history)
 
 
+#: WHERE a step (or a beat) sits in the arc of one explanation — Hook, Concept,
+#: Mechanism, Example, Result. THIS IS NOT TeachingApproach.primary: that field
+#: says HOW a concept is taught (process_demonstration, analogy, comparison, and
+#: so on — the pedagogical DEVICE, one decision for the whole reel); this says
+#: WHERE in the explanation a given step or beat already is. A `comparison`
+#: approach still has a concept stage, a mechanism stage, and so on — the two
+#: axes are orthogonal and neither is derived from the other.
+#:
+#: EXACTLY FIVE VALUES, ON PURPOSE. This is the vocabulary the rest of the
+#: pipeline (script.py's SYSTEM brief, the checks that will eventually read it)
+#: already uses in prose for the shape of a script's beats — see script.py's
+#: "THE TEACHING PROGRESSION". Adding a sixth value here (a "summary" stage, a
+#: "transition" stage) would let a step dodge being classified as one of the
+#: five the whole system is organised around, which is the same failure mode
+#: `hook_plan`'s own four-value Literal exists to close off.
+#:
+#: "hook" IS RARELY A TeachingStep'S OWN STAGE. The opening beat is normally
+#: decided by SectionUnderstanding.hook_plan, a separate field — see its own
+#: docstring — not by a step in this sequence. It is included here anyway
+#: because the type has to admit every stage a STEP could legitimately be, and
+#: a step that genuinely restates the same idea the hook opens on is a real,
+#: if uncommon, case.
+TeachingStage = Literal["hook", "concept", "mechanism", "example", "result"]
+
+
 class TeachingStep(BaseModel):
     """One step of the order a beginner has to meet the idea in.
 
-    THE THREE FIELDS ARE THREE DIFFERENT QUESTIONS and collapsing any two of them
-    is what makes a "teaching order" decorative:
+    THE THREE ORIGINAL FIELDS ARE THREE DIFFERENT QUESTIONS and collapsing any
+    two of them is what makes a "teaching order" decorative:
 
         concept           WHAT is introduced here
         purpose           WHY this step has to exist at all
@@ -596,10 +621,20 @@ class TeachingStep(BaseModel):
     "can this be represented" — unlike the quality bar in checks.py, which asks
     whether the sequence is any good. A step missing its purpose is not a weak
     step, it is not a step, and a blank string sails past a plain `str` annotation.
+
+    `stage` IS THE FOURTH FIELD, AND IT IS OPTIONAL — unlike the three above, a
+    blank stage does not make the step unusable, only unclassified. Optional for
+    the same reason `physical_form`/`source_quote` are elsewhere in this file:
+    every teaching_sequence already on disk predates this field, and a caller
+    that reads one back must still get a valid, loadable object rather than a
+    ValidationError on a section understood before this step existed. A NEWLY
+    GENERATED step should always carry one — see understanding.py's own brief —
+    but the schema's job is "can this be represented", not "is this complete".
     """
     concept: str
     purpose: str
     explanation_goal: str
+    stage: Optional[TeachingStage] = None
 
     @field_validator("concept", "purpose", "explanation_goal")
     @classmethod
@@ -896,10 +931,11 @@ class SectionUnderstanding(BaseModel):
             if hook.kind == "direct":
                 lines += [
                     "THE OPENING — DIRECT. No hook.",
-                    "  The concept is its own best opening here. Beat 1 asks plainly about",
-                    "  the thing and the answer starts explaining immediately. Do not",
-                    "  manufacture a stake, a scenario, or a surprise to warm the viewer up",
-                    "  — there are seconds in this short and the explanation needs them.",
+                    "  The concept is its own best opening here. Beat 1 states the idea",
+                    "  plainly and the explanation continues directly from it, in one",
+                    "  narrator's voice. Do not manufacture a stake, a scenario, or a",
+                    "  surprise to warm the viewer up — there are seconds in this short",
+                    "  and the explanation needs them.",
                     "",
                 ]
             elif hook.hook:
@@ -920,7 +956,11 @@ class SectionUnderstanding(BaseModel):
         if self.teaching_sequence:
             lines.append("HOW TO BUILD THE EXPLANATION — the order a beginner needs:")
             for i, step in enumerate(self.teaching_sequence, 1):
-                lines.append(f"  step {i}: {step.concept}")
+                # `stage` is Optional — a reading from before this field existed,
+                # or one where the model left it out, still renders exactly as
+                # before rather than printing a placeholder tag.
+                tag = f" [{step.stage}]" if step.stage else ""
+                lines.append(f"  step {i}{tag}: {step.concept}")
                 lines.append(f"    why it is needed:   {step.purpose}")
                 lines.append(f"    learner ends up:    {step.explanation_goal}")
             lines.append("")
@@ -1060,6 +1100,20 @@ class Beat(BaseModel):
     # Optional because the 20 units already in output/ predate the field and must
     # still load. Enforcement lives in the grader, per the note above.
     source_quote: Optional[str] = None
+
+    # Which SectionUnderstanding.teaching_sequence step this beat fulfils, 1-based
+    # — the SAME convention ExamplePlan.supports_step and ConfusionPlan.relates_to_step
+    # already use, and deliberately a REFERENCE rather than a copy: a beat does not
+    # carry its own `stage` field. Read TeachingStep.stage through this index when
+    # a beat's own stage matters — see schema.TeachingStage's own docstring for why
+    # duplicating the value here would just be a second copy that could drift from
+    # the plan it was supposed to describe.
+    #
+    # Optional for the same reason source_quote is: every script already on disk,
+    # and any caller not yet updated to fill it in, predates this field. beat 0
+    # (the hook) will usually leave this unset — the opening is normally decided
+    # by hook_plan, a separate field, not by a teaching_sequence step.
+    relates_to_step: Optional[int] = None
 
 
 class Script(BaseModel):
@@ -1477,6 +1531,31 @@ class VisualStrategy(BaseModel):
     def by_ref(self) -> dict[str, BeatStrategy]:
         return {b.ref: b for b in self.beats}
 
+    def compatible_with(self, approved: "VisualStrategy") -> bool:
+        """
+        STEP 8. Is this strategy still executing the SAME approved
+        composition, merely refined — or has it drifted onto a different one
+        entirely?
+
+        DELIBERATELY LOOSE, NOT FIELD-BY-FIELD EQUALITY. skills.visuals.
+        design_visuals legitimately RE-PLANS a strategy when the vision judge
+        rejects a frame's concept_communication — see its own docstring:
+        "the judge is saying the picture does not show the RELATIONSHIP...
+        asking the design step again against the same strategy gets a
+        different arrangement of the same wrong idea". That re-plan is
+        SUPPOSED to change a beat's relationship/physical_form/must_see when
+        the approved version of it was the wrong call — comparing those
+        field-by-field would flag every re-plan that actually helped as
+        "incompatible" and defeat the mechanism this docstring describes.
+
+        What must NOT change, on pain of the human's approval no longer
+        meaning anything: `subject` (what the whole short is a picture OF)
+        and WHICH beats are covered at all (by ref). Two strategies that
+        agree on both are still the same composition, however differently
+        each beat within it is now realised.
+        """
+        return self.subject == approved.subject and set(self.by_ref()) == set(approved.by_ref())
+
 
 class VisualStrategyRegenerationAttempt(BaseModel):
     """One completed LLM regeneration of a VisualStrategy — Step 11's
@@ -1851,6 +1930,17 @@ class VisualScore(BaseModel):
 
         Imported late so schema stays importable without config — the thresholds
         are configuration, and this module is what config-free tools parse.
+
+        FOUR AXES NOW, NOT TWO. animation_relevance and concept_communication
+        were being scored by judge_frames on every attempt and then thrown
+        away here — `problems_for_redesign` only ever saw a frame as a
+        FAILURE through educational_clarity/text_dependency, so a frame that
+        was clear and not text-heavy but showed the wrong relationship, or
+        showed no motion for a concept that needed it, passed regardless of
+        what those two axes said. `design_visuals`'s own re-plan branch
+        already trusted concept_communication against VISION_MIN_CLARITY for
+        exactly this reason — that comparison is reused here rather than
+        inventing a second bar for the same axis.
         """
         from . import config
         out = []
@@ -1864,6 +1954,16 @@ class VisualScore(BaseModel):
                 f"text_dependency {self.text_dependency}/10 is above "
                 f"{config.VISION_MAX_TEXT_DEPENDENCY}: the frame's meaning is carried "
                 f"by reading it, not by seeing it")
+        if self.concept_communication < config.VISION_MIN_CLARITY:
+            out.append(
+                f"concept_communication {self.concept_communication}/10 is below "
+                f"{config.VISION_MIN_CLARITY}: the frame does not show the "
+                f"relationship this beat is about")
+        if self.animation_relevance < config.VISION_MIN_ANIMATION_RELEVANCE:
+            out.append(
+                f"animation_relevance {self.animation_relevance}/10 is below "
+                f"{config.VISION_MIN_ANIMATION_RELEVANCE}: the motion is arbitrary, or "
+                f"the concept needed motion this frame never shows")
         return out
 
     @property
@@ -2056,6 +2156,45 @@ class QuestionWorkflow(BaseModel):
     visual_strategy: Optional[VisualStrategy] = None
     visual_plan_approval: VisualPlanApproval = Field(default_factory=VisualPlanApproval)
 
+    #: STEP 6. Bumped by with_version_bumped, below, on every mutation that
+    #: changes an approval-dependent decision — an approve/reject/regenerate
+    #: call in review.py, or a downstream invalidation (invalidate_script/
+    #: invalidate_downstream, which call it internally so no caller has to
+    #: remember to). NOT bumped by plain generation steps (frame_workflow,
+    #: choose_teaching_approach_for_workflow, write_and_grade_script_for_workflow,
+    #: plan_strategy_for_workflow) — those only ever fill in a field a human
+    #: has not yet been asked to approve, so there is no approval-dependent
+    #: decision for a stale copy to have missed.
+    #:
+    #: `= 1`, NOT `= 0`, so a freshly selected, never-mutated workflow (as
+    #: much a real, valid state as any other — see this class's own "EVERY
+    #: STAGE PAST SELECTION IS OPTIONAL") still reads as "version 1 exists",
+    #: never as "no version was ever assigned". Every workflow already on
+    #: disk predates this field and loads with this same default — there is
+    #: no way to know what version an old workflow was "really" on, and
+    #: claiming one would be a fabrication; `1` is simply the same honest
+    #: starting point a brand new workflow gets.
+    #:
+    #: WHAT THIS DOES NOT DO: there is no server-side store this is checked
+    #: against automatically. See server.py's approval-aware endpoints (Step
+    #: 6) for where a SUPPLIED version is actually compared against anything
+    #: — this field alone only makes staleness DETECTABLE, by a caller that
+    #: chooses to compare two copies, never enforced by itself.
+    version: int = 1
+
+    def with_version_bumped(self, **updates) -> "QuestionWorkflow":
+        """A copy of this workflow with `version` incremented, plus whatever
+        other fields the caller is changing in the SAME mutation — see this
+        class's own `version` docstring for which mutations this is.
+
+        ONE UPDATE DICT, NOT TWO CALLS. `self.model_copy(update={...}).
+        model_copy(update={"version": ...})` would work too, but every
+        caller would have to remember the second call, which is exactly the
+        kind of caller-remembered bookkeeping QuestionWorkflow.invalidate_
+        downstream's own docstring already argues against doing twice.
+        """
+        return self.model_copy(update={**updates, "version": self.version + 1})
+
     @property
     def effective_question(self) -> str:
         """
@@ -2195,6 +2334,58 @@ class QuestionWorkflow(BaseModel):
             return None
         return self.effective_visual_strategy
 
+    def approval_chain_problems(self) -> list[str]:
+        """
+        STEP 6. Human-readable descriptions of ways this workflow's fields
+        contradict its OWN approval chain — empty list means internally
+        consistent. Checks the causal chain the rest of this class already
+        assumes holds (question approved -> teaching approach may be
+        approved -> script may exist -> visual_strategy may exist), the same
+        chain invalidate_script/invalidate_downstream exist to keep intact
+        when THIS process mutates a workflow.
+
+        WHY THIS EXISTS, GIVEN approved_topic/approved_teaching_approach/
+        approved_visual_strategy ALREADY GATE ON STATUS: those properties are
+        airtight against a workflow this codebase's own functions produced —
+        review.py never sets teaching_approach_approval to "approved" without
+        question_approval already being "approved" first, for instance. But
+        every *_for_workflow / review.* function is reachable only by first
+        round-tripping a workflow through client JSON (this architecture has
+        no server-side store — see QuestionWorkflow's own module docstring)
+        and Pydantic will happily construct a QuestionWorkflow from ANY dict
+        shape that satisfies the field types, including one no code path here
+        ever produced: `teaching_approach_approval.status="approved"` next to
+        a `question_approval.status="pending"`, say. Called by server.py's
+        approval-aware endpoints (Step 6) to reject exactly that kind of
+        forged-or-stale snapshot BEFORE trusting anything it claims about
+        itself — see this module's own note on why version alone cannot.
+
+        ONE STEP AT A TIME, MIRRORING invalidate_downstream'S OWN ORDERING:
+        each rule only relates a stage to the ONE stage immediately above it,
+        never skips ahead, so a chain broken two stages up is still reported
+        even if reported redundantly at each stage it poisons.
+        """
+        problems = []
+        if self.teaching_approach_approval.status == "approved" and self.approved_topic is None:
+            problems.append(
+                "teaching_approach_approval is 'approved' but question_approval is not "
+                "— a teaching approach cannot be legitimately approved for a question "
+                "that is not itself approved")
+        if self.script is not None and self.approved_teaching_approach is None:
+            problems.append(
+                "script exists but teaching_approach_approval is not 'approved' "
+                "— write_and_grade_script_for_workflow never writes a script without "
+                "an approved teaching approach, so this script did not come from that gate")
+        if self.visual_strategy is not None and self.script is None:
+            problems.append(
+                "visual_strategy exists but script does not "
+                "— plan_strategy_for_workflow always plans from an existing script")
+        if self.visual_plan_approval.status == "approved" and self.approved_visual_strategy is None:
+            problems.append(
+                "visual_plan_approval is 'approved' but no visual_strategy (or "
+                "regenerated_strategy/override) exists to have been approved")
+        return problems
+
     def invalidate_script(self) -> "QuestionWorkflow":
         """
         A copy of this workflow with `script`, `visual_strategy` and
@@ -2241,11 +2432,17 @@ class QuestionWorkflow(BaseModel):
         was built to prevent for framing/teaching_approach in Step 7.1, two
         fields later here.
         """
-        return self.model_copy(update={
-            "script": None,
-            "visual_strategy": None,
-            "visual_plan_approval": VisualPlanApproval(),
-        })
+        # STEP 6: BUMPS version, THE ONE PLACE THIS INVALIDATION ITSELF DOES.
+        # Both callers below chain their OWN plain model_copy after this one
+        # (invalidate_downstream) or use this directly
+        # (regenerate_teaching_approach) — either way `version` only needs
+        # incrementing once per logical mutation, and putting it here, in the
+        # shared primitive, means neither caller has to remember to.
+        return self.with_version_bumped(
+            script=None,
+            visual_strategy=None,
+            visual_plan_approval=VisualPlanApproval(),
+        )
 
     def invalidate_downstream(self) -> "QuestionWorkflow":
         """

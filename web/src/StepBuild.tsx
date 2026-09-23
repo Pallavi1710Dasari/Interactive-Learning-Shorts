@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { advanceWorkflows, approveVisualPlan, finalize, release,
          type MaterialResult, type UsageTotals } from "./api";
 import { Spinner } from "./Spinner";
@@ -56,74 +56,95 @@ export function StepBuild({
   const [released, setReleased] = useState<string[]>([]);
   const [releaseErr, setReleaseErr] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // TWO SEPARATE REFS, ON PURPOSE — see StepReview.tsx's identical pair for
+  // the full reasoning. `startedFor` gates whether the multi-stage run (visual
+  // strategy, approval, AND /api/finalize — diagrams + judge + voice, the most
+  // expensive stage in the whole pipeline) is ever STARTED for a given
+  // `attempt` — set once per attempt, never reset for that same attempt, so
+  // StrictMode's double-mount in dev cannot start it twice. Keyed by
+  // `attempt`, not a bare boolean, so the Retry button (which bumps
+  // `attempt`) still starts a genuinely new run. `mounted` tracks whether
+  // THIS component instance is *currently* on screen, and is reset on EVERY
+  // effect invocation — so it correctly reads `true` again by the time the
+  // one real run's `await`s resolve, even though StrictMode's synchronous
+  // mount -> cleanup -> remount cycle runs (and its cleanup fires) before any
+  // of them settle. A single `alive` local variable captured only by the
+  // FIRST invocation's closure could not recover from that cleanup — every
+  // stage's result was silently discarded and the build screen never left
+  // "planning".
+  const startedFor = useRef<number | null>(null);
+  const mounted = useRef(false);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      setPhase("planning");
-      setSkipped([]);
-      setBuildError(null);
-      try {
-        // 1. Plan the visual strategy for every workflow — advance() sees
-        //    each already has a script, so this is the one thing left to
-        //    generate before rendering.
-        const adv = await advanceWorkflows(material.doc_id, workflows);
-        if (!alive) return;
-        onSpend(adv.usage, adv.total);
+    mounted.current = true;
+    if (startedFor.current !== attempt) {
+      startedFor.current = attempt;
+      (async () => {
+        setPhase("planning");
+        setSkipped([]);
+        setBuildError(null);
+        try {
+          // 1. Plan the visual strategy for every workflow — advance() sees
+          //    each already has a script, so this is the one thing left to
+          //    generate before rendering.
+          const adv = await advanceWorkflows(material.doc_id, workflows);
+          if (!mounted.current) return;
+          onSpend(adv.usage, adv.total);
 
-        const ok: QuestionWorkflow[] = [];
-        const failedNotes: string[] = [];
-        for (const wf of workflows) {
-          const hit = adv.results.find(
-            (x) => x.workflow.selection.topic.id === wf.selection.topic.id);
-          if (hit && hit.status !== "visual_plan_failed" && hit.status !== "script_failed") {
-            ok.push(hit.workflow);
-          } else {
-            failedNotes.push(`${wf.selection.topic.id}: ${hit?.detail ?? "visual planning failed"}`);
+          const ok: QuestionWorkflow[] = [];
+          const failedNotes: string[] = [];
+          for (const wf of workflows) {
+            const hit = adv.results.find(
+              (x) => x.workflow.selection.topic.id === wf.selection.topic.id);
+            if (hit && hit.status !== "visual_plan_failed" && hit.status !== "script_failed") {
+              ok.push(hit.workflow);
+            } else {
+              failedNotes.push(`${wf.selection.topic.id}: ${hit?.detail ?? "visual planning failed"}`);
+            }
           }
+          setSkipped(failedNotes);
+          if (!ok.length) throw new Error(failedNotes.join("; ") || "no visual plan could be generated");
+
+          // 2. Approve each plan automatically — no human wait in the normal
+          //    flow. shorts/review.approve_visual_plan, unchanged, 0 LLM calls.
+          const approvals = await Promise.allSettled(
+            ok.map((wf) => approveVisualPlan(material.doc_id, wf)));
+          const approved: QuestionWorkflow[] = [];
+          approvals.forEach((res, i) => {
+            if (res.status === "fulfilled") approved.push(res.value.workflow);
+            else setSkipped((prev) => [...prev, `${ok[i].selection.topic.id}: ${res.reason}`]);
+          });
+          if (!mounted.current) return;
+          if (!approved.length) throw new Error("no visual plan could be approved");
+
+          // 3. Render.
+          setPhase("rendering");
+          const r = await finalize(material.doc_id, approved.map((wf) => ({
+            topic: approvedTopic(wf) ?? wf.selection.topic,
+            qa: scriptToQA(wf.script!),
+            workflow: wf,
+          })));
+          if (!mounted.current) return;
+          onSpend(r.usage, r.total);
+          if (r.failed.length) {
+            setSkipped((prev) => [...prev, ...r.failed.map((f) => `${f.topic_id}: ${f.error}`)]);
+          }
+          setBuildWarnings(
+            Object.entries(r.warnings ?? {}).map(([id, ws]) => `${id} — ${ws.join("; ")}`));
+          setHeld(r.quarantined ?? []);
+          setPhase("done");
+
+          // Only leave this screen if there is something to watch — a run
+          // where every short was quarantined must not unmount the reasons.
+          if (r.shorts.length) onDone(r.shorts);
+        } catch (e) {
+          if (!mounted.current) return;
+          setBuildError((e as Error).message);
+          setPhase("done");
         }
-        setSkipped(failedNotes);
-        if (!ok.length) throw new Error(failedNotes.join("; ") || "no visual plan could be generated");
-
-        // 2. Approve each plan automatically — no human wait in the normal
-        //    flow. shorts/review.approve_visual_plan, unchanged, 0 LLM calls.
-        const approvals = await Promise.allSettled(
-          ok.map((wf) => approveVisualPlan(material.doc_id, wf)));
-        const approved: QuestionWorkflow[] = [];
-        approvals.forEach((res, i) => {
-          if (res.status === "fulfilled") approved.push(res.value.workflow);
-          else setSkipped((prev) => [...prev, `${ok[i].selection.topic.id}: ${res.reason}`]);
-        });
-        if (!alive) return;
-        if (!approved.length) throw new Error("no visual plan could be approved");
-
-        // 3. Render.
-        setPhase("rendering");
-        const r = await finalize(material.doc_id, approved.map((wf) => ({
-          topic: approvedTopic(wf) ?? wf.selection.topic,
-          qa: scriptToQA(wf.script!),
-          workflow: wf,
-        })));
-        if (!alive) return;
-        onSpend(r.usage, r.total);
-        if (r.failed.length) {
-          setSkipped((prev) => [...prev, ...r.failed.map((f) => `${f.topic_id}: ${f.error}`)]);
-        }
-        setBuildWarnings(
-          Object.entries(r.warnings ?? {}).map(([id, ws]) => `${id} — ${ws.join("; ")}`));
-        setHeld(r.quarantined ?? []);
-        setPhase("done");
-
-        // Only leave this screen if there is something to watch — a run
-        // where every short was quarantined must not unmount the reasons.
-        if (r.shorts.length) onDone(r.shorts);
-      } catch (e) {
-        if (!alive) return;
-        setBuildError((e as Error).message);
-        setPhase("done");
-      }
-    })();
-    return () => { alive = false; };
+      })();
+    }
+    return () => { mounted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt]);
 

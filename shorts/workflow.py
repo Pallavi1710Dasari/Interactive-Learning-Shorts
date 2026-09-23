@@ -28,11 +28,14 @@ skills/framing.py, skills/teaching_approach.py, skills/script.py and
 review.py, called here exactly as any other caller would call them.
 
 STEP 9 ADDS SCRIPT GENERATION, one stage past teaching-approach approval,
-using the EXISTING skills.script.write_script_for_workflow — no new
-generation logic, no rebuilt inputs: that function is still the one place
-that validates the three gates and assembles effective_question,
-teaching_question and the approved approach into a prompt. This module still
-only decides WHEN to call it.
+using skills.script.write_and_grade_script_for_workflow (STEP 5's authoritative
+path, wrapping write_script_for_workflow — still the one place that validates
+the three gates and assembles effective_question, teaching_question and the
+approved approach into a prompt — with the grading and retry loop
+server.py's /api/workflow/scripts and /api/regenerate already used, so a
+script reaching this stage through advance() alone is graded exactly like one
+drafted through either endpoint). This module still only decides WHEN to
+call it, never how the call itself is graded.
 
 STEP 10 ADDS VISUAL PLANNING, one stage past a script existing, using the
 EXISTING skills.strategy.plan_strategy_for_workflow — again no new generation
@@ -52,7 +55,7 @@ from .schema import QuestionWorkflow, Section, SectionUnderstanding
 from .parse import find_section, evidence_text
 from .skills.framing import frame_workflow
 from .skills.teaching_approach import choose_teaching_approach_for_workflow
-from .skills.script import write_script_for_workflow
+from .skills.script import write_and_grade_script_for_workflow
 from .skills.strategy import plan_strategy_for_workflow
 from .skills.understanding import understanding_for
 
@@ -202,12 +205,14 @@ def advance(workflow: QuestionWorkflow, sections: list[Section], *,
     from the SAME evidence-group `understanding` was read from, so the two
     never disagree about what "this section" means for a given workflow.
 
-    NO SCRIPT-GENERATION LOGIC LIVES HERE. `section` is looked up (a plain
-    dict-style lookup by id, not a decision) and handed straight to
-    skills.script.write_script_for_workflow, which remains the one place that
-    validates the three gates itself and assembles effective_question,
-    teaching_question and the approved approach into a prompt — see that
-    function's own docstring.
+    NO SCRIPT-GENERATION OR GRADING LOGIC LIVES HERE. `section` is looked up (a
+    plain dict-style lookup by id, not a decision) and handed straight to
+    skills.script.write_and_grade_script_for_workflow — Step 5's one
+    authoritative path, which still delegates gating and prompt-assembly to
+    write_script_for_workflow exactly as before, and adds the grader retry
+    loop this module never had. This module's own grader_results are
+    discarded (see the call site's own comment) — advance() only ever cared
+    whether a script now exists, never whether it graded cleanly.
 
     EXCEPTIONS FROM GENERATION ARE CAUGHT, DELIBERATELY, the same choice
     skills.understanding.understanding_for already makes for the reading one
@@ -254,7 +259,20 @@ def advance(workflow: QuestionWorkflow, sections: list[Section], *,
     if workflow.script is None:
         try:
             section = find_section(sections, workflow.selection.topic.source_section_id)
-            workflow = write_script_for_workflow(
+            # STEP 5: THE SAME AUTHORITATIVE, GRADED PATH /api/workflow/scripts
+            # USES — see write_and_grade_script_for_workflow's own docstring.
+            # This used to call write_script_for_workflow directly, ONCE, with
+            # no grader and no retry, so a workflow reaching this stage through
+            # repeated advance() calls (rather than through that endpoint)
+            # could get a script that had never been checked against a single
+            # grader. It cannot any more: this is the one path both callers
+            # share, and grader_results is discarded here on purpose — a
+            # script that failed every retry still stops at this same stage
+            # ("awaiting_visual_plan_approval") today, exactly as one that
+            # passed on the first attempt always has; advance() was never the
+            # place a failing script was reported back to a human, and this
+            # change does not make it one.
+            workflow, _grader_results = write_and_grade_script_for_workflow(
                 workflow, section, document=document, understanding=understanding,
                 source_text=source_text)
         except Exception as e:

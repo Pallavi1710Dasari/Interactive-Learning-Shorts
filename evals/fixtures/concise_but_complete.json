@@ -4,7 +4,7 @@
   "beats": [
     {
       "speaker": "interviewer",
-      "line": "Why does an operating system use paging instead of contiguous allocation?",
+      "line": "Contiguous memory allocation looks simple, but it has a real cost.",
       "on_screen": "Paging vs contiguous",
       "visual_ref": "q_paging"
     },

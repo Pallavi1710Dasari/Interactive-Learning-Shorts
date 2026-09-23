@@ -235,9 +235,11 @@ The beats are one continuous explanation, so the scenes are one continuous scene
 that develops. Two constraints follow and both are checked downstream:
   * Never describe a scene you have already described. Not just the previous beat
     — ANY earlier beat. A short that goes A, B, A ends where it started.
-  * The first beat is the opening QUESTION, and its scene draws the SUBJECT
-    as an object — the thing being asked about. It is not a title card, it is not
-    "what is being asked", and it is not the answer's code shown early.
+  * The first beat is the opening HOOK — a statement, an observation, a problem,
+    or a plain introduction (see the script step's own THE OPENING; only rarely
+    a literal question) — and its scene draws the SUBJECT as an object, the thing
+    the hook introduces. It is not a title card, it is not a restatement of the
+    internally-selected question, and it is not the answer's code shown early.
 
 DRAW FROM THE MATERIAL, NOT FROM THE PROSE
 You are given the section this short came from. What you take from it are the

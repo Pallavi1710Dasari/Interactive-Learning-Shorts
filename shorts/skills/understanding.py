@@ -69,6 +69,20 @@ hook_plan — how the short should OPEN, and what the opening hands over to.
   section does not hand you a real question, problem or surprise. Do not rank the
   four — pick the one this section supports.
 
+  LOOK FOR "problem" BEFORE SETTLING FOR "direct". A concept that names an
+  inefficiency, an annoyance, a cost, or a thing done "even though" it seems
+  wasteful — prop drilling forcing every in-between component to carry data
+  it never uses, external fragmentation wasting free memory, a re-render
+  running work nothing on screen needed — IS a problem the section already
+  states, whether or not the section itself uses the word "problem". Do not
+  reach for "direct" just because the section presents the concept as a
+  definition first; a definition of something inconvenient still has a real
+  problem inside it, and "problem" describes it more engagingly than "direct"
+  ever can. Reserve "direct" for concepts that are genuinely inert either
+  way — a plain fact, syntax, or a mechanism with no cost or friction to
+  notice — where inventing a difficulty would be exactly the manufactured
+  interest this schema forbids.
+
   NEVER MANUFACTURE INTEREST. No invented statistic, scenario, stake or comparison.
   No "you won't believe", "most people get this wrong", "nobody tells you", "the
   secret to" — that language promises something the material does not contain, and
@@ -95,12 +109,34 @@ teaching_sequence — the SMALLEST sequence of steps a beginner has to be walked
   a two-step plan for a five-beat short is how the extra beats get filled with
   restatement, which is the failure the whole length window was reworked to avoid.
   Never more than four; a step that has to share a beat stops being a step.
-  Each one is an object with three fields, and they are three different questions:
+  Each one is an object with four fields:
 
     concept           what is introduced at this step
     purpose           why this step has to exist — what the next step would be
                       unreadable without
     explanation_goal  what the learner understands once this step has landed
+    stage             which point of the explanation's own arc this step
+                      already is — see below. Not a fourth thing to decide
+                      about the step; a label for what the other three
+                      fields already describe.
+
+  stage — exactly one of "concept", "mechanism", "example", "result" (a fifth
+  value, "hook", exists for the opening beat's own hook_plan above and is
+  almost never a teaching_sequence step's own stage — use it here only in the
+  rare case a step genuinely IS the same idea the hook opens on):
+
+    concept     what the idea IS, stated in plain terms — usually step 1.
+    mechanism   how it works, or why it holds — the reasoning or the process.
+    example     the section's own concrete case, applying the idea.
+    result      the consequence, distinction, or takeaway the sequence ends
+                on — usually the LAST step.
+
+  THIS IS NOT A FOURTH SLOT TO FILL. Do not add a step so every stage is
+  represented, and do not force a "mechanism" or "example" step where the
+  section has none — a two-step concept-then-result sequence with no
+  mechanism step is a correct answer for a section that states a rule without
+  explaining why it holds. Tag the steps you already derived from the
+  section; never derive steps to complete the tags.
 
   THE ORDER IS THE ANSWER, so derive it from the concept and from nothing else.
   A process is taught by walking it. A comparison is taught by putting both sides
@@ -131,13 +167,16 @@ teaching_sequence — the SMALLEST sequence of steps a beginner has to be walked
             purpose: "Establish the two parts of a virtual address"
             explanation_goal: "Learner understands which part identifies the page
                                and which part identifies the location within it"
+            stage: "concept"
     step 2  concept: "Page table lookup"
             purpose: "Show how the page number is translated"
             explanation_goal: "Learner understands that the page number maps to a
                                frame number"
+            stage: "mechanism"
     step 3  concept: "Frame plus offset"
             purpose: "Complete the address translation"
             explanation_goal: "Learner understands how the physical address is formed"
+            stage: "result"
   Note what makes it work: three steps, each unusable without the one before,
   every concept named by the section, and it ends ON the objective rather than on a
   summary of it.
@@ -295,7 +334,8 @@ Output JSON:
 {"section_id":"...","core_idea":"...","key_points":["..."],
  "hook_plan":{"kind":"question|problem|surprise|direct","hook":"...",
    "why_it_matters":"...","leads_into":"..."},
- "teaching_sequence":[{"concept":"...","purpose":"...","explanation_goal":"..."}],
+ "teaching_sequence":[{"concept":"...","purpose":"...","explanation_goal":"...",
+   "stage":"concept|mechanism|example|result"}],
  "concrete_examples":["..."],
  "example_plan":{"need":"required|helpful|not_needed","example":"copied from the section",
    "supports_step":1,"learner_takeaway":"..."},

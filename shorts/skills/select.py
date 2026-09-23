@@ -9,7 +9,7 @@ from ..parse import sections_as_prompt_block
 from ..llm import ask_json
 
 SYSTEM = """You select which questions from a software-engineering course session deserve a
-35-50 second interview-style video short.
+35-50 second continuous, single-narrator educational teaching script.
 
 YOUR JOB IS TO RANK, NOT TO COLLECT
 There are always more answerable questions in a document than there are questions
@@ -21,7 +21,7 @@ So score every topic you return with `importance`, 1 to 5, against this rubric,
 and be strict. Inflating the scores defeats the whole step.
 
   5  The central idea of the material. If a learner understood only one thing from
-     this document, this is it. An interviewer asks it directly and often. Missing
+     this document, this is it. A learner is asked it directly and often. Missing
      it means not knowing the topic at all.
      "What happens on a page fault?"  "Why does paging need a page table?"
      THIS INCLUDES A DEFINITION THAT EVERYTHING ELSE IN THE MATERIAL DEPENDS ON.
@@ -1338,8 +1338,8 @@ class _RegeneratedQuestion(BaseModel):
     question: str
 
 
-REGENERATE_SYSTEM = """You refine ONE candidate interview question for a short-form
-educational video, using a human reviewer's own words about what is wrong with it.
+REGENERATE_SYSTEM = """You refine ONE candidate question for a short-form
+educational teaching script, using a human reviewer's own words about what is wrong with it.
 
 The question was already selected as important and already verified answerable
 from the section below — your job is not to re-judge either of those, only to

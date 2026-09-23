@@ -451,6 +451,55 @@ def test_teaching_approach_regeneration_does_not_clear_question_approval_with_sc
           "question_approval untouched (requirement 6)")
 
 
+# --------------------------------------------------------------------- 6b (Step 7 audit fix)
+def test_selecting_a_different_teaching_approach_clears_an_existing_script():
+    """
+    STEP 7 AUDIT: review.select_teaching_approach must invalidate `script`/
+    `visual_strategy` exactly like its sibling regenerate_teaching_approach
+    does, and for the identical reason — a script already written for the
+    approach being replaced no longer describes an approved decision once a
+    DIFFERENT device is picked. Before this fix, select_teaching_approach
+    only bumped teaching_approach_approval, leaving a stale script (written
+    for the OLD approach) in place with nothing to invalidate it — and
+    QuestionWorkflow.approval_chain_problems() could not catch this either,
+    since script/teaching_approach_approval are each individually
+    well-formed on their own, just no longer describing the same decision.
+    """
+    old_stub = config.STUB
+    config.STUB = True
+    try:
+        wf = _workflow_with_script()
+        assert wf.effective_teaching_approach.primary == "direct_explanation"
+        wf2 = review.select_teaching_approach(wf, "analogy")
+    finally:
+        config.STUB = old_stub
+    assert wf2.effective_teaching_approach.primary == "analogy"
+    assert wf2.script is None
+    assert wf2.visual_strategy is None
+    print("   ok — selecting a different teaching approach directly clears "
+          "an existing script, matching regenerate_teaching_approach's own "
+          "invalidation (Step 7 audit fix)")
+
+
+def test_selecting_the_same_teaching_approach_is_a_plain_approve_and_keeps_the_script():
+    """The one case select_teaching_approach's own docstring says should
+    never reach this function at all (server.py routes an unchanged pick to
+    approve_teaching_approach instead) — included so a caller that DOES
+    call it directly with the current recommendation is not surprised by an
+    invalidation that only makes sense for an actual change."""
+    old_stub = config.STUB
+    config.STUB = True
+    try:
+        wf = _workflow_with_script()
+        wf2 = review.approve_teaching_approach(wf)
+    finally:
+        config.STUB = old_stub
+    assert wf2.script is not None
+    print("   ok — approving the SAME recommendation (the path server.py "
+          "actually takes when override matches the current primary) still "
+          "keeps the existing script, unaffected by the fix above")
+
+
 # --------------------------------------------------------------------------- 7
 def test_no_script_before_regenerated_question_is_reapproved():
     old_stub = config.STUB

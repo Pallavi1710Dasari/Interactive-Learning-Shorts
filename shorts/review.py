@@ -59,7 +59,10 @@ def approve_question(workflow: QuestionWorkflow, note: str | None = None) -> Que
         "status": "approved",
         "note": note if note is not None else workflow.question_approval.note,
     })
-    return workflow.model_copy(update={"question_approval": approval})
+    # STEP 6: with_version_bumped, NOT plain model_copy — approving is an
+    # approved-property mutation, exactly the case QuestionWorkflow.version's
+    # own docstring names.
+    return workflow.with_version_bumped(question_approval=approval)
 
 
 def reject_question(workflow: QuestionWorkflow, note: str | None = None) -> QuestionWorkflow:
@@ -70,7 +73,7 @@ def reject_question(workflow: QuestionWorkflow, note: str | None = None) -> Ques
         "status": "rejected",
         "note": note if note is not None else workflow.question_approval.note,
     })
-    return workflow.model_copy(update={"question_approval": approval})
+    return workflow.with_version_bumped(question_approval=approval)
 
 
 def regenerate(workflow: QuestionWorkflow, reason: str,
@@ -257,7 +260,7 @@ def approve_teaching_approach(workflow: QuestionWorkflow,
         "status": "approved",
         "note": note if note is not None else workflow.teaching_approach_approval.note,
     })
-    return workflow.model_copy(update={"teaching_approach_approval": approval})
+    return workflow.with_version_bumped(teaching_approach_approval=approval)
 
 
 def select_teaching_approach(workflow: QuestionWorkflow, chosen: TeachingApproachKind,
@@ -320,7 +323,19 @@ def select_teaching_approach(workflow: QuestionWorkflow, chosen: TeachingApproac
         "override": chosen_approach,
         "note": note if note is not None else workflow.teaching_approach_approval.note,
     })
-    return workflow.model_copy(update={"teaching_approach_approval": approval})
+    # STEP 7 AUDIT FIX: CLEARS workflow.script (and visual_strategy/
+    # visual_plan_approval with it), THE SAME REASON regenerate_teaching_
+    # approach's own docstring gives for its identical call at its own end —
+    # a script already written FOR the approach being replaced no longer
+    # describes an approved decision once a DIFFERENT device is chosen here.
+    # Before this fix, picking a different approach on a workflow that
+    # already had a script left that stale script (and any visual_strategy
+    # planned from it) in place with no invalidation, and
+    # approval_chain_problems() could not catch it either — script and
+    # teaching_approach_approval are each individually well-formed, just no
+    # longer describing the same decision.
+    return workflow.model_copy(
+        update={"teaching_approach_approval": approval}).invalidate_script()
 
 
 def regenerate_teaching_approach(workflow: QuestionWorkflow, reason: str,
@@ -552,7 +567,7 @@ def approve_visual_plan(workflow: QuestionWorkflow,
         "status": "approved",
         "note": note if note is not None else workflow.visual_plan_approval.note,
     })
-    return workflow.model_copy(update={"visual_plan_approval": approval})
+    return workflow.with_version_bumped(visual_plan_approval=approval)
 
 
 def regenerate_visual_plan(workflow: QuestionWorkflow, reason: str,
@@ -611,7 +626,7 @@ def regenerate_visual_plan(workflow: QuestionWorkflow, reason: str,
         "regenerated_strategy": new_strategy,
         "regeneration_history": approval.regeneration_history + [attempt],
     })
-    return workflow.model_copy(update={"visual_plan_approval": approval})
+    return workflow.with_version_bumped(visual_plan_approval=approval)
 
 
 def run_visual_plan_gate(workflows: list[QuestionWorkflow], sections: list[Section],

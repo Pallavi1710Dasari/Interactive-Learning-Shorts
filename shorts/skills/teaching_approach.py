@@ -28,6 +28,7 @@ comparison, and so on — before a single beat is written.
 from ..schema import (QuestionWorkflow, TeachingApproach, Section, SectionUnderstanding)
 from ..llm import ask_json
 from ..parse import find_section
+from .. import checks
 
 
 #: THE KIND DEFINITIONS AND THE RULES GOVERNING THEM, SHARED BY BOTH PROMPTS
@@ -124,8 +125,9 @@ _APPROACH_JSON_INSTRUCTION = """Return JSON:
 
 
 TEACHING_APPROACH_SYSTEM = f"""You decide HOW an already-framed teaching question
-should be taught in a short interview-style video — not what the question is,
-not how it is worded, but which pedagogical DEVICE the answer beats should use.
+should be taught in a short, continuous single-narrator educational teaching
+script — not what the question is, not how it is worded, but which pedagogical
+DEVICE the answer beats should use.
 
 {_APPROACH_KINDS_AND_RULES}
 
@@ -336,4 +338,20 @@ def choose_teaching_approach_for_workflow(workflow: QuestionWorkflow,
 
     section = find_section(sections, workflow.selection.topic.source_section_id)
     approach = choose_teaching_approach(workflow, section, understanding=understanding)
+
+    # NON-BLOCKING, ON PURPOSE. These two graders exist to catch exactly the
+    # "code because the section has some" laziness and the generic-rationale
+    # tell this module's own docstring names — see
+    # checks.check_teaching_approach_not_code_by_default's own docstring for
+    # the shipped defect this was written against. They were written and
+    # unit-tested but never actually called from here, so the defect they
+    # exist to catch was never caught in a real run. Printed rather than
+    # raised or gated: this step adds no new approval concept, and a human
+    # still reviews teaching_approach at Step 6 regardless.
+    for grader in (checks.check_teaching_approach_not_code_by_default,
+                  checks.check_teaching_approach_rationale_specific):
+        result = grader(approach)
+        if not result.passed:
+            print(f"    ! {workflow.selection.topic.id}: {result.name}: {result.reason}")
+
     return workflow.model_copy(update={"teaching_approach": approach})

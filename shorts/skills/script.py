@@ -30,11 +30,46 @@ ONE NARRATOR, START TO FINISH. This is not a dialogue and there is no second
 voice — no interviewer, no student, no back-and-forth. One teacher explains the
 concept directly to the viewer, in one continuous piece of connected narration.
 
-Beat 1: opens on the concept — see THE QUESTION below (and, when the material
+THE SELECTED QUESTION IS AN INTERNAL TEACHING OBJECTIVE, NEVER A SPOKEN LINE.
+It exists to tell you WHAT this short has to teach — it is not a line anyone
+says out loud, not beat 1, not an interviewer's prompt this script then
+answers. The script TEACHES that objective through direct explanation; it does
+not restate it, verbally answer it, or perform it as a question-and-answer
+exchange. If your draft beat 1 could be produced by taking the selected
+question and rephrasing it — even loosely, even without a question mark — you
+have not written a hook, you have transcribed the objective. Delete it and
+write what a teacher would actually say to TEACH the idea, not to ASK it.
+
+NONE OF THESE, WHEN THEY FUNCTION AS AN INTERVIEWER ASKING AND A SECOND BEAT
+ANSWERING — a genuine, source-grounded curiosity observation is still allowed,
+see THE HOOK below, but not in this shape:
+  "How does...?"  "What is...?"  "Why does...?"  "How can we...?"
+  "Have you ever wondered...?"  "Can you guess...?"  "Let's find out..."
+This is checked (checks.check_no_interview_structure), not only prompted for.
+
+NO ROLE LABELS, EVER: "Interviewer:", "Student:", "Teacher:", "Question:",
+"Answer:" — every beat is the same one narrator's own sentence, unlabelled.
+
+AVOID FILLER THE SOURCE DOESN'T EARN: "That's the whole point...", "Here's the
+interesting part...", "Obviously...", "Basically...", "Now let's
+understand...", "Let's dive in..." — these are verbal tics standing in for
+content, not connective tissue a real explanation needs. Use them only when
+the material itself makes the moment genuinely warrant it, never as a default
+transition.
+
+Beat 1: opens on the concept — see THE HOOK below (and, when the material
 below includes one, "THE OPENING" DECIDES BEAT 1, for how a planned hook shapes it).
-Beats 2-6: the narrator continues explaining, in 4 or 5 SHORT parts. FIVE IS THE
-MAXIMUM. Every beat after the first carries the explanation forward — no follow-up
-question, no reply to a previous speaker, because there is no previous speaker.
+A hook is a natural way in: a statement, an observation, a situation, or a plain
+introduction of the concept. IT DOES NOT HAVE TO BE A QUESTION. Whether beat 1
+ends up phrased as a question is a stylistic choice, made when it is genuinely
+the most natural way in — never a structural requirement checked for its own
+sake.
+Beats 2-6: the narrator continues explaining, in 4 or 5 SHORT parts, following
+the teaching progression — CONCEPT, then MECHANISM, then EXAMPLE where the plan
+calls for one, landing on RESULT — see THE TEACHING PROGRESSION below. FIVE IS
+THE MAXIMUM. Every beat after the first carries the explanation forward — no
+follow-up question, no reply to a previous speaker, because there is no
+previous speaker.
 
 Each answer beat is ONE idea with ONE picture, and stays at or under 24 words.
 That cap does not move BY DEFAULT. Four or five beats is how this fills 45
@@ -44,18 +79,19 @@ per-call cap for a section that earned it (see THIS SECTION EARNS A WIDER
 WINDOW THAN USUAL below the material, when it appears); that block is the only
 thing that ever moves this number, and it says by how much.
 
-THE LAST BEAT MUST ANSWER THE QUESTION. THIS IS NOT NEGOTIABLE.
-Read the question again, then read your last beat. If the last beat is the last step
-of a mechanism rather than the answer, the short ends before it has said anything
-and the viewer is left waiting for a sentence that never comes.
+THE LAST BEAT MUST LAND ON THE OBJECTIVE. THIS IS NOT NEGOTIABLE.
+Read the learning objective again, then read your last beat. If the last beat is
+the last step of a mechanism rather than the point of the whole explanation, the
+short ends before it has said anything and the viewer is left waiting for a
+sentence that never comes.
 
 This is the defect that keeps happening, so here it is exactly:
 
-  QUESTION  "Why does an OS use paging instead of contiguous allocation?"
+  CONCEPT   Why an OS uses paging instead of contiguous allocation.
   BAD       "Paging removes contiguity: memory is split into frames and pages."
             "Any page can go in any free frame, so the OS can fill gaps."
-            ^ Both true, both from the material, and the question is never
-              answered. It asked WHY paging is used. Describing how paging works
+            ^ Both true, both from the material, and the point is never landed.
+              The concept is WHY paging is used. Describing how paging works
               is not a reason to use it. The short just stops.
   GOOD      "Contiguous allocation needs one unbroken block, so free memory ends
              up as unusable gaps."
@@ -63,55 +99,62 @@ This is the defect that keeps happening, so here it is exactly:
              any free frame."
             "So those scattered gaps become usable and external fragmentation
              disappears — that is why paging wins."
-            ^ Three beats: the problem, the mechanism, THE ANSWER.
+            ^ Three beats: the problem, the mechanism, THE RESULT.
 
-So match the shape of the answer to the shape of the question:
-- "Why..." / "Why not..."  -> the last beat is the CONSEQUENCE. Usually 3 beats:
-                              the problem, the mechanism, the payoff.
-- "How..." / "What happens..." -> the last beat is the RESULT of the process, the
-                              state you end up in. 2 or 3 beats.
-- "What is..." / "What does..." / "Which..." -> the FIRST answer beat is the
+THE CONCEPT'S OWN SHAPE
+Match the shape of the explanation to the KIND OF CONCEPT this is — not to
+the wording of any question, because the concept is not required to be phrased
+as one:
+- A CAUSAL or "why this exists" concept -> the last beat is the CONSEQUENCE.
+                              Usually 3 beats: the problem, the mechanism, the
+                              payoff.
+- A PROCESS or "what happens when..." concept -> the last beat is the RESULT of
+                              the process, the state you end up in. 2 or 3 beats.
+- A DEFINITION or "what this is" concept -> the FIRST body beat is the
                               definition, and the last is the DISTINCTION or the
                               worked example that makes it concrete. 2 beats is
                               usually enough. Do not save the definition for the
-                              end: a "what" question is answered by its first
-                              sentence or the viewer is left guessing through it.
-- "What do X, Y (and Z) each do..." / "What's the difference between X and Y..."
-                              -> a MULTI-PART question, asking about several named
-                              things at once. THE FIRST BEAT IS NOT PART ONE OF THE
-                              LIST. It is the organizing idea that explains WHY
-                              there are several things to distinguish at all — see
+                              end: a definitional concept is delivered in its
+                              first sentence or the viewer is left guessing
+                              through it.
+- A STRUCTURAL BREAKDOWN concept — several named things, each with its own role
+                              -> THE FIRST BEAT IS NOT PART ONE OF THE LIST. It
+                              is the organizing idea that explains WHY there are
+                              several things to distinguish at all — see
                               "THE ORGANIZING IDEA COMES BEFORE THE PARTS" below.
                               Only then does each beat cover one part's own role.
+Decide the kind from what the concept actually is (the CONTENT UNDERSTANDING
+and TeachingApproach blocks below, when present, already say which) — never
+from parsing grammar out of a question that may not even exist in this script.
 
-EVERY BEAT IS ON THE QUESTION'S OWN SUBJECT. A PREREQUISITE IS NOT AN ANSWER.
-A beat can be true, cited to a real sentence, and still not be part of the answer.
-The material is full of sentences that are ABOUT the topic without ANSWERING
-anything about it: prerequisites, syntax rules, spelling warnings, "you must
+EVERY BEAT IS ON THE CONCEPT'S OWN SUBJECT. A PREREQUISITE IS NOT THE CONCEPT.
+A beat can be true, cited to a real sentence, and still not be part of the
+explanation. The material is full of sentences that are ABOUT the topic without
+EXPLAINING anything about it: prerequisites, syntax rules, spelling warnings, "you must
 remember to", lists of common mistakes. They cite beautifully. They are not answers,
 and putting one in front of the real answer is how a short becomes hard to follow —
 the viewer is told a rule for using a thing before being told what the thing is.
 
 This is the defect, from a script this pipeline actually produced:
 
-  QUESTION  "What exactly does the CSS font-family property specify?"
+  CONCEPT   What the CSS font-family property specifies.
   BAD       "You must import the font stylesheet before using font-family."
             "It specifies which typeface the browser should use for an element."
             ^ Beat 2 is a footnote from a caveat list. It is correctly cited and it
-              answers a question nobody asked, so the viewer spends the first half
-              of the short waiting for the topic to arrive. And it makes the SECOND
-              beat carry the whole answer alone, with no room left to make it
-              concrete.
+              explains a caveat nobody needed yet, so the viewer spends the first
+              half of the short waiting for the topic to arrive. And it makes the
+              SECOND beat carry the whole concept alone, with no room left to
+              make it concrete.
   GOOD      "It sets which typeface the browser uses to render that element's text."
             "So `.main-heading {{ font-family: "Roboto"; }}` renders that heading in
              Roboto."
-            ^ Beat 2 answers. Beat 3 makes it something you can picture.
+            ^ Beat 2 states the concept. Beat 3 makes it something you can picture.
 
-So: THE FIRST BEAT AFTER THE OPENING ANSWERS THE QUESTION DIRECTLY, in the
-question's own terms. Later beats deepen it — the mechanism, the example, the
-consequence. Never open on setup, context, or a caveat. If a caveat is genuinely
-the most important thing in the section, then it is the topic, and beat 1 should
-be about it instead.
+So: THE FIRST BEAT AFTER THE OPENING STATES THE CONCEPT DIRECTLY, in plain
+terms. Later beats deepen it — the mechanism, the example, the consequence.
+Never open on setup, context, or a caveat. If a caveat is genuinely the most
+important thing in the section, then it is the topic, and beat 1 should be
+about it instead.
 
 BE CONCRETE: USE THE MATERIAL'S OWN EXAMPLE, BY NAME
 An answer made only of general statements is the kind a learner nods along to and
@@ -135,15 +178,15 @@ NEVER ONE. A single answer beat is rejected outright, every time, and it is the
 failure this section gets wrong most: the bound below is as hard as the bound above.
 One beat leaves one diagram on screen for the whole short and gives the viewer
 nothing that develops. If the section really only supports one sentence of answer,
-do not pad it into two — NARROW THE QUESTION in beat 1 until the section supports
+do not pad it into two — NARROW THE OBJECTIVE in beat 1 until the section supports
 two distinct things to say, each resting on its own sentence.
 Five-point answers are what these shorts are being fixed from. Nobody watching a
 phone remembers point four, and by the time you have written it you have buried the
 one sentence that mattered under context nobody asked for. If a beat is a
 restatement, a recap, or a "so in summary", DELETE IT.
 
-But do not cut the beat that answers the question in order to hit a beat count. A
-complete answer beats a tidy non-answer every time.
+But do not cut the beat that delivers the concept in order to hit a beat count. A
+complete explanation beats a tidy incomplete one every time.
 
 LENGTH — THE CONCEPT DECIDES, NOT A TARGET
 Total spoken words across ALL beats: {MIN_WORDS} minimum, {MAX_WORDS} maximum.
@@ -240,28 +283,53 @@ What brevity does NOT mean: dropping the part that makes it make sense. A short
 answer still has to be understandable on its own, to someone who has not read the
 material. Cut words, never cut the explanation.
 
-THE QUESTION (beat 1)
+THE HOOK (beat 1)
 - 8 to 16 words, and shorter is better: it is the first thing heard and the thing a
-  viewer decides on. Ask the thing a learner actually wonders, not a textbook
-  prompt.
-- Best when it targets a misconception, so the answer corrects a wrong prediction.
-- THE QUESTION AND THE ANSWER MUST MATCH. Write the answer first if it helps, then
-  make the question the exact thing that answer answers. A question that promises
-  more than the answer delivers — asking about two things and explaining one, or
-  asking "how" and answering "what" — is the most common defect in these scripts.
-  If the material only supports a narrower question, ask the narrower question.
+  viewer decides on. Introduce the thing a learner is actually about to meet — not
+  a textbook prompt, not manufactured excitement.
+- A HOOK IS NOT REQUIRED TO BE A QUESTION. It can be a statement, an observation, a
+  situation, or a direct introduction of the concept — see "THE OPENING" below for
+  the four shapes this can take. A question is one valid shape among several, used
+  when it is genuinely the most natural way in (often when the concept corrects a
+  misconception), never written by default because "beat 1 asks something" is
+  assumed.
+- THE HOOK AND THE EXPLANATION MUST MATCH. Write the explanation first if it helps,
+  then make the hook open on the exact thing that explanation delivers. A hook that
+  promises more than the explanation delivers — raising two things and explaining
+  one, or gesturing at a mechanism and then only defining a term — is the most
+  common defect in these scripts. If the material only supports a narrower concept,
+  open on the narrower concept.
 - NAME THE MECHANISM, NOT THE WORKED EXAMPLE. A section that teaches a general
-  idea through one concrete case tempts the question into naming the case: "how
-  does one loop turn an array of orders into receipt rows?" is a caption for a
-  screenshot, not a question — a learner who watched this could not answer "how
-  do you render a list from an array" in an interview, because that transferable
-  version was never asked. Ask the general version ("how does a loop turn an
-  array into a list of rendered elements?") and put the example's real values —
-  copied verbatim — in the ANSWER, where they are evidence, not in the question,
-  where they make it unrecognisable outside this one document. This applies
-  whether writing fresh or regenerating from a reviewer's note: a note asking to
-  "make it clearer" or "be more specific" is about the ANSWER'S wording, not a
-  license to re-anchor the question on the example either.
+  idea through one concrete case tempts the hook into naming the case: "here's how
+  one loop turns an array of orders into receipt rows" is a caption for a
+  screenshot, not an opening — a learner who watched this could not explain "how
+  a loop turns an array into a list of rendered elements" in an interview, because
+  that transferable version was never introduced. Open on the general version
+  ("how a loop turns an array into a list of rendered elements") and put the
+  example's real values — copied verbatim — in the EXPLANATION, where they are
+  evidence, not in the hook, where they make it unrecognisable outside this one
+  document. This applies whether writing fresh or regenerating from a reviewer's
+  note: a note asking to "make it clearer" or "be more specific" is about the
+  EXPLANATION'S wording, not a license to re-anchor the hook on the example either.
+
+THE TEACHING PROGRESSION (beats after the hook)
+The body is not an answer chasing the hook — it is one continuous explanation
+that moves through a fixed progression, in order:
+
+  CONCEPT     what the idea IS, stated in plain terms.
+  MECHANISM   how it works, or why it holds — the reasoning or the process.
+  EXAMPLE     the material's own concrete case, applying the idea (present when
+              THE EXAMPLE below calls for one; skipped when it says NOT NEEDED).
+  RESULT      the consequence, distinction, or takeaway the learner leaves
+              with — always the LAST beat, never an afterthought tacked on.
+
+Not every stage is its own beat. Merge CONCEPT and MECHANISM into one beat when
+the idea is simple enough to state and explain in the same breath; give MECHANISM
+two beats when the reasoning has two real steps; fold EXAMPLE into whichever beat
+it naturally belongs to rather than giving it a beat by itself. What does not
+move is the ORDER — nothing states an example before the idea it is an example
+OF, and nothing ends on a mechanism step when the point of the whole short was
+the result that step leads to.
 
 EACH ANSWER BEAT
 - ONE idea only. 12 to 20 spoken words. NEVER more than 24 — a longer beat is
@@ -285,7 +353,7 @@ sentence, and the beats together can STILL read as a list of separate
 captions instead of one explanation — because nothing in any one sentence
 tells the listener it continues the last one.
 
-  QUESTION  "What happens inside React after you call the state setter?"
+  CONCEPT   What happens inside React after you call the state setter.
   BAD       "Suppose the current count is 0."
             "We use setCount to tell React that the state should change."
             "React updates the state. Component renders again."
@@ -303,12 +371,12 @@ tells the listener it continues the last one.
             "So it's that re-render, not the setCount call itself, that puts
              count: 1 on the screen."
             ^ Same four ideas, same citations, about the same length. What
-              changed: "doesn't...directly — it tells" answers the question a
+              changed: "doesn't...directly — it tells" resolves a question a
               listener would have after beat 1; "then" ties beat 3 to what
               beat 2 just set in motion; "So it's...not..." in the last beat
-              explicitly closes the loop back to the question. Read start to
-              finish, it is one explanation, not four facts that happen to
-              sit next to each other.
+              explicitly closes the loop back to the concept the hook opened
+              on. Read start to finish, it is one explanation, not four facts
+              that happen to sit next to each other.
 
 HOW TO CONNECT A BEAT, CONCRETELY — use whichever actually fits what this
 particular beat is doing. Never the same one every time:
@@ -321,9 +389,9 @@ particular beat is doing. Never the same one every time:
   * An explicit contrast when a beat corrects what the last one might imply:
     "not X — Y" is what makes NEVER STATE THE WRONG BELIEF ON ITS OWN below
     read as connected instead of as two unrelated claims.
-  * The LAST beat closing the loop back to the actual question, in words
-    that echo it — see THE LAST BEAT MUST ANSWER THE QUESTION above. A
-    closing beat that never refers back to what was asked is the
+  * The LAST beat closing the loop back to the concept the hook opened on, in
+    words that echo it — see THE LAST BEAT MUST LAND ON THE OBJECTIVE above. A
+    closing beat that never refers back to what was introduced is the
     "disconnected fact" failure this section exists to stop.
 
 WHAT THIS IS NOT: do not open every beat with the same word ("So... So...
@@ -390,7 +458,7 @@ is a restatement of. Copy that sentence into source_quote CHARACTER FOR CHARACTE
   citation: quote the line of code. `font-family: "Roboto";` is the document
   establishing exactly what that beat claims.
 - Having a valid quote does not make a beat worth keeping. Prerequisite and caveat
-  sentences cite perfectly and answer nothing — see EVERY BEAT IS ON THE QUESTION'S
+  sentences cite perfectly and explain nothing — see EVERY BEAT IS ON THE CONCEPT'S
   OWN SUBJECT above. Check the beat belongs before you check it is cited.
 - The quote must actually SUPPORT the beat, not merely share words with it. Sharing
   a phrase is not support: a beat claiming a file extension causes rendering is not
@@ -433,7 +501,7 @@ forgetting that, and both have shipped:
    character. Keep the literal form there and the spoken sense in `line`.
 
 LEAD WITH THE IDEA. CODE IS EVIDENCE, NOT THE STARTING POINT.
-When the question is really about a general mechanism — why a loop stops, why a
+When the concept is really about a general mechanism — why a loop stops, why a
 value does not update, why two things conflict — and the material happens to
 show that mechanism through code, the FIRST answer beat states the general,
 plain-language principle: true in words that do not depend on the listener
@@ -441,7 +509,7 @@ already knowing the syntax. Only THEN does a beat bring in the material's own
 line of code, naming it as the concrete case of the principle you already
 stated — evidence for it, not the explanation itself.
 
-  QUESTION  "Why does `i--` inside the loop cause an infinite loop?"
+  CONCEPT   Why `i--` inside the loop causes an infinite loop.
   BAD       "The loop's own updation, `i++`, is supposed to push `i` toward the
              termination condition."
             "But adding `i--` inside the body pulls `i` right back down after
@@ -480,18 +548,18 @@ simply. Writing the line first and hunting for a quote afterwards is how wrong
 answers get made.
 
 THE ORGANIZING IDEA COMES BEFORE THE PARTS
-A question that names several things at once — "what do X, Y and Z each do",
-"what's the difference between X and Y" — is not answered by listing them one
-after another. Four true, cited, disconnected facts are not an explanation;
-that is a Q&A pipeline mechanically reading a section's own paragraph breaks
-back to the viewer.
+A concept that names several things at once — what X, Y and Z each do; what's
+different between X and Y — is not explained by listing them one after
+another. Four true, cited, disconnected facts are not an explanation; that is
+a script mechanically reading a section's own paragraph breaks back to the
+viewer.
 
 Beat 1 states the ONE idea that explains why there are several things to
 distinguish at all — the shared context each part sits inside, or the reason
 the distinction matters — in words that do not yet name any one part. Only
 then do later beats cover what makes each part different, one at a time.
 
-  QUESTION  "What do the doctype, head, and body sections each actually do?"
+  CONCEPT   What the doctype, head, and body sections each actually do.
   BAD       "Every page starts with the doctype line, then wraps everything
              else inside one html tag."
             "Inside that, the head holds page information..."
@@ -510,23 +578,25 @@ then do later beats cover what makes each part different, one at a time.
               beat 2 onward fills in, not a fourth fact competing with the
               other three.
 
-THIS IS NOT A FOUR-BEAT TEMPLATE TO COPY ONTO EVERY SCRIPT. Different
-questions need different shapes, and the shape is decided by what KIND of
-claim the question is making — the same judgement THE QUESTION'S OWN SHAPE
-above already asks for, one level more specific:
+THIS IS NOT A FOUR-BEAT TEMPLATE TO COPY ONTO EVERY SCRIPT. Different concepts
+need different shapes, and the shape is decided by what KIND of concept this
+is — the same judgement THE CONCEPT'S OWN SHAPE above already asks for, one
+level more specific:
   a structural breakdown ("what does each part do")   -> the organizing idea
     above, then each part's own responsibility, in the order a learner meets
     them.
   a problem the material solves                       -> the problem, the
-    mechanism that solves it, the result — this is THE QUESTION'S OWN SHAPE's
-    "Why" pattern, restated as a progression.
+    mechanism that solves it, the result — this is THE CONCEPT'S OWN SHAPE's
+    CAUSAL pattern, restated as a progression.
   a misconception the material corrects                -> the wrong belief
     and its correction IN THE SAME BREATH (see "NEVER STATE THE WRONG BELIEF
     ON ITS OWN" further down), then why the correct version holds.
   a comparison                                          -> what is genuinely
     different between the two, held up together, then when each applies.
-Pick the one the CONCEPT actually is. Forcing a structural-breakdown opening
-onto a script that is really answering "why" wastes beat 1 on a frame nobody
+Pick the one the CONCEPT actually is, from what it IS (the CONTENT
+UNDERSTANDING and TeachingApproach blocks below usually say directly), never
+from the grammar of a question. Forcing a structural-breakdown opening onto a
+script that is really a causal explanation wastes beat 1 on a frame nobody
 needed.
 
 AN EXAMPLE OR A WORKED CASE IS EVIDENCE FOR AN IDEA ALREADY STATED, NEVER THE
@@ -559,8 +629,8 @@ a version, a benchmark, a comparison to something it never mentions — however
 true it is elsewhere. The test for any sentence you are about to add: could a
 careful reader of THIS SECTION ALONE follow you to it, using only what the
 section says? If getting there needs something only someone who already knew the
-wider topic would know, it does not belong in this short — narrow the question
-instead of reaching for it.
+wider topic would know, it does not belong in this short — narrow the
+objective instead of reaching for it.
 
 - Never add a fact the material does not state — no version numbers, vendor names,
   benchmarks, dates, statistics, or "typically it's around..." figures.
@@ -583,20 +653,53 @@ order. Aim beat 1 at a listed confusion. Name one of the listed concrete example
 
 "THE OPENING" DECIDES BEAT 1. WRITE THE SENTENCE; DO NOT RE-DECIDE THE APPROACH.
 When that block appears it says how this short starts, chosen with the section in
-view. It gives you the SUBSTANCE of beat 1 — you still write the question, in the
-8-to-16 words THE QUESTION asks for.
+view. It gives you the SUBSTANCE of beat 1, in the 8-to-16 words THE HOOK asks
+for — see THE HOOK above: NONE of the four kinds below requires beat 1 to be a
+literal question, and only the first even suggests one.
 
-  QUESTION  Ask the planned question, in a learner's words.
-  PROBLEM   Beat 1 puts the difficulty in front of the viewer, and the answer beats
-            resolve it. The problem is the section's, not one you thought of.
-  SURPRISE  Beat 1 aims at the thing that will not be predicted. It has to be a
-            real surprise the section states — if it needs a claim the section
-            does not make to be surprising, it is not one.
-  DIRECT    No hook. Ask plainly about the thing and start explaining in beat 2.
+  QUESTION  Ask the planned question, in a learner's words — NOT the workflow's
+            own selected question restated, see below — when a question is
+            genuinely the most natural way in — often when it targets a
+            misconception. This is one hook among four, never the default.
+  PROBLEM   Beat 1 puts the REAL difficulty the section describes in front of
+            the viewer — as whatever wording makes a listener actually feel
+            it, which is very often a short curiosity-creating observation or
+            rhetorical question ("Ever wondered why...", "Notice how...")
+            rather than a flat textbook statement of it. "Prop drilling is
+            when data passes through components that never use it" states the
+            problem; "Ever wondered why data sometimes has to travel through
+            components that don't even use it?" is the SAME problem, and it
+            is the stronger opening — it makes the viewer want the next
+            sentence instead of just receiving a fact. Either way the problem
+            is the section's, not one you thought of, and beat 2 resolves it
+            immediately — this is not the QUESTION shape with extra steps, it
+            is one beat that states the difficulty and moves straight into
+            explaining it.
+  SURPRISE  Beat 1 states the thing that will not be predicted, in whatever
+            wording makes it land as surprising — a real surprise the section
+            states can be phrased as an observation OR a short rhetorical
+            question, same choice as PROBLEM above. If it needs a claim the
+            section does not make to be surprising, it is not one.
+  DIRECT    No hook. Introduce the concept plainly and start explaining in beat 2.
             This is a decision, not a gap: do NOT manufacture a stake, a scenario
-            or a "have you ever wondered" to warm the viewer up. For a definition
+            or a "have you ever wondered" to warm the viewer up when the section
+            gives you nothing to be curious ABOUT — that is what makes it
+            manufactured rather than the sentence shape. For a definition
             or a plain mechanism the concept IS the strongest opening, and seconds
-            spent warming up are seconds the explanation does not get.
+            spent warming up are seconds the explanation does not get. "Props let
+            a React component receive data from its parent" is a complete DIRECT
+            opening — a plain statement of the concept, nothing more required.
+
+NEVER JUST CONVERT THE SELECTED QUESTION INTO A SENTENCE, UNDER ANY OF THE FOUR.
+The workflow's own selected question ("What is prop drilling and why does passing
+data through many components become a problem?") is what earned this concept its
+short — it is not the opening, and beat 1 is not that question restated, lightly
+reworded, or answered as a definition of its own terms. All four shapes above ask
+you to find the section's own hook — a real problem, a real surprise, a genuine
+question a learner would ask, or the plain concept — and none of them is "take the
+selected question and make it sound like narration". If your draft beat 1 could be
+produced by mechanically rephrasing the selected question, it has not found a hook,
+it has found a paraphrase, and it is checked and rejected.
 
 THE HOOK IS ONE BEAT AND IT IS SHORT. This whole short is 12 to 28 seconds. An
 opening that takes two sentences to set a scene has eaten the explanation. Beat 1
@@ -623,12 +726,16 @@ why it is there and what the learner should have at the end of it. Follow it:
     what that beat has to deliver. If a step is small enough to share a beat with
     the next one, merge them — you have 2 or 3 answer beats and the sequence may
     have more steps than that.
-  * The LAST step is where the answer lands, so the last beat delivers it. That is
-    the same rule as THE LAST BEAT MUST ANSWER THE QUESTION above, and the sequence
-    is telling you which sentence that is.
+  * The LAST step is where the explanation lands, so the last beat delivers it.
+    That is the same rule as THE LAST BEAT MUST LAND ON THE OBJECTIVE above, and
+    the sequence is telling you which sentence that is.
   * A step you cannot support from the section is a step you DROP, and you make
-    beat 1 ask the narrower question the remaining steps answer. Do not keep a step
-    alive by inventing a sentence for it.
+    beat 1 open on the narrower objective the remaining steps deliver. Do not keep
+    a step alive by inventing a sentence for it.
+  * SET `relates_to_step` ON EVERY ANSWER BEAT to the number of the step (1, 2, 3...)
+    printed beside it in the block above — the SAME number, not the stage name.
+    A beat merging two steps names the EARLIER one. Beat 1 (the hook) leaves this
+    out; it is not built from a step, it is built from THE OPENING above.
 The sequence is a plan for explaining, never wording. Do not read a step's fields
 aloud: "purpose" and "learner ends up" are notes to you about why a beat exists,
 and a beat that narrates its own purpose is the "so in summary" beat this brief
@@ -644,7 +751,7 @@ BE CONCRETE above tells you why one matters. It has three forms:
              the example DOING the thing, so a learner sees the takeaway named in
              the block rather than hearing a noun go by.
   HELPFUL    Use it if the beats have room. If using it would cost you the beat
-             that answers the question, leave it out — brevity wins, and nothing
+             that delivers the concept, leave it out — brevity wins, and nothing
              fails for its absence.
   NOT NEEDED The section shows nothing concrete worth building on, and this is a
              verdict, not an oversight. Explain it in general terms. DO NOT reach
@@ -663,9 +770,9 @@ SECTION, and the example block is guidance like the rest of the CONTENT
 UNDERSTANDING — it is not a citation and may not be quoted as one.
 
 "THE MISCONCEPTION" IS ALSO ALREADY DECIDED. DO NOT SECOND-GUESS IT.
-This brief says a question aimed at a misconception is the best kind, and that is
-still true — but WHICH misconception, or whether there is one at all, is not your
-call. The block says:
+This brief says a hook aimed at a misconception is often the strongest one, and
+that is still true — but WHICH misconception, or whether there is one at all, is
+not your call. The block says:
 
   REQUIRED   The section exists partly to correct this. Clear it up INSIDE the
              explanation, at the step it belongs to — the beat that explains the
@@ -677,7 +784,7 @@ call. The block says:
              relates_to_step puts it at the END of the sequence, where it
              interrupts nothing.
   HELPFUL    Clarify it only if it costs you nothing. If making room means losing
-             the beat that answers the question, drop the clarification — nothing
+             the beat that delivers the concept, drop the clarification — nothing
              fails for its absence.
   NONE TO CORRECT  There is nothing here worth correcting, and that is a finding,
              not a gap. Do NOT invent a belief so you have something to fix, do
@@ -754,12 +861,12 @@ real sentence from a section the viewer never read:
                   values — zero and one."
         ^ Smaller, and answerable from the page the viewer actually read.
 
-THE SECTION IS SMALLER THAN YOU WANT IT TO BE. ANSWER ANYWAY.
-When the section will not support the question as asked, you do NOT go looking
-elsewhere and you do NOT refuse. You ANSWER THE NARROWER QUESTION THE SECTION DOES
-SUPPORT, and you rewrite beat 1 to open on that narrower question instead. A clear,
-complete, correctly-cited answer to a smaller question is a good
-short. It is the ONLY good short available when the material is thin.
+THE SECTION IS SMALLER THAN YOU WANT IT TO BE. TEACH IT ANYWAY.
+When the section will not support the objective as given, you do NOT go looking
+elsewhere and you do NOT refuse. You TEACH THE NARROWER OBJECTIVE/CONCEPT THE
+SECTION DOES SUPPORT, and you rewrite beat 1 to open on that narrower concept
+instead. A clear, complete, correctly-cited explanation of a smaller concept is a
+good short. It is the ONLY good short available when the material is thin.
 
 You must NEVER produce any of these:
 - "I can't answer that", "that's not covered here", "the section I have only
@@ -768,10 +875,11 @@ You must NEVER produce any of these:
   have. The viewer is watching a person explain an idea; that person does not
   discuss their reference documents.
 
-If the SECTION genuinely answers a NARROWER version of the question, answer the
-narrower version well and let beat 1's opening match what you answered.
-A clear answer to a slightly smaller question is a good short. A refusal is not a
-short at all, and a wider answer borrowed from elsewhere is a wrong one.
+If the SECTION genuinely supports a NARROWER version of the objective, teach the
+narrower version well and let beat 1's opening match what you taught.
+A clear explanation of a slightly smaller concept is a good short. A refusal is
+not a short at all, and a wider explanation borrowed from elsewhere is a wrong
+one.
 
 BE CORRECT, THEN BE SIMPLE
 - Say it the way you would to a friend who missed the class. Short sentences.
@@ -783,11 +891,14 @@ BE CORRECT, THEN BE SIMPLE
 - One idea per beat, and the beats in the order the section presents them.
 
 Output JSON — one opening beat, then 3-4 more beats continuing the same narrator's
-explanation. Only the beats AFTER the opening carry source_quote:
+explanation. Only the beats AFTER the opening carry source_quote and
+relates_to_step. `question` is INTERNAL: the learning objective this short is
+built to teach, kept for the rest of the pipeline — it is not read aloud, and
+beat 1's `line` does not need to restate it as a spoken question:
 {{"short_id":"...","question":"...","beats":[
-{{"speaker":"narrator","line":"the opening line","on_screen":"<=8 words","visual_ref":"snake_case"}},
+{{"speaker":"narrator","line":"the opening line — a hook, not necessarily a question","on_screen":"<=8 words","visual_ref":"snake_case"}},
 {{"speaker":"narrator","line":"spoken words","on_screen":"<=8 words","visual_ref":"snake_case",
-"source_quote":"copied verbatim from the section"}}]}}"""
+"source_quote":"copied verbatim from the section","relates_to_step":1}}]}}"""
 
 
 #: STEP 8 — one paragraph of concrete guidance per TeachingApproachKind, added
@@ -881,8 +992,8 @@ def write_script(topic: Topic, section: Section, feedback: str | None = None,
 
     It used to be the escape hatch for a thin section: given only its own section a
     model would sometimes refuse, and a refusal reaches the reviewer as a broken
-    card. The escape hatch is now the NARROWER QUESTION instead, which the brief
-    spells out — answer what the section supports and rewrite beat 1 to match. That
+    card. The escape hatch is now the NARROWER OBJECTIVE instead, which the brief
+    spells out — teach what the section supports and rewrite beat 1 to match. That
     keeps the short honest and still never refuses.
 
     `understanding` is skills/understanding.understand()'s reading of the SAME
@@ -911,10 +1022,12 @@ def write_script(topic: Topic, section: Section, feedback: str | None = None,
     the gated entry point that always supplies both from an approved
     QuestionWorkflow), they add ONE more guidance block to the SAME prompt and
     the SAME call — never a second LLM call to translate them into
-    instructions first. `topic.topic` is still what beat 1 is built from; the
-    caller that wants the TEACHING question asked (framing.teaching_question,
-    which may differ from the plain approved question) passes a `topic`
-    already carrying it — this function does not re-derive that choice.
+    instructions first. `topic.topic` is still the objective beat 1 is built
+    around; the caller that wants the TEACHING framing used (framing.teaching_
+    question, which may differ from the plain approved question) passes a
+    `topic` already carrying it — this function does not re-derive that
+    choice. Beat 1 is NOT required to restate `topic.topic` as a spoken
+    question — see THE HOOK in SYSTEM above.
     """
     user = f"""TOPIC: {topic.topic}
 WHY IT MATTERS: {topic.why_it_matters}
@@ -999,12 +1112,16 @@ matched against THE SECTION.
         user += f"""
 THE APPROVED TEACHING PLAN — a human approved both of these before this
 script was written. You are not re-deciding either one; follow them.
+
+TOPIC above is the LEARNING OBJECTIVE this short must teach — internal
+context, not a line to read aloud. Beat 1 does not need to restate it as a
+spoken question; see THE HOOK above for how beat 1 actually opens.
 """
         if framing.source_question and framing.source_question != topic.topic:
-            user += f"ORIGINALLY APPROVED QUESTION: {framing.source_question}\n"
+            user += f"ORIGINALLY APPROVED QUESTION (context only): {framing.source_question}\n"
         if framing.framing_rationale:
             user += f"WHY IT WAS FRAMED THIS WAY: {framing.framing_rationale}\n"
-        user += f"THIS QUESTION'S ROLE IN THE REEL: {framing.role}\n"
+        user += f"THIS OBJECTIVE'S ROLE IN THE REEL: {framing.role}\n"
 
         approach_line = approach.primary
         if approach.combined_with:
@@ -1074,8 +1191,8 @@ THE SECTION THIS SHORT IS FILED UNDER — start here [{section.section_id}] {sec
 
 Write the script. Every beat must be supported by a sentence from THE SECTION ABOVE,
 copied verbatim into its source_quote. If the section does not support the topic as
-stated, answer the narrower question it does support and make beat 1 ask that
-narrower question. Do not borrow from elsewhere in the document, do not refuse, and
+stated, teach the narrower objective it does support and open beat 1 on that
+narrower concept. Do not borrow from elsewhere in the document, do not refuse, and
 do not mention the material."""
 
     # A targeted edit ("just fix the question") is impossible if the model cannot
@@ -1142,22 +1259,24 @@ def write_script_for_workflow(workflow: QuestionWorkflow, section: Section,
     works exactly as it always has for every existing caller (run.py,
     server.py, rescript.py) — this function is additive, not a replacement.
     It is a THIN WRAPPER: it gates, builds ONE Topic carrying the TEACHING
-    question (see below), and calls write_script itself with `framing` and
+    objective (see below), and calls write_script itself with `framing` and
     `approach` supplied — the SAME single call, never a second one to
     translate them first.
 
-    THE TEACHING QUESTION DRIVES THE SCRIPT, NOT THE RAW APPROVED QUESTION.
+    THE TEACHING OBJECTIVE DRIVES THE SCRIPT, NOT THE RAW APPROVED QUESTION.
     workflow.approved_topic.topic is the human-approved question text, but
     framing.teaching_question is the human-approved decision about HOW that
-    question should actually be ASKED on screen — reframed for a clearer
+    concept should actually be TAUGHT on screen — reframed for a clearer
     teaching flow, or identical to the approved question when no reframe was
-    needed (framing.py's own contract). This function asks the TEACHING
-    question in beat 1 by building a Topic whose `.topic` is
-    framing.teaching_question, everything else (id, why_it_matters,
-    answer_quote, concept) carried over from approved_topic unchanged — and
-    the original approved question is still shown to the model, for context,
-    inside the teaching-plan block write_script builds when `framing` is
-    supplied. See write_script's own "THE APPROVED TEACHING PLAN".
+    needed (framing.py's own contract). This function hands write_script the
+    TEACHING framing as the objective for beat 1 to build around by building
+    a Topic whose `.topic` is framing.teaching_question, everything else (id,
+    why_it_matters, answer_quote, concept) carried over from approved_topic
+    unchanged — and the original approved question is still shown to the
+    model, for context, inside the teaching-plan block write_script builds
+    when `framing` is supplied. NEITHER VALUE HAS TO BE SPOKEN AS A LITERAL
+    QUESTION IN BEAT 1 — both are internal objective/context; see write_script's
+    own "THE APPROVED TEACHING PLAN" and SYSTEM's "THE HOOK".
 
     ONLY workflow.script IS WRITTEN. selection, question_approval, framing,
     teaching_approach, teaching_approach_approval and visual_strategy all pass
@@ -1187,3 +1306,97 @@ def write_script_for_workflow(workflow: QuestionWorkflow, section: Section,
                           document=document, understanding=understanding,
                           framing=framing, approach=approach, source_text=source_text)
     return workflow.model_copy(update={"script": script})
+
+
+def write_and_grade_script_for_workflow(
+        workflow: QuestionWorkflow, section: Section, *,
+        document: str | None = None,
+        understanding: SectionUnderstanding | None = None,
+        source_text: str | None = None,
+        current: Script | None = None,
+        initial_feedback: str = "",
+        retry_prefix: str = "",
+        max_attempts: int = 3,
+        ) -> tuple[QuestionWorkflow, list]:
+    """
+    STEP 5's ONE AUTHORITATIVE WORKFLOW SCRIPT PATH: write_script_for_workflow,
+    graded, with retries — the same three things every caller that wants a real
+    script for a workflow needs, done once instead of three times.
+
+    THE BUG THIS CLOSES. Before this function existed, there were three
+    separate places that could produce workflow.script:
+      - shorts/workflow.py's advance() called write_script_for_workflow ONCE,
+        no grader, no retry — Step 9's own docstring said so outright.
+      - server.py's /api/workflow/scripts ran its OWN 3-attempt loop calling
+        write_script_for_workflow then checks.run_script_graders by hand.
+      - server.py's /api/regenerate ran a SECOND, near-identical 3-attempt
+        loop, for the same reason, with a human's note carried as a prefix.
+    Two of those three were the same grading logic typed out twice, and the
+    third had none at all — a workflow could reach "awaiting_visual_plan_
+    approval" with a script that had never been checked against a single
+    grader, teaching-approach check, or TeachingStage check, depending only on
+    which endpoint a caller happened to hit. This function is the fix: ONE
+    place that writes AND grades, called by all three.
+
+    GATING IS write_script_for_workflow's OWN JOB, UNCHANGED. This function
+    does not re-check approved_topic/framing/approved_teaching_approach itself
+    — the first call to write_script_for_workflow below does, raising before
+    any LLM call the same way it always has, so a workflow that fails any gate
+    still spends nothing.
+
+    RETRIES USE THE EXISTING MECHANISM, NOT A NEW ONE: checks.run_script_graders
+    (which already includes check_script_matches_teaching_approach when an
+    approach is given, and check_teaching_sequence's stage-progression check
+    when `understanding` is given and `script` is passed to it — Steps 1 and 4)
+    plus revision.feedback_for, the SAME two calls /api/workflow/scripts and
+    /api/regenerate already made by hand. `initial_feedback` and `retry_prefix`
+    exist ONLY so /api/regenerate's human-note-as-prefix behaviour survives
+    unchanged through this shared path — see its own call site. Every other
+    caller (advance(), /api/workflow/scripts) leaves both "" and gets exactly
+    the plain retry loop /api/workflow/scripts always ran.
+
+    NO "BEST OF N" SELECTION, ON PURPOSE — matching both loops this replaces:
+    the LAST attempt is kept, passed or not, exactly as before. Introducing a
+    best-attempt-kept behaviour here would be a real behaviour change beyond
+    this step's scope.
+
+    DOES NOT CATCH EXCEPTIONS. A provider error or timeout propagates to the
+    caller, which already has its own way to report it (WorkflowProgress's
+    "script_failed" status in advance(); a per-card {"error": ...} dict in
+    server.py) — swallowing it here would blur those two different shapes
+    into one.
+
+    Returns (workflow_with_script_set, grader_results_for_the_kept_attempt).
+    """
+    feedback = initial_feedback
+    results: list = []
+    for _ in range(max_attempts):
+        workflow = write_script_for_workflow(
+            workflow, section, feedback=feedback or None, current=current,
+            document=document, understanding=understanding, source_text=source_text)
+        text = section.text if source_text is None else source_text
+        results = checks.run_script_graders(
+            workflow.script, text, doc_text=document, understanding=understanding,
+            topic=workflow.approved_topic, approach=workflow.approved_teaching_approach,
+            # STEP 8: THE "NEW WORKFLOW GENERATION" CONTEXT THE TASK ASKS FOR
+            # IS THIS FUNCTION ITSELF — the one authoritative path a script
+            # ever reaches workflow.script through (Step 5). A script graded
+            # here is by definition freshly generated by write_script_for_
+            # workflow's own prompt, which already instructs the model to set
+            # relates_to_step on every body beat — so unlike every other
+            # caller of run_script_graders (the eval harness, legacy bare-
+            # Topic endpoints, a caller re-grading an old saved script),
+            # "zero beats reference a step" here is never legacy data, it is
+            # the model not complying, and must fail like any other grader.
+            strict_stage_references=True,
+            # THE SELECTED QUESTION, FOR check_no_interview_structure's ONE
+            # NAME-THE-DEFECT REFINEMENT — see that check's own docstring.
+            # approved_topic.topic is effective_question already substituted
+            # in (schema.QuestionWorkflow.approved_topic), the same text this
+            # workflow was actually asked to teach, never a stale original.
+            selected_question=(workflow.approved_topic.topic
+                               if workflow.approved_topic else None))
+        if checks.all_passed(results):
+            break
+        feedback = revision.feedback_for(results, prefix=retry_prefix)
+    return workflow, results

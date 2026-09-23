@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { makeWorkflowScripts, regenerate, type MaterialResult, type UsageTotals } from "./api";
 import { Spinner } from "./Spinner";
 import { money, tokens } from "./CostPill";
@@ -41,6 +41,21 @@ export function StepReview({
     })),
   );
   const [drafting, setDrafting] = useState(true);
+  // TWO SEPARATE REFS, ON PURPOSE. `started` gates whether a fetch is ever
+  // sent — set once, NEVER reset, checked BEFORE the fetch — so StrictMode's
+  // double-mount in dev cannot send /api/workflow/scripts (a real
+  // script-writing LLM call) twice. `mounted` tracks whether THIS component
+  // instance is *currently* on screen, and is reset on EVERY effect
+  // invocation, not just the first — so it correctly reads `true` again by
+  // the time the one real fetch resolves, even though StrictMode's
+  // synchronous mount -> cleanup -> remount cycle runs (and its cleanup
+  // fires) before that fetch's promise settles. A single `alive` local
+  // variable captured only by the FIRST invocation's closure could not
+  // recover from that cleanup — it stayed `false` forever, so the only
+  // fetch that ever ran had its successful result silently discarded and
+  // the "drafting…" spinner never cleared.
+  const started = useRef(false);
+  const mounted = useRef(false);
 
   const patch = (i: number, next: Partial<ReviewItem>) =>
     setItems((prev) => prev.map((it, k) => (k === i ? { ...it, ...next } : it)));
@@ -50,31 +65,34 @@ export function StepReview({
   // "draft it", and the total wait was the sum of every call instead of the
   // slowest one.
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const r = await makeWorkflowScripts(material.doc_id, workflows);
-        if (!alive) return;
-        onSpend(r.usage, r.total);
-        setItems((prev) => prev.map((it) => {
-          const hit = r.results.find((x) => x.topic.id === it.topic.id);
-          if (!hit) return { ...it, state: "error", error: "no result returned" };
-          if (hit.error || !hit.qa) return { ...it, state: "error", error: hit.error ?? "no script" };
-          // hit.topic is the workflow's approved_topic (regenerated wording
-          // already substituted, if any) — the same effective text the
-          // script was actually drafted from, not the original suggestion.
-          return { ...it, topic: hit.topic, qa: hit.qa, graders: hit.graders ?? [],
-                   judge: hit.judge ?? null,
-                   state: "ready", workflow: hit.workflow ?? it.workflow };
-        }));
-      } catch (e) {
-        if (!alive) return;
-        setItems((prev) => prev.map((it) => ({ ...it, state: "error", error: (e as Error).message })));
-      } finally {
-        if (alive) setDrafting(false);
-      }
-    })();
-    return () => { alive = false; };
+    mounted.current = true;
+    if (!started.current) {
+      started.current = true;
+      (async () => {
+        try {
+          const r = await makeWorkflowScripts(material.doc_id, workflows);
+          if (!mounted.current) return;
+          onSpend(r.usage, r.total);
+          setItems((prev) => prev.map((it) => {
+            const hit = r.results.find((x) => x.topic.id === it.topic.id);
+            if (!hit) return { ...it, state: "error", error: "no result returned" };
+            if (hit.error || !hit.qa) return { ...it, state: "error", error: hit.error ?? "no script" };
+            // hit.topic is the workflow's approved_topic (regenerated wording
+            // already substituted, if any) — the same effective text the
+            // script was actually drafted from, not the original suggestion.
+            return { ...it, topic: hit.topic, qa: hit.qa, graders: hit.graders ?? [],
+                     judge: hit.judge ?? null,
+                     state: "ready", workflow: hit.workflow ?? it.workflow };
+          }));
+        } catch (e) {
+          if (!mounted.current) return;
+          setItems((prev) => prev.map((it) => ({ ...it, state: "error", error: (e as Error).message })));
+        } finally {
+          if (mounted.current) setDrafting(false);
+        }
+      })();
+    }
+    return () => { mounted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

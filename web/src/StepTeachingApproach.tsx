@@ -45,6 +45,21 @@ export function StepTeachingApproach({
   const [reasons, setReasons] = useState<Record<number, string>>({});
   const [showReason, setShowReason] = useState<number | null>(null);
   const [deciding, setDeciding] = useState(true);
+  // TWO SEPARATE REFS, ON PURPOSE — see StepReview.tsx's identical pair for
+  // the full reasoning. `started` gates whether a fetch is ever sent (set
+  // once, NEVER reset — this is what stops StrictMode's double-mount from
+  // sending a second real framing + teaching-approach LLM call). `mounted`
+  // tracks whether THIS component instance is *currently* on screen, and is
+  // reset on every effect run, not just the first — so StrictMode's
+  // synchronous mount -> cleanup -> remount cycle (which happens before the
+  // fetch's promise can resolve) leaves `mounted.current` back at `true` by
+  // the time the ONE real fetch actually finishes. A single `alive` local
+  // variable captured by the first invocation's own closure could not do
+  // this: StrictMode's cleanup set it `false` and nothing ever set it back
+  // to `true`, so the only fetch that ever ran had its successful result
+  // silently discarded and the "Deciding…" spinner never cleared.
+  const started = useRef(false);
+  const mounted = useRef(false);
 
   const patch = (i: number, wf: QuestionWorkflow) =>
     setItems((prev) => prev.map((it, k) => (k === i ? wf : it)));
@@ -62,33 +77,36 @@ export function StepTeachingApproach({
   // approach exists but has not been approved; it can never skip past this
   // screen on its own.
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const r = await advanceWorkflows(material.doc_id, workflows);
-        if (!alive) return;
-        onSpend(r.usage, r.total);
-        setItems((prev) => prev.map((it, i) => {
-          const hit = r.results.find(
-            (x) => x.workflow.selection.topic.id === it.selection.topic.id);
-          if (!hit) return it;
-          if (hit.status === "teaching_approach_failed" || hit.status === "framing_failed") {
-            patchError(i, hit.detail);
-          }
-          return hit.workflow;
-        }));
-      } catch (e) {
-        if (!alive) return;
-        const msg = (e as Error).message;
-        setItems((prev) => {
-          prev.forEach((_, i) => patchError(i, msg));
-          return prev;
-        });
-      } finally {
-        if (alive) setDeciding(false);
-      }
-    })();
-    return () => { alive = false; };
+    mounted.current = true;
+    if (!started.current) {
+      started.current = true;
+      (async () => {
+        try {
+          const r = await advanceWorkflows(material.doc_id, workflows);
+          if (!mounted.current) return;
+          onSpend(r.usage, r.total);
+          setItems((prev) => prev.map((it, i) => {
+            const hit = r.results.find(
+              (x) => x.workflow.selection.topic.id === it.selection.topic.id);
+            if (!hit) return it;
+            if (hit.status === "teaching_approach_failed" || hit.status === "framing_failed") {
+              patchError(i, hit.detail);
+            }
+            return hit.workflow;
+          }));
+        } catch (e) {
+          if (!mounted.current) return;
+          const msg = (e as Error).message;
+          setItems((prev) => {
+            prev.forEach((_, i) => patchError(i, msg));
+            return prev;
+          });
+        } finally {
+          if (mounted.current) setDeciding(false);
+        }
+      })();
+    }
+    return () => { mounted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

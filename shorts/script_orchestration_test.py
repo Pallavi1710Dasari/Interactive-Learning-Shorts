@@ -219,27 +219,35 @@ def test_advance_many_generates_scripts_only_for_eligible_workflows():
 # -------------------------------------------------------------------------- 10
 def test_understanding_reused_for_script_generation():
     # PATCH THE NAME AS shorts.workflow ITSELF SEES IT, not
-    # skills.script.write_script_for_workflow — workflow.py did
-    # `from .skills.script import write_script_for_workflow`, which binds a
-    # SEPARATE reference into workflow's own namespace at import time;
+    # skills.script.write_and_grade_script_for_workflow — workflow.py does
+    # `from .skills.script import write_and_grade_script_for_workflow`, which
+    # binds a SEPARATE reference into workflow's own namespace at import time;
     # patching the original module's attribute would not touch that binding.
+    #
+    # STEP 5 CHANGED WHAT advance() CALLS, NOT THE THING BEING TESTED HERE.
+    # advance() used to call skills.script.write_script_for_workflow directly;
+    # it now calls write_and_grade_script_for_workflow (Step 5's authoritative,
+    # graded path), which itself calls write_script_for_workflow internally.
+    # Spying one level up still proves the same requirement — the SAME
+    # understanding object reaches script generation — through whichever
+    # function advance() actually calls today.
     captured = {}
-    real_write_script_for_workflow = workflow.write_script_for_workflow
+    real_write_and_grade = workflow.write_and_grade_script_for_workflow
 
     def spy(wf, section, **kw):
         captured["understanding"] = kw.get("understanding")
-        return real_write_script_for_workflow(wf, section, **kw)
+        return real_write_and_grade(wf, section, **kw)
 
     old_stub = config.STUB
     config.STUB = True
-    workflow.write_script_for_workflow = spy
+    workflow.write_and_grade_script_for_workflow = spy
     try:
         wf = _approved_teaching_approach_workflow()
         u = SectionUnderstanding(section_id="3.1",
                                  core_idea="paging removes external fragmentation")
         workflow.advance(wf, [_section()], understanding=u)
     finally:
-        workflow.write_script_for_workflow = real_write_script_for_workflow
+        workflow.write_and_grade_script_for_workflow = real_write_and_grade
         config.STUB = old_stub
 
     assert captured["understanding"] is u

@@ -221,6 +221,23 @@ VISION_MIN_CLARITY = _i("VISION_MIN_CLARITY", 7)
 #: the text is just the narration").
 VISION_MAX_TEXT_DEPENDENCY = _i("VISION_MAX_TEXT_DEPENDENCY", 5)
 
+#: Redesign a frame whose animation_relevance is under this, out of 10.
+#:
+#: THE AXIS THAT WAS SCORED AND NEVER GATED. judge_frames has always asked for
+#: this — the rubric's own bands are 9-10 "the motion IS the concept", 5-6 "a
+#: sensible build order that does not itself explain anything", 0-3 "parts
+#: appearing in an arbitrary order, or motion on a frame whose concept has
+#: nothing moving in it" — but VisualScore.failures() never read it, so a
+#: frame scoring 0-3 here shipped exactly like a 9. The bar sits at 4, not 7
+#: like VISION_MIN_CLARITY: the 5-6 band is an honest, legitimate score for a
+#: concept the rubric itself says "does not need motion and is not penalised
+#: for arriving quietly" (a `structure` beat, say), and gating there would
+#: send every correctly-static frame back for a redesign it does not need.
+#: 0-3 is reserved for the rubric's own bad cases — arbitrary motion, or a
+#: process/data_movement/cause_effect beat that needed motion and got none —
+#: which is what this threshold is for.
+VISION_MIN_ANIMATION_RELEVANCE = _i("VISION_MIN_ANIMATION_RELEVANCE", 4)
+
 #: Tier words that mark a light/fast model. Matched as WHOLE SEGMENTS of the model
 #: id, not as substrings — "gemini" contains "mini", so a plain `in` test called
 #: google/gemini-2.5-pro a light tier and printed a warning telling the user their

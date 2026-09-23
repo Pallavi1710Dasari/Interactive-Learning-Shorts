@@ -30,6 +30,7 @@ from ..schema import (QuestionWorkflow, QuestionFraming, QuestionRole, Section,
                       SectionUnderstanding)
 from ..llm import ask_json
 from ..parse import find_section
+from .. import checks
 
 
 FRAMING_SYSTEM = """You decide how an ALREADY-APPROVED interview question should
@@ -225,6 +226,32 @@ def frame_workflow(workflow: QuestionWorkflow, sections: list[Section],
             f"cannot frame {workflow.selection.topic.id}: question_approval.status="
             f"{workflow.question_approval.status!r}, not 'approved'")
 
+    # SAME NON-BLOCKING REASONING AS BELOW. This is the check that catches a
+    # QuestionSelection read back after its document was re-parsed with
+    # renumbered or retitled headings — see the grader's own docstring. This
+    # is the first workflow-aware entry point every request reaches with both
+    # a fresh `sections` parse and the workflow's original `selection` in
+    # hand, so it is where drift would first become visible.
+    title_check = checks.check_question_selection_source_title(workflow.selection, sections)
+    if not title_check.passed:
+        print(f"    ! {workflow.selection.topic.id}: {title_check.name}: {title_check.reason}")
+
     section = find_section(sections, workflow.selection.topic.source_section_id)
     framing = frame_question(workflow, section, understanding=understanding)
-    return workflow.model_copy(update={"framing": framing})
+    updated = workflow.model_copy(update={"framing": framing})
+
+    # NON-BLOCKING, ON PURPOSE — same reasoning as
+    # skills.teaching_approach.choose_teaching_approach_for_workflow's own
+    # note: both graders were written and unit-tested but never actually
+    # called from here, so a reframe that drifted off the approved concept,
+    # or a source_question that stopped matching effective_question, was
+    # never caught in a real run. Printed, not gated: a human still reviews
+    # the framed question before anything downstream reads it.
+    concept_check = checks.check_framing_stays_on_concept(framing, workflow.approved_topic)
+    if not concept_check.passed:
+        print(f"    ! {workflow.selection.topic.id}: {concept_check.name}: {concept_check.reason}")
+    source_check = checks.check_framing_source_matches_effective_question(updated)
+    if not source_check.passed:
+        print(f"    ! {workflow.selection.topic.id}: {source_check.name}: {source_check.reason}")
+
+    return updated

@@ -269,7 +269,8 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
         # The SAME understanding that wrote the script grades it. Both sides of the
         # loop read one object, so a retry is judged against the plan it was shown.
         results = checks.run_script_graders(script, source_text, doc_text=document,
-                                            understanding=understanding, topic=topic)
+                                            understanding=understanding, topic=topic,
+                                            selected_question=topic.topic)
         for r in results:
             print(f"    {r}")
 

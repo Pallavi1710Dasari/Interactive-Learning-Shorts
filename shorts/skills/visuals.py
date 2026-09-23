@@ -279,30 +279,39 @@ shorts get most ("showing same visuals again and again which feel bore"). A
 composition that builds does not revisit. If a later beat genuinely needs an earlier
 picture back, give it that beat's visual_ref and hold the picture honestly.
 
-TITLE BEAT 1 WITH THE QUESTION, AND DRAW THE SUBJECT UNDER IT.
+TITLE BEAT 1 WITH WHAT IT ACTUALLY OPENS ON, AND DRAW THE SUBJECT UNDER IT.
 
-Beat 1 is the narrator OPENING on the question, and the frame has to look like the
-thing being asked or the reel opens on a mismatch: the voice poses a question while the picture
-presents a finished topic, and a viewer arriving on it cannot tell a question from a
-conclusion. So the frame's `title` is the question, phrased AS a question and short
-enough to read at a glance — "What is a Function?", "Which runs first?", "Why does
-dot fail here?" — not the subject as a noun phrase. "CSS color property" is the
-wrong title for beat 1; "What does color do?" is the right one.
+Beat 1 is a continuous single narrator's HOOK, not a question posed to the viewer —
+see the script step's own THE OPENING, which chooses one of four shapes (question,
+problem, surprise, direct) and only the first of those is ever a literal question.
+NEVER TITLE THE OPENING FRAME AS A REPEATED OR IMPLIED QUESTION UNLESS BEAT 1 ITSELF
+IS ONE. "What is prop drilling?" over a frame is a quiz card, not a teaching short's
+opening — it presents the internally-selected concept as a prompt being asked OF the
+viewer, which is exactly the interview framing a continuous explanation has to avoid,
+even when beat 1's own words never use a question at all. The title has to match
+what the narrator is actually saying at that moment:
+  * Beat 1 IS phrased as a question (rare — see THE OPENING's "question" shape) ->
+    the title may be that same short question, phrased AS a question.
+  * Beat 1 is a statement, an observation, a problem, or a plain introduction (the
+    normal case) -> the title is a short LABEL for the subject the hook introduces —
+    a noun phrase, not a question mark bolted onto it. "Passing data nobody needs",
+    not "What is prop drilling?". "A stack only opens at one end", not "What is a
+    stack?".
+Either way, short enough to read at a glance, and never longer than beat 1's own hook.
 
-The BODY of the frame is unchanged, and this is the half that keeps it from being a
-title slide: it still draws THE SUBJECT as an object — the two things about to be
-related, the device, the file, the structure. Interrogative title, real drawing
-underneath. A frame whose whole content is the question set large is the placeholder
-this has always rejected, and it is still rejected; the question belongs in the
-title, over a picture, never instead of one.
+The BODY of the frame is unchanged regardless of which title shape applies: it still
+draws THE SUBJECT as an object — the two things about to be related, the device, the
+file, the structure. A frame whose whole content is a title card set large is the
+placeholder this has always rejected, and it is still rejected; the title belongs
+over a picture, never instead of one.
 
 If the honest answer is "the subject is an abstract idea", draw what it acts on or
-sits between, and title that with the question.
+sits between, and title that plainly.
 
-AND DO NOT OPEN ON THE ANSWER'S CODE. Beat 1 is the opening question, and its
-frame should show the SUBJECT — the thing being asked about, drawn — not the listing
-that answers it. A short that starts on the same code panel it ends on has shown the
-viewer the answer before the question finished, and then has nothing left to reveal.
+AND DO NOT OPEN ON THE ANSWER'S CODE. Beat 1 is the opening hook, and its frame
+should show the SUBJECT — the thing being introduced, drawn — not the listing that
+answers it. A short that starts on the same code panel it ends on has shown the
+viewer the answer before the explanation began, and then has nothing left to reveal.
 Lead with an "icons" or "preview" frame and let the code arrive when it is earned.
 
 CHANGING TEMPLATE BETWEEN BEATS IS ENCOURAGED, not a failure of continuity. The
@@ -337,6 +346,29 @@ pointed at. Never a clause, never a claim, never a line of the dialogue.
 
 If your cells, steps or rows could be read aloud as the answer, you have drawn the
 transcript. Throw it away and draw the SUBJECT instead.
+
+THE SIMPLEST FRAME THAT SHOWS THE ONE IDEA WINS, ALWAYS. A beat teaches ONE thing
+(see the strategist's own `focus` — exactly one object carries the accent), so its
+frame needs exactly enough to show that one thing changing or relating, and nothing
+past it:
+  * Prefer the plainest template that can carry `physical_form`/`relationship` over
+    a more elaborate one — a "flow" of boxes over a "compare" of titled panels, a
+    "state" over a "compare", whenever either would show the same idea. Reach for
+    panels, titled groups, or a second column only when the beat is GENUINELY a
+    two-way contrast and a simpler shape would hide it.
+  * A frame's job is never bigger than the beat's own 12-24 words. If you are
+    naming four labelled groups, three colours of role, and a title to explain a
+    beat that says one sentence, you have built a slide, not a diagram — cut back
+    to what that one sentence needs shown.
+  * Two-beat pairs — beat 3 says "X and Y don't need it", beat 4 says "only Z does"
+    — do not need two DIFFERENT panel layouts with different framing to make that
+    same point twice. If a simpler, single composition (e.g. one flow with roles
+    changing beat to beat, not a fresh set of titled panels each time) can carry
+    both beats, use it — see BUILD, DO NOT REPEAT, the strategist's own rule that
+    the scene develops rather than resets.
+  * The source material having more detail than this is NOT a reason to draw more
+    than the beat says. A richer document earns a richer NARRATION (more beats),
+    never a busier frame for the same one sentence.
 
 There is NO caption band and NO note field. Do not ask for one.
 
@@ -1334,7 +1366,7 @@ MAX_DESIGN_ATTEMPTS = config.DESIGN_ATTEMPTS
 #: fails on a line of the material's own code being too long to fit, which a
 #: redesign cannot shorten without inventing code, and check_diagram_matches_narration
 #: is a vocabulary heuristic that a correct frame can trip.
-def _design_graders(section: Section | None = None):
+def _design_graders(section: Section | None = None, understanding=None):
     """Imported late: checks imports schema, and schema is what defines a Frame.
 
     check_code_frames_quote_source IS IN THIS LIST, and leaving it out was a real
@@ -1396,6 +1428,13 @@ def _design_graders(section: Section | None = None):
                checks.check_state_pointer_moves_are_shown,
                checks.check_flow_traversal_progresses,
                checks.check_one_hero_per_frame,
+               # STEP 8: wired into the retry gate for the same reason
+               # one_hero_per_frame is right above it — fully implemented,
+               # reuses the same _frame_role_collections helper, but never
+               # actually registered anywhere before this. Gates here so a
+               # short that trails off on a neutral final frame gets a
+               # redesign attempt instead of shipping as-is.
+               checks.check_ends_on_answer,
                # Catches the failure that motivated it directly: a frame whose
                # template names a structured field (Store, Graph) that was left
                # empty renders as a blank container, and every prior grader here
@@ -1412,9 +1451,27 @@ def _design_graders(section: Section | None = None):
                # but the reel's overall reliance on the box family. A redesign
                # can act on this by giving the beats named in the verdict a
                # different shape, exactly like the code-overuse case above.
-               checks.check_generic_boxes_not_overused]
+               checks.check_generic_boxes_not_overused,
+               # WRITTEN AND UNIT-TESTED, NEVER ACTUALLY CALLED FROM HERE
+               # BEFORE THIS. Catches a short the strategist itself called a
+               # process, a data movement or a cause and effect held on a
+               # static template for its entire length — see the grader's own
+               # docstring for two confirmed, shipped instances of exactly
+               # this. Actionable by a redesign the same way every check
+               # above it is: reach for `state`/`flow`/`cause_effect`/`analogy`
+               # instead of the static shelf.
+               checks.check_motion_concept_not_static]
     if section is not None:
         graders.append(lambda u: checks.check_code_frames_quote_source(u, section.text))
+    if understanding is not None:
+        # NEEDS understanding TO RESOLVE A BEAT'S STAGE AT ALL — Beat carries
+        # only relates_to_step (an index), never the stage itself; see
+        # schema.TeachingStage's own docstring on why. Omitted, this check
+        # simply is not in the list, the same as check_code_frames_quote_source
+        # above when there is no section — never a hole silently unfilled,
+        # because check_mechanism_stage_shows_change's own "no teaching
+        # sequence" branch would report the same "skipped" either way.
+        graders.append(lambda u: checks.check_mechanism_stage_shows_change(u, understanding))
     return graders
 
 
@@ -1428,12 +1485,23 @@ def design_visuals(script: Script, section: Section | None = None, *,
                    understanding: SectionUnderstanding | None = None,
                    strategy: VisualStrategy | None = None,
                    approach: TeachingApproach | None = None,
+                   strategy_out: dict | None = None,
                    ) -> tuple[dict[str, Visual], list[str]]:
     """
     Design the frames, grade them, and ask again for the ones that failed.
 
     Returns (visuals, remaining problems). The problems list is empty on success and
     is what the caller should warn about when every attempt has been spent.
+
+    `strategy_out`, WHEN PASSED, IS FILLED WITH THE STRATEGY THAT ACTUALLY
+    PRODUCED THE KEPT ATTEMPT — the caller's `strategy` argument on an
+    ordinary build, or the re-planned one below on the (rare) build where the
+    vision judge rejected the plan itself, not just its drawing. Optional and
+    additive, same contract as `scores_out` right above it: a caller that
+    omits it (every caller before Step 8) gets byte-identical behaviour.
+    Step 8's own server.py caller uses this to tell a legitimate re-plan
+    (still teaching the human-approved composition) from one that drifted
+    onto a different one — see VisualStrategy.compatible_with.
 
     WHY THIS EXISTS. Every defect it catches was already detectable, by graders that
     already lived in checks.py and already printed the right sentence — and every
@@ -1482,6 +1550,7 @@ def design_visuals(script: Script, section: Section | None = None, *,
     one this function would otherwise plan silently.
     """
     from ..schema import ShortUnit
+    from .. import checks
 
     # Every ref the beats actually name. A returned design MUST cover all of them or
     # ShortUnit will not validate — see the ref-drift note below.
@@ -1521,6 +1590,24 @@ def design_visuals(script: Script, section: Section | None = None, *,
             print(f"    strategy for {script.short_id} unavailable "
                   f"({type(e).__name__}: {str(e)[:90]}) — designing from the beats alone")
 
+    # STRATEGY-LEVEL PROBLEMS, COMPUTED ONCE — same reasoning as the strategy
+    # itself: these ask whether the PLAN is usable, not whether any one
+    # drawing of it is, so there is nothing to gain by recomputing them per
+    # attempt. Both graders were written and unit-tested but never actually
+    # called from a real run before this: a strategy entry with a blank
+    # must_see/focus (nothing decided for that beat) or one that quietly
+    # defaults to a code-centred visual despite a non-code approved approach
+    # passed every existing check silently.
+    strategy_problems: list[str] = []
+    if strategy is not None:
+        coverage = checks.check_visual_strategy_covers_every_beat(strategy, refs)
+        if not coverage.passed:
+            strategy_problems.append(f"{coverage.name}: {coverage.reason}")
+        if approach is not None:
+            approach_match = checks.check_visual_strategy_matches_teaching_approach(strategy, approach)
+            if not approach_match.passed:
+                strategy_problems.append(f"{approach_match.name}: {approach_match.reason}")
+
     best: dict[str, Visual] | None = None
     best_problems: list[str] | None = None
     # A HUMAN'S NOTE SEEDS THE FEEDBACK CHANNEL the graders already use, rather than
@@ -1535,7 +1622,29 @@ def design_visuals(script: Script, section: Section | None = None, *,
         if note and note.strip() else None
     )
 
-    for attempt in range(1, max(1, attempts) + 1):
+    # total_attempts, NOT `attempts` DIRECTLY, DECIDES WHEN THE LOOP STOPS.
+    #
+    # THE BUG THIS CLOSES. The re-plan branch below requires attempt >= 2 (give
+    # the plan one redraw first — see its own comment) AND a later attempt to
+    # spend a new plan on (attempt < total_attempts at the time it fires). Both
+    # conditions are individually right and were jointly impossible at
+    # DESIGN_ATTEMPTS's own default of 2: attempt >= 2 is only true on the
+    # LAST configured attempt, which by definition has no later attempt left —
+    # so the branch was dead code at the shipped default, and a plan that was
+    # actually wrong (not just badly drawn) never got reconsidered no matter
+    # how many real builds hit it.
+    #
+    # THE FIX EXTENDS THE BUDGET BY EXACTLY ONE ATTEMPT, ONCE, AND ONLY WHEN A
+    # REPLAN ACTUALLY HAPPENS — see `extended` below. An ordinary build that
+    # never trips the re-plan condition costs exactly what it always has;
+    # `total_attempts` only ever grows past `attempts` on a build where the
+    # judge specifically said the PLAN, not the drawing, was wrong, which is
+    # the one case worth spending an extra call on.
+    total_attempts = max(1, attempts)
+    extended = False
+    attempt = 0
+    while attempt < total_attempts:
+        attempt += 1
         # ONE BAD ATTEMPT MUST NOT LOSE THE GOOD ONES.
         #
         # It did, and this is the bug that cost a whole redesign sweep. On a retry
@@ -1571,7 +1680,13 @@ def design_visuals(script: Script, section: Section | None = None, *,
                               estimated_seconds=script.estimated_seconds,
                               beats=script.beats, visuals=visuals)
             problems = [f"{r.name}: {r.reason}"
-                        for r in (g(probe) for g in _design_graders(section)) if not r.passed]
+                        for r in (g(probe) for g in _design_graders(section, understanding)) if not r.passed]
+            # STRATEGY-LEVEL PROBLEMS, THE SAME EVERY ATTEMPT — computed once,
+            # above, before the loop. Folded in here so a redesign attempt
+            # that fixes every per-frame defect still is not treated as
+            # clean while the strategy itself is incomplete or off the
+            # approved approach.
+            problems += strategy_problems
 
             # THE VISION GATE, and it only opens once the free checks are clean.
             #
@@ -1597,7 +1712,7 @@ def design_visuals(script: Script, section: Section | None = None, *,
                 vision_problems = problems_for_redesign(scored, composition)
                 problems += vision_problems
         except Exception as e:
-            print(f"    attempt {attempt}/{attempts} for {script.short_id} unusable: "
+            print(f"    attempt {attempt}/{total_attempts} for {script.short_id} unusable: "
                   f"{type(e).__name__}: {str(e)[:120]}")
             feedback = ((feedback or "") +
                         f"\n  - your previous answer was unusable ({type(e).__name__}). "
@@ -1613,11 +1728,13 @@ def design_visuals(script: Script, section: Section | None = None, *,
                 scores_out.clear()
                 scores_out.update({ref: sc.model_dump()
                                    for ref, sc in (attempt_scores or {}).items()})
+            if strategy_out is not None:
+                strategy_out["strategy"] = strategy
         if not problems:
             return visuals, []
 
-        if attempt < attempts:
-            print(f"    redesign {attempt}/{attempts} for {script.short_id}: "
+        if attempt < total_attempts:
+            print(f"    redesign {attempt}/{total_attempts} for {script.short_id}: "
                   + "; ".join(p[:110] for p in problems[:2]))
 
         # REDRAWING A SCENE THAT WAS NEVER GOING TO TEACH IS WHAT THE OLD LOOP DID.
@@ -1632,7 +1749,15 @@ def design_visuals(script: Script, section: Section | None = None, *,
         # judge's own words. Deliberately not on the FIRST failure: the commonest
         # rejection is a good scene drawn in the wrong template, and that is fixed
         # by redesigning against the plan that is already right.
-        if vision_problems and attempt >= 2 and strategy is not None and attempt < attempts:
+        #
+        # NO LONGER GATED ON "attempt < total_attempts" HERE. That used to make
+        # this branch dead at DESIGN_ATTEMPTS's own default (2): attempt >= 2 is
+        # only ever true on the last configured attempt, which by definition had
+        # no later attempt to spend a new plan on. The budget is extended
+        # instead, below, exactly once, only when a replan actually happens —
+        # so this still never fires on ordinary passing builds and never runs
+        # away on a build that keeps failing.
+        if vision_problems and attempt >= 2 and strategy is not None:
             weak = [sc for sc in (v.score for v in visuals.values()) if sc is not None
                     and sc.concept_communication < config.VISION_MIN_CLARITY]
             if weak:
@@ -1642,6 +1767,11 @@ def design_visuals(script: Script, section: Section | None = None, *,
                                              understanding=understanding, approach=approach)
                     print(f"    re-planned the strategy for {script.short_id}: the judge "
                           f"rejected what {len(weak)} frame(s) SHOW, not how they look")
+                    if attempt >= total_attempts and not extended:
+                        total_attempts += 1
+                        extended = True
+                        print(f"    extending this design to {total_attempts} attempt(s) "
+                              f"so the re-planned strategy is actually drawn, not discarded")
                 except Exception as e:
                     print(f"    strategy re-plan failed ({type(e).__name__}) — "
                           f"keeping the original plan")

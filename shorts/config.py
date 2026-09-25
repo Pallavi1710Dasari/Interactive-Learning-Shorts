@@ -506,6 +506,16 @@ VOICE_SPEAKER_BOOST = os.getenv("VOICE_SPEAKER_BOOST", "1").strip() not in ("0",
 # change, so this doubles as the viewer's beat to look at the new picture.
 VOICE_BEAT_GAP = _f("VOICE_BEAT_GAP", 0.45)
 
+# STEP 5 (continuous narration). Silence before a beat whose own
+# Beat.continues_previous is True — the same spoken thought as the beat
+# before it, kept as a separate beat only because it needs its own visual.
+# Short enough not to read as a second answer starting, long enough that the
+# concat join at tts._join's beat boundary does not run two words together —
+# roughly a comma's worth of pause, not a full stop's. Still nonzero: a hard
+# 0 risks an audible click at the join on some providers' trailing samples,
+# and this is silence either way, never speech.
+VOICE_CONTINUATION_GAP = _f("VOICE_CONTINUATION_GAP", 0.12)
+
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 

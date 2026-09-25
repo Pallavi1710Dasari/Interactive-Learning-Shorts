@@ -348,7 +348,7 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
     # (source_quotes, answers_its_section, ...) on the attempt that survived, and
     # re-checking it against a NARROWER text than it was actually written and
     # graded against would fail a script here that the loop just accepted.
-    grader_results, report = audit(script, source_text, unit)
+    grader_results, report = audit(script, source_text, unit, understanding=understanding)
     for r in grader_results:
         print(f"    {r}")
     if report:

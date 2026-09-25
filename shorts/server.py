@@ -52,7 +52,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .schema import (Script, Topic, Section, ShortUnit, QuestionApproval,
-                     QuestionWorkflow, TeachingApproachKind)
+                     QuestionWorkflow, TeachingApproach, TeachingApproachKind)
 from .parse import parse_markdown, find_section, evidence_text
 from .skills.select import select_topics_with_selections
 from .skills.script import write_script, write_and_grade_script_for_workflow
@@ -1085,7 +1085,8 @@ class FinalizeIn(BaseModel):
 
 
 def _rejudge_after_fix(unit: ShortUnit, script: Script, topic: Topic,
-                       section: Section, body: "FinalizeIn") -> ShortUnit | None:
+                       section: Section, body: "FinalizeIn",
+                       approach: TeachingApproach | None = None) -> ShortUnit | None:
     """
     One repair attempt on a short the judge failed, then quarantine. Returns the
     unit to keep, or None to keep the caller's.
@@ -1136,8 +1137,12 @@ def _rejudge_after_fix(unit: ShortUnit, script: Script, topic: Topic,
                              feedback=feedback, current=script,
                              understanding=repair_understanding)
         # The code graders come first and are free. A rewrite that breaks a hard
-        # rule is not worth a judge call.
-        if not checks.all_passed(checks.run_script_graders(fixed, section.text)):
+        # rule is not worth a judge call. understanding=repair_understanding and
+        # approach=approach for the same reason as the main gate above — without
+        # them the repaired hook and the approved teaching approach would not be
+        # re-checked either.
+        if not checks.all_passed(checks.run_script_graders(
+                fixed, section.text, understanding=repair_understanding, approach=approach)):
             print(f"    ! repair of {unit.short_id} failed the code graders — keeping the original")
         else:
             visuals, _ = design_visuals(fixed, section, draw=body.do_svg,
@@ -1358,8 +1363,35 @@ def finalize(body: FinalizeIn):
             # The voice still records in parallel, so most of the latency is still
             # absorbed; only the judge waits, and only for the one visual call.
             judging = None
+            # STEP 11: judge_requested TRACKS "a verdict was asked for", separate
+            # from unit.eval ITSELF — the only way to tell "the caller asked for
+            # a verdict and did not get one" from "the caller never asked" once
+            # the try/except below has run and unit.eval is still None either
+            # way. Without this distinction those two cases were indistinguishable
+            # AFTER THE FACT, and the code below treated both as "no verdict to
+            # judge, ship the human's approval as-is" — which is right for the
+            # second and a silent NO VERDICT -> APPROVED bug for the first.
+            judge_requested = body.do_judge
+            judge_error: str | None = None
+            # understanding=understanding: without it this gate skips
+            # check_opening_follows_hook/check_hook_plan (both gated on
+            # `understanding is not None` — see run_script_graders's own
+            # docstring), so a hook that generalises past what the section
+            # supports would sail through the one grader check that runs at
+            # the actual finalize gate, even though the earlier /api/script
+            # drafting call already had it in hand.
+            #
+            # approach=approach: THE SAME GAP, ONE STEP OVER. approach is
+            # already in scope (wf.approved_teaching_approach, above) and
+            # already threaded into design_visuals for the PICTURES; without
+            # it here, check_script_matches_teaching_approach (gated on
+            # `approach is not None`) never runs at this gate either, so an
+            # approved-but-ignored teaching approach was checkable only
+            # during /api/script drafting, never at the point that actually
+            # decides whether the short ships.
             if body.do_judge and checks.all_passed(
-                    checks.run_script_graders(script, section.text)):
+                    checks.run_script_graders(script, section.text,
+                                              understanding=understanding, approach=approach)):
                 judging = _JUDGE_POOL.submit(judge_script, script, section.text, unit)
 
             if judging is not None:
@@ -1367,8 +1399,11 @@ def finalize(body: FinalizeIn):
                     unit.eval = judging.result()
                 except Exception as e:
                     # A short without a score is still a short. Losing the reel
-                    # because the grader had a bad minute is the wrong trade.
-                    print(f"    ! judge {script.short_id}: {type(e).__name__}: {e}")
+                    # because the grader had a bad minute is the wrong trade —
+                    # but see judge_requested/judge_error below: it must not ship
+                    # "approved" as though the missing verdict were a pass.
+                    judge_error = f"{type(e).__name__}: {e}"
+                    print(f"    ! judge {script.short_id}: {judge_error}")
 
             # THE JUDGE NOW DECIDES SOMETHING, which it did not before.
             #
@@ -1390,13 +1425,45 @@ def finalize(body: FinalizeIn):
             # already knows how to act on it.
             if unit.eval is not None and not unit.eval.passed:
                 if config.REPAIR_FAILED_SHORTS:
-                    unit = _rejudge_after_fix(unit, script, topic, section, body) or unit
+                    unit = _rejudge_after_fix(unit, script, topic, section, body,
+                                              approach=approach) or unit
                 else:
+                    # NO REPAIR ATTEMPTED (REPAIR_FAILED_SHORTS=0) MEANS NO RETRY
+                    # IS AVAILABLE, not that the failure is forgiven — the comment
+                    # above promises "one retry ... then quarantine", and a short
+                    # with zero retries configured has zero retries left. Without
+                    # this line `unit.status` was still "approved" from its
+                    # construction above, so a failed judge (diagram_correct=False,
+                    # or any score under the bar) shipped exactly like a 5 — the
+                    # same bug the retry-then-quarantine path exists to prevent,
+                    # just reachable through the default config instead of a
+                    # broken repair.
+                    unit.status = "needs_review"
                     print(f"    ! {unit.short_id} failed the judge "
                           f"(f={unit.eval.faithfulness} c={unit.eval.clarity} "
                           f"p={unit.eval.pace}) — no repair attempted "
-                          f"(REPAIR_FAILED_SHORTS=0). Its verdict is on the short; "
-                          f"redraw it from a note or publish it anyway.")
+                          f"(REPAIR_FAILED_SHORTS=0). Quarantined; its verdict is "
+                          f"on the short — redraw it from a note or publish it by "
+                          f"hand after reading the judge's problems.")
+            elif judge_requested and unit.eval is None:
+                # STEP 11: NO VERDICT IS NOT THE SAME AS A PASSING ONE.
+                #
+                # Two ways to get here, both meaning the same thing: a verdict
+                # was asked for (body.do_judge) and never obtained. Either the
+                # judge call itself raised/timed out (judge_error is set), or it
+                # was never even submitted because the deterministic graders
+                # already failed at THIS gate (see the understanding= comment
+                # above) — known-bad output that a caller asking for judging
+                # must not see waved through just because the judge was skipped
+                # as not worth paying for. Neither case fabricates an
+                # EvalReport: unit.eval stays None, exactly what it is, and the
+                # status is what changes.
+                unit.status = "needs_review"
+                reason = judge_error or (
+                    "the script failed its own deterministic graders at this "
+                    "gate, so no judge call was even made")
+                print(f"    ! {unit.short_id} has no judge verdict ({reason}) — "
+                      f"quarantined rather than shipped with no verdict at all.")
 
             if recording is not None:
                 try:

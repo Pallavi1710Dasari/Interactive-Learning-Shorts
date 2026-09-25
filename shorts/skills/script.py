@@ -410,6 +410,21 @@ someone else — an article, a connective, a reason. Read every beat back to
 yourself as if you were saying it to a friend across a table, not writing a
 caption under a diagram. If it sounds like a slide bullet, it is not done.
 
+MARK IT WHEN THE VOICE SHOULD NOT PAUSE. Every beat still gets its own
+recorded line — one visual change needs one beat, and that has not changed —
+but a beat that opens with a tight connective straight off the one before it
+("So", "That's why", "Once that happens", "Then") is not starting a new
+answer, it is finishing the last sentence's thought in the next breath. Set
+`continues_previous: true` on that beat and shorts.tts places a short
+continuation gap before it instead of the ordinary pause between answers, so
+two beats written to read as one continuous explanation actually SOUND like
+one, not like two separate answers with a breath held between them. Beat 1
+can never set this (there is no beat before it). Do NOT set it on a beat
+that could stand as its own answer, changes subject, or belongs to a
+different teaching stage (CONCEPT/MECHANISM/EXAMPLE/RESULT) than the beat
+before it — those pauses are real and the viewer needs them to keep up with
+the picture changing. Default false; most beats leave it unset.
+
 EVERY BEAT IS ONE COMPLETE SENTENCE A TOTAL BEGINNER COULD READ ONCE AND KEEP
 The bar is not "technically correct", it is "a person meeting this concept for
 the first time understands it on one pass and could say it back in an
@@ -886,6 +901,13 @@ BE CORRECT, THEN BE SIMPLE
   Everyday words.
 - Use a technical term only if the section itself introduces it. If you use one,
   the beat that introduces it must say what it means.
+- Prefer the plain word over its jargon synonym: "use" over "leverage" or
+  "utilize", "help" over "facilitate", "coordinate" over "orchestrate", "create"
+  over "instantiate", "call" over "invocation", "approach" over "paradigm",
+  "a simpler way to think about it" over "an abstraction" — UNLESS the section
+  itself uses that exact word, in which case use it (checks.check_beginner_
+  friendly_language enforces this list; it never touches real technical
+  vocabulary the section teaches).
 - Never imply a causal link ("so", "which means", "because") that the section does
   not make. An invented explanation of a real fact is still an invention.
 - One idea per beat, and the beats in the order the section presents them.
@@ -894,11 +916,14 @@ Output JSON — one opening beat, then 3-4 more beats continuing the same narrat
 explanation. Only the beats AFTER the opening carry source_quote and
 relates_to_step. `question` is INTERNAL: the learning objective this short is
 built to teach, kept for the rest of the pipeline — it is not read aloud, and
-beat 1's `line` does not need to restate it as a spoken question:
+beat 1's `line` does not need to restate it as a spoken question.
+`continues_previous` is OPTIONAL and false unless you mean it — see MARK IT
+WHEN THE VOICE SHOULD NOT PAUSE above; omit it entirely on most beats:
 {{"short_id":"...","question":"...","beats":[
 {{"speaker":"narrator","line":"the opening line — a hook, not necessarily a question","on_screen":"<=8 words","visual_ref":"snake_case"}},
 {{"speaker":"narrator","line":"spoken words","on_screen":"<=8 words","visual_ref":"snake_case",
-"source_quote":"copied verbatim from the section","relates_to_step":1}}]}}"""
+"source_quote":"copied verbatim from the section","relates_to_step":1,
+"continues_previous":false}}]}}"""
 
 
 #: STEP 8 — one paragraph of concrete guidance per TeachingApproachKind, added

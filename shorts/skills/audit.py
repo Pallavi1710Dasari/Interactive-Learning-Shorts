@@ -118,9 +118,20 @@ Grade it."""
                     max_tokens=4000, think=True, label="judge")
 
 
-def audit(script: Script, source_text: str, unit: ShortUnit | None = None):
-    """Full audit: code graders, then the judge only if the cheap checks passed."""
-    results = checks.run_script_graders(script, source_text)
+def audit(script: Script, source_text: str, unit: ShortUnit | None = None, understanding=None):
+    """Full audit: code graders, then the judge only if the cheap checks passed.
+
+    `understanding` IS OPTIONAL AND ADDITIVE, same contract as everywhere else it is
+    threaded through — but omitting it here is not free the way it is at drafting
+    time. Without it, run_script_graders skips check_opening_follows_hook and
+    check_hook_plan entirely (they are gated on `understanding is not None`), so a
+    hook that generalises past what the section supports is not re-checked at the
+    one point this module exists to be the last one. The retry loop that drafted
+    this script already read the section once and has `understanding` in hand
+    (see skills.understanding.understanding_for's own note on reading once); passing
+    the same object here costs nothing extra and closes that gap.
+    """
+    results = checks.run_script_graders(script, source_text, understanding=understanding)
     if unit:
         # run_unit_graders rather than a loop over UNIT_GRADERS: the diagram check
         # needs the material to recognise a code frame's verbatim labels as grounded.

@@ -298,6 +298,78 @@ def check_no_stage_directions(script: Script) -> GraderResult:
                         "every beat reads as spoken narration, not a storyboard note")
 
 
+# ------------------------------------------------------------- beginner-friendly
+
+#: STEP 9. A SMALL, EVIDENCED LIST, not a general jargon detector — the same
+#: "narrow word list over a blanket rule" precedent _INTERVIEW_LEAD and
+#: _CLICKBAIT already follow. Every entry is a word script.py's own "BE
+#: CORRECT, THEN BE SIMPLE" brief already names as the wrong reach — a
+#: technical-sounding synonym for a plain word the listener already owns —
+#: not a stand-in for "any word a beginner might not know". A term the
+#: material itself teaches (a page table, a promise, useState) is never on
+#: this list; it is caught structurally instead, by the exception below.
+_UNNECESSARY_JARGON: dict[str, str] = {
+    "facilitate":    "help",
+    "facilitates":   "helps",
+    "leverage":      "use",
+    "leverages":     "uses",
+    "leveraging":    "using",
+    "abstraction":   "a simpler way to think about it",
+    "orchestration": "coordination",
+    "orchestrate":   "coordinate",
+    "orchestrates":  "coordinates",
+    "invocation":    "call",
+    "paradigm":      "approach",
+    "utilize":       "use",
+    "utilizes":      "uses",
+    "utilization":   "use",
+    "instantiate":   "create",
+    "instantiates":  "creates",
+    "instantiation": "creation",
+}
+_JARGON_PATTERN = re.compile(
+    r"\b(" + "|".join(re.escape(w) for w in _UNNECESSARY_JARGON) + r")\b", re.I)
+
+
+def check_beginner_friendly_language(script: Script,
+                                     source_text: str | None = None) -> GraderResult:
+    """
+    Does this script reach for a jargon word where a plain one already says
+    the same thing?
+
+    THE EXCEPTION IS THE WHOLE POINT: a word on _UNNECESSARY_JARGON is fine —
+    expected, even — the moment the material itself uses it. script.py's own
+    brief already draws this line in prose ("Jargon the material itself
+    introduces... stays; jargon you reach for instead of a word the listener
+    already owns does not") and nothing checked it. If `source_text` is not
+    given, every hit is reported: a caller with no material to check against
+    cannot tell the two cases apart, so it is not asked to.
+
+    NOT A GENERAL READING-LEVEL SCORE. This catches exactly the words on the
+    list, nothing else — see the list's own note for why a small, named set
+    beats a general jargon detector here: a false positive on real technical
+    vocabulary the section teaches costs a script rewrite for no reason, and
+    "sounds complicated" is not a thing a regex can judge.
+    """
+    haystack = _flatten(source_text) if source_text else ""
+    hits: list[str] = []
+    for i, beat in enumerate(script.beats):
+        line = beat.line or ""
+        for m in _JARGON_PATTERN.finditer(line):
+            word = m.group(1).lower()
+            if source_text and _flatten(word) in haystack:
+                continue     # the material itself uses this word — stays
+            hits.append(f"beat {i} uses {word!r} — say "
+                       f"{_UNNECESSARY_JARGON[word]!r} instead, unless the section "
+                       f"itself uses '{word}'")
+
+    if hits:
+        return GraderResult("beginner_friendly_language", False, "; ".join(hits[:4]),
+                            {"hits": hits})
+    return GraderResult("beginner_friendly_language", True,
+                        "no unnecessary jargon — plain words throughout")
+
+
 # --------------------------------------------------------- interviewer / Q&A shape
 #
 # THE FAILURE THIS CLOSES. THE HOOK's own prose rules (script.py's SYSTEM) already
@@ -346,7 +418,8 @@ _ROLE_LABEL = re.compile(r"^\s*(interviewer|student|teacher|answer|question|q|a)
 
 
 def check_no_interview_structure(script: Script,
-                                 selected_question: str | None = None) -> GraderResult:
+                                 selected_question: str | None = None,
+                                 understanding=None) -> GraderResult:
     """
     Does this script read as ONE continuous narrator teaching a concept, or as
     an interviewer asking the selected question and a second voice answering it?
@@ -358,6 +431,27 @@ def check_no_interview_structure(script: Script,
     the more generic "opens with an interviewer-style question" one. Passing it
     never makes an otherwise-clean script fail — see below, it only sharpens
     which message a genuine failure gets.
+
+    `understanding` IS OPTIONAL AND ADDITIVE TOO, and omitting it reproduces
+    the exact behaviour this check had before this parameter existed: every
+    _INTERVIEW_LEAD-shaped beat 1, including "have you ever wondered", fails.
+    THAT WAS TOO STRICT FOR A DELIBERATE, GROUNDED CURIOSITY HOOK — the
+    module comment above _INTERVIEW_LEAD already says a blanket "?" ban would
+    reject "a genuine curiosity hook the format explicitly still allows", but
+    nothing implemented that distinction for beat 1 specifically; every
+    question-shaped opening failed regardless of whether it was a lazy
+    restatement of the selected question or a hook the reading planned and
+    checks.check_hook_plan already verified is actually grounded in the
+    section. `understanding.hook_plan.kind == "question"` is exactly that
+    signal — understanding_for() already drops a hook_plan to None the moment
+    check_hook_plan rejects it (see skills/understanding.py), so a non-None
+    "question" plan reaching here has ALREADY passed grounding. Beat 1 is then
+    held only to the ONE rule Step 2 keeps absolute — it must not be the
+    selected question simply converted into a spoken question — not the
+    generic "no interviewer-shaped question at all" rule. Whether the actual
+    written beat 1 still echoes that grounded plan is a different question,
+    and checks.check_opening_follows_hook's own ON THE HOOK rule is what
+    answers it — composed here, not re-implemented.
 
     FOUR THINGS ARE CHECKED, EACH FOR THE SAME UNDERLYING DEFECT — narration
     shaped as a question-and-answer EXCHANGE rather than a single explanation:
@@ -380,11 +474,15 @@ def check_no_interview_structure(script: Script,
     happens?" and then teaching X immediately afterward is exactly the pattern
     those four words describe, and the fix belongs in the prompt (write a
     problem/surprise hook that does not open on one of these leads), not in
-    loosening this check to ignore punctuation that happens to look like one.
+    loosening this check to ignore punctuation that happens to look like one
+    — UNLESS `understanding.hook_plan.kind == "question"` says the reading
+    deliberately chose and grounded exactly this shape, per the note above.
     """
     problems: list[str] = []
     beats = script.beats
     opening = (beats[0].line or "").strip() if beats else ""
+    planned_question_hook = (
+        getattr(getattr(understanding, "hook_plan", None), "kind", None) == "question")
 
     role_hits = [i for i, b in enumerate(beats) if _ROLE_LABEL.match((b.line or "").strip())]
     if role_hits:
@@ -411,10 +509,15 @@ def check_no_interview_structure(script: Script,
                 f'teaching the concept directly: "{opening[:80]}" — the selected '
                 f"question is the internal teaching objective, never the "
                 f"opening line itself")
-        else:
+        elif not planned_question_hook:
             problems.append(
                 f'script opens with an interviewer-style question instead of '
                 f'teaching the concept directly: "{opening[:80]}"')
+        # else: a deliberate, grounded question-shaped hook (understanding
+        # .hook_plan.kind == "question", already checked by
+        # checks.check_hook_plan) that is not the selected question restated
+        # — allowed. Whether beat 1 still echoes what was planned is
+        # checks.check_opening_follows_hook's job, not this one's.
 
     later = [i for i in qa_hits if i != 0]
     if len(later) == 1:
@@ -2125,6 +2228,163 @@ def _unique_frames(unit: ShortUnit) -> list:
             refs.append(beat.visual_ref)
     return [unit.visuals[r].frame for r in refs
             if r in unit.visuals and unit.visuals[r].frame is not None]
+
+
+#: Step 3 (visual continuity). Language in BeatStrategy.changes_from_previous
+#: that says elements were deliberately KEPT rather than replaced — the
+#: strategist's own claim of continuity across a template switch. Not exact
+#: wording, since changes_from_previous is free prose: a handful of stems
+#: that only show up when something IS being carried forward, held still, or
+#: explicitly reused, the same "narrow, evidenced word list over a blanket
+#: rule" precedent _INTERVIEW_LEAD already follows.
+_CONTINUITY_LANGUAGE = re.compile(
+    r"\b(carr(y|ies|ied|ying)|keeps?|kept|keeping|remain(s|ing)?|stays?|"
+    r"staying|still\s+shows?|same\s+\w+|from\s+the\s+previous|"
+    r"continu(e|es|ing|ation)|unchanged|held\s+(still|over)|reused?)\b", re.I)
+
+
+def check_visual_continuity(unit: ShortUnit) -> GraderResult:
+    """
+    Does the short read as ONE visual explanation developing, or as unrelated
+    pictures that happen to appear in sequence?
+
+    THE GAP THIS CLOSES, AND WHY THE EXISTING GRADERS DO NOT ALREADY CLOSE IT.
+    check_frames_develop asks whether the picture changes enough (catches a
+    short that stands still); check_frames_match_strategy and
+    check_physical_form_matches_template ask whether EACH frame, in
+    isolation, is drawn in a shape that can carry ITS OWN claim;
+    check_motion_concept_not_static and check_mechanism_stage_shows_change
+    ask whether a process/data_movement/cause_effect beat shows motion AT
+    ALL, anywhere in the short (or on its own frame). None of the five asks
+    the cross-beat question this one does: once a short has spent several
+    beats building one composition (the same template, elements
+    accumulating), does a later beat's switch to a DIFFERENT template
+    actually say, anywhere, that it is building on what came before — or
+    does it just start over? A frame can pass every one of those checks —
+    grounded labels, a template its own relationship allows, real motion
+    elsewhere in the short — and still be the fourth beat of a five-beat
+    short throwing away a four-beat build for an unrelated layout with no
+    visual or textual thread back to it. That is exactly the complaint a
+    slide-deck short draws: "image 1 -> unrelated image 2 -> unrelated
+    image 3".
+
+    COMPOSITION ABANDONED, the one thing checked: a run of 2+ consecutive
+    frames sharing one template (an established composition) followed by a
+    frame in a DIFFERENT template, where that later beat's own
+    changes_from_previous says nothing about carrying, keeping, or reusing
+    anything from what came before. One template switch with no continuity
+    claim is a plausible fresh start (the short earning a second act, or its
+    payoff); the run-of-2+ requirement is what tells an early establishing
+    switch (nothing built yet to abandon) apart from discarding real,
+    accumulated work.
+
+    Skipped silently for any frame with no strategy (see
+    check_frames_match_strategy's own note — the eval harness and units
+    built before the strategist existed must still grade cleanly).
+
+    IN UNIT_GRADERS (reports on every build) AND IN skills/visuals.py's
+    _design_graders (gates a redesign attempt) — the same pair every other
+    actionable-by-a-redesign check in this file is wired into (see
+    check_frames_match_strategy and its neighbours). A redesign can act on
+    this exactly like it acts on those: reach for a template that continues
+    what the previous frames built, or write a changes_from_previous that
+    actually says what carries over. This is Step 4's "prefer the template
+    that continues the established picture over a fresh panel" made
+    enforceable rather than only a prompt instruction skills/visuals.py's
+    SPEC_SYSTEM already gives ("THE SIMPLEST FRAME THAT SHOWS THE ONE IDEA
+    WINS", "reach for panels... only when the beat is GENUINELY a two-way
+    contrast") — see this module's own note for why a prompt-only rule was
+    not enough (a real reel, code panel built over 4 beats, still switched to
+    an unrelated `compare` panel on beat 5).
+    """
+    ordered: list[tuple[str, "Frame", "BeatStrategy | None"]] = []
+    refs: list[str] = []
+    for beat in unit.beats:
+        if refs and refs[-1] == beat.visual_ref:
+            continue
+        refs.append(beat.visual_ref)
+        visual = unit.visuals.get(beat.visual_ref)
+        if visual is None or visual.frame is None:
+            continue
+        ordered.append((beat.visual_ref, visual.frame, visual.strategy))
+
+    if len(ordered) < 2:
+        return GraderResult("visual_continuity", True, "fewer than two frames — nothing to compare")
+
+    problems = []
+    run_len = 1
+    for i in range(1, len(ordered)):
+        _, prev_frame, _ = ordered[i - 1]
+        ref, frame, strategy = ordered[i]
+        if frame.template == prev_frame.template:
+            run_len += 1
+            continue
+
+        # No strategy on the beat that switched template — same "skipped
+        # silently" precedent check_frames_match_strategy follows: without a
+        # strategy there is no changes_from_previous to have said anything
+        # in, so there is nothing to hold this beat to. Units built before
+        # the strategist existed must still grade cleanly.
+        if strategy is not None:
+            claims_continuity = bool(
+                _CONTINUITY_LANGUAGE.search(strategy.changes_from_previous or ""))
+            if run_len >= 2 and not claims_continuity:
+                problems.append(
+                    f"[{ref}] switches from a {run_len}-beat '{prev_frame.template}' "
+                    f"composition to '{frame.template}' with nothing in its "
+                    f"changes_from_previous saying anything carries over — the build "
+                    f"is abandoned rather than continued")
+        run_len = 1
+
+    if problems:
+        return GraderResult("visual_continuity", False, "; ".join(problems[:3]),
+                            {"problems": problems})
+    return GraderResult("visual_continuity", True,
+                        f"{len(ordered)} frame(s) read as one developing composition")
+
+
+def check_sub_focus_is_grounded(unit: ShortUnit) -> GraderResult:
+    """
+    STEP 10 (sub-beat highlighting). Every name in a beat's
+    BeatStrategy.sub_focus must be a real thing — a label actually drawn on
+    its own frame, or a word the beat's own spoken line actually uses. See
+    schema.BeatStrategy.sub_focus's own docstring for what this field is
+    (an ORDERED list of additional things a beat calls out, beyond the one
+    `focus`) and is not (a timeline — nothing here carries a timestamp).
+
+    Skipped silently — same precedent as check_frames_match_strategy and its
+    neighbours — for any beat with no strategy, or whose strategy leaves
+    sub_focus empty (every beat written before this field existed, and
+    every ordinary beat that only ever needed one `focus`).
+    """
+    offenders = []
+    checked = 0
+    for beat in unit.beats:
+        visual = unit.visuals.get(beat.visual_ref)
+        if visual is None or visual.strategy is None or visual.frame is None:
+            continue
+        sub_focus = getattr(visual.strategy, "sub_focus", None) or []
+        if not sub_focus:
+            continue
+        checked += 1
+        labels = [l for l in _frame_labels(visual.frame) if l]
+        narration = beat.line or ""
+        for item in sub_focus:
+            on_frame = any(_label_matches(item, label) for label in labels)
+            in_narration = bool(item) and _grounded_share(item, narration) >= 0.5
+            if not on_frame and not in_narration:
+                offenders.append(
+                    f"[{beat.visual_ref}] sub_focus {item!r} matches neither a "
+                    f"label drawn on the frame nor a word in the beat's own "
+                    f"line — it names something that is not actually there")
+
+    if not checked:
+        return GraderResult("sub_focus_is_grounded", True, "no sub_focus to check")
+    if offenders:
+        return GraderResult("sub_focus_is_grounded", False, "; ".join(offenders[:3]),
+                            {"problems": offenders})
+    return GraderResult("sub_focus_is_grounded", True,
+                        f"{checked} beat(s) with sub_focus, every entry grounded")
 
 
 def _store_labels(frame, states: tuple[str, ...] | None = None) -> set[str]:
@@ -6189,12 +6449,28 @@ UNIT_GRADERS   = [check_visuals_resolved, check_technical_beats_use_diagrams,
                   check_icons_are_pictures, check_diagram_matches_narration,
                   check_code_not_overused, check_generic_boxes_not_overused,
                   check_motion_concept_not_static,
+                  # Step 3/4 (visual continuity, no unnecessary cards): a
+                  # template switch that abandons an established multi-beat
+                  # composition with no stated continuity — see its own
+                  # docstring for why check_frames_develop/
+                  # check_frames_match_strategy/check_motion_concept_not_static
+                  # do not already cover it. Also gates a redesign attempt —
+                  # see skills/visuals.py's _design_graders.
+                  check_visual_continuity,
                   # STEP 8: wired in — fully implemented (reuses
                   # _frame_role_collections, same as check_one_hero_per_frame
                   # right above) but never actually registered anywhere
                   # before this, so a short could ship trailing off on a
                   # neutral frame instead of landing on its own answer.
-                  check_ends_on_answer]
+                  check_ends_on_answer,
+                  # Step 10 (sub-beat highlighting): the reusable foundation
+                  # for a beat naming more than one thing to look at, in
+                  # order — see schema.BeatStrategy.sub_focus's own
+                  # docstring for what it is and its documented limitation
+                  # (no renderer consumes it yet). A no-op today (nothing
+                  # populates sub_focus), but wired in so it validates the
+                  # moment anything does.
+                  check_sub_focus_is_grounded]
 
 #: Unit graders that read the reading material as well as the unit.
 _NEEDS_SOURCE = {check_diagram_matches_narration, check_code_frames_quote_source}
@@ -6296,7 +6572,13 @@ def run_script_graders(script: Script, source_text: str | None = None,
     # UNCONDITIONAL, UNLIKE EVERY OTHER APPEND BELOW — see this function's own
     # docstring for why the interview/Q&A shape check runs for every caller
     # regardless of what extra context it was given.
-    results.append(check_no_interview_structure(script, selected_question=selected_question))
+    results.append(check_no_interview_structure(script, selected_question=selected_question,
+                                                understanding=understanding))
+    # ALSO UNCONDITIONAL, same reasoning: it degrades gracefully with no
+    # source_text (every hit reported, since there is nothing to check the
+    # material-uses-it exception against) rather than being skipped
+    # entirely — see its own docstring.
+    results.append(check_beginner_friendly_language(script, source_text=source_text))
     if source_text:
         results.append(check_source_quotes(script, source_text, doc_text=doc_text))
         results.append(check_answers_its_section(script, source_text))

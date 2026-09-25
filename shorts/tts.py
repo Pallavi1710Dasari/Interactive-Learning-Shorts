@@ -23,9 +23,10 @@ and concatenating those without normalising produces a file whose later beats pl
 at the wrong speed.
 """
 import json, subprocess, tempfile, wave
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from .schema import Script, Audio, WordTiming, BeatSpan
+from .schema import Beat, Script, Audio, WordTiming, BeatSpan
 from . import config, providers, speech
 
 # Re-exported so callers can keep catching tts.AccountBlocked.
@@ -124,9 +125,20 @@ def synthesize(script: Script, out_dir: Path | None = None,
     if not narrator_voice:
         raise RuntimeError(f"{provider.name}: no narrator voice configured")
 
-    parts, spans, all_words, cursor = [], [], [], 0.0
-
-    for i, beat in enumerate(script.beats):
+    # STEP 8 (latency). provider.synth()'s network/inference call is the
+    # slow, independent-per-beat part of this loop — the ffmpeg
+    # normalisation and the span/word/cursor bookkeeping below are all fast
+    # and, for the cursor especially, genuinely sequential (each beat's
+    # start time depends on every beat before it). So only synth() is
+    # pulled out and run ahead of time, in parallel when the provider says
+    # it is safe to (see Provider.concurrent_safe's own docstring for why
+    # most are not) — everything after it stays exactly the single-threaded
+    # loop it always was. A provider that is NOT concurrent_safe (Chatterbox,
+    # Kokoro, Piper, or the default for any future one) still renders one
+    # beat at a time, in order — byte-identical behaviour, not merely
+    # similar timing.
+    def _render_beat(item: tuple[int, Beat]) -> tuple[str, bytes]:
+        i, beat = item
         spoken = speech.conversational(beat.line)
         # `role` is a DELIVERY preset, not a second voice — see above. Beat 0 is
         # still the opening and gets the slightly livelier "asking" settings each
@@ -134,25 +146,51 @@ def synthesize(script: Script, out_dir: Path | None = None,
         # "explaining" settings. Same speaker throughout either way.
         role = "interviewer" if i == 0 else "student"
         raw = provider.synth(spoken, narrator_voice, role)
+        return spoken, raw
 
+    items = list(enumerate(script.beats))
+    if provider.concurrent_safe and len(items) > 1:
+        with ThreadPoolExecutor(max_workers=len(items)) as pool:
+            rendered = list(pool.map(_render_beat, items))
+    else:
+        rendered = [_render_beat(item) for item in items]
+
+    parts, spans, all_words, gaps, cursor = [], [], [], [], 0.0
+
+    for i, (spoken, raw) in enumerate(rendered):
         chunk = out_dir / f"beat_{i:02d}.wav"
         duration = _to_wav(raw, provider.suffix, chunk, exe)
 
         spans.append(BeatSpan(start=round(cursor, 3), end=round(cursor + duration, 3)))
         all_words += _even_words(spoken, cursor, duration)
         parts.append(str(chunk))
-        cursor += duration + gap
+        # STEP 5: THE GAP BEFORE THE *NEXT* BEAT, not this one — a beat whose
+        # own continues_previous is True gets the short continuation gap
+        # placed BEHIND it (between it and the beat before it), so the gap
+        # list has one entry per junction, decided by the beat that FOLLOWS
+        # each junction. Computed here, one iteration ahead of where it is
+        # used, so `cursor` (which every beat's own span depends on) reflects
+        # the real gap that will separate it from the next beat rather than
+        # the uniform one every beat used to get.
+        next_gap = gap
+        if i + 1 < len(script.beats) and script.beats[i + 1].continues_previous:
+            next_gap = config.VOICE_CONTINUATION_GAP
+        gaps.append(next_gap)
+        cursor += duration + next_gap
 
     combined = out_dir / "audio.mp3"
-    _join(parts, combined, gap, exe)
+    _join(parts, gaps, combined, exe)
 
     (out_dir / "spans.json").write_text(
         json.dumps([s.model_dump() for s in spans], indent=2), encoding="utf-8")
     (out_dir / "timings.json").write_text(
         json.dumps([w.model_dump() for w in all_words], indent=2), encoding="utf-8")
 
-    # The trailing gap is silence after the last word; the track ends with the words.
-    duration = round(max(cursor - gap, 0.0), 2)
+    # The trailing gap is silence after the last word; the track ends with the
+    # words. `gaps[-1]` is the trailing entry _join never places (see its own
+    # "no trailing silence" note) — same value `cursor` was last advanced by.
+    trailing = gaps[-1] if gaps else 0.0
+    duration = round(max(cursor - trailing, 0.0), 2)
     return Audio(file=str(combined), duration_seconds=duration,
                  word_timings=all_words, beat_spans=spans)
 
@@ -176,16 +214,32 @@ def _even_words(text: str, offset: float, duration: float) -> list[WordTiming]:
             for i, w in enumerate(words)]
 
 
-def _join(parts: list[str], out: Path, gap: float, exe: str) -> None:
-    """Concatenate the beat wavs with silence between them, encode one mp3."""
-    silence = out.parent / "_gap.wav"
-    _run([exe, "-y", "-f", "lavfi", "-i",
-          f"anullsrc=r={SAMPLE_RATE}:cl=mono", "-t", str(gap), str(silence)])
+def _join(parts: list[str], gaps: list[float], out: Path, exe: str) -> None:
+    """Concatenate the beat wavs with silence between them, encode one mp3.
+
+    `gaps` HAS ONE ENTRY PER PART (synthesize's own bookkeeping — see its
+    "STEP 5" comment), but only the first len(parts)-1 are real junctions;
+    the last is never placed, same as the single-gap version's own trailing
+    slice below always dropped its last silence file. STEP 5: no longer one
+    silence duration for the whole short — a beat whose continues_previous is
+    True gets config.VOICE_CONTINUATION_GAP instead of the ordinary
+    VOICE_BEAT_GAP, so each DISTINCT duration needed gets its own silence
+    file (typically one or two, never one per beat — most shorts use at most
+    two gap lengths total).
+    """
+    junctions = gaps[:len(parts) - 1] if len(parts) > 1 else []
+    silence_for: dict[float, str] = {}
+    for g in set(junctions):
+        silence = str(out.parent / f"_gap_{g:.3f}.wav")
+        _run([exe, "-y", "-f", "lavfi", "-i",
+              f"anullsrc=r={SAMPLE_RATE}:cl=mono", "-t", str(g), silence])
+        silence_for[g] = silence
 
     seq: list[str] = []
-    for p in parts:
-        seq += [p, str(silence)]
-    seq = seq[:-1]                      # no trailing silence
+    for i, p in enumerate(parts):
+        seq.append(p)
+        if i < len(junctions):
+            seq.append(silence_for[junctions[i]])
 
     # ABSOLUTE PATHS IN THE LIST. ffmpeg's concat demuxer resolves each entry
     # relative to the LIST FILE, and the list file is in the system temp dir — so a
@@ -201,7 +255,8 @@ def _join(parts: list[str], out: Path, gap: float, exe: str) -> None:
     _run([exe, "-y", "-f", "concat", "-safe", "0", "-i", listfile,
           "-ar", str(SAMPLE_RATE), "-ac", "1", "-b:a", "128k", str(out)])
     Path(listfile).unlink(missing_ok=True)
-    silence.unlink(missing_ok=True)
+    for s in silence_for.values():
+        Path(s).unlink(missing_ok=True)
 
 
 def probe(provider: providers.Provider | None = None) -> tuple[bool, str]:

@@ -53,6 +53,27 @@ class Provider:
     #: Extension of the audio this provider returns, so chunks land on disk correctly.
     suffix = ".mp3"
 
+    #: STEP 8 (latency). Can synth() safely be called from several threads
+    #: AT ONCE for the same provider instance? FALSE BY DEFAULT, deliberately
+    #: — this is a claim about thread safety, and the absence of a known
+    #: problem is not evidence of its absence. Overridden True only where
+    #: synth() is a plain, independent network request with no shared local
+    #: process or model object behind it (ElevenLabs, Google): concurrent
+    #: calls are just concurrent HTTP requests, nothing to race on.
+    #:
+    #: Chatterbox is explicitly NOT safe — see its own synth()'s "One at a
+    #: time: the worker is a single process with one model in it" and the
+    #: lock right above that comment; this attribute must never be set True
+    #: there. Kokoro and Piper each hold ONE LOADED MODEL OBJECT per process
+    #: (see their own _load()/_voice() caches) and call into a third-party
+    #: library's inference method with no lock of their own — whether that
+    #: is safe under real concurrent calls is not established here either
+    #: way, so both stay at this conservative default rather than being
+    #: guessed into True. shorts.tts.synthesize only runs beats in parallel
+    #: when this is True; every other provider gets the same one-at-a-time
+    #: loop it always has.
+    concurrent_safe = False
+
     def available(self) -> tuple[bool, str]:
         raise NotImplementedError
 
@@ -110,6 +131,9 @@ _EL_FALLBACK = {"interviewer": "pNInz6obpgDQGcFmaJgB",    # Adam
 class ElevenLabs(Provider):
     name = "elevenlabs"
     suffix = ".mp3"
+    # A plain, independent HTTPS request per call — see Provider.concurrent_safe's
+    # own docstring for what this claim does and does not cover.
+    concurrent_safe = True
 
     def _headers(self) -> dict:
         return {"xi-api-key": config.ELEVENLABS_API_KEY,
@@ -216,6 +240,9 @@ class Google(Provider):
 
     name = "google"
     suffix = ".mp3"
+    # Same reasoning as ElevenLabs.concurrent_safe: a plain, independent
+    # HTTPS request per call, nothing shared to race on.
+    concurrent_safe = True
 
     def available(self) -> tuple[bool, str]:
         if not config.GOOGLE_TTS_API_KEY:
@@ -789,6 +816,49 @@ def is_explicit() -> bool:
 _adopted_unavailable_warned: set[str] = set()
 
 
+def _adopted() -> Provider | None:
+    """
+    The provider kept in the Voice Lab UI, if one was adopted and is usable —
+    the ONE check both get() and chain() must make before anything else, so a
+    kept voice actually outranks everything downstream of it, not just the
+    one call path that happened to ask for it explicitly.
+
+    STEP 5: THIS USED TO LIVE ONLY INSIDE get(), AND CHAIN() NEVER CALLED IT.
+    voice.synthesize() — the function that actually narrates a real short —
+    iterates providers.chain(), not get(); chain()'s own "auto" branch used
+    to walk the static _PREFERENCE list straight past whatever was adopted.
+    An adopted Chatterbox voice was silently skipped in favour of the first
+    _PREFERENCE entry that happened to report available() True — ElevenLabs,
+    if credentials existed in .env for any reason (leftover testing, a key
+    added for a different provider check) — with no warning at all, because
+    ElevenLabs succeeding was never treated as a fallback, only as chain()
+    doing exactly what it was written to do. get()'s own docstring already
+    promises "the adopted provider being unavailable is printed, never
+    silent"; that promise only meant something on the path that called
+    get(), and voice.synthesize() is not on it. Shared here so both are.
+
+    Prints the same "adopted provider unavailable" warning get() always has,
+    at most once per process per name — never raises, never silent either
+    way: returns the adopted provider when it works, None (nothing to
+    prefer) when none was adopted or the adopted one cannot speak, and the
+    caller falls through to its own ordinary resolution either way.
+    """
+    chosen = config.voice_settings().get("provider")
+    if not chosen or chosen not in _REGISTRY:
+        return None
+    ok, why = _REGISTRY[chosen].available()
+    if ok:
+        return _REGISTRY[chosen]
+    if chosen not in _adopted_unavailable_warned:
+        _adopted_unavailable_warned.add(chosen)
+        print(f"  ! adopted voice provider {chosen!r} (voices/settings.json) "
+              f"is unavailable ({why}) — falling back to "
+              f"TTS_PROVIDER={config.TTS_PROVIDER or 'auto'!r} instead of "
+              f"the voice you kept. Fix or re-adopt the {chosen} voice, or "
+              f"POST /api/voice/revert to stop trying it.")
+    return None
+
+
 def get(name: str | None = None) -> Provider:
     """
     The provider to use.
@@ -806,29 +876,14 @@ def get(name: str | None = None) -> Provider:
 
     `revert to .env` deletes the store, which is how you get back.
 
-    THE ADOPTED PROVIDER BEING UNAVAILABLE IS PRINTED, NEVER SILENT. It used to
-    fall straight through to whatever `.env`/`auto` resolved to with no signal
-    at all — so a Chatterbox voice adopted on one machine (its reference clips
-    live at an absolute path, see providers.Chatterbox.resolve) silently became
-    a DIFFERENT provider's DIFFERENT voice on another, and the only trace was
-    the finished reel itself sounding wrong. This does not raise — synthesize()
-    below has its own "never raises" contract, because a voice failure must not
-    lose a short a human already approved — but it is no longer quiet about
-    which voice actually spoke and why the adopted one did not.
+    THE ADOPTED PROVIDER BEING UNAVAILABLE IS PRINTED, NEVER SILENT — see
+    _adopted()'s own docstring, including the Step 5 note on why chain() had
+    to start making the same check.
     """
     if name is None:
-        chosen = config.voice_settings().get("provider")
-        if chosen and chosen in _REGISTRY:
-            ok, why = _REGISTRY[chosen].available()
-            if ok:
-                return _REGISTRY[chosen]
-            if chosen not in _adopted_unavailable_warned:
-                _adopted_unavailable_warned.add(chosen)
-                print(f"  ! adopted voice provider {chosen!r} (voices/settings.json) "
-                      f"is unavailable ({why}) — falling back to "
-                      f"TTS_PROVIDER={config.TTS_PROVIDER or 'auto'!r} instead of "
-                      f"the voice you kept. Fix or re-adopt the {chosen} voice, or "
-                      f"POST /api/voice/revert to stop trying it.")
+        adopted = _adopted()
+        if adopted is not None:
+            return adopted
     name = (name or config.TTS_PROVIDER or "auto").strip().lower()
 
     if name != "auto":
@@ -847,12 +902,19 @@ def chain() -> list[Provider]:
     Every provider worth trying, best first.
 
     One entry when TTS_PROVIDER names a provider — an explicit choice is not a
-    preference to be overridden. Otherwise the available ones in preference order,
-    minus any that has already proved it cannot speak, so "auto" means "the best one
-    that actually works" rather than "the best one that has a key".
+    preference to be overridden. One entry when a voice was ADOPTED in the UI
+    and is still usable — see _adopted()'s own docstring for why this check
+    was missing here before Step 5, and voice.synthesize()'s own docstring
+    for why THIS function, not get(), is the one that actually decides who
+    narrates a real short. Otherwise the available ones in preference order,
+    minus any that has already proved it cannot speak, so "auto" means "the
+    best one that actually works" rather than "the best one that has a key".
     """
     if is_explicit():
         return [get()]
+    adopted = _adopted()
+    if adopted is not None:
+        return [adopted]
     return [_REGISTRY[n] for n in _PREFERENCE
             if n not in _blocked and _REGISTRY[n].available()[0]]
 

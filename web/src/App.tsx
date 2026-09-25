@@ -102,8 +102,13 @@ function Workspace() {
     fetch("/api/voice").then((r) => r.json())
       .then((v) => setVoiceNow(v.reason ?? null)).catch(() => {});
   }, []);
-  useEffect(() => { readVoice(); }, [readVoice]);
-  // Re-read when the studio closes: that is the only thing that can change it.
+  // ONE EFFECT, NOT TWO. This used to be a separate `useEffect(() =>
+  // readVoice(), [readVoice])` for the initial read, plus this one for
+  // "re-read when the studio closes" — but voiceOpen starts false, so this
+  // effect ALREADY fires on mount too (a changed dependency's initial value
+  // still runs the effect), making the first one a second, redundant
+  // GET /api/voice on every page load. Cost-free (no LLM call) but still a
+  // duplicate request Step 7 asks to close.
   useEffect(() => { if (!voiceOpen) readVoice(); }, [voiceOpen, readVoice]);
   const [material, setMaterial] = useState<MaterialResult | null>(null);
   // Each stage's own gate output — the FULL QuestionWorkflow record, never a

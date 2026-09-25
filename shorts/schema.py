@@ -1115,6 +1115,25 @@ class Beat(BaseModel):
     # by hook_plan, a separate field, not by a teaching_sequence step.
     relates_to_step: Optional[int] = None
 
+    #: STEP 5 (continuous narration). Does this beat continue the SAME spoken
+    #: thought as the one before it, rather than start a new one? An EXPLICIT
+    #: signal, not inferred from punctuation or connective words at TTS time —
+    #: shorts.tts.synthesize still synthesises one beat at a time (see its own
+    #: module docstring on why: per-beat duration measurement, per-provider
+    #: reliability), so the only thing this changes is the SILENCE gap
+    #: tts._join places before this beat: config.VOICE_CONTINUATION_GAP
+    #: instead of the full config.VOICE_BEAT_GAP. Two beats that are really
+    #: one continuous explanation — the "merge CONCEPT and MECHANISM into one
+    #: beat when the idea is simple enough" case in skills/script.py's own
+    #: brief, kept as two beats instead because each needs its own visual —
+    #: should not sound like two separate answers with a pause between them.
+    #:
+    #: FALSE BY DEFAULT, on beat 0 always, and False for anything written
+    #: before this field existed — the ordinary VOICE_BEAT_GAP is the safe,
+    #: unchanged default; a script has to say a beat continues rather than
+    #: every reel being asked to prove one does not.
+    continues_previous: bool = False
+
 
 class Script(BaseModel):
     """Output of Skill 2 — a single narrator's connected explanation of one concept.
@@ -1519,6 +1538,35 @@ class BeatStrategy(BaseModel):
 
     #: The single object that carries the accent. Exactly one, always.
     focus: str
+
+    #: STEP 10 (sub-beat highlighting). ADDITIONAL objects the narration
+    #: calls out, in the order it mentions them, when ONE beat's line
+    #: genuinely names more than one thing a viewer should look at in turn —
+    #: "count is the current value... setCount changes it" inside a single
+    #: beat, say, rather than `focus` alone trying to carry both.
+    #:
+    #: DELIBERATELY NOT A TIMELINE. `focus` already answers "the one object
+    #: that carries the accent" for the ordinary case — most beats say one
+    #: thing about one object, and this stays empty for all of them. This is
+    #: the smallest useful extension for the beat that names several: an
+    #: ORDERED list of labels, checked by checks.check_sub_focus_is_grounded
+    #: against the frame's own labels/narration exactly like `focus` is, with
+    #: no word-level timestamp attached to any entry.
+    #:
+    #: NOT YET CONSUMED BY THE RENDERER. skills/visuals.py's design prompt
+    #: does not ask for this yet, and web/src/AnimatedSvg.tsx has no
+    #: mechanism to shift which element is "hero" partway through a single
+    #: beat's frame — data-role="focus" is still a per-FRAME, not per-WORD,
+    #: attribute (see its own module docstring). Real word-level visual sync
+    #: needs that renderer to read shorts.tts's existing WordTiming data and
+    #: shift emphasis at the matching playback time, which is frontend
+    #: animation work, not a schema change — recorded here as the documented
+    #: limitation rather than attempted as a rushed, untestable one. This
+    #: field is the reusable foundation that work would consume: the ORDER
+    #: is already decided and already validated; only the "when" is missing.
+    #: Optional, empty by default, so every strategy from before this field
+    #: existed still loads unchanged.
+    sub_focus: list[str] = Field(default_factory=list)
 
 
 class VisualStrategy(BaseModel):

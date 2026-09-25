@@ -1460,7 +1460,17 @@ def _design_graders(section: Section | None = None, understanding=None):
                # this. Actionable by a redesign the same way every check
                # above it is: reach for `state`/`flow`/`cause_effect`/`analogy`
                # instead of the static shelf.
-               checks.check_motion_concept_not_static]
+               checks.check_motion_concept_not_static,
+               # Step 4 (visual continuity / no unnecessary cards): a
+               # template switch away from a real, multi-beat composition
+               # with nothing in changes_from_previous saying anything
+               # carries over. Same actionable-by-a-redesign shape as
+               # frames_match_strategy: a redesign can pick a template that
+               # continues the composition, or write a changes_from_previous
+               # that says what is kept. See the grader's own docstring —
+               # confirmed on a real reel (a 4-beat code build abandoned for
+               # an unrelated `compare` panel on the last beat).
+               checks.check_visual_continuity]
     if section is not None:
         graders.append(lambda u: checks.check_code_frames_quote_source(u, section.text))
     if understanding is not None:

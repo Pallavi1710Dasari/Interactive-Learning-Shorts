@@ -11,14 +11,15 @@ import argparse, io, json, sys, threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from .schema import ShortUnit, TopicList, QuestionWorkflow
-from .parse import parse_markdown, find_section, evidence_text
+from .schema import ShortUnit, TopicList, QuestionWorkflow, Topic, Section
+from .parse import parse_markdown, find_section, evidence_text, story_evidence_pool
 from .skills.select import select_topics_with_selections
-from .skills.script import write_script
+from .skills.script import (write_script, plan_story_mapping, write_story_shots,
+                            MAX_STORY_MAPPING_RETRIES, MAX_STORY_JUDGE_RETRIES)
 from .skills.understanding import understanding_for
 from .skills.visuals import design_visuals, render_diagrams
-from .skills.audit import audit
-from . import checks, config, review, revision, workflow as question_workflow
+from .skills.audit import audit, audit_story
+from . import checks, config, preflight, review, revision, workflow as question_workflow
 
 MAX_SCRIPT_RETRIES = 3
 
@@ -362,12 +363,178 @@ def build_one(topic, section, session_id: str, do_tts: bool, do_svg: bool,
     return unit
 
 
+# =============================================================================
+# STORY MODE — RESTYLE_TO_STORY_REELS.md Phase 1. Reached only when
+# config.REEL_STYLE == "story" (see main()'s branch, before the explainer loop
+# below this one runs). Deliberately NOT a branch inside build_one() above: a
+# StoryScript is not a ShortUnit, has no TTS/visuals/video stage yet, and
+# mixing the two shapes into one function's return type is exactly the kind of
+# "same function, two unrelated meanings" this project's own schema docstrings
+# (see Beat.speaker's note on the old two-role Literal) warn against.
+# =============================================================================
+
+def build_one_story(topic: Topic, section: Section, session_id: str,
+                    sections: list[Section], document: str | None = None,
+                    yes: bool = False):
+    """
+    Phase 1's per-topic pipeline: METAPHOR MAPPING, reviewed and checked,
+    THEN shots — never the reverse. Returns None when the mapping never
+    passes checks.check_mapping, OR when the finished shots fail
+    run_story_graders, OR when the metaphor-faithfulness judge rejects them —
+    a StoryScript only when EVERY gate passed. RESTYLE_TO_STORY_REELS.md Step
+    3 Part 0's own fix: audit_story() used to run and print a verdict here but
+    `return story` was unconditional, so a REJECTed reel still reached
+    build_story_shorts and got written to disk exactly like a passing one —
+    the judge was being consulted, not obeyed. There is still no quarantine
+    directory for a rejected story (unlike build_one's rejected/ — this is a
+    smaller, newer path and that machinery is not built for it yet); a
+    rejected reel is simply not returned, so build_story_shorts's `if story:`
+    filter drops it.
+
+    SOURCE SCOPE is two-stage, because the wider pool depends on information
+    that does not exist until AFTER the first, narrower read: understanding_for
+    is run once against the plain evidence_text group (the same scope every
+    other caller of understanding_for gets), and only once its
+    teaching_sequence exists is story_evidence_pool asked to widen the pool
+    around it and around whatever problem-statement section the document has
+    — see parse.story_evidence_pool's own docstring for why both additions
+    are heading-title matches, not a resolved list some earlier step handed
+    over ready-made.
+    """
+    print(f"\n=== [story] {topic.id} — {topic.topic[:60]}")
+    base_text, base_ids = story_evidence_pool(sections, topic.source_section_id)
+
+    understanding = understanding_for(section, document=document, source_text=base_text)
+
+    pool_text, pool_ids = story_evidence_pool(
+        sections, topic.source_section_id,
+        teaching_sequence=understanding.teaching_sequence if understanding else None)
+    print(f"    sections used as source: {pool_ids}")
+
+    # RESTYLE_TO_STORY_REELS.md Step 8 Part 0 #4: pre-flight, before the
+    # first real LLM call this topic makes. WORST CASE: every mechanical
+    # mapping attempt fails within every metaphor-judge-gate iteration (see
+    # plan_story_mapping's own docstring for why those are two separate
+    # retry budgets) — the same "the honest ceiling, not the usually-lower
+    # real number" framing story_frames.py's own pre-flight already used.
+    mapping_calls = MAX_STORY_MAPPING_RETRIES * (MAX_STORY_JUDGE_RETRIES + 1)
+    judge_calls = MAX_STORY_JUDGE_RETRIES + 1
+    usages = [
+        preflight.ModelPlan(
+            label="story_mapping", model=config.MODEL_GENERATOR,
+            planned_calls=mapping_calls,
+            cost_per_call=preflight.text_cost_per_call(config.MODEL_GENERATOR, 2500, 1500)),
+        preflight.ModelPlan(
+            label="story_judge", model=config.MODEL_STORY_JUDGE,
+            planned_calls=judge_calls,
+            cost_per_call=preflight.text_cost_per_call(config.MODEL_STORY_JUDGE, 800, 600)),
+        preflight.ModelPlan(
+            label="story_shots", model=config.MODEL_GENERATOR, planned_calls=1,
+            cost_per_call=preflight.text_cost_per_call(config.MODEL_GENERATOR, 4000, 6000)),
+    ]
+    if not preflight.run_preflight("story", topic.id, usages, yes):
+        return None
+
+    mapping = plan_story_mapping(topic, section, understanding=understanding,
+                                 source_text=pool_text)
+    if mapping is None:
+        print(f"    GIVING UP on {topic.id} — no mapping passed checks.check_mapping")
+        return None
+
+    # Persisted the moment the mapping is APPROVED, independent of whether
+    # shots ever get written — RESTYLE_TO_STORY_REELS.md Step 1's own
+    # checkpoint: the mapping is reviewable on its own, so it must be on disk
+    # on its own, not only bundled inside the eventual *.story.json.
+    mapping_path = config.OUTPUT_DIR / f"{topic.id}.mapping.json"
+    mapping_path.write_text(mapping.model_dump_json(indent=2), encoding="utf-8")
+    print(f"    wrote mapping to {mapping_path}")
+
+    print(f"    candidates ({len(mapping.candidates)}):")
+    for c in mapping.candidates:
+        flag = " <- chosen" if c.chosen else ""
+        print(f"      - {c.name}: familiarity={c.familiarity} faithfulness={c.faithfulness} "
+             f"drawability={c.drawability} drama={c.drama} total={c.total}{flag}")
+    print(f"    setting: {mapping.setting}   system_name: {mapping.system_name}")
+    print(f"    props: {mapping.props}")
+    print(f"    hook_line: {mapping.hook_line!r}")
+    print(f"    mapping ({len(mapping.mapping)} entries):")
+    for m in mapping.mapping:
+        print(f"      - actor={m.actor} {m.concept_rule}")
+        print(f"        quote: {m.source_quote[:70]!r}")
+        print(f"        event: {m.metaphor_event}")
+        print(f"        proof: {m.visible_proof}")
+        print(f"        lesson: {m.lesson_line}")
+
+    story = write_story_shots(mapping, topic, section, understanding=understanding,
+                              source_text=pool_text, session_id=session_id)
+    print(f"    shots: {len(story.shots)}")
+
+    # STEP 9 FIX 2: technical_term comes from the story's OWN mapping now
+    # (story.technical_term, copied from ConceptMappingSet — see write_
+    # story_shots), not topic.concept, which story-mode topics essentially
+    # never set (that's why check_concept_named_once always reported
+    # "skipped" before this fix).
+    results, report = audit_story(story, pool_text, technical_term=story.technical_term)
+    for r in results:
+        print(f"    {r}")
+    if report is None:
+        # run_story_graders itself already failed — audit_story does not pay
+        # for the judge on known-bad output (see its own docstring). Gate
+        # here: no report at all means the reel does not ship.
+        print(f"    GIVING UP on {topic.id} — the final shots failed the free "
+             f"story graders above; the metaphor judge was never called")
+        return None
+
+    verdict = "PASS" if report.passed else "REJECT"
+    print(f"    metaphor judge -> {verdict}")
+    for v in report.verdicts:
+        if not v.faithful:
+            print(f"      ! {v.concept_rule}: {v.problem}")
+    if not report.passed:
+        print(f"    GIVING UP on {topic.id} — the metaphor judge rejected the final shots")
+        return None
+
+    return story
+
+
+def build_story_shorts(topics: list[Topic], sections: list[Section], session_id: str,
+                       document: str | None = None, yes: bool = False) -> list:
+    """
+    The story-mode counterpart to main()'s explainer build loop — sequential,
+    not thread-pooled like build_one's SHORTS ARE BUILT SIDE BY SIDE above.
+    Phase 1 is meant to be watched one mapping at a time, not to build a
+    batch fast; that is also why this prints as it goes rather than
+    collecting per-thread logs the way _StdoutRouter exists for.
+    """
+    stories = []
+    for topic in topics:
+        section = find_section(sections, topic.source_section_id)
+        story = build_one_story(topic, section, session_id, sections,
+                                document=document, yes=yes)
+        if story:
+            stories.append(story)
+
+    outdir = config.OUTPUT_DIR
+    for s in stories:
+        (outdir / f"{s.short_id}.story.json").write_text(
+            s.model_dump_json(indent=2), encoding="utf-8")
+    print(f"\nwrote {len(stories)} story script(s) to {outdir} (*.story.json)")
+    print("PHASE 1 STOPS HERE — no TTS, no illustration, no video yet.")
+    return stories
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("doc")
     ap.add_argument("--limit", type=int, default=None, help="only build N shorts")
     ap.add_argument("--topics", type=int, default=5, help="how many topics to select")
     ap.add_argument("--no-tts", action="store_true", help="skip voice generation")
+    ap.add_argument("--yes", action="store_true",
+                    help="story mode only (config.REEL_STYLE=story): confirm "
+                        "each topic's pre-flight cost summary and proceed. "
+                        "Without it, build_one_story prints the plan, writes "
+                        "output/<short_id>/preflight.json, and stops before "
+                        "any LLM call.")
     ap.add_argument("--no-svg", action="store_true", help="skip diagram generation")
     ap.add_argument("--gate-topics", action="store_true",
                     help="run Step 3's question gate after selection — "
@@ -581,6 +748,16 @@ def main():
             topics = approved
 
     topics = topics[: args.limit] if args.limit else topics
+
+    # RESTYLE_TO_STORY_REELS.md Phase 1's ONLY branch point. Everything above
+    # this line (parsing, selection, every human gate) is style-agnostic and
+    # already ran identically either way; everything below this line — TTS,
+    # design_visuals, ShortUnit assembly, the render/feed instructions printed
+    # at the end — is explainer-only and none of it applies to a StoryScript
+    # yet, so story mode returns here instead of falling through into it.
+    if config.REEL_STYLE == "story":
+        build_story_shorts(topics, sections, session_id, document=doc_text, yes=args.yes)
+        return
 
     # SHORTS ARE BUILT SIDE BY SIDE, not one after another.
     #

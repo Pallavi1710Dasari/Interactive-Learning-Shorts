@@ -1,5 +1,5 @@
 """SKILL 5 — eval-audit. Code graders run first (free), then the LLM judge (paid)."""
-from ..schema import Script, ShortUnit, EvalReport
+from ..schema import Script, ShortUnit, EvalReport, StoryScript, StoryEvalReport
 from ..llm import ask_json
 from .. import config, checks
 
@@ -141,3 +141,77 @@ def audit(script: Script, source_text: str, unit: ShortUnit | None = None, under
         return results, None                      # don't pay for a judge on known-bad output
 
     return results, judge_script(script, source_text, unit)
+
+
+# --------------------------------------------------------------------- story mode
+#
+# RESTYLE_TO_STORY_REELS.md Phase 1's judge step. checks.check_mapping (free) is
+# what run.py's story path calls first — this only runs once that has already
+# passed, the same "don't pay for a judge on known-bad output" order audit()
+# keeps above.
+
+METAPHOR_JUDGE_SYSTEM = """You check ONE thing, for each mapping entry given to you: does
+metaphor_event behave EXACTLY like concept_rule, with nothing extra implied?
+
+faithful: false if the metaphor_event:
+  - implies a behavior, cause, or consequence concept_rule does not state — a
+    metaphor is allowed to dramatize a rule, never to add a second rule of its
+    own that sounds plausible but was not in the material.
+  - shows the OPPOSITE of concept_rule, or a weaker/stronger version of it than
+    the material actually claims.
+  - would teach a viewer something false about concept_rule if they treated the
+    metaphor_event as a literal description of it.
+
+faithful: true only if a viewer who accepted metaphor_event as "this is what
+concept_rule means" would come away believing exactly what concept_rule says —
+no more, no less.
+
+When faithful is false, `problem` names EXACTLY what the metaphor implies that
+concept_rule does not say, e.g. "the whiteboard being wiped implies the value is
+lost forever, but concept_rule only says it is recreated with the SAME initial
+value — the metaphor drops that it comes back, not that it's gone".
+
+Output JSON: {"verdicts": [{"concept_rule": "...", "faithful": bool, "problem": "..."}, ...]},
+one verdict per mapping entry given, in the same order."""
+
+
+def judge_story_metaphors(mapping: list) -> StoryEvalReport:
+    """
+    RESTYLE_TO_STORY_REELS.md Phase 1: "for each mapping entry, ask the judge:
+    Does metaphor_event behave exactly like concept_rule, with nothing extra
+    implied? Any 'no' fails the reel." — StoryEvalReport.passed is that rule.
+
+    TAKES THE MAPPING DIRECTLY (list[ConceptMapping]), NOT A StoryScript —
+    Step 2's own "run judge_story_metaphors() on the mapping BEFORE shots are
+    written" needs this gate reachable from skills.script.plan_story_mapping,
+    which has a ConceptMappingSet in hand and no shots yet, hence no
+    StoryScript to build. audit_story (below) still calls this the same way,
+    passing `story.mapping`.
+
+    Takes source_text implicitly through concept_rule/source_quote already
+    being grounded by checks.check_mapping before this runs; the judge is
+    asked to compare the METAPHOR against the RULE, not re-derive the rule
+    from the material a second time — that grounding question is
+    check_mapping's job, already paid for and already passed by the time this
+    call happens.
+    """
+    entries = "\n\n".join(
+        f"concept_rule: {m.concept_rule}\n"
+        f"metaphor_event: {m.metaphor_event}\n"
+        f"visible_proof: {m.visible_proof}"
+        for m in mapping)
+    user = f"MAPPING ENTRIES TO CHECK:\n\n{entries}\n\nGrade each one."
+    return ask_json(METAPHOR_JUDGE_SYSTEM, user, StoryEvalReport,
+                    model=config.MODEL_STORY_JUDGE, max_tokens=2000, think=True,
+                    label="story_judge")
+
+
+def audit_story(story: StoryScript, source_text: str, technical_term: str = ""):
+    """Story mode's counterpart to audit() above: free checks first, judge only
+    if they passed. See checks.run_story_graders for why this is a separate
+    grader list rather than a branch inside run_script_graders.
+    """
+    results = checks.run_story_graders(story, source_text, technical_term=technical_term)
+    if not checks.all_passed(results):
+        return results, None
+    return results, judge_story_metaphors(story.mapping)

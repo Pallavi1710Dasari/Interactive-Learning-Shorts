@@ -42,10 +42,13 @@ WHY IT MUST NOT BE THE MODEL THAT DREW THE FRAME
 See config._vision_warning. A model grading its own composition approves it.
 """
 import re
+import threading
+import time
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from ..schema import Script, Section, Visual, VisualScore, VisualStrategy
+from ..schema import Script, Section, Visual, VisualScore, VisualStrategy, Shot, StoryFrameJudge
 from ..llm import ask_json
 from .. import config, raster
 from .strategy import EDUCATIONAL_VISUAL_RULES
@@ -340,3 +343,160 @@ def problems_for_redesign(scored: dict[str, VisualScore],
                    + "; ".join(failures) + f". What the judge saw: {detail}")
     out += [f"the sequence as a whole: {p}" for p in composition_problems]
     return out
+
+
+# =============================================================================
+# STORY MODE — RESTYLE_TO_STORY_REELS.md Step 6 Part 2. A completely separate
+# judge from judge_frames above (explainer mode, unchanged by anything below
+# this line): that one scores a WHOLE SHORT's SVG diagrams against motion and
+# narration; this one scores ONE GENERATED IMAGE FRAME against its shot spec
+# and reference sheets. shorts/story_frames.py is the only caller.
+# =============================================================================
+
+STORY_FRAME_JUDGE_SYSTEM = """You are judging ONE generated illustration frame from an
+illustrated teaching story, against its shot spec and reference images.
+
+IMAGE 1 is the GENERATED FRAME being judged. The images after it are reference
+material: the CAST REFERENCE SHEET(S) for every character in this shot, in
+order, and then — unless this is the reel's first `wide` shot, which has none
+— the SETTING REFERENCE (the first wide shot's own generated frame, already
+approved, establishing what the setting looks like).
+
+Score six axes, 1-5 each:
+
+1. character_match — does every character in the frame match its reference
+   sheet: head shape, hair, cap/badge, proportions? A character who looks
+   like a different person (or a different cast member) scores low here,
+   even if the picture is otherwise well-drawn.
+2. no_text — no letters, garbled text, speech bubbles, or logos anywhere in
+   the frame. A single stray letter-like mark is enough to fail this axis.
+3. action_visible — the shot's own ACTION and KEY OBJECT are both clearly,
+   unambiguously shown — a viewer who only sees this frame (sound off)
+   should be able to tell what is physically happening. The key object
+   should read as glowing softly in yellow.
+4. emotion_readable — the shot's own EMOTION is readable on the character's
+   face at PHONE SIZE, not just at full resolution — a subtle expression
+   that only reads zoomed-in scores low here.
+5. style_match — outlines, palette, and background follow the style bible:
+   thick clean black outlines, off-white paper background, accent colors
+   only purple/warm yellow, flat 2D, no gradients, no photorealism, no 3D.
+6. setting_match — the same setting as the SETTING REFERENCE image. OMIT
+   this field entirely (do not guess a score) if no setting reference image
+   was given — that only happens for the reel's first `wide` shot.
+
+PASS RULE (strict — read carefully, this is not "every axis >= 3"):
+  - no_text MUST BE A PERFECT 5. Any text at all — even one stray letter-like
+    mark — fails the whole frame, no exceptions.
+  - character_match MUST BE >= 4. Merely recognizable is not enough; the
+    fixed cast has to stay visually consistent across every shot in the feed.
+  - action_visible, emotion_readable, style_match, and setting_match (when
+    scored) each only need >= 3.
+
+Be specific in `reasons`: name exactly what's wrong ("the badge is missing
+from System's chest", "the whiteboard prop has become a laptop, not matching
+the setting reference") rather than a vague restatement of a low score.
+
+Output JSON: {"character_match": n, "no_text": n, "action_visible": n,
+"emotion_readable": n, "style_match": n, "setting_match": n (or omit it),
+"reasons": ["..."]}"""
+
+
+#: RESTYLE_TO_STORY_REELS.md Step 7 Part 0 #3 — the judge is rate-limited to
+#: config.JUDGE_RPM calls/minute, with exponential backoff-and-retry (never a
+#: hard failure) on a 429. Module-level (not per-call) state: the throttle
+#: has to hold across every judge call in a process, not reset per shot.
+_judge_lock = threading.Lock()
+_last_judge_call: list[float] = [0.0]
+JUDGE_MAX_RETRIES = 5
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    """True for anything that smells like an HTTP 429 — the Anthropic SDK's
+    own RateLimitError when available, or any exception carrying a
+    status_code/response.status_code of 429 (covers a raw HTTP client, or a
+    gateway wrapping a different SDK). Never imports anthropic unconditionally
+    at module load — this project already runs against gateways where that
+    import may not even be present the same way."""
+    try:
+        import anthropic
+        if isinstance(exc, anthropic.RateLimitError):
+            return True
+    except ImportError:
+        pass
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    return status == 429
+
+
+def _throttle_judge_rpm() -> None:
+    """Block until at least 60/JUDGE_RPM seconds have passed since the last
+    judge call started — a plain fixed-interval throttle, not a bursty token
+    bucket, because a judge call is expensive enough that "space them out
+    evenly" is the right shape, not "allow a burst then cool down".
+
+    A NO-OP UNDER SHORTS_STUB=1 — there is no real rate limit to respect
+    against a canned local response, and a mandatory 60/JUDGE_RPM-second
+    sleep before every stub judge call would make the entire test suite
+    minutes slower for a limit that does not apply to it.
+    """
+    if config.STUB:
+        return
+    with _judge_lock:
+        min_interval = 60.0 / max(1, config.JUDGE_RPM)
+        wait = _last_judge_call[0] + min_interval - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_judge_call[0] = time.monotonic()
+
+
+def judge_story_frame(frame_path: Path, shot: Shot, cast_refs: list[Path],
+                      setting_ref: Path | None = None) -> StoryFrameJudge:
+    """
+    Look at ONE generated frame and score it against its own shot spec and
+    reference images — story_frames.py's regenerate loop calls this only
+    AFTER shorts.frame_checks.run_pre_checks has already passed (see that
+    module's own docstring: no paying for a judge's opinion on a frame that
+    is already known to be the wrong size or blank).
+
+    `cast_refs` must be in the SAME order as build_shot_prompt's own
+    "reference image n" numbering (skills.visuals.cast_refs_for_shot already
+    guarantees that) — IMAGE 1 is always the generated frame; images 2..N+1
+    are the cast refs, in order; the setting reference, when given, is last.
+
+    RATE-LIMITED AND NEVER FAILS A REEL OVER IT (Step 7 Part 0 #3): every
+    call waits for _throttle_judge_rpm() first, and a 429 is retried with
+    exponential backoff (1s, 2s, 4s, ...) up to JUDGE_MAX_RETRIES times
+    before finally raising — a reel stops on a genuinely broken judge call,
+    never on ordinary rate limiting.
+    """
+    images = [Path(frame_path).read_bytes()]
+    images += [Path(r).read_bytes() for r in cast_refs]
+    if setting_ref is not None:
+        images.append(Path(setting_ref).read_bytes())
+
+    characters = ", ".join(shot.characters) or "(none — a Narrator-only shot)"
+    user = f"""SHOT SPEC
+characters: {characters}
+framing:    {shot.framing}
+emotion:    {shot.emotion or '(none)'}
+action:     {shot.action}
+key_prop:   {shot.key_prop or '(none)'}
+
+{len(cast_refs)} cast reference sheet(s) follow the generated frame, in order.
+{"A setting reference follows them — score setting_match." if setting_ref else
+"No setting reference is given (first wide shot) — omit setting_match."}
+
+Score the generated frame (IMAGE 1)."""
+
+    for attempt in range(JUDGE_MAX_RETRIES + 1):
+        _throttle_judge_rpm()
+        try:
+            return ask_json(STORY_FRAME_JUDGE_SYSTEM, user, StoryFrameJudge,
+                            model=config.MODEL_STORY_VISION_JUDGE, max_tokens=1500,
+                            think=True, label="story_frame_judge", images=images)
+        except Exception as e:
+            if _is_rate_limited(e) and attempt < JUDGE_MAX_RETRIES:
+                time.sleep(2 ** attempt)
+                continue
+            raise

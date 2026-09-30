@@ -16,6 +16,7 @@ A stub run should therefore go green end to end. If it doesn't, the bug is in
 your code, not in a prompt — which is exactly what you want a smoke test to tell
 you. These are deliberately dumb. Do not tune them; tune the real prompts.
 """
+import ast
 import re
 
 from .schema import MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND
@@ -69,6 +70,16 @@ def fake(model_cls, system: str, user: str):
         return model_cls(**_framing(user))
     if name == "TeachingApproach":
         return model_cls(**_teaching_approach(user))
+    if name == "ConceptMappingSet":
+        return model_cls(**_story_mapping(user))
+    if name == "HookLineOnly":
+        return model_cls(**_story_hook_fix(user))
+    if name == "StoryShotsSet":
+        return model_cls(**_story_shots(user))
+    if name == "StoryEvalReport":
+        return model_cls(**_story_eval(user))
+    if name == "StoryFrameJudge":
+        return model_cls(**_story_frame_judge(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 
@@ -670,3 +681,253 @@ def _visuals(user: str) -> dict:
         out.append({"ref": ref, "spec": f"Stub frame {i + 1}: hero on {cells[i]!r}.",
                     "frame": frame})
     return {"visuals": out}
+
+
+# --------------------------------------------------------------------- story mode
+#
+# RESTYLE_TO_STORY_REELS.md Phase 1. Same honesty rule as _understanding/_script
+# above: every source_quote is a REAL verbatim span of the material, because that
+# is the one thing checks.check_mapping actually checks against the source, and a
+# stub that faked it would let a broken quote-matcher pass a stub run clean. Every
+# other field (concept_rule, metaphor_event, visible_proof, lesson_line) is a
+# fixed, deterministic phrase — check_mapping never asks whether those are TRUE,
+# only that they are internally consistent (same concept_rule string used as
+# concept_ref, same lesson_line used as a shot's line and in `lessons`), so
+# inventing prose for them is not the honesty gap the module docstring warns
+# about.
+
+#: Rotates through checks.STORY_ACTORS so a stub mapping's actor field is
+#: always a valid one without importing checks (stubs.py stays a leaf module).
+_STUB_ACTORS = ("Rahul", "System", "Riya")
+
+
+def _story_mapping(user: str) -> dict:
+    body = _find(r"MATERIAL:\n(.*?)\n\nILLUSTRATION STYLE", user, re.S) or ""
+    sentences = [s for s in re.split(r"(?<=\.)\s+", " ".join(body.split())) if s.strip()]
+    spans = _spans(sentences) if sentences else []
+    if not spans:
+        spans = [body.strip() or "this material"]
+    # 3 entries — check_mapping's own preferred default (2-4 allowed; Step 2
+    # Part B's ~26-30 shot budget needs 3 mini-scenes' worth of material to
+    # land in range without stretching each one artificially thin).
+    picks = spans[:3] if len(spans) >= 3 else (spans + [spans[-1]] * (3 - len(spans)))
+    mapping = [
+        {
+            # entry 0 must read as THE PROBLEM (check_mapping's first-entry
+            # rule) — "does not" is one of _FAILURE_WORDS.
+            "concept_rule": (f"rule {i + 1} does not work without the fix: {quote[:40]}"
+                             if i == 0 else f"rule {i + 1}: {quote[:40]}"),
+            "source_quote": quote,
+            "actor": _STUB_ACTORS[i % len(_STUB_ACTORS)],
+            "metaphor_event": f"stub event {i + 1} happens when the stub notebook is opened",
+            "visible_proof": f"stub visible proof {i + 1}, no words needed",
+            "lesson_line": f"Stub lesson {i + 1}.",
+        }
+        for i, quote in enumerate(picks)
+    ]
+    # `chosen` is intentionally absent here — skills.script._assign_chosen_candidate
+    # sets it in code from these scores, the same as it would for a real
+    # model response that omits the field (see MetaphorCandidate.chosen).
+    candidates = [
+        {"name": "stub desk", "pitch": "a stub scene at a stub desk",
+         "familiarity": 5, "faithfulness": 5, "drawability": 5, "drama": 5},
+        {"name": "stub runner-up A", "pitch": "a weaker stub candidate",
+         "familiarity": 3, "faithfulness": 3, "drawability": 3, "drama": 3},
+        {"name": "stub runner-up B", "pitch": "another weaker stub candidate",
+         "familiarity": 2, "faithfulness": 3, "drawability": 3, "drama": 2},
+    ]
+    return {
+        "mapping": mapping,
+        "system_name": "Stub System",
+        "setting": "a quiet stub desk",
+        "props": ["stub notebook"],
+        "candidates": candidates,
+        "hook_line": "Ever noticed how the stub desk always resets?",
+        # STEP 9 FIX 2: required, non-blank — see ConceptMappingSet.
+        # technical_term's own field validator.
+        "technical_term": "stub state",
+        "card_facts": ["Stub notation fact about a return shape.",
+                      "Stub complexity fact, written as O(1)."],
+    }
+
+
+def _story_hook_fix(user: str) -> dict:
+    """
+    skills.script.regenerate_hook_line's stub path — a NARROW repair call
+    (HookLineOnly, one field), separate from _story_mapping above. Always
+    returns a line that passes checks.check_hook (a real opener from
+    HOOK_OPENERS, short, no technical term named) so the happy path —
+    story_reel.py's _fix_stale_hook_line regenerating a stale, pre-4-opener
+    hook_line on a resumed mapping — exercises end to end under
+    SHORTS_STUB=1 with no real model call. A test that wants the RETRY path
+    (a candidate that keeps failing check_hook) monkeypatches
+    skills.script.ask_json directly, the same pattern every other retry-path
+    test in this project already uses (see e.g. judge_story_metaphors
+    rejection tests) — this stub only needs to model the common case.
+    """
+    return {"hook_line": "Ever noticed how the stub scene always resets?"}
+
+
+#: RESTYLE_TO_STORY_REELS.md Step 2 Part B — the shape every stub (and every
+#: real) shot list must follow. Kept here, not folded inline into
+#: _story_shots, so shorts/story_mode_test.py can import it directly and
+#: build "break exactly one rule" variants by mutating a COPY of a known-good
+#: script, rather than stubs.py needing one hand-written variant per rule.
+def build_stub_shots(entries: list[dict], hook_line: str, props: list[str],
+                     card_facts: list[str], brand_handle: str, topic_label: str,
+                     technical_term: str | None = None) -> list[dict]:
+    """
+    Build a compliant ~26-30 shot list from an approved mapping's entries.
+
+    `entries` is a list of dicts with concept_rule/source_quote/actor/lesson_line
+    — the same shape _story_shots below parses out of the approved-mapping
+    text block. Deterministic and dumb on purpose, same philosophy as every
+    other stub in this module: it follows the RULES (rhythm, structure,
+    per-shot fields) exactly, using the real mapping's own words, so
+    checks.run_story_graders passes for real rather than by being switched off.
+    """
+    props = list(props) or ["stub prop"]
+    technical_term = technical_term or "the concept"
+    shots: list[dict] = []
+
+    def add(shot_id, characters, action, **kw):
+        shots.append({
+            "shot_id": shot_id, "characters": characters, "action": action,
+            "line": kw.get("line"), "concept_ref": kw.get("concept_ref"),
+            "story_beat": kw.get("story_beat"), "kind": kw.get("kind", "scene"),
+            "emotion": kw.get("emotion", ""), "key_prop": kw.get("key_prop"),
+            "camera": kw.get("camera", "static"), "framing": kw.get("framing", "medium"),
+            "source_quote": kw.get("source_quote"), "overlay_text": kw.get("overlay_text"),
+            "card_lines": kw.get("card_lines") or [],
+        })
+
+    add("s_hook", [], "the scene opens on the empty setting", line=hook_line,
+       framing="wide")
+
+    for ei, e in enumerate(entries):
+        actor, rule, quote, lesson = e["actor"], e["rule"], e["quote"], e["lesson"]
+        prop = props[ei % len(props)]
+        common = dict(concept_ref=rule, key_prop=prop, source_quote=quote)
+
+        # 4 "problem" shots — the difficulty this entry's metaphor resolves.
+        # STEP 9 FIXES ROUND 6: bumped from 3 to 4 (7 -> 8 shots/entry
+        # overall) to match SYSTEM_STORY_SHOTS's own retuned "aim for 8
+        # shots PER MINI-SCENE" arithmetic — real runs had been landing at
+        # 22-23 total shots (below the 24 floor) even with the prompt's
+        # prior "aim for 7" target, so the prompt now targets ~29, and
+        # this fixture is kept in step with it so the stub sits clearly
+        # above the floor too, not just barely over it.
+        add(f"s{ei}_problem0", [actor], f"{actor} tries the old way with the {prop}",
+           line=f"{actor} tries again with the {prop}.", story_beat="problem",
+           emotion="determined", camera="static", framing="medium", **common)
+        add(f"s{ei}_problem1", [actor], f"{actor} keeps trying, nothing changes",
+           story_beat="problem", emotion="frustrated", camera="static",
+           framing="medium", **common)
+        add(f"s{ei}_problem2", [actor], f"{actor} stares at the {prop}, stuck",
+           story_beat="problem", emotion="frustrated", camera="push_left",
+           framing="medium", **common)
+        add(f"s{ei}_problem3", [actor], f"{actor} tries one more thing with the {prop}, still stuck",
+           story_beat="problem", emotion="frustrated", camera="zoom_out",
+           framing="medium", **common)
+
+        # THE REVEAL — one "reaction" shot, wide, then close_up right after it
+        # (checks.check_shot_rhythm's own rule).
+        add(f"s{ei}_reaction", [actor], f"the {prop} does what the rule says it does",
+           story_beat="reaction", emotion="surprised", camera="shake",
+           framing="wide", **common)
+        add(f"s{ei}_reveal_close", [actor], f"a close view of the {prop} settles",
+           story_beat="payoff", emotion="surprised", camera="zoom_in",
+           framing="close_up", **common)
+
+        # 2 more "payoff" shots. The first is a `two_shot` — the actor and a
+        # companion sharing the moment together, waist up — Step 5's own
+        # framing, and what guarantees every mapping entry contributes both
+        # a second cast member on screen and a two_shot for story_frames.py's
+        # --sample selection to actually find.
+        companion = "Rahul" if actor != "Rahul" else "System"
+        add(f"s{ei}_payoff0", [actor, companion],
+           f"{actor} and {companion} both look at the {prop} together",
+           story_beat="payoff", emotion="relieved", camera="static",
+           framing="two_shot", **common)
+        add(f"s{ei}_payoff1", [actor], f"{actor} nods at the {prop}",
+           line=lesson, story_beat="payoff", emotion="relieved", camera="static",
+           framing="medium", **common)
+
+        if ei == 0:
+            add("s_concept_named", [], f"the camera lingers on the {prop} a moment longer",
+               line=f"And that {prop}? That's {technical_term}.")
+
+    for i, fact in enumerate(card_facts[:2]):
+        add(f"s_card{i}", [], "a plain fact card appears over the scene",
+           kind="text_card", overlay_text=fact)
+
+    recap_lines = [" ".join(e["lesson"].split()[:min(5, max(2, len(e["lesson"].split())))])
+                  for e in entries]
+    add("s_recap", [], "a short recap card appears", kind="recap", card_lines=recap_lines)
+
+    add("s_cta", [], "a follow card appears", kind="cta",
+       overlay_text=f"Follow {brand_handle} to learn {topic_label} the simple way.")
+
+    return shots
+
+
+_STORY_SHOTS_ENTRY_RE = re.compile(
+    r"concept_rule:\s*(?P<rule>.+?)\n\s*source_quote:\s*(?P<quote>.+?)\n"
+    r"\s*actor:\s*(?P<actor>.+?)\n\s*metaphor_event:.*?\n\s*visible_proof:.*?\n"
+    r"\s*lesson_line:\s*(?P<lesson>.+?)(?:\n|$)", re.S)
+
+
+def _story_shots(user: str) -> dict:
+    entries = [{k: v.strip() for k, v in m.groupdict().items()}
+              for m in _STORY_SHOTS_ENTRY_RE.finditer(user)]
+    if not entries:
+        entries = [{"rule": "stub rule", "quote": "stub quote", "actor": "Rahul",
+                   "lesson": "Stub lesson."}]
+
+    hook_line = _find(r"OPENING HOOK LINE[^:]*:\s*(.+)", user) or "Ever noticed the stub reset?"
+    technical_term = _find(r"TECHNICAL TERM[^:]*:\s*(.+)", user) or "the concept"
+    props_text = _find(r"PROPS:\s*(\[.*?\])", user)
+    try:
+        props = ast.literal_eval(props_text) if props_text else []
+    except (ValueError, SyntaxError):
+        props = []
+    brand_handle = _find(r"BRAND HANDLE FOR THE CTA:\s*(.+)", user) or "@learnthesimpleway"
+    topic_label = _find(r"TOPIC FOR THE CTA[^:]*:\s*(.+)", user) or "this"
+    card_block = _find(r"CARD FACTS[^\n]*:\n(.*?)\nBRAND HANDLE", user, re.S) or ""
+    card_facts = [ln.strip("- ").strip() for ln in card_block.splitlines()
+                 if ln.strip().startswith("-")]
+
+    shots = build_stub_shots(entries, hook_line, props, card_facts, brand_handle, topic_label,
+                             technical_term=technical_term)
+    return {
+        "cast": [],
+        "shots": shots,
+        "lessons": [e["lesson"] for e in entries],
+        "estimated_seconds": 30.0,
+    }
+
+
+def _story_eval(user: str) -> dict:
+    rules = re.findall(r"concept_rule:\s*(.+)", user)
+    return {"verdicts": [{"concept_rule": r.strip(), "faithful": True, "problem": ""}
+                         for r in rules]}
+
+
+def _story_frame_judge(user: str) -> dict:
+    """
+    A clean pass, every axis 5 — the honesty rule other stubs in this module
+    follow (see the module docstring) does not apply the same way here:
+    there is no real frame for this stub to look at and report on
+    truthfully, only the same canned "this looks fine" opinion every
+    SHORTS_STUB=1 judge call in this project already gives (see EvalReport's
+    own stub above). Tests exercising a FAILING verdict monkeypatch
+    skills.vision.judge_story_frame directly instead of trying to make this
+    stub text-sniff its way to a bad score.
+    """
+    result = {
+        "character_match": 5, "no_text": 5, "action_visible": 5,
+        "emotion_readable": 5, "style_match": 5, "reasons": [],
+    }
+    if "score setting_match" in user:
+        result["setting_match"] = 5
+    return result

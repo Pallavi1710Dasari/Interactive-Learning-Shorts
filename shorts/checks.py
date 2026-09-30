@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from .schema import (
     Script, ShortUnit, Section, QuestionSelection, QuestionFraming, QuestionWorkflow,
     TeachingApproach, VisualStrategy, Topic, MIN_SECONDS, MAX_SECONDS, HARD_MAX_SECONDS,
-    MAX_OVERLAY_WORDS, WORDS_PER_SECOND,
+    MAX_OVERLAY_WORDS, WORDS_PER_SECOND, ConceptMapping, Shot, MetaphorCandidate,
 )
 
 
@@ -1052,6 +1052,781 @@ def check_source_quotes(script: Script, source_text: str,
     return GraderResult("source_quotes", True,
                         f"{len(answers)} answer beats, {len(quotes)} distinct "
                         f"citations, all verbatim")
+
+
+# --------------------------------------------------------------------- story mode
+#
+# RESTYLE_TO_STORY_REELS.md Phase 1. check_mapping is the free (no LLM) gate on a
+# story's METAPHOR MAPPING — everything here is countable; whether a metaphor
+# actually FEELS like the rule (the STEP 1b self-rejection list in
+# skills/script.py's SYSTEM_STORY) is a judgement call and belongs to
+# skills/audit.py's judge, not this function.
+
+#: config.CAST's three ACTING roles — the roles a ConceptMapping.actor may
+#: name. Narrator is deliberately excluded: it carries the story, it never
+#: performs a metaphor_event (see SYSTEM_STORY's own cast rules).
+STORY_ACTORS = {"Rahul", "Riya", "System"}
+
+#: Words that mean "an invented mechanism", never "an everyday human
+#: situation" — RESTYLE_TO_STORY_REELS.md's own banned-metaphor list. Matched
+#: case-insensitively as whole words. A document that is ITSELF about one of
+#: these (a topic literally about gears, pipes, or circuits) is exempted by
+#: check_mapping checking whether the word already appears in source_text —
+#: the ban is about METAPHORS invented for a technology topic, not about
+#: technology topics that are literally that apparatus.
+APPARATUS_WORDS = ("lever", "machine", "cabinet", "conveyor", "pipe", "gear", "circuit")
+
+#: A heuristic vocabulary for "this concept_rule reads as a problem/limitation,
+#: not a definition" — the first mapping entry's own required shape. Not an
+#: exhaustive parser of English, just the words a failure/limitation is
+#: actually phrased with ("does not survive", "cannot", "loses", "without").
+_FAILURE_WORDS = (
+    "not ", "n't", "cannot", "can't", "never", "fails", "fail ", "failing",
+    "wrong", "loses", "lose ", "lost", "breaks", "broken", "without", "limit",
+    "stuck", "problem", "unable", "doesn't", "won't", "hard to", "difficult",
+)
+
+#: The curiosity-hook shape check_hook accepts for a story's opening line —
+#: A LATER FIX (RESTYLE_TO_STORY_REELS.md, following the shot-under-
+#: generation/duration/reveal-framing fixes) NARROWED this back to a fixed
+#: rotating set of exactly 4 openers — the Step 1 widening to any bare
+#: "ever <verb>..." (kept in the comment above as history, e.g. "Ever
+#: clicked a button that just refuses to change?") produced hooks that
+#: were short and grounded but too varied in shape for a consistent brand
+#: voice across reels; the 4 patterns below are the deliberate, narrower
+#: replacement. Still the one exception to the explainer-mode ban on this
+#: shape — see checks.check_hook_plan's own curiosity-hook allowance for
+#: the explainer side of that same split.
+HOOK_OPENERS = ("have you ever wondered", "ever noticed", "did you know", "ever wonder why")
+_HOOK_SHAPE_RE = re.compile(
+    r"^(" + "|".join(re.escape(o) for o in HOOK_OPENERS) + r")\b", re.IGNORECASE)
+#: Kept for anything that still wants the literal phrase list (error messages).
+HOOK_PHRASES = HOOK_OPENERS
+#: RESTYLE_TO_STORY_REELS.md Step 1 fix: short and punchy, not a full sentence.
+HOOK_MAX_WORDS = 12
+
+
+def _apparatus_problems(field_name: str, text: str, source_text: str) -> list[str]:
+    lower = text.lower()
+    source_lower = source_text.lower()
+    hits = [w for w in APPARATUS_WORDS
+           if re.search(rf"\b{re.escape(w)}\b", lower)
+           and not re.search(rf"\b{re.escape(w)}\b", source_lower)]
+    if hits:
+        return [f"{field_name} {text[:60]!r} uses invented-apparatus word(s) {hits} — "
+               f"the metaphor must be an everyday human situation, not a machine "
+               f"(the source material itself never uses {hits}, so this isn't the "
+               f"topic's own vocabulary)"]
+    return []
+
+
+def _candidate_problems(candidates: list[MetaphorCandidate]) -> list[str]:
+    """
+    Only the count is graded here. "Exactly one candidate chosen, and it's the
+    highest-scoring one" USED to be checked here too, and it was the wrong
+    layer for it: the model reliably scored the 3 candidates correctly and
+    just as reliably forgot to flag its own winner, which a grader can only
+    report, never fix, and burned a full retry (a second paid call) on a
+    field the caller could derive from the scores it already had. See
+    schema.MetaphorCandidate.chosen and skills.script._assign_chosen_candidate
+    — `chosen` is now SET IN CODE from the scores, so it cannot be wrong
+    (enforced there by a plain `assert`, not a GraderResult), and there is
+    nothing left here to grade.
+    """
+    if not candidates:
+        return []
+    if len(candidates) != 3:
+        return [f"candidates has {len(candidates)} entries, needs 3 "
+               f"(CANDIDATE SELECTION scores exactly 3 metaphors)"]
+    return []
+
+
+#: Words that mean "a mark/effect", never "a physical object" — RESTYLE_TO_
+#: STORY_REELS.md Step 2 Part A's own list. A prop is something the camera
+#: could show sitting on a shelf; "a chalk tally mark" is the RESIDUE of an
+#: action on a prop (the chalkboard), not a prop itself. Matched as whole
+#: words, same reasoning as APPARATUS_WORDS above.
+_NON_PHYSICAL_PROP_WORDS = ("mark", "tally", "line", "sound", "light", "flash", "effect")
+
+
+def _core_words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z]+", text.lower()) if len(w) > 3}
+
+
+def _card_fact_problems(mapping: list[ConceptMapping], card_facts: list[str]) -> list[str]:
+    """
+    RESTYLE_TO_STORY_REELS.md Step 2 Part A: a concept lives in `mapping` OR
+    `card_facts`, never both. Matched the same way the props-usage fix
+    matches "named in a metaphor_event" — core words, not the whole string,
+    since a card_fact restating a rule is reworded, not copied verbatim.
+    A shared-word MAJORITY (not just any overlap) is what "restates" means
+    here; two genuinely different facts about the same feature can share a
+    couple of words without being the same fact.
+    """
+    problems = []
+    for cf in card_facts:
+        cf_words = _core_words(cf)
+        if not cf_words:
+            continue
+        for m in mapping:
+            rule_words = _core_words(m.concept_rule)
+            if not rule_words:
+                continue
+            overlap = cf_words & rule_words
+            if len(overlap) >= 3 and len(overlap) >= len(rule_words) * 0.5:
+                problems.append(
+                    f'card_fact {cf!r} restates concept_rule {m.concept_rule!r} '
+                    f'(shared words: {sorted(overlap)}) — a concept belongs in '
+                    f'`mapping` OR `card_facts`, never both')
+    return problems
+
+
+def check_mapping(mapping: list[ConceptMapping], source_text: str,
+                  shots: list[Shot] | None = None,
+                  lessons: list[str] | None = None,
+                  setting: str = "",
+                  props: list[str] | None = None,
+                  candidates: list[MetaphorCandidate] | None = None,
+                  extra_entry_reason: str | None = None,
+                  card_facts: list[str] | None = None,
+                  technical_term: str = "") -> GraderResult:
+    """
+    `shots`/`lessons` ARE OPTIONAL, AND THAT SPLIT IS THE POINT.
+    skills.script.plan_story_mapping calls this right after the mapping-only
+    call — before a single shot exists — with neither, and only the checks a
+    bare mapping can already answer run (count, source_quote grounding,
+    actor/props/setting/candidates — everything STEP 1/1b of SYSTEM_STORY
+    already produces in that same call). Once shots exist (grading the
+    finished StoryScript), the caller passes shots/lessons too and the three
+    shot-coverage rules run as well. One function with two natural stages,
+    rather than a second one, mirrors how run_script_graders already composes
+    many independently-optional checks into a single list.
+
+    Reuses checks._flatten, the same substring matcher check_source_quotes
+    uses above, so a mapping's source_quote is held to the identical
+    normalisation (whitespace, punctuation, light stemming) an explainer
+    beat's source_quote already is — not a second, looser definition of
+    "quoted verbatim".
+    """
+    problems: list[str] = []
+    props = props or []
+    candidates = candidates or []
+    card_facts = card_facts or []
+
+    # STEP 9 FIX 2: technical_term is the concept's name exactly as the
+    # Narrator will say it once, after it's first shown ("state", "a
+    # stack") — checks.check_concept_named_once (below) grades WHERE it is
+    # said; this is the free, mechanical half, that it was said AT ALL.
+    # ConceptMappingSet.technical_term is itself a required, validated-
+    # non-empty pydantic field (see schema.py) — a caller building a fresh
+    # mapping can never hand this a blank string by construction, but the
+    # free grader still checks it explicitly, the same "schema says CAN
+    # this be represented, checks.py says IS this good" split every other
+    # rule in this function already follows.
+    if not technical_term.strip():
+        problems.append("technical_term is missing or blank — the concept's name, "
+                        "exactly as the Narrator will say it once, is required")
+
+    if not (2 <= len(mapping) <= 4):
+        problems.append(f"mapping has {len(mapping)} entries, needs 2-4")
+    elif len(mapping) == 4 and not (extra_entry_reason or "").strip():
+        problems.append("mapping has 4 entries but extra_entry_reason is blank — "
+                        "3 entries is preferred, a 4th needs a stated reason")
+
+    haystack = _flatten(source_text)
+    for m in mapping:
+        flat = _flatten(m.source_quote)
+        if flat not in haystack:
+            problems.append(
+                f'concept_rule {m.concept_rule!r} cites source_quote '
+                f'"{m.source_quote[:70]}" which is not in the material')
+        if m.actor not in STORY_ACTORS:
+            problems.append(
+                f'concept_rule {m.concept_rule!r} has actor {m.actor!r}, must be '
+                f'one of {sorted(STORY_ACTORS)}')
+
+    if mapping and not any(w in mapping[0].concept_rule.lower() for w in _FAILURE_WORDS):
+        problems.append(
+            f'first mapping entry {mapping[0].concept_rule!r} must be THE PROBLEM '
+            f'the concept solves (a failure/limitation), not a definition')
+    if mapping and mapping[0].actor != "Rahul":
+        # THE ACTOR-ROLE RULE: Rahul owns the problem — the thing that breaks
+        # or is lost belongs to him, System performs the rule (keeps, blocks,
+        # guards, returns it), Riya only explains or reacts. Only the first
+        # entry's actor is checked mechanically; the rest of the rule is
+        # SYSTEM_STORY's own guidance, not something a concept_rule's wording
+        # can verify the way the problem/failure-word heuristic above can.
+        problems.append(
+            f"the first (problem) mapping entry's actor is {mapping[0].actor!r}, must be "
+            f"'Rahul' — Rahul owns the problem, the thing that breaks or is lost")
+
+    if len(props) > 3:
+        problems.append(f"props has {len(props)} entries, needs <= 3: {props}")
+    non_physical = [p for p in props
+                   if any(re.search(rf"\b{w}\b", p.lower()) for w in _NON_PHYSICAL_PROP_WORDS)]
+    if non_physical:
+        problems.append(
+            f"prop(s) are a mark/effect, not a physical object: {non_physical} — a prop "
+            f"is something the camera could show sitting on a shelf, not the residue an "
+            f"action leaves on one")
+    # Checkable direction only: a prop declared but never used anywhere is
+    # clutter the story doesn't need. The reverse (an undeclared object
+    # mentioned in prose) isn't mechanically detectable without free-text
+    # noun extraction, so it is left to skills/audit.py's judge.
+    #
+    # MATCHED ON CORE WORDS, NOT THE WHOLE STRING. A real generation named
+    # props like "the school register (System's own persistent ledger)" —
+    # true to the setting, but never repeated character-for-character in a
+    # metaphor_event, which only ever says "the register". Requiring an exact
+    # substring match failed a mapping that was, in fact, using every prop it
+    # declared; stripping a parenthetical aside and matching on any real word
+    # (>3 letters, so "the"/"a" cannot match everything) is what "named in a
+    # metaphor_event" can mean without a real noun-phrase parser.
+    events_flat = " ".join(m.metaphor_event.lower() for m in mapping)
+    unused = []
+    for p in props:
+        core = re.sub(r"\([^)]*\)", " ", p.lower())
+        words = [w for w in re.findall(r"[a-z]+", core) if len(w) > 3]
+        if words and not any(w in events_flat for w in words):
+            unused.append(p)
+    if unused:
+        problems.append(f"prop(s) declared but never used in any metaphor_event: {unused}")
+
+    if setting:
+        problems += _apparatus_problems("setting", setting, source_text)
+    for m in mapping:
+        problems += _apparatus_problems("metaphor_event", m.metaphor_event, source_text)
+
+    problems += _candidate_problems(candidates)
+    problems += _card_fact_problems(mapping, card_facts)
+
+    if shots is not None:
+        rule_names = [m.concept_rule for m in mapping]
+        refs = [s.concept_ref for s in shots if s.concept_ref]
+
+        orphans = sorted({r for r in refs if r not in rule_names})
+        if orphans:
+            problems.append(
+                f"shot(s) reference concept_ref(s) that are not in the mapping: "
+                f"{orphans}")
+
+        counts = {name: refs.count(name) for name in rule_names}
+        thin = [name for name, n in counts.items() if n < 3]
+        if thin:
+            problems.append(
+                f"mapping entries dramatized by fewer than 3 shots: {thin} "
+                f"(counts: {counts})")
+
+        shot_lines = {(s.line or "").strip() for s in shots}
+        lessons_flat = {(l or "").strip() for l in (lessons or [])}
+        for m in mapping:
+            line = m.lesson_line.strip()
+            if line not in shot_lines:
+                problems.append(
+                    f'lesson_line "{line}" for concept_rule {m.concept_rule!r} '
+                    f"does not appear as any shot's own line")
+            if line not in lessons_flat:
+                problems.append(
+                    f'lesson_line "{line}" for concept_rule {m.concept_rule!r} '
+                    f"is missing from the top-level lessons list")
+
+    if problems:
+        return GraderResult("mapping", False, "; ".join(problems),
+                            {"mapping_count": len(mapping)})
+    graded_shots = shots is not None
+    return GraderResult("mapping", True,
+                        f"{len(mapping)} mapping entries, all grounded" +
+                        (" and dramatized by >=3 shots each" if graded_shots else
+                         " (shots not graded yet — mapping-only call)"))
+
+
+def check_hook(hook_line: str, technical_term: str = "") -> GraderResult:
+    """
+    The free gate on a story's opening curiosity hook (ConceptMappingSet.hook_line
+    / StoryScript.hook_line). Four rules, all mechanical:
+
+    - it is spoken by the Narrator, never a character — checked structurally,
+      since hook_line carries no separate speaker field: a line opening with
+      "Name:" reads as that character speaking, not the Narrator.
+    - it BEGINS WITH ONE OF THE 4 FIXED OPENERS in HOOK_OPENERS above
+      (case-insensitive) — not just "any curiosity shape"; a narrower,
+      deliberate rotating set, so every reel's hook reads in the same
+      brand voice.
+    - it is SHORT — <= HOOK_MAX_WORDS words. RESTYLE_TO_STORY_REELS.md's own
+      Step 1 fix: a hook that runs long reads as a narrated setup, not the
+      one-breath, punchy line a cold open needs.
+    - it never names the concept's own technical term — the hook is about the
+      everyday situation or the visible symptom ("why does your button stay
+      at zero"), never the vocabulary ("what is useState").
+
+    `technical_term` is OPTIONAL (Topic.concept is itself optional) — when
+    blank, that one check is skipped rather than failed; the other rules
+    still run.
+    """
+    problems: list[str] = []
+    line = (hook_line or "").strip()
+    if not line:
+        return GraderResult("hook", False, "hook_line is blank")
+
+    lower = line.lower()
+    if re.match(r"^[A-Za-z][\w ]*:\s", line):
+        problems.append(f'hook_line {line!r} is prefixed like a character speaking '
+                        f'("Name: ...") — it must be the Narrator\'s line')
+
+    if not _HOOK_SHAPE_RE.match(line):
+        problems.append(
+            f'hook_line {line!r} does not begin with one of the required '
+            f'openers: {HOOK_OPENERS}')
+
+    word_count = len(line.split())
+    if word_count > HOOK_MAX_WORDS:
+        problems.append(
+            f'hook_line {line!r} is {word_count} words, needs <= {HOOK_MAX_WORDS} '
+            f'— short and punchy, not a narrated setup')
+
+    if technical_term and technical_term.lower() in lower:
+        problems.append(
+            f'hook_line {line!r} names the technical term {technical_term!r} — '
+            f'the hook must be about the everyday symptom, not the vocabulary')
+
+    if problems:
+        return GraderResult("hook", False, "; ".join(problems))
+    return GraderResult("hook", True, f"hook_line {line[:60]!r} is a grounded curiosity hook")
+
+
+#: What a "character defines/explains a term" reply looks like — a cheap,
+#: mechanical proxy for "this line is an explanation", not a real parse of
+#: English. checks.check_story_not_qa only fires this when the PRECEDING line
+#: is also a question (or a banned QA opener) from a DIFFERENT speaker, which
+#: is what keeps it from flagging an ordinary declarative sentence.
+_DEFINER_PHRASES = (" is a ", " is an ", " is the ", " is when ", " is how ",
+                   " means ", " refers to ", " works by ", " happens when ")
+_BANNED_QA_OPENERS = ("what is", "what's", "how does", "how do", "why does", "why do")
+
+
+def shot_speaker(shot: Shot) -> str:
+    # A shot's `characters` list has no per-line speaker field (see Shot's own
+    # docstring) — the first named character is treated as who speaks `line`;
+    # no characters means the line is the Narrator's.
+    return shot.characters[0] if shot.characters else "Narrator"
+
+
+def check_story_not_qa(shots: list[Shot]) -> GraderResult:
+    """
+    RESTYLE_TO_STORY_REELS.md's ban on the interview shape, enforced on SHOTS
+    (Step 2 wires this into the retry loop; the function is implemented now
+    so its rules exist and are tested before that wiring happens).
+
+    Fails when a line that READS AS A QUESTION (ends in "?", or opens with
+    "what is"/"how does"/"why does"/...) is followed by a DIFFERENT
+    character's line that READS AS AN EXPLANATION (a _DEFINER_PHRASES hit, or
+    just a notably longer reply) — the same shape as
+    checks.check_no_interview_structure's explainer-mode ban, applied to shot
+    dialogue instead of Beat lines.
+    """
+    dialogue = [(shot_speaker(s), s.line.strip()) for s in shots if (s.line or "").strip()]
+    problems: list[str] = []
+    for i in range(len(dialogue) - 1):
+        speaker, line = dialogue[i]
+        next_speaker, next_line = dialogue[i + 1]
+        if speaker == next_speaker:
+            continue
+        lower = line.lower()
+        reads_as_question = line.endswith("?") or any(lower.startswith(o) for o in _BANNED_QA_OPENERS)
+        if not reads_as_question:
+            continue
+        next_lower = next_line.lower()
+        reads_as_explanation = (any(p in next_lower for p in _DEFINER_PHRASES)
+                                or len(next_line.split()) > 12)
+        if reads_as_explanation:
+            problems.append(
+                f'{speaker}: "{line}" is a question, answered by {next_speaker}: '
+                f'"{next_line}" — that is an interview exchange, not a story')
+
+    if problems:
+        return GraderResult("story_not_qa", False, "; ".join(problems))
+    return GraderResult("story_not_qa", True, f"{len(dialogue)} spoken lines, no Q&A exchange")
+
+
+#: ==========================================================================
+#: RESTYLE_TO_STORY_REELS.md Step 2 Part B — shot-generation checks. All free,
+#: no LLM, story mode only. Composed into run_story_graders below.
+#: ==========================================================================
+
+STORY_SHOT_COUNT_RANGE = (24, 30)
+STORY_DURATION_RANGE = (60.0, 80.0)
+SHOT_MAX_LINE_WORDS = 12
+#: What fraction of "scene"-kind shots must have at least one character
+#: acting in them — a story where most shots are pure voiceover isn't a
+#: DRAMATIZED story any more. Step 2 introduced this as a 0.6 judgment call
+#: (the brief named check_character_ratio but didn't spell out a number);
+#: Step 3 Part 0 set the real figure — 70%.
+MIN_CHARACTER_SHOT_RATIO = 0.7
+
+
+def check_shot_count(shots: list[Shot]) -> GraderResult:
+    lo, hi = STORY_SHOT_COUNT_RANGE
+    n = len(shots)
+    if not (lo <= n <= hi):
+        return GraderResult("shot_count", False, f"{n} shots, needs {lo}-{hi}")
+    return GraderResult("shot_count", True, f"{n} shots, within {lo}-{hi}")
+
+
+def check_story_duration(shots: list[Shot]) -> GraderResult:
+    lo, hi = STORY_DURATION_RANGE
+    total = round(sum(s.duration_seconds for s in shots), 2)
+    if not (lo <= total <= hi):
+        return GraderResult("story_duration", False,
+                            f"estimated {total}s, needs {lo}-{hi}s")
+    return GraderResult("story_duration", True, f"estimated {total}s, within {lo}-{hi}s")
+
+
+def check_line_length(shots: list[Shot]) -> GraderResult:
+    problems = [
+        f'shot {s.shot_id} line is {len(s.line.split())} words, needs <= '
+        f'{SHOT_MAX_LINE_WORDS}: {s.line!r}'
+        for s in shots if (s.line or "").strip()
+        and len(s.line.split()) > SHOT_MAX_LINE_WORDS
+    ]
+    if problems:
+        return GraderResult("line_length", False, "; ".join(problems))
+    return GraderResult("line_length", True,
+                        f"every spoken line is <= {SHOT_MAX_LINE_WORDS} words")
+
+
+def check_shot_rhythm(shots: list[Shot]) -> GraderResult:
+    """
+    Three pacing rules, RESTYLE_TO_STORY_REELS.md Step 2 Part B's own:
+      - never 3 `wide`-framed SCENE shots in a row.
+      - a `close_up` shot immediately follows every "reveal" — a shot whose
+        story_beat is "reaction" (the metaphor_event itself happening; see
+        Shot.story_beat's own docstring for why that beat, not "payoff", is
+        the moment being revealed).
+      - never 2 Narrator-spoken LINES in a row — except the hook (shot 0)
+        and the shot right after it, the one exception the brief names.
+        Only shots with a non-blank `line` count; a lineless Narrator-
+        attributed shot (a text_card/recap/cta) is silent, not a repeated
+        line.
+
+    THE "3 WIDE IN A ROW" RULE IS SCENE-SHOT-ONLY (kind == "scene") — a
+    real production run under Step 9's own technical_term fix (see that
+    step's own note) exposed this: text_card/recap/cta shots are flat
+    full-screen graphic cards with no camera at all, `framing` on them is
+    semantically meaningless (StoryStage.tsx never reads it for anything
+    but a scene shot), and the fixed closing structure often puts a
+    text_card, the recap, and the cta back to back — three non-scene shots
+    in a row that happened to carry framing="wide" (the model's own guess,
+    with nothing in the prompt telling it otherwise, for a field the
+    render pipeline never looks at on these three kinds) failed a
+    "pacing" rule about camera VARIETY that only ever meant something for
+    drawn scenes. Filtering to scene shots here is the robust half of that
+    fix — write_story_shots' own prompt is also told explicitly what to
+    put in `framing` for these three kinds now, but this check no longer
+    depends on the model actually doing that.
+    """
+    problems: list[str] = []
+    scene_only = [s for s in shots if s.kind == "scene"]
+
+    run = 0
+    for i, s in enumerate(scene_only):
+        run = run + 1 if s.framing == "wide" else 0
+        if run >= 3:
+            problems.append(f"3 consecutive 'wide' scene shots ending at {s.shot_id}")
+
+    for i, s in enumerate(shots[:-1]):
+        if s.story_beat == "reaction" and shots[i + 1].framing != "close_up":
+            problems.append(
+                f"shot {shots[i + 1].shot_id} follows a reveal (shot {s.shot_id}, "
+                f"story_beat='reaction') but is framed {shots[i + 1].framing!r}, "
+                f"not 'close_up'")
+
+    for i, s in enumerate(shots[:-1]):
+        nxt = shots[i + 1]
+        both_lined = (s.line or "").strip() and (nxt.line or "").strip()
+        both_narrator = shot_speaker(s) == "Narrator" and shot_speaker(nxt) == "Narrator"
+        if both_lined and both_narrator and i != 0:
+            problems.append(
+                f"shots {s.shot_id} and {nxt.shot_id} are both spoken lines by the "
+                f"Narrator back to back — only the hook and the shot right after it "
+                f"may do that")
+
+    if problems:
+        return GraderResult("shot_rhythm", False, "; ".join(problems))
+    return GraderResult("shot_rhythm", True, "framing and narrator-line rhythm both hold")
+
+
+def check_text_card_budget(shots: list[Shot], card_facts: list[str]) -> GraderResult:
+    """Exactly one `text_card`-kind shot per card_fact, each carrying that
+    fact's own text in `overlay_text` — never more, never fewer, never one
+    that doesn't match a real card_fact."""
+    cards = [s for s in shots if s.kind == "text_card"]
+    if len(cards) != len(card_facts):
+        return GraderResult("text_card_budget", False,
+                            f"{len(cards)} text_card shot(s) for {len(card_facts)} "
+                            f"card_fact(s) — needs exactly one each")
+    remaining = list(card_facts)
+    problems = []
+    for s in cards:
+        overlay = (s.overlay_text or "").strip()
+        match = next((cf for cf in remaining if _flatten(cf) == _flatten(overlay)), None)
+        if match is None:
+            problems.append(f"shot {s.shot_id}'s overlay_text {overlay!r} does not "
+                            f"match any card_fact")
+        else:
+            remaining.remove(match)
+    if problems:
+        return GraderResult("text_card_budget", False, "; ".join(problems))
+    return GraderResult("text_card_budget", True,
+                        f"{len(cards)} text_card shot(s), one per card_fact, matched")
+
+
+def check_character_ratio(shots: list[Shot]) -> GraderResult:
+    scene = [s for s in shots if s.kind == "scene"]
+    if not scene:
+        return GraderResult("character_ratio", True, "no scene shots to grade")
+    acted = sum(1 for s in scene if s.characters)
+    ratio = acted / len(scene)
+    if ratio < MIN_CHARACTER_SHOT_RATIO:
+        return GraderResult("character_ratio", False,
+                            f"only {acted}/{len(scene)} scene shots ({ratio:.0%}) have a "
+                            f"character acting in them, needs >= "
+                            f"{MIN_CHARACTER_SHOT_RATIO:.0%} — too much pure voiceover, "
+                            f"not enough dramatized action")
+    return GraderResult("character_ratio", True,
+                        f"{acted}/{len(scene)} scene shots ({ratio:.0%}) have a character "
+                        f"acting in them")
+
+
+#: A quoted phrase or a code span in `action` means the words are being
+#: smuggled into the visual description instead of overlay_text/line — the
+#: exact defect checks.check_no_text_in_action exists to catch.
+_QUOTED_PHRASE_RE = re.compile(r'"[^"]{4,}"|`[^`]+`')
+
+
+def check_no_text_in_action(shots: list[Shot]) -> GraderResult:
+    problems = [f"shot {s.shot_id}'s action contains quoted/coded text: {s.action!r}"
+               for s in shots if _QUOTED_PHRASE_RE.search(s.action)]
+    if problems:
+        return GraderResult("no_text_in_action", False, "; ".join(problems))
+    return GraderResult("no_text_in_action", True,
+                        "no shot's action smuggles words or code")
+
+
+def check_shot_grounding(shots: list[Shot], source_text: str) -> GraderResult:
+    """Every concept-carrying shot (concept_ref set) cites the exact source
+    sentence it dramatizes — the same verbatim discipline check_source_quotes
+    already holds explainer beats to, applied to Shot.source_quote."""
+    haystack = _flatten(source_text)
+    problems = []
+    for s in shots:
+        if not s.concept_ref:
+            continue
+        quote = (s.source_quote or "").strip()
+        if not quote:
+            problems.append(f"shot {s.shot_id} dramatizes {s.concept_ref!r} but carries "
+                            f"no source_quote")
+        elif _flatten(quote) not in haystack:
+            problems.append(f'shot {s.shot_id}\'s source_quote "{quote[:70]}" is not in '
+                            f'the material')
+    if problems:
+        return GraderResult("shot_grounding", False, "; ".join(problems))
+    return GraderResult("shot_grounding", True,
+                        "every concept-carrying shot cites real source text")
+
+
+def check_scene_coverage(shots: list[Shot], mapping: list[ConceptMapping]) -> GraderResult:
+    """Every mapping entry gets >= 3 shots (its mini-scene), ending on its own
+    lesson_line — the shot-level half of check_mapping's old shots-mode
+    rules, now checked directly on the assembled StoryScript's shots rather
+    than folded into check_mapping itself."""
+    problems = []
+    for m in mapping:
+        refs = [s for s in shots if s.concept_ref == m.concept_rule]
+        if len(refs) < 3:
+            problems.append(f"concept_rule {m.concept_rule!r} has {len(refs)} shots, "
+                            f"needs >= 3")
+            continue
+        last_line = (refs[-1].line or "").strip()
+        if last_line != m.lesson_line.strip():
+            problems.append(f"concept_rule {m.concept_rule!r}'s mini-scene ends on "
+                            f"{last_line!r}, not its lesson_line {m.lesson_line!r}")
+    if problems:
+        return GraderResult("scene_coverage", False, "; ".join(problems))
+    return GraderResult("scene_coverage", True,
+                        f"all {len(mapping)} mapping entries have a >=3-shot mini-scene "
+                        f"ending on their lesson_line")
+
+
+def _shot_spoken_words(shot: Shot) -> str:
+    """
+    Every word this shot's audio will actually say, gathered for term-
+    detection purposes only (not full spoken_text's own punctuation-
+    cleanup — this just needs to know what WORDS occur, not how they're
+    read aloud). Deliberately NOT imported from story_audio.spoken_text:
+    story_audio.py imports FROM this module (checks.shot_speaker), so the
+    reverse import would be circular. checks.check_concept_named_once
+    needs this because a round-7 real-run bug showed a recap's
+    `card_lines` are genuinely spoken aloud (story_audio.spoken_text joins
+    and reads them) even though `line` is blank for a recap shot — a
+    check that only reads `.line` has a blind spot exactly there, and the
+    same is true of a text_card/cta shot's `overlay_text`.
+    """
+    parts = [shot.line or ""]
+    if shot.kind in ("text_card", "cta"):
+        parts.append(shot.overlay_text or "")
+    if shot.kind == "recap":
+        parts.extend(shot.card_lines or [])
+    return " ".join(parts)
+
+
+def check_concept_named_once(shots: list[Shot], mapping: list[ConceptMapping],
+                             technical_term: str = "") -> GraderResult:
+    """The Narrator names the concept's technical term EXACTLY ONCE, and only
+    after the first mapping entry's mini-scene has finished (its payoff has
+    already landed) — RESTYLE_TO_STORY_REELS.md Step 2 Part B's own "...and
+    that clipboard? That's state." rule.
+
+    `technical_term` OPTIONAL, same pattern as check_hook: Topic.concept can
+    be unset, and this check has nothing to grade without it.
+
+    MATCHES ON A WHOLE WORD, NOT A SUBSTRING (STEP 9 FIXES ROUND 8): a real
+    run had this fail as "spoken twice" when technical_term="state" and one
+    shot's own line legitimately said "useState" (source-material code
+    syntax) — "state" IS a substring of "useState" (and of "statement"),
+    but neither one is the Narrator naming the concept a second time. A
+    plain `in` check could not tell those apart; a \\bword\\b regex can,
+    since there is no word boundary between "use" and "State" in a single
+    camelCase identifier.
+
+    Also scans every shot's FULL spoken content (line + text_card/cta
+    overlay_text + recap card_lines — see _shot_spoken_words), not just
+    `line` — the same round-7 lesson that a recap's card_lines are real,
+    spoken narration, not silent on-screen-only text.
+    """
+    if not technical_term:
+        return GraderResult("concept_named_once", True, "no technical_term supplied, skipped")
+    term_re = re.compile(r"\b" + re.escape(technical_term) + r"\b", re.IGNORECASE)
+
+    first_entry_end = -1
+    if mapping:
+        refs = [i for i, s in enumerate(shots) if s.concept_ref == mapping[0].concept_rule]
+        if refs:
+            first_entry_end = max(refs)
+
+    hits = [(i, s) for i, s in enumerate(shots)
+           if term_re.search(_shot_spoken_words(s))]
+    if not hits:
+        return GraderResult("concept_named_once", False,
+                            f"the term {technical_term!r} is never spoken")
+    if len(hits) > 1:
+        return GraderResult("concept_named_once", False,
+                            f"the term {technical_term!r} is spoken {len(hits)} times, "
+                            f"needs exactly once: shots {[s.shot_id for _, s in hits]}")
+    i, s = hits[0]
+    problems = []
+    if shot_speaker(s) != "Narrator":
+        problems.append(f"shot {s.shot_id} names {technical_term!r} but is spoken by "
+                        f"{shot_speaker(s)}, not the Narrator")
+    if first_entry_end >= 0 and i <= first_entry_end:
+        problems.append(f"shot {s.shot_id} names {technical_term!r} before the first "
+                        f"mapping entry's mini-scene has finished (ends at shot index "
+                        f"{first_entry_end})")
+    if problems:
+        return GraderResult("concept_named_once", False, "; ".join(problems))
+    return GraderResult("concept_named_once", True,
+                        f"{technical_term!r} named exactly once, by the Narrator, after "
+                        f"the first mini-scene")
+
+
+def check_key_prop_valid(shots: list[Shot], props: list[str]) -> GraderResult:
+    normalized = {_flatten(p) for p in props}
+    problems = [f"shot {s.shot_id}'s key_prop {s.key_prop!r} is not in props {props}"
+               for s in shots if s.key_prop and _flatten(s.key_prop) not in normalized]
+    if problems:
+        return GraderResult("key_prop_valid", False, "; ".join(problems))
+    return GraderResult("key_prop_valid", True, "every key_prop is a declared prop")
+
+
+#: RESTYLE_TO_STORY_REELS.md Step 9 Fixes round 4 — named so
+#: skills.script._truncate_recap_card_lines can enforce the same bound in
+#: code that this check enforces in review, rather than duplicating the
+#: numbers 2 and 5 across two files.
+RECAP_LINE_MIN_WORDS = 2
+RECAP_LINE_MAX_WORDS = 5
+
+
+def check_structure_ends(shots: list[Shot], mapping: list[ConceptMapping]) -> GraderResult:
+    """Second-last shot is the `recap` (one 2-5 word condensed line per
+    mapping entry, in order); last shot is the `cta`."""
+    if len(shots) < 2:
+        return GraderResult("structure_ends", False, "fewer than 2 shots")
+    recap, cta = shots[-2], shots[-1]
+    problems = []
+
+    if recap.kind != "recap":
+        problems.append(f"second-last shot ({recap.shot_id}) has kind {recap.kind!r}, "
+                        f"needs 'recap'")
+    else:
+        if len(recap.card_lines) != len(mapping):
+            problems.append(f"recap has {len(recap.card_lines)} card_lines, needs "
+                            f"{len(mapping)} (one per mapping entry)")
+        bad_len = [l for l in recap.card_lines
+                  if not (RECAP_LINE_MIN_WORDS <= len(l.split()) <= RECAP_LINE_MAX_WORDS)]
+        if bad_len:
+            problems.append(f"recap card_lines must be {RECAP_LINE_MIN_WORDS}-"
+                            f"{RECAP_LINE_MAX_WORDS} words each: {bad_len}")
+
+    if cta.kind != "cta":
+        problems.append(f"last shot ({cta.shot_id}) has kind {cta.kind!r}, needs 'cta'")
+    else:
+        overlay = (cta.overlay_text or "").lower()
+        if "follow" not in overlay or "learn" not in overlay:
+            problems.append(f"cta overlay_text {cta.overlay_text!r} doesn't read as "
+                            f"'Follow ... to learn ... the simple way.'")
+
+    if problems:
+        return GraderResult("structure_ends", False, "; ".join(problems))
+    return GraderResult("structure_ends", True, "ends on a valid recap then cta")
+
+
+def run_story_graders(story, source_text: str, technical_term: str = "") -> list[GraderResult]:
+    """
+    Story mode's counterpart to run_script_graders. NOT a branch inside that
+    function — a StoryScript has no `.beats`, so every explainer-only grader
+    in SCRIPT_GRADERS (check_timing, check_overlays, check_narration_shape,
+    check_no_interview_structure, check_beats_develop, ...) would raise on it
+    rather than meaningfully skip; keeping story mode's graders in their own
+    list is what "skip explainer-only checks in story mode" (RESTYLE_TO_
+    STORY_REELS.md Phase 1) actually means in code, not a flag threaded
+    through every explainer check.
+
+    RESTYLE_TO_STORY_REELS.md Step 2 wires check_story_not_qa in (deferred at
+    Step 1) alongside every shot-generation check Part B asks for.
+    skills/audit.py's metaphor-faithfulness judge is the paid check that runs
+    after ALL of these pass — not duplicated here, the same split
+    run_script_graders keeps between its own free checks and the judge.
+    """
+    return [
+        check_mapping(story.mapping, source_text, shots=story.shots,
+                      lessons=story.lessons, setting=story.setting,
+                      props=story.props, candidates=story.candidates,
+                      extra_entry_reason=story.extra_entry_reason,
+                      card_facts=story.card_facts, technical_term=technical_term),
+        check_hook(story.hook_line, technical_term=technical_term),
+        check_story_not_qa(story.shots),
+        check_shot_count(story.shots),
+        check_story_duration(story.shots),
+        check_line_length(story.shots),
+        check_shot_rhythm(story.shots),
+        check_text_card_budget(story.shots, story.card_facts),
+        check_character_ratio(story.shots),
+        check_no_text_in_action(story.shots),
+        check_shot_grounding(story.shots, source_text),
+        check_scene_coverage(story.shots, story.mapping),
+        check_concept_named_once(story.shots, story.mapping, technical_term=technical_term),
+        check_key_prop_valid(story.shots, story.props),
+        check_structure_ends(story.shots, story.mapping),
+    ]
 
 
 def check_answers_its_section(script: Script, section_text: str) -> GraderResult:

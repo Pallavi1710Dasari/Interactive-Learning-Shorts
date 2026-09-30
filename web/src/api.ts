@@ -1,5 +1,5 @@
 import type { QA, Topic, Unit, GraderResult, QuestionApproval, QuestionWorkflow,
-             TeachingApproachKind, WorkflowProgress, Judge } from "./types";
+             StoryReel, TeachingApproachKind, WorkflowProgress, Judge } from "./types";
 
 // Vite proxies /api to the FastAPI server in dev (see vite.config.ts), and in
 // production the same server serves this bundle — so a relative path works in both.
@@ -290,6 +290,15 @@ export async function getShorts(held = false): Promise<Unit[]> {
   const res = await fetch(held ? "/api/shorts?held=1" : "/api/shorts");
   if (!res.ok) throw new Error(await detail(res));
   return (await res.json()).shorts;
+}
+
+/** RESTYLE_TO_STORY_REELS.md Step 8 — one story-mode reel, for the capture
+ *  page (App.tsx's CaptureRoute) and StoryCaptureStage. See shorts/
+ *  server.py's story_data for the exact shape (types.ts's StoryReel). */
+export async function getStory(shortId: string): Promise<StoryReel> {
+  const res = await fetch(`/api/story/${encodeURIComponent(shortId)}`);
+  if (!res.ok) throw new Error(await detail(res));
+  return res.json();
 }
 
 export type UsageTotals = {

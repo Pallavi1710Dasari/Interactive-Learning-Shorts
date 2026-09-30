@@ -352,6 +352,52 @@ export type Unit = {
   beats: ReelBeat[];
 };
 
+// ------------------------------------------------------------- story mode
+//
+// RESTYLE_TO_STORY_REELS.md Step 8 — mirrors GET /api/story/{short_id}
+// (shorts/server.py's story_data). A SEPARATE shape from Unit/ReelBeat
+// above, not a variant of them: a story shot is a rendered PNG (or a
+// text/recap/cta overlay) with real measured timing, not an inline SVG
+// diagram — see ReelStage.tsx's own top-level branch on which of `unit`/
+// `story` a caller passes it.
+
+/** One shot in a story-mode reel — the StoryScript Shot's own fields plus
+ *  its REAL measured timing (shorts/story_audio.py's timings.json, never
+ *  the shot's merely-PLANNED duration) and a URL for its rendered frame,
+ *  when it has one (text_card/recap/cta shots have none — see `image_url`). */
+export type StoryShot = {
+  shot_id: string;
+  kind: "scene" | "text_card" | "recap" | "cta";
+  camera: "zoom_in" | "zoom_out" | "push_left" | "push_right" | "shake" | "static";
+  framing: "wide" | "medium" | "close_up" | "two_shot";
+  emotion: string;
+  characters: string[];
+  line: string | null;
+  overlay_text: string | null;
+  card_lines: string[];
+  /** Seconds from the start of the WHOLE reel — same clock ReelStage's
+   *  explainer branch already uses `time` against. */
+  start: number;
+  end: number;
+  final_duration: number;
+  words: CaptionWord[];
+  /** null for text_card/recap/cta — those are drawn as overlays, never
+   *  rendered images (see shorts/story_frames.py's own top docstring). */
+  image_url: string | null;
+};
+
+/** GET /api/story/{short_id}'s full payload — everything StoryStage
+ *  (ReelStage.tsx's story-mode branch) needs to render and be captured. */
+export type StoryReel = {
+  short_id: string;
+  hook_line: string;
+  system_name: string;
+  lessons: string[];
+  shots: StoryShot[];
+  total: number;
+  audio_url: string | null;
+};
+
 export type Feedback = {
   short_id: string;
   event: "view" | "confusing";

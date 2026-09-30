@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { AnimatedSvg } from "./AnimatedSvg";
 import { FlowingCaption } from "./FlowingCaption";
+import { StoryStage } from "./StoryStage";
 import { ThreeStage } from "./ThreeStage";
-import type { Unit } from "./types";
+import type { StoryReel, Unit } from "./types";
 
 /**
  * Everything a viewer WATCHES, with none of what they click.
@@ -29,9 +30,7 @@ import type { Unit } from "./types";
  * MP4 alike — it stays in step 2's review cards (see StepReview), the one place
  * anyone reads it to decide whether a short should ship.
  */
-export function ReelStage({
-  unit, beatIndex, time, speaking, hue, progressPct, onStageClick,
-}: {
+type ExplainerStageProps = {
   unit: Unit;
   /** Which beat is on screen. */
   beatIndex: number;
@@ -45,7 +44,30 @@ export function ReelStage({
   progressPct: number;
   /** Tap-to-pause in the player; absent in the renderer, which cannot be tapped. */
   onStageClick?: () => void;
-}) {
+  story?: undefined;
+};
+
+type StoryStageProps = {
+  /** RESTYLE_TO_STORY_REELS.md Step 8 — a COMPLETELY SEPARATE render tree
+   *  (web/src/StoryStage.tsx), branched on here rather than folded into
+   *  the explainer JSX below: navy gradient, Three.js depth layer,
+   *  progress segments and the framed diagram box are all explainer-only
+   *  and must not leak into story mode by sharing a code path. */
+  story: StoryReel;
+  time: number;
+  unit?: undefined;
+};
+
+/** THE BRANCH — explainer mode's own render path below is completely
+ *  unchanged by this; a story-mode caller passes `story` (and never
+ *  `unit`), an explainer caller passes `unit` (and never `story`), and
+ *  each stays on its own side of this `if`. */
+export function ReelStage(props: ExplainerStageProps | StoryStageProps) {
+  if (props.story) {
+    return <StoryStage story={props.story} time={props.time} />;
+  }
+
+  const { unit, beatIndex, time, speaking, hue, progressPct, onStageClick } = props;
   const beat = unit.beats[beatIndex];
 
   // Every frame of this short, so AnimatedSvg can crop them all to one shared box

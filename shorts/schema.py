@@ -7,7 +7,7 @@ further downstream. Design this file first and change it rarely.
 """
 
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 
 # Speech pacing. 150 words/min is a conservative average for clear narration.
 WORDS_PER_MINUTE = 150
@@ -1218,6 +1218,353 @@ class Script(BaseModel):
         return v
 
 
+class Character(BaseModel):
+    """One member of story mode's fixed cast (see config.CAST).
+
+    A name plus a short descriptor, not a personality bible — config.CAST is
+    the source of truth for who exists at all; this model exists so a
+    StoryScript can say WHICH of them appear in this particular reel with a
+    typed value instead of a bare string with no contract, the same reason
+    Node/Cell exist instead of passing labels around as plain strings.
+    """
+    name: str
+    description: str = ""
+
+
+class MetaphorCandidate(BaseModel):
+    """One of the 3 everyday-situation metaphors scored before the mapping is
+    filled — see SYSTEM_STORY's CANDIDATE SELECTION step. Persisted alongside
+    the mapping (ConceptMappingSet.candidates) so a human reviewer can see
+    what was NOT chosen and override the pick, not just the winner.
+
+    The four scores are what the prompt asks the model to actually judge;
+    `total` is a COMPUTED field, not something the model has to add up
+    correctly — see its own docstring for why that is a schema decision, not
+    a checks.py one.
+    """
+    name: str        #: short label for the metaphor, e.g. "a library checkout desk"
+    pitch: str        #: one sentence: what happens and why it teaches the rule
+    familiarity: int = Field(ge=1, le=5)   #: a 19-year-old gets it instantly
+    faithfulness: int = Field(ge=1, le=5)  #: implies no behavior the source doesn't state
+    drawability: int = Field(ge=1, le=5)   #: one setting, <= 3 props
+    drama: int = Field(ge=1, le=5)         #: someone is stopped, confused, or surprised
+    #: WHICH CANDIDATE WON — SET IN CODE, NEVER ASKED OF THE MODEL.
+    #: RESTYLE_TO_STORY_REELS.md's Step 1 fix: the model was asked to both
+    #: score all 3 candidates AND flag its own winner, and in real runs it
+    #: reliably scored them right while regularly forgetting to set this flag
+    #: on any of them — a prompt-compliance failure a mechanical "exactly one
+    #: chosen" grader can only catch, never fix. skills.script.plan_story_mapping
+    #: now sets this itself, on the candidate with the highest total (ties
+    #: broken by faithfulness, then familiarity) — see its own
+    #: _assign_chosen_candidate. Defaults False so a model response that
+    #: (still) includes the field is simply overwritten, not rejected.
+    chosen: bool = False
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total(self) -> int:
+        # COMPUTED, NOT MODEL-REPORTED: a model asked to both score 4 axes and
+        # add them up will occasionally report a total that doesn't match its
+        # own scores, and checks.check_mapping's "chosen has the highest
+        # total" rule would then be grading arithmetic, not the model's
+        # judgement. Deriving it here makes that failure mode impossible
+        # rather than adding a consistency check for it.
+        return self.familiarity + self.faithfulness + self.drawability + self.drama
+
+
+class ConceptMapping(BaseModel):
+    """One technical rule and the physical story event that dramatizes it.
+
+    See RESTYLE_TO_STORY_REELS.md Phase 1 — this is the METAPHOR MAPPING step,
+    filled BEFORE any shot is written. skills.script.plan_story_mapping
+    produces these; checks.check_mapping grades them (count, source_quote
+    grounding, shot coverage) before skills.script.write_story_shots is ever
+    called — the same "cheap check before the expensive call" shape as
+    skills.understanding's SectionUnderstanding gate ahead of write_script.
+    """
+    concept_rule: str      #: the technical rule, in plain words
+    source_quote: str      #: exact sentence from the material proving the rule
+    #: Which cast member PERFORMS metaphor_event — checks.check_mapping requires
+    #: this to be one of config.CAST's acting roles (Rahul, Riya, System); the
+    #: Narrator carries the story but never performs an event.
+    actor: str
+    metaphor_event: str    #: what physically HAPPENS in the story that shows this rule
+    visible_proof: str     #: what the viewer SEES that makes the rule obvious with sound off
+    lesson_line: str       #: the one-line payoff, <= 10 words
+
+
+class ConceptMappingSet(BaseModel):
+    """Output of skills.script.plan_story_mapping — the mapping ALONE, before
+    any shot exists. A separate, smaller model rather than a partial
+    StoryScript so "the mapping is reviewable on its own" is a real type
+    distinction: nothing holding one of these can accidentally be treated as
+    a finished StoryScript, which always has shots.
+    """
+    mapping: list[ConceptMapping]
+    #: The technology's display name for THIS reel ("React", "the OS", "the
+    #: Database") — worn as System's chest badge; System's own visual design
+    #: never changes (see config.CAST).
+    system_name: str
+    #: The one everyday human situation the whole story happens in — a
+    #: classroom, a library, a gate with a guard. One place, not one per shot.
+    setting: str
+    #: <= 3 recurring physical objects the story uses — see checks.check_mapping.
+    props: list[str] = Field(default_factory=list)
+    #: The 3 scored candidates from CANDIDATE SELECTION, winner marked `chosen`
+    #: — see that field's own docstring for why the mark is set in code.
+    candidates: list[MetaphorCandidate] = Field(default_factory=list)
+    #: The Narrator's opening curiosity line — about the everyday situation or
+    #: visible symptom, never the technical term. See checks.check_hook.
+    hook_line: str
+    #: RESTYLE_TO_STORY_REELS.md Step 9 Fix 2 — the concept's name EXACTLY as
+    #: the Narrator will say it once, after it's first shown ("state", "a
+    #: stack") — checks.check_concept_named_once grades where it is said;
+    #: checks.check_mapping grades that it was said at all. Required (no
+    #: default) and validated non-blank below — this is a NEW field on a
+    #: NEW reel's own mapping output, not backfilled onto anything already
+    #: persisted (see StoryScript.technical_term's own note on why THAT
+    #: field stays optional for exactly this reason).
+    technical_term: str
+    #: Required ONLY when len(mapping) == 4 — checks.check_mapping's "3
+    #: entries preferred, 4 only with a reason" rule. None for the (preferred)
+    #: 2-3 entry case.
+    extra_entry_reason: Optional[str] = None
+    #: Facts that are pure syntax, notation, or a complexity figure (a
+    #: return-value shape, "O(1)") — true and worth keeping, but nothing
+    #: visibly HAPPENS to them, so they do not belong in `mapping` as a
+    #: dramatized rule. Rendered as a text card instead of a shot in a later
+    #: phase; at most 2, same reasoning as props' own small cap — a card that
+    #: needs a third fact needed a mapping entry instead.
+    card_facts: list[str] = Field(default_factory=list)
+
+    @field_validator("mapping")
+    @classmethod
+    def has_mapping(cls, v):
+        if not v:
+            raise ValueError("no concept mapping produced")
+        return v
+
+    @field_validator("technical_term")
+    @classmethod
+    def technical_term_not_blank(cls, v):
+        if not v.strip():
+            raise ValueError("technical_term is required and must not be blank — "
+                             "the concept's name, exactly as the Narrator will say it")
+        return v
+
+    @field_validator("card_facts")
+    @classmethod
+    def card_facts_stay_small(cls, v):
+        if len(v) > 2:
+            raise ValueError(f"card_facts has {len(v)} entries, needs <= 2 — a "
+                             f"3rd fact belongs in `mapping` as its own dramatized rule")
+        return v
+
+    @field_validator("system_name")
+    @classmethod
+    def system_name_is_a_short_noun_phrase(cls, v):
+        # THE SCHEMA'S OWN JOB — "can this be represented" — not whether the
+        # name is a GOOD one, which nobody downstream actually checks either;
+        # this only rejects the shape that clearly is not a badge label, a
+        # full sentence standing in for one.
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("system_name is blank")
+        if len(v.split()) > 5:
+            raise ValueError(f"system_name {v!r} is not a short noun phrase (>5 words)")
+        return v
+
+
+class HookLineOnly(BaseModel):
+    """Output of skills.script.regenerate_hook_line — a narrow repair schema,
+    not a full ConceptMappingSet. Used when an ALREADY-APPROVED mapping
+    resumed from disk carries a hook_line that fails checks.check_hook under
+    a rule tightened after it was approved (e.g. the 4-opener rule): since
+    check_hook never inspects the rest of the mapping, regenerating just this
+    one field is safe and does not require re-running the paid metaphor judge
+    or re-approving the cast/setting/entries. See story_reel.py's
+    _fix_stale_hook_line for where this is wired in."""
+    hook_line: str
+
+
+class Shot(BaseModel):
+    """One filmed moment of the story — story mode's equivalent of Beat.
+
+    A shot dramatizes AT MOST one ConceptMapping entry. `concept_ref`, when
+    set, must match some ConceptMapping.concept_rule in the same StoryScript
+    — checks.check_mapping is what actually enforces that a mapping entry
+    with no shot referencing it, or a concept_ref pointing at nothing, fails
+    the grader; the schema only requires the field to be a plain string.
+
+    RESTYLE_TO_STORY_REELS.md Step 2 Part B added `kind` and the fields below
+    `story_beat` — a scene shot dramatizes a mapping entry (unchanged from
+    Step 1), while `kind` now also covers the three shots that DON'T: a
+    `text_card` (one per card_fact), the closing `recap`, and the closing
+    `cta`. Those three carry their words in `overlay_text`/`card_lines`,
+    never in `line` or `action` — see checks.check_no_text_in_action.
+    """
+    shot_id: str
+    #: Names into config.CAST / this StoryScript's own `cast` — not full
+    #: Character objects, so a shot does not repeat each character's
+    #: description every time they appear in a scene.
+    characters: list[str] = Field(default_factory=list)
+    action: str                    #: what the camera sees happen — physical, no words/code
+    line: Optional[str] = None     #: spoken narration/dialogue for this shot, if any
+    concept_ref: Optional[str] = None  #: the ConceptMapping.concept_rule this shot dramatizes
+    #: Which leg of a mapping entry's required 3-shot arc (problem, reaction,
+    #: payoff — see RESTYLE_TO_STORY_REELS.md Phase 1) this shot fulfils.
+    #: Only meaningful when concept_ref is set.
+    story_beat: Optional[Literal["problem", "reaction", "payoff"]] = None
+
+    #: What role this shot plays in the reel. "scene" (the default) dramatizes
+    #: a mapping entry like every Step 1 shot did; the other three are Step 2
+    #: Part B's fixed closing structure — see checks.check_structure_ends and
+    #: check_text_card_budget.
+    kind: Literal["scene", "text_card", "recap", "cta"] = "scene"
+    emotion: str = ""               #: e.g. "frustrated", "relieved" — what's on the actor's face
+    #: The one physical object this shot's action centers on. Must be one of
+    #: ConceptMappingSet.props — see checks.check_key_prop_valid. None for a
+    #: shot with no single focal prop (an establishing shot, text_card, ...).
+    key_prop: Optional[str] = None
+    #: How the camera moves — a fixed, small vocabulary so illustration/
+    #: animation later has something concrete to render against.
+    camera: Literal["zoom_in", "zoom_out", "push_left", "push_right",
+                    "shake", "static"] = "static"
+    #: Shot SIZE (distinct from `camera`'s MOVEMENT) — checks.check_shot_rhythm's
+    #: "never 3 wide in a row" / "close_up right after every reveal" rules.
+    #: `two_shot` (Step 5) is two characters sharing a moment, facing each
+    #: other, waist up — distinct from `wide` (full bodies, whole room) and
+    #: `close_up` (one face fills the frame).
+    framing: Literal["wide", "medium", "close_up", "two_shot"] = "medium"
+    #: The exact source sentence this shot dramatizes — required on every
+    #: shot that carries a `concept_ref` (see checks.check_grounding), the
+    #: same grounding discipline Beat.source_quote already holds explainer
+    #: beats to.
+    source_quote: Optional[str] = None
+    #: On-screen text for a text_card/cta shot — the words live HERE, never
+    #: smuggled into `action` (see checks.check_no_text_in_action).
+    overlay_text: Optional[str] = None
+    #: The recap shot ONLY: one condensed 2-5 word phrase per mapping entry,
+    #: in entry order — NOT the full lesson_line (which can run to 10 words),
+    #: a shorter, punchier restatement for the closing beat.
+    card_lines: list[str] = Field(default_factory=list)
+    #: RESTYLE_TO_STORY_REELS.md Step 7 Part 2 — the MEASURED duration once
+    #: shorts/story_audio.py has actually synthesized this shot's line,
+    #: written back onto the persisted story.json. `duration_seconds` above
+    #: stays a computed ESTIMATE (word count / rate) forever, the planning
+    #: figure every check in Step 2 was written against; this is the
+    #: SEPARATE, later, real number — never trust a real-audio caller into
+    #: overwriting the estimate a whole grading pass already agreed on.
+    #: None until story_audio.py runs.
+    final_duration_seconds: Optional[float] = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def duration_seconds(self) -> float:
+        """
+        COMPUTED, NOT MODEL-REPORTED — same reasoning as MetaphorCandidate.total:
+        a model asked for a duration on top of a line will occasionally report
+        one that doesn't match the line's own length, and checks.check_story_
+        duration would then be grading arithmetic instead of pacing. The
+        formula is RESTYLE_TO_STORY_REELS.md Step 2 Part B's own: "Estimate
+        per shot as max(2.0, words / WORDS_PER_SECOND + 0.4)". A shot with no
+        spoken `line` (a pure-action beat, or a text_card/recap/cta) still
+        gets the 2.0s floor — silence still needs a moment on screen.
+        """
+        words = len((self.line or "").split())
+        return round(max(2.0, words / WORDS_PER_SECOND + 0.4), 2)
+
+
+class StoryScript(BaseModel):
+    """Output of story mode's script stage (REEL_STYLE=story).
+
+    Deliberately NOT a subclass of Script and NOT wired into ShortUnit yet —
+    Phase 1 (RESTYLE_TO_STORY_REELS.md) is script generation only. Rendering
+    an illustrated shot to video is a separate, later phase this schema does
+    not attempt to answer.
+
+    Two-stage, not one LLM call: `mapping` comes from
+    skills.script.plan_story_mapping and is reviewable on its own — see that
+    function's own docstring for why the mapping is a separate, cheaper call
+    rather than folded into the same request as `shots` — and `shots` comes
+    from skills.script.write_story_shots, called only once a mapping has
+    passed checks.check_mapping.
+    """
+    short_id: str
+    session_id: str
+    source_section_id: str
+    question: str
+    estimated_seconds: float
+    #: The subset of config.CAST actually appearing in this reel.
+    cast: list[Character] = Field(default_factory=list)
+    mapping: list[ConceptMapping]
+    #: Copied through, unchanged, from the approved ConceptMappingSet — see
+    #: that model's own docstrings. Carried onto the finished StoryScript
+    #: (rather than left behind on the mapping-only object) so
+    #: checks.run_story_graders can still check_mapping/check_hook the FULL
+    #: story, after shots exist, without re-deriving them from `mapping`.
+    system_name: str = ""
+    setting: str = ""
+    props: list[str] = Field(default_factory=list)
+    candidates: list[MetaphorCandidate] = Field(default_factory=list)
+    hook_line: str = ""
+    #: RESTYLE_TO_STORY_REELS.md Step 9 Fix 2 — copied through from the
+    #: approved ConceptMappingSet, same as system_name/setting/hook_line
+    #: above. DEFAULTS TO "" — unlike ConceptMappingSet.technical_term
+    #: (required, no default) — deliberately: a StoryScript persisted
+    #: BEFORE this field existed must still load (see RESTYLE_TO_STORY_
+    #: REELS.md Step 9 Fix 4's "schema changes stay backward compatible,
+    #: so old reel JSON still loads" rule); a blank technical_term here
+    #: just means an old reel, not an invalid new one.
+    technical_term: str = ""
+    extra_entry_reason: Optional[str] = None
+    card_facts: list[str] = Field(default_factory=list)
+    shots: list[Shot] = Field(default_factory=list)
+    #: Every ConceptMapping.lesson_line, collected — see checks.check_mapping's
+    #: "every lesson_line appears as a shot line AND in lessons" rule.
+    lessons: list[str] = Field(default_factory=list)
+
+    @field_validator("mapping")
+    @classmethod
+    def has_mapping(cls, v):
+        # THE SCHEMA'S OWN JOB, same split as Script.has_beats above: "can
+        # this be represented", not "is this good". The 2-4 count, source
+        # grounding and shot-coverage rules are checks.check_mapping's job.
+        if not v:
+            raise ValueError("story script has no concept mapping")
+        return v
+
+    @field_validator("shots")
+    @classmethod
+    def has_shots(cls, v):
+        if not v:
+            raise ValueError("story script has no shots")
+        return v
+
+
+class StoryShotsSet(BaseModel):
+    """Output of skills.script.write_story_shots's LLM call.
+
+    NOT a StoryScript — it has no `mapping` field. The mapping is already
+    APPROVED by the time this call happens (see StoryScript's own two-stage
+    docstring), so it is handed to the model as context and copied straight
+    onto the final StoryScript in Python, never asked of the model a second
+    time — the same reason write_story_shots's caller, not the model, is what
+    sets StoryScript.mapping.
+    """
+    cast: list[Character] = Field(default_factory=list)
+    shots: list[Shot]
+    lessons: list[str] = Field(default_factory=list)
+    estimated_seconds: float = 30.0
+
+    @field_validator("shots")
+    @classmethod
+    def has_shots(cls, v):
+        if not v:
+            raise ValueError("no shots produced")
+        return v
+
+
 #: How a cell, box or row is being treated by the narration right now.
 #:
 #: The narration decides emphasis, not the drawing, so a frame names ROLES and the
@@ -2094,6 +2441,102 @@ class EvalReport(BaseModel):
             and self.diagram_correct
             and self.question_answered
         )
+
+
+class MetaphorVerdict(BaseModel):
+    """The judge's answer, for ONE ConceptMapping entry: does metaphor_event
+    behave exactly like concept_rule, with nothing extra implied?
+
+    See RESTYLE_TO_STORY_REELS.md Phase 1 and skills.audit.judge_story_metaphors.
+    """
+    concept_rule: str
+    faithful: bool
+    #: Required when faithful is False — what the metaphor implies beyond, or
+    #: instead of, concept_rule. Empty when faithful.
+    problem: str = ""
+
+
+class StoryEvalReport(BaseModel):
+    """Story mode's counterpart to EvalReport. ONE verdict per mapping entry,
+    not five scalar scores — the judge question here is binary and per-entry
+    ("does metaphor_event behave exactly like concept_rule"), not a 1-5 scale
+    over the whole script, so a single aggregate number would hide which
+    entry actually failed.
+    """
+    verdicts: list[MetaphorVerdict]
+
+    @property
+    def passed(self) -> bool:
+        # ANY 'no' FAILS THE REEL — RESTYLE_TO_STORY_REELS.md Phase 1's own
+        # rule, verbatim. Not a majority vote, not "most metaphors hold up":
+        # one metaphor that implies a behavior the source never states is one
+        # invented fact taught as true, the same bar EvalReport.faithfulness
+        # already holds explainer scripts to.
+        return all(v.faithful for v in self.verdicts)
+
+
+class StoryFrameJudge(BaseModel):
+    """
+    RESTYLE_TO_STORY_REELS.md Step 6 Part 2 — skills.vision.judge_story_frame's
+    own rubric, per GENERATED FRAME (not per mapping entry — StoryEvalReport
+    above judges the METAPHOR, this judges the PICTURE that resulted from it).
+
+    `setting_match` is the one axis that can be genuinely inapplicable — the
+    reel's first `wide` shot has no setting reference yet (it IS the
+    reference every later shot is checked against), so there is nothing to
+    compare it to. Optional, and left OUT of `passed`/`total` when absent,
+    rather than defaulted to some score that would silently count for or
+    against a shot that was never actually asked about it.
+    """
+    character_match: int = Field(ge=1, le=5)
+    no_text: int = Field(ge=1, le=5)
+    action_visible: int = Field(ge=1, le=5)
+    emotion_readable: int = Field(ge=1, le=5)
+    style_match: int = Field(ge=1, le=5)
+    setting_match: Optional[int] = Field(default=None, ge=1, le=5)
+    #: Specific, actionable defects — not required to be one per axis. This
+    #: is what story_frames.py's regenerate loop appends to the next
+    #: attempt's prompt as "FIX: ...".
+    reasons: list[str] = Field(default_factory=list)
+
+    def _scores(self) -> list[int]:
+        scores = [self.character_match, self.no_text, self.action_visible,
+                 self.emotion_readable, self.style_match]
+        if self.setting_match is not None:
+            scores.append(self.setting_match)
+        return scores
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def passed(self) -> bool:
+        # RESTYLE_TO_STORY_REELS.md Step 7 Part 0 #2's STRICTER rule,
+        # replacing Step 6's flat "every axis >= 3": no_text must be a
+        # perfect 5 (any text at all is the one defect this format cannot
+        # tolerate even a little of — see STYLE_BIBLE's own "ABSOLUTELY NO
+        # TEXT" line), character_match must be >= 4 (a character who's
+        # merely RECOGNIZABLE as themselves, not a clean match, still breaks
+        # the fixed-cast consistency the whole project is built on), and
+        # every other scored axis (action_visible, emotion_readable,
+        # style_match, setting_match when scored) still only needs >= 3.
+        # Computed, not asked of the model, same reasoning as
+        # MetaphorCandidate.total: the model already gave the numbers, so
+        # applying the bar is arithmetic this function should not have to
+        # trust a second, separately-reported boolean to get right.
+        if self.no_text != 5:
+            return False
+        if self.character_match < 4:
+            return False
+        others = [self.action_visible, self.emotion_readable, self.style_match]
+        if self.setting_match is not None:
+            others.append(self.setting_match)
+        return min(others) >= 3
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total(self) -> int:
+        # Used to pick the BEST-SCORING attempt when every attempt in the
+        # regenerate loop still fails — Step 6 Part 3's own rule.
+        return sum(self._scores())
 
 
 class ShortUnit(BaseModel):

@@ -40,11 +40,14 @@ they were text. Three things caused it and all three are fixed here.
   "code" for the snippet it teaches from, "compare" for two named alternatives.
 """
 
+import re
+
 from pydantic import BaseModel
 from ..schema import (Script, Visual, Section, Frame, VisualStrategy, SectionUnderstanding,
-                     TeachingApproach)
+                     TeachingApproach, Shot, StoryScript)
 from ..llm import ask_json
-from .. import config
+from .. import config, style
+from ..imagegen import ImageGenError
 from . import layout
 from .strategy import EDUCATIONAL_VISUAL_RULES, as_brief as strategy_brief,\
     plan_strategy
@@ -1815,3 +1818,138 @@ def render_diagrams(visuals: dict[str, Visual], script: Script,
         if visual.frame is not None:
             visual.svg = layout.render(visual.frame)
     return visuals
+
+
+# =============================================================================
+# STORY MODE — RESTYLE_TO_STORY_REELS.md Step 5. Reached only when
+# config.REEL_STYLE == "story" (shorts/story_frames.py's own caller). Nothing
+# above this line changed to make room for it — SVG spec generation and
+# build_shot_prompt are two completely separate paths through this module,
+# picked by the CALLER (run.py for explainer, story_frames.py for story), not
+# by a branch inside any function above.
+#
+# "Replace SVG spec generation" (Step 5's own phrase) means for story mode's
+# purposes, not literally — spec_visuals/render_diagrams above are untouched
+# and still exist for REEL_STYLE=explainer. A story shot never goes through
+# either; it goes through build_shot_prompt instead, straight to
+# shorts/imagegen.py's image model.
+# =============================================================================
+
+#: Shot.framing -> the composition instruction build_shot_prompt puts after
+#: "SHOT: {framing} shot." — Step 5's own three descriptions, verbatim.
+_FRAMING_DESCRIPTIONS = {
+    "wide": "full bodies, room visible",
+    "close_up": "head and shoulders, face fills the frame",
+    "two_shot": "two characters facing each other, waist up",
+}
+
+#: RESTYLE_TO_STORY_REELS.md Step 9 Fixes round 10: an establishing shot
+#: like the hook (Shot 1's own STRUCTURE rule: `characters` always empty)
+#: got the SAME "full bodies, room visible" wide-shot description as any
+#: other wide shot — self-contradictory when the shot's own `action` (e.g.
+#: "the camera drifts toward a whiteboard") describes an empty room with no
+#: one in it. An image prompt asking for "full bodies" while describing zero
+#: people is genuinely ambiguous, not just a stylistic quibble — a real run
+#: hit a content-policy refusal (NSFW code 8007) and two empty responses on
+#: exactly this shot, and an under-specified "bodies" phrase with nothing to
+#: anchor it is a plausible trigger for a miscalibrated safety filter, not
+#: only bad luck. Used instead of _FRAMING_DESCRIPTIONS whenever
+#: `shot.characters` is empty, for any framing the model picked (not just
+#: "wide" — "head and shoulders" or "two characters facing each other" are
+#: exactly as self-contradictory with zero characters on screen).
+_FRAMING_DESCRIPTIONS_NO_CHARACTERS = {
+    "wide": "an empty establishing view, the room and its props visible, no people in frame",
+    "close_up": "a close view of the room's own detail or prop, no people in frame",
+    "two_shot": "an empty establishing view, the room and its props visible, no people in frame",
+}
+
+#: A single digit with no digit immediately before or after it — "0" in
+#: "reads 0" matches, "1"/"0" in "reads 10" do not (each has a digit
+#: neighbour). ALLOWED GLYPHS is only ever single, isolated digits; a
+#: multi-digit number is not "essential" the way a single digit on a button
+#: or counter is, and letting one through would smuggle real numbers/words
+#: into the image the same way check_no_text_in_action polices `action`.
+_ISOLATED_DIGIT_RE = re.compile(r"(?<!\d)\d(?!\d)")
+
+
+def allowed_glyphs(shot: Shot) -> str:
+    """
+    The ONLY text ever permitted inside a generated frame: single, isolated
+    digits pulled from THIS shot's own action/key_prop, when a number is
+    part of what's being shown (a button reading "0"). Never a whole number,
+    never a word, never code — STYLE_BIBLE's own "ABSOLUTELY NO TEXT ...
+    unless listed under ALLOWED GLYPHS" is what this string fills in.
+    """
+    text = f"{shot.action} {shot.key_prop or ''}"
+    digits = sorted(set(_ISOLATED_DIGIT_RE.findall(text)))
+    return ", ".join(digits)
+
+
+def cast_refs_for_shot(shot: Shot) -> list:
+    """
+    assets/cast/<name>.png for each character in `shot`, IN ORDER — this
+    list's order is what "reference image n" in build_shot_prompt's own text
+    refers to, so a caller must pass exactly this list, in this order, as
+    the cast portion of imagegen refs (before any setting reference).
+
+    Raises ImageGenError naming every missing character at once (not just
+    the first) — Step 5's own "missing sheet -> clear error naming it" rule.
+    A shot cannot be rendered at all without its cast's approved sheets, so
+    this fails loudly rather than falling back to no reference and drawing
+    an ungrounded guess at what the character looks like.
+    """
+    refs, missing = [], []
+    for name in shot.characters:
+        path = config.CAST_ASSETS_DIR / f"{name.lower()}.png"
+        if path.exists():
+            refs.append(path)
+        else:
+            missing.append(name)
+    if missing:
+        raise ImageGenError(
+            f"shot {shot.shot_id}: no approved cast sheet for {missing} — run "
+            f"`python -m shorts.cast_sheets --candidates N --character <name>` "
+            f"then --approve first")
+    return refs
+
+
+def build_shot_prompt(shot: Shot, story: StoryScript) -> str:
+    """
+    The full image-generation prompt for one scene shot — STYLE_BIBLE, then
+    one line per piece of information a caller (shorts/story_frames.py) has
+    already resolved, in the fixed order Step 5 specifies. Deterministic:
+    the same shot + the same story always produces the exact same string, so
+    the SAME prompt text is what makes two identical calls a cache hit in
+    shorts/imagegen.py — nothing here reads randomness or wall-clock time.
+
+    ONLY for `kind == "scene"` shots. text_card/recap/cta are not drawn by an
+    image model at all (ReelStage draws the first two as overlays in a later
+    step; the cta uses style.mascot_prompt() instead, generated once and
+    cached, see shorts/story_frames.py) — callers should not reach this
+    function for them, and it does not special-case them internally.
+    """
+    # Step 5's own spec says "story.mapping.setting" — StoryScript.mapping is
+    # list[ConceptMapping] (no .setting on it); `setting` is StoryScript's
+    # OWN top-level field, copied through from the approved ConceptMappingSet
+    # by write_story_shots (see schema.StoryScript's docstring). Read as
+    # "the mapping stage's setting", which is what story.setting IS.
+    parts = [style.STYLE_BIBLE, f"SETTING: {story.setting}"]
+
+    framing_descriptions = (_FRAMING_DESCRIPTIONS if shot.characters
+                           else _FRAMING_DESCRIPTIONS_NO_CHARACTERS)
+    desc = framing_descriptions.get(shot.framing, "")
+    parts.append(f"SHOT: {shot.framing} shot." + (f" {desc}" if desc else ""))
+
+    for i, name in enumerate(shot.characters, 1):
+        look = config.CAST_LOOK.get(name, "")
+        parts.append(f"{name}: {look}, matching reference image {i}")
+
+    parts.append(f"EMOTION: {shot.emotion or 'neutral'}")
+    parts.append(f"ACTION: {shot.action}")
+
+    if shot.key_prop:
+        parts.append(f"KEY OBJECT (glowing softly yellow): {shot.key_prop}")
+
+    parts.append(f"ALLOWED GLYPHS: {allowed_glyphs(shot) or 'none'}")
+
+    return "\n".join(parts)

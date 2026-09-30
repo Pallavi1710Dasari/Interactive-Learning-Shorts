@@ -360,35 +360,106 @@ def _capture_slice(chrome: str, base: str, short_id: str, outdir: Path,
             proc.kill()
 
 
+def _story_total_seconds(short_id: str) -> float:
+    """
+    RESTYLE_TO_STORY_REELS.md Step 8 — a story-mode reel's own timeline
+    total, read from shorts/story_audio.py's own output rather than
+    feed._timeline(unit) (which only understands ShortUnit/Beat). Prefers
+    audio/status.json's total_seconds (the number story_audio.py itself
+    already validated against config.STORY_MAX_TOTAL_SECONDS); falls back
+    to timings.json's own max shot end when status.json is missing (e.g.
+    story_audio.py hasn't been run yet under some other workflow).
+    """
+    outdir = config.OUTPUT_DIR / short_id
+    status_path = outdir / "audio" / "status.json"
+    if status_path.exists():
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        if status.get("total_seconds"):
+            return float(status["total_seconds"])
+    timings_path = outdir / "timings.json"
+    if timings_path.exists():
+        timings = json.loads(timings_path.read_text(encoding="utf-8"))
+        if timings:
+            return max(t["end"] for t in timings.values())
+    return 0.0
+
+
+def is_story_reel(short_id: str) -> bool:
+    """Whether <short_id> is a story-mode reel (has a .story.json) rather
+    than an explainer-mode one (.json/ShortUnit) — the SINGLE SOURCE OF
+    TRUTH both render() and mp4_path() defer to, so the two can never
+    disagree about which pipeline produced a given id."""
+    return (config.OUTPUT_DIR / f"{short_id}.story.json").exists()
+
+
+def mp4_path(short_id: str) -> Path:
+    """
+    output/<short_id>/reel.mp4 for an explainer reel, output/<short_id>/
+    reel_STORY.mp4 for a story reel.
+
+    RESTYLE_TO_STORY_REELS.md Step 9 Fixes round 9: the short_id's own
+    __story suffix (Step 9 Fix 4) already disambiguates the DIRECTORY, but
+    the mp4 FILE ITSELF was always literally named "reel.mp4" either way —
+    indistinguishable at a glance the moment it is out of its folder
+    (downloaded, emailed, sitting in a folder of clips next to an
+    explainer-mode one), which is exactly how "I keep accidentally
+    generating explainer reels instead of story mode" kept happening.
+    Every caller that needs this path (render() itself, story_reel.py,
+    server.py, this module's own tests) goes through this one function
+    so the filename decision can never drift out of sync across them.
+    """
+    filename = "reel_STORY.mp4" if is_story_reel(short_id) else "reel.mp4"
+    return config.OUTPUT_DIR / short_id / filename
+
+
 def render(short_id: str, force: bool = False,
            base_url: str | None = None, fps: int = FPS,
            progress=None, workers: int | None = None) -> Path:
     """
-    Build output/<short_id>/reel.mp4 and return its path.
+    Build output/<short_id>/reel.mp4 (reel_STORY.mp4 for a story reel —
+    see mp4_path) and return its path.
 
     Cached: rebuilt only when missing, when --force is passed, or when the unit
     JSON is newer than the video.
+
+    STORY MODE (RESTYLE_TO_STORY_REELS.md Step 8): a short with a
+    <short_id>.story.json is rendered through the SAME capture protocol
+    (window.__capture.seek, see _capture_slice) — web/src/StoryStage.tsx's
+    own StoryCaptureStage implements that exact contract — but its total
+    duration comes from _story_total_seconds, not feed._timeline(unit)
+    (which only understands the explainer ShortUnit/Beat shape), and its
+    audio track is story_audio.py's own mixed WAV, not voice.synthesize's
+    audio.mp3.
     """
-    path = config.OUTPUT_DIR / f"{short_id}.json"
-    if not path.exists():
-        raise FileNotFoundError(f"no such short: {short_id}")
-    unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
+    is_story = is_story_reel(short_id)
+
+    unit: ShortUnit | None = None
+    if is_story:
+        path = config.OUTPUT_DIR / f"{short_id}.story.json"
+        total = _story_total_seconds(short_id)
+        if total <= 0:
+            raise RuntimeError(f"{short_id} has a zero-length story timeline — "
+                               f"has `python -m shorts.story_audio {short_id}` run yet?")
+    else:
+        path = config.OUTPUT_DIR / f"{short_id}.json"
+        if not path.exists():
+            raise FileNotFoundError(f"no such short: {short_id}")
+        unit = ShortUnit(**json.loads(path.read_text(encoding="utf-8")))
+        # The SAME timeline the player animates to, so the video and the
+        # reel cannot disagree about when a beat starts.
+        beats, total = feed._timeline(unit)
+        if not beats:
+            raise RuntimeError(f"{short_id} has no beats to render")
+        if total <= 0:
+            raise RuntimeError(f"{short_id} has a zero-length timeline")
 
     outdir = config.OUTPUT_DIR / short_id
     outdir.mkdir(parents=True, exist_ok=True)
-    mp4 = outdir / "reel.mp4"
+    mp4 = mp4_path(short_id)
     stamp = outdir / "reel.stamp"
     fingerprint = _renderer_fingerprint()
     if mp4.exists() and not force and _stamp_matches(stamp, fingerprint, path):
         return mp4
-
-    # The SAME timeline the player animates to, so the video and the reel cannot
-    # disagree about when a beat starts.
-    beats, total = feed._timeline(unit)
-    if not beats:
-        raise RuntimeError(f"{short_id} has no beats to render")
-    if total <= 0:
-        raise RuntimeError(f"{short_id} has a zero-length timeline")
 
     base = (base_url or config.VIDEO_BASE_URL).rstrip("/")
     if not _server_is_up(base):
@@ -403,7 +474,13 @@ def render(short_id: str, force: bool = False,
                            "The renderer photographs the built app.")
 
     chrome, ff = _chrome(), _ffmpeg()
-    audio = outdir / "audio.mp3"
+    if is_story:
+        audio_dir = outdir / "audio"
+        audio = audio_dir / "mix_with_music.wav"
+        if not audio.exists():
+            audio = audio_dir / "mix.wav"
+    else:
+        audio = outdir / "audio.mp3"
     frames = max(1, int(round(total * fps)))
     workers = max(1, min(workers or DEFAULT_WORKERS, frames))
 
@@ -493,8 +570,14 @@ def render(short_id: str, force: bool = False,
     #
     # The stamp now records the unit mtime it was built FROM, written last, so the
     # comparison is against a number rather than a race.
-    unit.video_path = str(mp4.relative_to(config.ROOT))
-    path.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
+    #
+    # STORY MODE has no video_path field to write back (StoryScript is not a
+    # ShortUnit — see this function's own docstring) — the stamp file alone
+    # is what makes the cache check above work, so it is the only thing
+    # written for a story-mode short; `path` (story.json) is left untouched.
+    if unit is not None:
+        unit.video_path = str(mp4.relative_to(config.ROOT))
+        path.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
     stamp.write_text(f"{fingerprint} {path.stat().st_mtime_ns}", encoding="utf-8")
     return mp4
 

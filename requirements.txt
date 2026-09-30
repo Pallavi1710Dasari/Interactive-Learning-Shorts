@@ -6,6 +6,11 @@ pyyaml>=6.0
 fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
+# shorts/imagegen.py's own crop/resize-to-1080x1920 step and the stub
+# provider's solid-colour + shot_id PNG. No provider SDK — every real
+# provider here (Gemini, Cloudflare Workers AI) is called over plain REST
+# with `requests`, already a dependency.
+Pillow>=10.0
 
 # Static ffmpeg for joining voice beats, so recording needs no sudo install.
 imageio-ffmpeg>=0.5
@@ -21,3 +26,10 @@ kokoro-onnx>=0.4
 # It arrived as a uvicorn[standard] transitive before; video.py imports it
 # directly, so it is declared rather than borrowed.
 websockets>=12
+
+# RESTYLE_TO_STORY_REELS.md Step 8 Part 1: real per-word timings from the
+# ACTUAL synthesized audio (shorts/story_audio.py), not an even split.
+# CTranslate2-backed, CPU-friendly, no torch — reuses the same "no apt
+# install needed" reasoning as kokoro-onnx above. Model weights (tiny.en by
+# default, config.WHISPER_MODEL) are fetched on first use, not by pip.
+faster-whisper>=1.0

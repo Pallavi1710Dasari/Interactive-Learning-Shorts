@@ -1628,7 +1628,8 @@ def revisual(body: RevisualIn):
     path.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
 
     # The cached MP4 was rendered from the frames this just replaced.
-    stale = config.OUTPUT_DIR / unit.short_id / "reel.mp4"
+    from . import video as videomod
+    stale = videomod.mp4_path(unit.short_id)
     stale.unlink(missing_ok=True)
 
     fresh = [u for u in feed.collect(include_quarantined=True)
@@ -1727,6 +1728,106 @@ def audio(short_id: str):
                         headers={"Cache-Control": "no-store"})
 
 
+# ------------------------------------------------------------------ story mode
+#
+# RESTYLE_TO_STORY_REELS.md Step 8 Part 2 — web/src/ReelStage.tsx's story-mode
+# branch (and shorts/video.py's capture of it) needs a way to READ a
+# StoryScript + its real measured timings (shorts/story_audio.py's
+# timings.json) as one JSON payload, and to fetch each shot's rendered PNG
+# and the mixed audio track as files. None of this existed before this step
+# — story mode had no server-side surface at all.
+
+def _story_short_id(short_id: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", short_id):
+        raise HTTPException(400, "bad short_id")
+    return short_id
+
+
+@app.get("/api/story/{short_id}")
+def story_data(short_id: str):
+    """
+    Everything the story-mode capture page needs: the StoryScript's own
+    narrative fields (hook_line, system_name, lessons — for the title card,
+    System's badge, and the recap) plus each shot's REAL measured timing
+    (timings.json, never the shot's merely-PLANNED duration_seconds — see
+    Shot.final_duration_seconds's own docstring on why those two numbers
+    must never be confused) and a URL for its rendered frame, when one
+    exists (text_card/recap/cta shots have none — they are drawn as
+    overlays, never images).
+    """
+    short_id = _story_short_id(short_id)
+    story_path = config.OUTPUT_DIR / f"{short_id}.story.json"
+    if not story_path.exists():
+        raise HTTPException(404, "no such story reel")
+    from .schema import StoryScript
+    story = StoryScript.model_validate_json(story_path.read_text(encoding="utf-8"))
+
+    timings_path = config.OUTPUT_DIR / short_id / "timings.json"
+    timings = (json.loads(timings_path.read_text(encoding="utf-8"))
+              if timings_path.exists() else {})
+    frames_dir = config.OUTPUT_DIR / short_id / "frames"
+
+    shots = []
+    for s in story.shots:
+        t = timings.get(s.shot_id, {})
+        has_frame = (frames_dir / f"shot_{s.shot_id}.png").exists()
+        shots.append({
+            "shot_id": s.shot_id, "kind": s.kind, "camera": s.camera,
+            "framing": s.framing, "emotion": s.emotion, "characters": s.characters,
+            "line": s.line, "overlay_text": s.overlay_text, "card_lines": s.card_lines,
+            "start": t.get("start", 0.0),
+            "end": t.get("end", s.final_duration_seconds or s.duration_seconds),
+            "final_duration": t.get("final_duration",
+                                    s.final_duration_seconds or s.duration_seconds),
+            # Remapped to the SAME {w,s,e} shape explainer mode's CaptionWord
+            # already uses (timings.json itself stores the verbose
+            # word/start/end field names WordTiming.model_dump() writes) —
+            # one CaptionWord type and one chunking function serve both
+            # modes rather than duplicating either per mode.
+            "words": [{"w": w["word"], "s": w["start"], "e": w["end"]}
+                     for w in t.get("words", [])],
+            "image_url": (f"/api/story/{short_id}/frame/shot_{s.shot_id}.png"
+                         if has_frame else None),
+        })
+
+    status_path = config.OUTPUT_DIR / short_id / "audio" / "status.json"
+    status = (json.loads(status_path.read_text(encoding="utf-8"))
+             if status_path.exists() else {})
+    audio_dir = config.OUTPUT_DIR / short_id / "audio"
+    has_audio = (audio_dir / "mix_with_music.wav").exists() or (audio_dir / "mix.wav").exists()
+    total = status.get("total_seconds") or (shots[-1]["end"] if shots else 0.0)
+
+    return {"short_id": short_id, "hook_line": story.hook_line,
+           "system_name": story.system_name, "lessons": story.lessons,
+           "shots": shots, "total": total,
+           "audio_url": f"/api/story/{short_id}/audio" if has_audio else None}
+
+
+@app.get("/api/story/{short_id}/frame/{filename}")
+def story_frame(short_id: str, filename: str):
+    short_id = _story_short_id(short_id)
+    if not re.fullmatch(r"shot_[A-Za-z0-9_-]{1,64}\.png", filename):
+        raise HTTPException(400, "bad filename")
+    path = config.OUTPUT_DIR / short_id / "frames" / filename
+    if not path.exists():
+        raise HTTPException(404, "no such frame")
+    return FileResponse(path, media_type="image/png",
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/story/{short_id}/audio")
+def story_audio_file(short_id: str):
+    short_id = _story_short_id(short_id)
+    audio_dir = config.OUTPUT_DIR / short_id / "audio"
+    path = audio_dir / "mix_with_music.wav"
+    if not path.exists():
+        path = audio_dir / "mix.wav"
+    if not path.exists():
+        raise HTTPException(404, "no audio for this story reel")
+    return FileResponse(path, media_type="audio/wav",
+                        headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/voice")
 def voice_status():
     """Whether recorded narration is available, and what is missing when it is not."""
@@ -1810,7 +1911,7 @@ def start_render(short_id: str):
             return {"short_id": short_id, **job}
         # Cached AND current — the fingerprint check inside render() covers a stale
         # video from an older renderer, so this only short-circuits a real hit.
-        mp4 = config.OUTPUT_DIR / short_id / "reel.mp4"
+        mp4 = videomod.mp4_path(short_id)
         stamp = config.OUTPUT_DIR / short_id / "reel.stamp"
         unit = config.OUTPUT_DIR / f"{short_id}.json"
         if mp4.exists() and videomod._stamp_matches(
@@ -2165,6 +2266,17 @@ def health():
             # layout.py from the same config value) and the chrome around them
             # cannot disagree about which theme is live.
             "theme": config.REEL_THEME,
+            # RESTYLE_TO_STORY_REELS.md Step 8 Part 2 — story mode's brand
+            # colors (config.BRAND's bg/accent_1/accent_2, config.BRAND_
+            # HANDLE), for main.tsx to apply as CSS custom properties the
+            # same way it already applies `theme` as data-theme. Config-
+            # driven, not hardcoded in styles.css, so a .env brand change
+            # (like a REEL_THEME change already does for explainer mode)
+            # reaches the story-mode player without a rebuild.
+            "brand_bg": config.BRAND.bg,
+            "brand_accent_1": config.BRAND.accent_1,
+            "brand_accent_2": config.BRAND.accent_2,
+            "brand_handle": config.BRAND_HANDLE,
             "units": len(feed.collect()),
             "total": usage.totals()}
 
@@ -2173,6 +2285,16 @@ def health():
 
 if WEB_DIST.exists():
     app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
+
+# Project assets (assets/brand/logo.png, assets/cast/*.png, ...) — a SEPARATE
+# prefix from /assets above (the built JS/CSS bundle's own asset chunks); the
+# story-mode CaptureStage fetches assets/brand/logo.png from here (Step 8
+# Part 2's persistent logo), falling back to a drawn placeholder client-side
+# when the mount 404s (see StoryCaptureStage's own note — this directory has
+# no assets/brand/ yet in a fresh checkout).
+if (config.ROOT / "assets").exists():
+    app.mount("/story-assets", StaticFiles(directory=config.ROOT / "assets"),
+             name="story-assets")
 
     @app.get("/")
     def index():

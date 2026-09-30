@@ -264,6 +264,88 @@ def evidence_section_ids(sections: list[Section], section_id: str) -> list[str]:
     return [s.section_id for s in group] if group else [section_id]
 
 
+#: Heading words that mark "the section stating the problem/motivation" —
+#: RESTYLE_TO_STORY_REELS.md's own "always include the section that states
+#: the PROBLEM the concept solves, if the document has one" rule. Same
+#: generic-role idea as _ELABORATION_TITLES above, aimed at a different role.
+_PROBLEM_TITLE_WORDS = ("problem", "why", "without", "motivation", "limitation")
+
+#: Heading words that mark "the section stating the concept's MEANING or
+#: CONCLUSION" — RESTYLE_TO_STORY_REELS.md's Step 1 fix, its own addition to
+#: SOURCE SCOPE alongside the PROBLEM section above. A document that spells
+#: out "what X actually means" or wraps up with a summary/takeaway often puts
+#: the clean, teachable definition of the concept there rather than in the
+#: section a topic happens to be filed under — see content/react_usestate_
+#: basics.md's own "7.4 What state actually means in a React component".
+_MEANING_TITLE_WORDS = ("actually means", "what this means", "conclusion", "takeaway")
+
+
+def story_evidence_pool(sections: list[Section], section_id: str,
+                        teaching_sequence=None) -> tuple[str, list[str]]:
+    """
+    The evidence pool story mode's mapping call may draw on — RESTYLE_TO_
+    STORY_REELS.md's SOURCE SCOPE rule: "the mapping must see ALL text the
+    concept depends on, not only the selected section."
+
+    Wider than evidence_text alone. Starts from the same elaboration-group
+    evidence_text already resolves (evidence_section_ids above), then adds:
+      - any section whose own title names a concept a teaching_sequence step
+        is about — a prerequisite the story leans on that lives under its own
+        heading, outside the elaboration group;
+      - the FIRST section (in document order) whose title reads as stating
+        the problem/motivation the concept solves (_PROBLEM_TITLE_WORDS),
+        when the document has one;
+      - the FIRST section (in document order) whose title reads as the
+        concept's MEANING or CONCLUSION (_MEANING_TITLE_WORDS) — Step 1's own
+        fix, added alongside the PROBLEM section above for the same reason:
+        the clean, teachable statement of a concept often lives in its own
+        "what this actually means" or summary heading, not the section a
+        topic happens to be filed under.
+
+    All three additions are HEADING-TITLE matches, the same conservative,
+    string-only signal group_sections_by_concept already uses rather than any
+    attempt to understand prose — a document that phrases either role
+    idiosyncratically is simply not matched (a missed addition, not a wrong
+    one), which is the safe failure direction here exactly as it is there.
+
+    Returns (pooled_text, section_ids_used) so a caller can log exactly which
+    headings contributed to a mapping — the rule's own "log which sections
+    were used" instruction.
+    """
+    used = list(evidence_section_ids(sections, section_id))
+    texts = [find_section(sections, sid).text for sid in used]
+
+    for step in (teaching_sequence or []):
+        concept = _normalize_title(getattr(step, "concept", "") or "")
+        if not concept:
+            continue
+        for s in sections:
+            if s.section_id in used:
+                continue
+            title = _normalize_title(s.title)
+            if title and (concept in title or title in concept):
+                used.append(s.section_id)
+                texts.append(s.text)
+
+    for s in sections:
+        if s.section_id in used:
+            continue
+        if any(w in _normalize_title(s.title) for w in _PROBLEM_TITLE_WORDS):
+            used.append(s.section_id)
+            texts.append(s.text)
+            break   # "the section", singular — the first one found
+
+    for s in sections:
+        if s.section_id in used:
+            continue
+        if any(w in _normalize_title(s.title) for w in _MEANING_TITLE_WORDS):
+            used.append(s.section_id)
+            texts.append(s.text)
+            break   # "the section", singular — the first one found
+
+    return "\n\n".join(texts), used
+
+
 if __name__ == "__main__":
     import sys
     for s in parse_markdown(sys.argv[1]):

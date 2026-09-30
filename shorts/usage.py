@@ -33,6 +33,20 @@ PRICES = {
     "gemini-3.1-flash-lite": (0.25e-6, 1.50e-6),
     "gemini-3.5-flash-lite": (0.30e-6, 2.50e-6),
     "gemini-2.5-flash-lite": (0.10e-6, 0.40e-6),
+    # RESTYLE_TO_STORY_REELS.md Step 9 Fixes round 14: config.py's own note
+    # on MODEL_STORY_VISION_JUDGE verified gemini-3.8-flash as "Free of
+    # charge" against ai.google.dev's OWN pricing page — true for Google's
+    # direct API, but every call in this project goes through OpenRouter
+    # (this module's own docstring above), a paid reseller that does NOT
+    # pass a model's own free tier through to callers. A real sample stage
+    # showed $0.0000 estimated (this table had no entry, so text_cost_
+    # per_call's fallback silently assumed free) but $0.0430 actual —
+    # OpenRouter's own reported per-call cost (estimated=False rows in
+    # output/usage.json), which is authoritative. Fitted here by least-
+    # squares regression against 53 real, non-estimated logged calls
+    # (input_tokens, output_tokens, cost) — not guessed, not copied from a
+    # docs page: it reproduces every sampled real cost to 6 decimal places.
+    "gemini-3.8-flash": (0.75e-6, 3.75e-6),
 }
 
 
@@ -128,6 +142,34 @@ def record(label: str, model: str, resp, duration_seconds: float = 0.0) -> Call 
         return None
 
 
+def record_image(label: str, model: str, cost: float, estimated: bool = True,
+                 duration_seconds: float = 0.0) -> Call | None:
+    """
+    record()'s counterpart for shorts/imagegen.py — an image call has no
+    token count, only a flat per-image price (or exactly $0.0 for a cache
+    hit or the stub provider), so it cannot go through record()'s
+    usage.input_tokens/output_tokens path at all. Same ledger (this function
+    appends to the same _calls list record() does, so totals()/since()
+    aggregate image and text calls together without either caller needing to
+    know which kind the other was), same "never raises" contract.
+
+    `estimated` mirrors record()'s own field: True for a real provider call
+    (Gemini/Cloudflare report no per-call cost the way OpenRouter does for
+    text — see config.IMAGE_COST_PER_CALL's own note), False for a cache hit
+    or the stub provider, where $0.0 is not an estimate, it is the actual cost.
+    """
+    try:
+        call = Call(label, model, 0, 0, round(float(cost), 6), estimated,
+                    round(float(duration_seconds), 3))
+        with _lock:
+            _load_locked()
+            _calls.append(call)
+            _save_locked()
+        return call
+    except Exception:
+        return None
+
+
 def _sum(calls: list[Call]) -> Totals:
     t = Totals()
     for c in calls:
@@ -175,6 +217,17 @@ def since(cursor: int) -> dict:
     """Totals for calls made after `cursor` — i.e. what this request cost."""
     with _lock:
         return asdict(_sum(_calls[cursor:]))
+
+
+def calls_since(cursor: int) -> list[dict]:
+    """RESTYLE_TO_STORY_REELS.md Step 9 — the RAW per-call records after
+    `cursor`, each with its own `model` — since()'s own Totals.by_label
+    aggregates by LABEL, not by model, and shorts/story_reel.py's report
+    stage needs a genuine per-model breakdown (a story reel's "mapping"
+    label and "shots" label can both use the same MODEL_GENERATOR, but a
+    report reader wants to see total spend BY MODEL as its own axis)."""
+    with _lock:
+        return [asdict(c) for c in _calls[cursor:]]
 
 
 def _save_locked() -> None:

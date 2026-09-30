@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getHealth, getShorts, getUsage, renderStatus, startRender,
+import { getHealth, getShorts, getStory, getUsage, renderStatus, startRender,
          type MaterialResult, type UsageTotals } from "./api";
 import { CostPill } from "./CostPill";
 import { Reel } from "./Reel";
@@ -10,8 +10,9 @@ import { StepReview } from "./StepReview";
 import { StepBuild } from "./StepBuild";
 import { VoiceLab } from "./VoiceLab";
 import { CaptureStage } from "./CaptureStage";
+import { StoryCaptureStage } from "./StoryStage";
 import { pickVoices, useVoices } from "./useNarration";
-import type { Feedback, QuestionWorkflow, Unit } from "./types";
+import type { Feedback, QuestionWorkflow, StoryReel, Unit } from "./types";
 
 // THE LIVE PRODUCT FLOW, IN ORDER. EXACTLY TWO STAGES ARE HUMAN GATES:
 //   material -> approve (QUESTION, human gate) -> approach (TEACHING
@@ -63,21 +64,33 @@ function useCaptureRoute(): string | null {
  */
 function CaptureRoute({ shortId }: { shortId: string }) {
   const [unit, setUnit] = useState<Unit | null>(null);
+  // RESTYLE_TO_STORY_REELS.md Step 8 — a story-mode reel has no entry in
+  // the explainer feed at all (feed.collect() only ever reads *.json
+  // ShortUnit files — see shorts/feed.py); GET /api/story/{id} is tried
+  // FIRST, and only falls through to the explainer lookup on a 404, so
+  // one route serves both without the caller having to know which mode a
+  // short_id belongs to in advance.
+  const [story, setStory] = useState<StoryReel | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    getShorts(true)
-      .then((all) => {
-        const hit = all.find((u) => u.short_id === shortId);
-        if (!hit) throw new Error(`no such short in the feed: ${shortId}`);
-        setUnit(hit);
-      })
-      .catch((e) => {
-        const msg = e instanceof Error ? e.message : String(e);
-        (window as unknown as Record<string, unknown>).__captureError = msg;
-        setError(msg);
+    getStory(shortId)
+      .then(setStory)
+      .catch(() => {
+        getShorts(true)
+          .then((all) => {
+            const hit = all.find((u) => u.short_id === shortId);
+            if (!hit) throw new Error(`no such short in the feed: ${shortId}`);
+            setUnit(hit);
+          })
+          .catch((e) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            (window as unknown as Record<string, unknown>).__captureError = msg;
+            setError(msg);
+          });
       });
   }, [shortId]);
   if (error) return <div className="center"><b>capture failed</b><p>{error}</p></div>;
+  if (story) return <StoryCaptureStage story={story} />;
   if (!unit) return null;
   return <CaptureStage unit={unit} />;
 }

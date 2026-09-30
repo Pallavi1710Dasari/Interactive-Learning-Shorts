@@ -2,12 +2,23 @@
 
 This is the highest-leverage prompt in the project. Everything downstream inherits
 its quality. Tune it against the eval set, not by vibes.
+
+SYSTEM_EXPLAINER (below) is that prompt, unchanged in behaviour by the rename —
+it was plain `SYSTEM` before REEL_STYLE (config.REEL_STYLE) existed, and every
+existing caller (run.py, workflow.py, the eval harness) still gets it by default.
+SYSTEM_STORY, further down, is story mode's prompt — see RESTYLE_TO_STORY_REELS.md
+Phase 1 — used only when a caller explicitly asks for it (config.REEL_STYLE ==
+"story"). The two prompts are independent; nothing in SYSTEM_EXPLAINER changed to
+make room for SYSTEM_STORY.
 """
 from ..schema import (Script, Topic, Section, SectionUnderstanding, QuestionWorkflow,
                       QuestionFraming, TeachingApproach,
+                      Character, ConceptMapping, ConceptMappingSet, Shot, StoryScript,
+                      StoryShotsSet, HookLineOnly,
                       MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND)
 from ..llm import ask_json
-from .. import revision, checks
+from .. import revision, checks, config
+from .audit import judge_story_metaphors   # audit.py -> checks/schema/config/llm only, no cycle
 
 MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 62
 MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
@@ -23,7 +34,7 @@ MAX_WORDS = int(MAX_SECONDS * WORDS_PER_SECOND)   # 112
 #: in the prompt tells the model to aim at it.
 TARGET_WORDS = (MIN_WORDS + MAX_WORDS) // 2   # 87
 
-SYSTEM = f"""You write SHORT single-narrator video scripts that teach ONE concept.
+SYSTEM_EXPLAINER = f"""You write SHORT single-narrator video scripts that teach ONE concept.
 
 FORMAT
 ONE NARRATOR, START TO FINISH. This is not a dialogue and there is no second
@@ -677,19 +688,37 @@ literal question, and only the first even suggests one.
             genuinely the most natural way in — often when it targets a
             misconception. This is one hook among four, never the default.
   PROBLEM   Beat 1 puts the REAL difficulty the section describes in front of
-            the viewer — as whatever wording makes a listener actually feel
-            it, which is very often a short curiosity-creating observation or
-            rhetorical question ("Ever wondered why...", "Notice how...")
-            rather than a flat textbook statement of it. "Prop drilling is
-            when data passes through components that never use it" states the
-            problem; "Ever wondered why data sometimes has to travel through
-            components that don't even use it?" is the SAME problem, and it
-            is the stronger opening — it makes the viewer want the next
-            sentence instead of just receiving a fact. Either way the problem
-            is the section's, not one you thought of, and beat 2 resolves it
-            immediately — this is not the QUESTION shape with extra steps, it
-            is one beat that states the difficulty and moves straight into
-            explaining it.
+            the viewer. DEFAULT TO a short curiosity-creating observation or
+            rhetorical question ("Ever wondered why...", "Notice how...") —
+            never "Have you ever wondered", which is checked and rejected as
+            an interviewer-shaped lead. Reach for a flat textbook statement of
+            the difficulty only when the section's own wording already reads
+            naturally that way and dressing it up as a question would sound
+            forced — the curiosity framing is the default choice here, not an
+            optional upgrade. "Prop drilling is when data passes through
+            components that never use it" states the problem; "Ever wondered
+            why data sometimes has to travel through components that don't
+            even use it?" is the SAME problem, and it is the stronger opening
+            — it makes the viewer want the next sentence instead of just
+            receiving a fact.
+
+            THE FLAT-STATEMENT DEFAULT IS THE PATTERN TO AVOID — a real one
+            this project has shipped:
+              FLAT     "A function component needs a way to create data it
+                        can change later — that's what a Hook is for."
+              CURIOUS  "Ever wondered how a function component keeps a value
+                        changing across renders, when the function itself
+                        runs from scratch every time?"
+            Same section, same fact. The FLAT version is a definition wearing
+            a problem's clothes — it states the need and resolves it in the
+            same breath, leaving beat 2 nothing left to deliver. The CURIOUS
+            version holds the resolution back for beat 2, which is where a
+            PROBLEM hook's payoff belongs.
+
+            Either way the problem is the section's, not one you thought of,
+            and beat 2 resolves it immediately — this is not the QUESTION
+            shape with extra steps, it is one beat that states the difficulty
+            and moves straight into explaining it.
   SURPRISE  Beat 1 states the thing that will not be predicted, in whatever
             wording makes it land as surprising — a real surprise the section
             states can be phrased as an observation OR a short rhetorical
@@ -1052,7 +1081,7 @@ def write_script(topic: Topic, section: Section, feedback: str | None = None,
     question, which may differ from the plain approved question) passes a
     `topic` already carrying it — this function does not re-derive that
     choice. Beat 1 is NOT required to restate `topic.topic` as a spoken
-    question — see THE HOOK in SYSTEM above.
+    question — see THE HOOK in SYSTEM_EXPLAINER above.
     """
     user = f"""TOPIC: {topic.topic}
 WHY IT MATTERS: {topic.why_it_matters}
@@ -1253,7 +1282,7 @@ do not mention the material."""
     # 2000 was too tight: a script plus a verbatim quote per beat is a longer
     # payload than a script alone, and a truncated response comes back with no
     # text block at all (see the note in llm.py).
-    return ask_json(SYSTEM, user, Script, max_tokens=4000, label="script")
+    return ask_json(SYSTEM_EXPLAINER, user, Script, max_tokens=4000, label="script")
 
 
 def write_script_for_workflow(workflow: QuestionWorkflow, section: Section,
@@ -1301,7 +1330,7 @@ def write_script_for_workflow(workflow: QuestionWorkflow, section: Section,
     model, for context, inside the teaching-plan block write_script builds
     when `framing` is supplied. NEITHER VALUE HAS TO BE SPOKEN AS A LITERAL
     QUESTION IN BEAT 1 — both are internal objective/context; see write_script's
-    own "THE APPROVED TEACHING PLAN" and SYSTEM's "THE HOOK".
+    own "THE APPROVED TEACHING PLAN" and SYSTEM_EXPLAINER's "THE HOOK".
 
     ONLY workflow.script IS WRITTEN. selection, question_approval, framing,
     teaching_approach, teaching_approach_approval and visual_strategy all pass
@@ -1425,3 +1454,822 @@ def write_and_grade_script_for_workflow(
             break
         feedback = revision.feedback_for(results, prefix=retry_prefix)
     return workflow, results
+
+
+# =============================================================================
+# STORY MODE — RESTYLE_TO_STORY_REELS.md Phase 1. See that file for the full
+# plan; everything below is Phase 1 only: script generation (mapping + shots),
+# not rendering. Reachable only when config.REEL_STYLE == "story" — every
+# existing caller above this line is SYSTEM_EXPLAINER and is untouched.
+#
+# THIS PROMPT IS A FIRST DRAFT, NOT A TUNED ONE. SYSTEM_EXPLAINER above earned
+# its current wording against evals/cases.yaml over many real runs; SYSTEM_STORY
+# and SYSTEM_STORY_SHOTS below have not been run against a single real short
+# yet. Expect to rewrite most of the prose here once real output exists to
+# read — the STRUCTURE (mapping before shots, one call each, checks.check_mapping
+# gating the second call) is the part this phase is actually committing to.
+# =============================================================================
+
+SYSTEM_STORY = """You are mapping ONE piece of teaching material onto a short illustrated
+story, before a single scene is written.
+
+THIS IS A STORY SCRIPT, NOT A QUESTION-AND-ANSWER EXCHANGE. The concept is
+taught by an everyday human situation, acted out by the fixed cast below,
+problem-first — never by one character asking "What is X?" or "How does X
+work?" and another one answering with a definition. There is no Interviewer,
+Student, or Teacher role, and no quiz-style question to the viewer. The
+concept is revealed by WHAT HAPPENS, and named once, at the end, by the
+Narrator ("...and that notebook? That's state."). This prompt's own job (the
+mapping) is upstream of dialogue, but every metaphor_event you invent below
+must be something that HAPPENS, not something a character explains in a line
+— the shot-writing step that follows this one is held to the same rule and
+checks.check_story_not_qa enforces it mechanically on the shots.
+
+WHAT THIS STORY IS. A single continuous scene (or short run of connected scenes),
+starring characters from a fixed cast, that teaches ONE technical concept by
+having something happen that IS the concept — not a character who explains it in
+dialogue. A viewer who muted the video and only watched the picture should still
+be able to tell what rule the scene just demonstrated. This is not the single-
+narrator explainer format (no diagrams, no on-screen text carrying the meaning) —
+if the concept can only be understood by reading a line of on-screen text, the
+metaphor has not actually shown it.
+
+THE CAST is fixed and given to you below — you do not invent characters. Rahul
+and Riya are the only characters who ACT; System is the personified technology
+of the reel (a keeper/guard/librarian role — one visual design, only its name
+badge changes per reel, which you choose as `system_name` below); Narrator is
+voice-only and never appears in a scene. Choose which of Rahul/Riya/System
+appear in THIS short from what the scene needs, not all of them by default.
+
+THE METAPHOR MUST BE AN EVERYDAY HUMAN SITUATION the viewer already
+understands and has working intuition for — a classroom, a library, a gate
+with a guard, an office, a shop, a queue — NEVER a machine or apparatus
+invented for the purpose (no levers, no conveyor belts, no control panels).
+The viewer's existing intuition about the situation is what teaches the rule;
+an invented mechanism has no intuition attached to it and has to be explained,
+which is exactly what this format exists to avoid.
+
+STEP 0 — CANDIDATE SELECTION (do this before choosing anything else)
+Generate 3 CANDIDATE metaphors for the everyday situation the whole story will
+happen in. For each, give a short `name`, a one-sentence `pitch` (what
+happens, and why it teaches the rule), and score it 1-5 on:
+  familiarity   would a 19-year-old get this instantly?
+  faithfulness  does it imply no behavior the source doesn't state?
+  drawability   one setting, 3 props or fewer?
+  drama         is someone stopped, confused, or surprised?
+Put all 3 in `candidates`. DO NOT PICK A WINNER YOURSELF and do not include a
+`chosen` field — the highest-scoring candidate (by familiarity+faithfulness+
+drawability+drama) is selected AUTOMATICALLY, in code, from the scores you
+give. That means the scores are the actual decision: score honestly, because
+whichever candidate ends up highest-scoring is the one STEP 1 below must
+build the rest of the mapping from. The other two stay in the output so a
+human reviewer can see what wasn't picked.
+
+STEP 1 — THE SETTING, THE PROPS, AND system_name
+From your highest-scoring candidate, name:
+  setting      the ONE concrete place the whole story happens in (a room, a
+               library, a stage) — one place, not a location per shot.
+  props        at most 3 recurring PHYSICAL OBJECTS the story uses — things
+               the camera could show sitting on a shelf, not a mark, sound,
+               or effect one of them leaves behind. "chalk", "notebook",
+               "whiteboard" are props; "a chalk tally mark", "a flash of
+               light", "a bell sound" are NOT — those are things that HAPPEN
+               to a prop, described inside a metaphor_event, not a prop of
+               their own. The setting must be able to physically host every
+               metaphor_event STEP 2 below is about to invent, using only
+               these props — decide setting/props with that in mind, not
+               before you know what the events will be.
+  system_name  the short display name System wears as its chest badge in
+               THIS reel ("React", "the OS", "the Database", "the JVM") — a
+               short noun phrase, not a sentence. System's own design never
+               changes; only this name does.
+  hook_line    the Narrator's OPENING line, spoken before the scene starts —
+               SHORT AND PUNCHY, 12 WORDS OR FEWER, one breath, not a
+               narrated setup, naming the EVERYDAY visible symptom, never
+               the technical term. MUST BEGIN WITH ONE OF THESE EXACT
+               PATTERNS (pick whichever fits the concept best — check_hook
+               rejects anything else, no other curiosity phrasing is
+               accepted):
+                 "Have you ever wondered..."
+                 "Ever noticed..."
+                 "Did you know..."
+                 "Ever wonder why..."
+               Bad: "Have you ever wondered what useState is?" (opener is
+               right, but it names the term and is a setup sentence, not
+               punchy). Bad: "Ever clicked a button that just refuses to
+               change?" (does NOT start with one of the 4 patterns above —
+               "Ever clicked" is not "Ever noticed"/"Ever wonder why").
+               Good: "Ever noticed your counter forgets everything?" or
+               "Did you know a click can vanish without a trace?" (right
+               opener, short, symptom, no jargon).
+  technical_term  the concept's name, exactly as the Narrator will say it
+               once, after the concept is first shown ("state", "a stack").
+               Required — never blank.
+
+STEP 2 — MAP EVERY RULE BEFORE WRITING ANY LINE
+Fill `mapping` next, and ONLY `mapping` — no shots exist yet at this stage.
+Default to 3 sub-concepts. Use a 4th entry ONLY when the material truly needs
+it, and say why in `extra_entry_reason` — a 4th entry with no reason is a
+rejected mapping (see key_points/teaching_sequence below if given, which name
+how many this section actually supports).
+
+NOT EVERY TRUE STATEMENT IN THE MATERIAL BELONGS IN `mapping`. If a rule is
+pure syntax, notation, or a complexity figure (the SHAPE of a return value,
+"O(1)", a keyword's spelling) — something true that nothing visibly HAPPENS
+to — it does not get a metaphor_event invented for it. Put it, verbatim or
+near-verbatim, in `card_facts` instead (a plain text card, at most 2 facts).
+Reserve `mapping` for rules something in the scene can actually DO. A
+concept goes in `mapping` OR `card_facts`, NEVER BOTH — putting the same rule
+in both is a rejected mapping, not thoroughness.
+
+WHEN THE CONCEPT REPLACES A WRONG APPROACH, the right approach must be a
+DIFFERENT, DELIBERATE ACTION by the actor. System never fixes the wrong
+approach automatically unless the source says it is automatic. The viewer
+must see TWO DIFFERENT ACTIONS: the wrong one fails, the right one works.
+Show only what the source states. If the source says the wrong approach
+causes NOTHING to happen, show nothing happening — do not add a reset or
+reaction that the wrong action seems to cause.
+
+For each mapping entry:
+
+  concept_rule    the rule in plain words ("a plain variable is recreated every
+                  render"). THE FIRST ENTRY MUST BE THE PROBLEM the concept
+                  solves — its concept_rule states a failure or limitation
+                  ("a plain variable does NOT survive a re-render"), not a
+                  definition. Everything after it is the concept resolving
+                  that problem.
+  source_quote    the exact sentence in the material that states it — character
+                  for character, not paraphrased. If no single sentence states
+                  it, the rule does not belong in this mapping.
+  actor           which cast member PERFORMS metaphor_event. THE ACTOR-ROLE
+                  RULE, always: Rahul OWNS THE PROBLEM — the thing that
+                  breaks or is lost belongs to him, so the FIRST (problem)
+                  entry's actor is ALWAYS Rahul, no exception. System
+                  PERFORMS the rule that resolves it (keeps, blocks, guards,
+                  returns). Riya only explains or reacts — she never owns
+                  the problem's object, and is rarely the actor of an entry.
+                  Never the Narrator; the Narrator carries the story, it
+                  does not act inside it.
+  metaphor_event  what physically HAPPENS in the story that shows this rule,
+                  performed by `actor` and using only props from STEP 1 — AND
+                  someone else in the scene must REACT to it (surprise,
+                  frustration, relief). ("the whiteboard is wiped every time
+                  the room resets, and Rahul groans.")
+  visible_proof   what a viewer sees WITH THE SOUND OFF that makes the rule
+                  obvious ("Rahul writes 5, the room flashes, the board is
+                  blank").
+  lesson_line     the payoff one-liner, 10 words or fewer ("Some things are
+                  worth remembering.").
+
+REJECT YOUR OWN METAPHOR AND CHOOSE ANOTHER IF ANY OF THESE IS TRUE:
+  - concept_rule has no metaphor_event that VISIBLY happens — an event only a
+    narrator's line describes, with nothing to actually see, is not one.
+  - the metaphor implies a behavior the source does not state. A metaphor is
+    allowed to dramatize the rule; it is not allowed to add a second rule of
+    its own that sounds plausible but the material never said.
+  - two rules map to the same event. Each metaphor_event is evidence for
+    exactly one concept_rule — an event doing double duty for two rules means
+    one of them has no real dramatization and is borrowing the other's.
+  - visible_proof needs words on screen to be understood. If the only way to
+    tell the rule from the picture is an on-screen caption, the picture is not
+    the proof — the caption is, and that is the explainer format this exists
+    to move away from.
+
+Do this for every rule before moving on. A mapping entry you cannot defend
+against all four rejections above does not get to keep its shots later —
+checks.check_mapping enforces every one of them mechanically, not just this
+prompt.
+
+BEFORE YOU OUTPUT JSON, RE-CHECK: every string in `props` is actually used —
+as an object doing something — inside at least one `metaphor_event`. Cut any
+prop you described but never dramatized.
+"""
+
+SYSTEM_STORY_SHOTS = """You are writing the shots for an illustrated teaching story, from an
+ALREADY-APPROVED concept mapping — see THE APPROVED MAPPING below. Do not
+invent a new mapping, rename a concept_rule, or add a rule the mapping does not
+contain; the mapping is a decision that has already been made, checked, and
+already passed the metaphor-faithfulness judge.
+
+THIS IS A STORY SCRIPT, NOT A QUESTION-AND-ANSWER EXCHANGE.
+- Shot 1 is the Narrator speaking hook_line (copied verbatim from THE APPROVED
+  MAPPING below) — `characters` empty, `kind` "scene".
+- After the opening, the NARRATOR CARRIES THE STORY FORWARD between shots like
+  a storyteller: "So Rahul tried again...", "That's when the librarian stepped
+  in...", "And here's the twist..." — these narrator lines are allowed and
+  encouraged; they are not the banned pattern below.
+- Characters ACT AND REACT inside the story — surprise, frustration, relief, a
+  short remark. They never interview each other.
+- BANNED: a character asking "What is X?" / "How does X work?" / "Why does
+  X...?" followed by another character answering with an explanation or
+  definition. No Interviewer/Student/Teacher roles. No quiz-style question
+  aimed at the viewer mid-story.
+- The Narrator names the TECHNICAL TERM given below — verbatim, exactly as
+  given, not a paraphrase — EXACTLY ONCE, right after it is first shown
+  ("...and that clipboard? That's state."), not before — and never
+  announced by a character asking or defining it. checks.check_story_not_qa
+  and check_concept_named_once enforce this mechanically (an exact
+  substring match against the term given below); use them as the actual
+  bar, not a suggestion.
+
+HOOK-PHRASE HANDLING: the 4 hook openers above ("Have you ever wondered...",
+"Ever noticed...", "Did you know...", "Ever wonder why...") are ONLY allowed
+on shot 1 — never introduce that phrasing again later in the story; a second
+curiosity-hook line reads as a second cold open, not a story in motion.
+
+STRUCTURE, IN ORDER
+1. Shot 1: the hook (above).
+2. One MINI-SCENE per mapping entry, IN ORDER. >= 3 SHOTS IS ONLY THE
+   ABSOLUTE FLOOR checks.check_scene_coverage enforces, NEVER THE TARGET —
+   a mini-scene that stops at the floor is the single most common reason a
+   script fails check_shot_count/check_story_duration LOW (24-30 shots
+   total, 60-80s), and PRIOR ATTEMPTS AT THIS SAME PROMPT CONSISTENTLY
+   UNDERSHOT — landing at 22-23 shots (BELOW the 24 floor) even when
+   asked to aim for the middle of the range. If you are ever unsure
+   whether you have written enough, WRITE ONE MORE SHOT, not one fewer —
+   every real failure of this rule so far has been an undershoot, never
+   an overshoot. DO THE ARITHMETIC BEFORE WRITING, AND TARGET THE UPPER
+   PART OF THE RANGE, NOT THE MIDDLE: this script needs 24-30 shots total
+   — aim for ~29, close to the ceiling (30), not 24 and not the middle.
+   Subtract your fixed shots (1 hook + 1 concept-naming shot + one
+   text_card per card_fact given below + 1 recap + 1 cta — typically 5-6
+   total) from 29, then split what's left EVENLY across your mapping
+   entries. For the common case (3 entries, 2 card_facts, 6 fixed shots)
+   that arithmetic gives 23 / 3 = 7.67, so aim for 8 shots PER MINI-SCENE
+   — recompute for YOUR OWN entry/card_fact count, always centered on ~29
+   total, not the low or middle end of 24-30 — the shape problem,
+   reaction, attempt, reaction, reveal, reaction, payoff, trimmed or
+   extended to hit YOUR OWN computed number, not a fixed one copied from
+   this example, and not shrunk further "for safety" once you've computed
+   it. Every shot
+   in a mini-scene is tagged story_beat:
+     "problem"   the difficulty the metaphor_event is about to resolve.
+     "reaction"  the metaphor_event itself happening, physically, on screen.
+     "payoff"    the visible_proof landing, closing on the entry's lesson_line.
+   Every shot in a mini-scene carries `concept_ref` copied character-for-
+   character from that entry's concept_rule, and `source_quote` copied from
+   that entry's own source_quote. THE MINI-SCENE'S LAST SHOT'S `line` MUST
+   BE THAT ENTRY'S lesson_line, WORD FOR WORD — NOT A PARAPHRASE, NOT A
+   THEMATICALLY SIMILAR LINE, NOT a new sentence that makes the same point
+   in different words. checks.check_scene_coverage does an EXACT STRING
+   comparison against the lesson_line given in THE APPROVED MAPPING below;
+   "close enough" fails it exactly like a wrong answer would. Copy the
+   characters, don't compose a new closing line — also collected into the
+   top-level `lessons` list.
+
+   NAMING THE TECHNICAL TERM — EXACTLY ONE SHOT, NEVER ANYWHERE ELSE.
+   THE SHOT: immediately after the FIRST mapping entry's mini-scene ends
+   (i.e. the very next shot after that mini-scene's LAST shot, the one
+   whose `line` you just set to entry 1's lesson_line above) — insert ONE
+   new, DEDICATED Narrator shot (`kind` "scene", `characters` empty, no
+   concept_ref) whose entire job is naming the concept. Its `line` says
+   the technical term given below verbatim, exactly once in that one
+   sentence (e.g. "...and that clipboard? That's state."). This is the
+   ONLY shot in the ENTIRE SCRIPT — out of every shot you write, in every
+   mini-scene, the recap, every text_card, and the cta — allowed to
+   contain that word. checks.check_concept_named_once fails the whole
+   script if the term is missing from this shot, AND fails it just as
+   hard if the term turns up ANYWHERE else — a second mini-scene's
+   dialogue, a card_fact's own phrasing, a recap `card_lines` entry (recap
+   lines are read aloud too, not just shown on screen — see LENGTH AND
+   PACING), or the cta. Before finalizing, reread every OTHER line and
+   card_lines entry you wrote and confirm none of them contain the term.
+3. One `text_card` shot per entry in card_facts (given below, at most 2),
+   placed right after the mini-scene it explains — `overlay_text` MUST BE
+   THAT card_fact's OWN TEXT, COPIED VERBATIM FROM THE CARD FACTS GIVEN
+   BELOW — never a paraphrase, never new wording you compose yourself.
+   checks.check_text_card_budget requires an EXACT STRING MATCH against
+   one of the approved card_facts; a close rewrite ("in your own words")
+   fails it just as hard as an unrelated sentence would. Nothing in `line`
+   or `action` beyond describing a plain card appearing. `framing`:
+   "medium" — a text_card is a flat graphic card, not a drawn scene, so
+   `framing` is not rendered for it either way, but set it anyway (never
+   "wide" — see RHYTHM below).
+4. Second-last shot: `kind` "recap" — `card_lines` is one CONDENSED phrase
+   per mapping entry, EXACTLY 2-5 WORDS EACH — COUNT THE WORDS IN EACH
+   LINE BEFORE YOU FINALIZE IT. checks.check_structure_ends rejects a 6-
+   word line exactly as hard as a 20-word one; there is no partial credit
+   for "close to 5". In entry order (not the full lesson_line — a shorter,
+   punchier restatement of it), `characters` empty, no spoken `line`.
+   `framing`: "medium", same reasoning as the text_card shots above.
+5. Last shot: `kind` "cta" — `overlay_text` reads "Follow <the BRAND HANDLE
+   given below> to learn <this reel's topic, given below> the simple way.",
+   `characters` empty, no spoken `line`. `framing`: "medium", same reasoning
+   as the text_card shots above.
+
+LENGTH AND PACING
+- 24 TO 30 SHOTS TOTAL — aim for ~29, close to the ceiling (30), not the
+  floor (24) and not the middle. Every real attempt so far has UNDERSHOT
+  this range (landing at 22-23), never overshot it — there is no evidence
+  this script needs protecting from too many shots, only from too few.
+  See STRUCTURE item 2's arithmetic above.
+- TOTAL ESTIMATED SPOKEN DURATION MUST LAND AT 65-75 SECONDS — the MIDDLE
+  of the 60-80s range checks.check_story_duration enforces, with real
+  margin on BOTH ends: a script at 78-80s has no room for its own
+  estimate to run slightly long, and a script at 60-62s has no room to
+  run slightly short. Estimate: each shot with a spoken `line` costs
+  about (word count / 2.5 + 0.4) seconds; a shot with NO `line` (pure
+  physical action) costs a flat 2.0s. Roughly HALF the shots in each
+  mini-scene should carry a spoken `line` (about 3-4 out of your ~7) —
+  the rest are silent, physical beats. Do NOT cut this further to save
+  duration: fewer spoken shots means each remaining `line` has to carry
+  the SAME meaning in the same <= 12 words, not more of it — a line
+  written to cover for a cut spoken shot is exactly how a line ends up
+  over the word cap. If a beat needs more than 12 words to land, give it
+  its OWN shot instead of cramming it into a neighboring line.
+- Every `line` is <= 12 words, NO EXCEPTIONS — checks.check_line_length
+  enforces this on every attempt, real or stub.
+- A `text_card`/`recap`/`cta` shot carries its words in `overlay_text`/
+  `card_lines`, never in `line` or `action`.
+
+RHYTHM (SCENE SHOTS ONLY — a text_card/recap/cta shot has no camera at all
+and is exempt from every rule below; see STEP 3 above for what THOSE three
+get instead)
+- Never 3 `wide`-framed SCENE shots in a row.
+- THE SHOT IMMEDIATELY AFTER A REVEAL (story_beat="reaction") MUST BE
+  FRAMED `close_up` — NO EXCEPTIONS. This is not a preference: every
+  single "reaction"-tagged shot in your output must be followed by a
+  shot with `framing` set to exactly "close_up", every time, with zero
+  exceptions across the whole script.
+- NEVER 2 NARRATOR-SPOKEN LINES BACK TO BACK — NO EXCEPTIONS BEYOND SHOT 1
+  AND THE SHOT RIGHT AFTER IT (the one pair this rule allows). This is not
+  a style preference: if ANY other two consecutive shots both have
+  `characters` empty and a non-blank `line`, checks.check_shot_rhythm
+  fails the whole script — the same hard failure as a missing close_up
+  after a reveal. BEFORE YOU FINALIZE, scan your own shot list for every
+  adjacent pair outside that one allowed pair where both shots are
+  Narrator lines; if you find one, give the SECOND shot to a character
+  reacting instead (with or without a short line of their own), or make
+  it a silent action beat with no `line` at all — do not leave two
+  Narrator lines touching.
+
+PER-SHOT FIELDS
+- `characters`: cast members chosen in STEP 1 only — never introduce someone
+  new mid-story. Empty for a Narrator-only shot.
+- `emotion`: what's on the acting character's face (e.g. "frustrated",
+  "relieved", "surprised") — blank for a shot with no character.
+- `action`: what the camera sees — a physical, filmable event, PHYSICALLY
+  VISIBLE, no words or code in it (never a quoted line, never a code
+  snippet) — a restatement of the concept_rule in different words is not an
+  action either.
+- `key_prop`: the one physical object this shot's action centers on — must be
+  one of the PROPS given below. Omit it when no single prop is the focus.
+- `camera`: vary it — one of zoom_in, zoom_out, push_left, push_right, shake,
+  static. Use `shake` only on a shock or failure moment.
+- `framing`: wide, medium, close_up, or two_shot (two characters sharing a
+  moment, facing each other, waist up) — see RHYTHM above. text_card/recap/
+  cta shots use "medium" instead — see STEP 3 above.
+- Shots stay in one continuous setting (STEP 1's own choice) unless the
+  material itself describes a change of place.
+
+NEVER MANUFACTURE A FACT THE MATERIAL DOES NOT STATE, the same rule
+SYSTEM_EXPLAINER holds beat-for-beat: a metaphor may dramatize a rule, it may
+never imply a mechanism, comparison or number the source never mentions.
+"""
+
+
+#: Same number as run.py's own MAX_SCRIPT_RETRIES, not imported from it —
+#: run.py imports skills.script, so the reverse import would be circular.
+#: Kept as its own constant rather than duplicated as a bare literal below.
+MAX_STORY_MAPPING_RETRIES = 3
+
+
+def _story_cast_block() -> str:
+    lines = [f'  {name}: {desc}' for name, desc in config.CAST.items()]
+    return "AVAILABLE CAST (choose from these, do not invent others):\n" + "\n".join(lines)
+
+
+def _story_material_block(topic: Topic, section: Section,
+                          understanding: SectionUnderstanding | None,
+                          source_text: str) -> str:
+    parts = [
+        f"QUESTION THIS SHORT TEACHES: {topic.topic}",
+        f"\nMATERIAL:\n{source_text}",
+        f"\nILLUSTRATION STYLE: {config.BRAND}",
+    ]
+    if understanding:
+        parts.append(f"\nCORE IDEA: {understanding.core_idea}")
+        if understanding.key_points:
+            parts.append("KEY POINTS (teaching order):\n" +
+                         "\n".join(f"  - {p}" for p in understanding.key_points))
+    return "\n".join(parts)
+
+
+def _assign_chosen_candidate(candidates: list) -> None:
+    """
+    Sets MetaphorCandidate.chosen IN CODE — RESTYLE_TO_STORY_REELS.md's Step 1
+    fix. The model used to be asked to flag its own winner and, in real runs,
+    reliably forgot to on some fraction of calls even after two rounds of
+    stronger prompting — a prompt-compliance gap a mechanical grader could
+    only report, never repair, burning a full paid retry on a field this
+    function can derive from the scores already in hand.
+
+    Highest `total` wins; ties broken by faithfulness, then familiarity — the
+    two axes STEP 0 calls out as "is this actually true to the source" and
+    "would a viewer instantly get it", the ones worth breaking a tie on over
+    drawability/drama. Mutates in place (chosen is reset on every candidate,
+    not just set on the winner, so a stray `chosen: true` the model still
+    sends on a losing candidate is overwritten, not left standing).
+    """
+    if not candidates:
+        return
+    best = max(candidates, key=lambda c: (c.total, c.faithfulness, c.familiarity))
+    for c in candidates:
+        c.chosen = (c is best)
+    assert sum(c.chosen for c in candidates) == 1, "exactly one candidate must end up chosen"
+
+
+#: RESTYLE_TO_STORY_REELS.md Step 2 Part A: the judge gate ahead of shots gets
+#: its OWN, separate retry budget from MAX_STORY_MAPPING_RETRIES — the same
+#: "a different complaint needs a different counter" reasoning config.py's
+#: MAX_TEACHING_APPROACH_REGENERATIONS docstring gives for keeping ITS budget
+#: apart from MAX_QUESTION_REGENERATIONS. A mapping that keeps failing the
+#: FAITHFULNESS judge is a different failure from one that keeps failing the
+#: free structural checks, and the two must not share a counter.
+MAX_STORY_JUDGE_RETRIES = 2
+
+
+def _plan_mapping_mechanical(topic: Topic, section: Section, user: str, source_text: str,
+                             feedback: str | None) -> ConceptMappingSet | None:
+    """
+    The free-checks half of plan_story_mapping, factored out so the judge
+    gate below can re-run a full mechanical attempt (not just one ask_json
+    call) every time the judge rejects a mapping that already passed the
+    free checks — a judge-driven regeneration is not "tweak one field", it
+    is "try a different mapping altogether", which needs the same
+    check_mapping/check_hook gate a first attempt does.
+    """
+    if feedback:
+        user = user + f"\n\nA PREVIOUS MAPPING FAILED REVIEW:\n{feedback}"
+    for _ in range(MAX_STORY_MAPPING_RETRIES):
+        result = ask_json(SYSTEM_STORY, user, ConceptMappingSet, max_tokens=2000,
+                          label="story_mapping")
+        _assign_chosen_candidate(result.candidates)
+        # STEP 9 FIX 2: technical_term now comes from the mapping's OWN
+        # output (required, validated non-blank by the schema already —
+        # see ConceptMappingSet.technical_term), not topic.concept (an
+        # explainer-mode field that story-mode topics usually never set,
+        # which is exactly why check_concept_named_once was skipping
+        # every time before this fix).
+        verdict = checks.check_mapping(
+            result.mapping, source_text, setting=result.setting, props=result.props,
+            candidates=result.candidates, extra_entry_reason=result.extra_entry_reason,
+            card_facts=result.card_facts, technical_term=result.technical_term)
+        hook_verdict = checks.check_hook(result.hook_line, technical_term=result.technical_term)
+        if verdict.passed and hook_verdict.passed:
+            return result
+        reasons = "; ".join(r.reason for r in (verdict, hook_verdict) if not r.passed)
+        feedback = f"THE PREVIOUS MAPPING FAILED REVIEW: {reasons}"
+        user += f"\n\n{feedback}"
+    return None
+
+
+def plan_story_mapping(topic: Topic, section: Section,
+                       understanding: SectionUnderstanding | None = None,
+                       source_text: str | None = None,
+                       feedback: str | None = None) -> ConceptMappingSet | None:
+    """
+    STEP 1b, as its own call. RESTYLE_TO_STORY_REELS.md Phase 1's own reason for
+    splitting this out of write_story_shots: the mapping does not change across
+    a shot-writing retry, so it is read/written ONCE here, the same shape as
+    skills.understanding.understanding_for running once outside write_script's
+    retry loop — and it means a human (or checks.check_mapping) can reject a bad
+    mapping before a single shot, the more expensive call, is ever written
+    against it.
+
+    STEP 2 PART A adds a SECOND gate, after the free checks: skills.audit.
+    judge_story_metaphors, asking whether each metaphor_event behaves EXACTLY
+    like its concept_rule. A mapping that passes every free check can still
+    fail this — the free checks can confirm a source_quote is real and an
+    actor is valid, but "does this metaphor imply something the source didn't
+    say" needs a model to hold the two claims side by side, same reasoning as
+    skills.audit.judge_script for explainer scripts. Any single 'no' fails the
+    whole mapping (StoryEvalReport.passed is not a majority), and the
+    rejection's `problem` text is fed back for a fresh mechanical attempt —
+    up to MAX_STORY_JUDGE_RETRIES times.
+
+    NO SHOTS ARE WRITTEN FOR A MAPPING THAT FAILS THE JUDGE. Returns None,
+    not an exception, on EITHER gate's exhaustion — the same nullable-on-
+    failure contract understanding_for already uses, so a caller can print
+    "no mapping" / "failed the metaphor judge" and move on rather than crash
+    the whole run over one section.
+    """
+    source_text = section.text if source_text is None else source_text
+    base_user = (_story_cast_block() + "\n\n" +
+                _story_material_block(topic, section, understanding, source_text))
+
+    for _ in range(MAX_STORY_JUDGE_RETRIES + 1):
+        result = _plan_mapping_mechanical(topic, section, base_user, source_text, feedback)
+        if result is None:
+            return None   # exhausted MAX_STORY_MAPPING_RETRIES on the free checks alone
+
+        report = judge_story_metaphors(result.mapping)
+        if report.passed:
+            return result
+
+        reasons = "; ".join(f"{v.concept_rule}: {v.problem}"
+                            for v in report.verdicts if not v.faithful)
+        feedback = f"THE METAPHOR JUDGE REJECTED THE PREVIOUS MAPPING: {reasons}"
+    return None
+
+
+#: A NARROW REPAIR PATH for one stale field, not the full SYSTEM_STORY prompt
+#: — see regenerate_hook_line's own docstring for why hook_line alone is safe
+#: to regenerate without touching (or re-approving, or re-judging) the rest
+#: of an already-approved ConceptMappingSet.
+SYSTEM_STORY_HOOK_FIX = """You are writing ONE line — the opening hook_line — for an
+ALREADY-APPROVED illustrated teaching story. The setting, cast, props, and
+metaphor mapping given below are FINAL and not yours to change; only write a
+replacement hook_line.
+
+hook_line is the Narrator's OPENING line, spoken before the scene starts —
+SHORT AND PUNCHY, 12 WORDS OR FEWER, one breath, not a narrated setup, naming
+the EVERYDAY visible symptom, never the technical term. MUST BEGIN WITH ONE OF
+THESE EXACT PATTERNS (pick whichever fits the concept best — no other opener
+is accepted):
+  "Have you ever wondered..."
+  "Ever noticed..."
+  "Did you know..."
+  "Ever wonder why..."
+Bad: "Have you ever wondered what useState is?" (opener is right, but it names
+the term and is a setup sentence, not punchy). Bad: "Ever clicked a button
+that just refuses to change?" (does NOT start with one of the 4 patterns
+above — "Ever clicked" is not "Ever noticed" or "Ever wonder why").
+
+Ground the hook in the everyday situation described below so it reads like
+the natural opening line for THIS scene, not a generic curiosity hook that
+could open any reel. Return ONLY hook_line — no other field."""
+
+
+#: A single hook_line is a tiny ask (one short sentence, no judge gate) next
+#: to MAX_STORY_MAPPING_RETRIES's full-mapping retries — its own, smaller
+#: budget, same "a narrower job gets a narrower retry count" reasoning as
+#: every other *_RETRIES constant in this file.
+MAX_HOOK_FIX_RETRIES = 3
+
+
+def regenerate_hook_line(mapping: ConceptMappingSet, topic: Topic, section: Section,
+                         understanding: SectionUnderstanding | None,
+                         source_text: str) -> str | None:
+    """
+    A NARROW REPAIR, not a full plan_story_mapping rerun: checks.check_hook is
+    purely mechanical (opener/word-count/speaker-prefix/no-technical-term —
+    see its own docstring) and never inspects setting/props/candidates/
+    mapping entries, so an already-APPROVED mapping's hook_line can be
+    replaced on its own without contradicting anything skills.audit.
+    judge_story_metaphors or a human already signed off on.
+
+    Exists because write_story_shots only ever COPIES mapping.hook_line onto
+    the returned StoryScript verbatim (see its own body) — it never
+    regenerates it. If a mapping was approved and persisted BEFORE a
+    check_hook rule tightened (e.g. the 4-opener rule added after this
+    project's own why_plain_variable_fails__story run was approved), then
+    every future `--force-stage shots` on that same cached mapping fails
+    checks.run_story_graders's check_hook identically forever — retrying
+    shots alone can never fix a field shots never writes. story_reel.py's
+    _fix_stale_hook_line calls this the moment a resumed mapping's hook_line
+    fails check_hook, BEFORE shots ever runs, and — only on human approval —
+    rewrites just this one field back into the persisted mapping.json.
+
+    Returns None if no candidate passes check_hook within MAX_HOOK_FIX_RETRIES
+    attempts — same nullable-on-exhaustion contract as plan_story_mapping.
+    """
+    mapping_block = "\n".join(
+        f"- concept_rule: {m.concept_rule}\n  metaphor_event: {m.metaphor_event}"
+        for m in mapping.mapping)
+    base_user = (
+        _story_material_block(topic, section, understanding, source_text) +
+        f"\n\nAPPROVED SETTING: {mapping.setting}\n"
+        f"APPROVED SYSTEM NAME: {mapping.system_name}\n"
+        f"TECHNICAL TERM (do not name it in the hook): {mapping.technical_term}\n"
+        f"APPROVED MAPPING (context/tone only — do not change; do not "
+        f"contradict it in the hook):\n{mapping_block}\n\n"
+        f"THE PREVIOUS hook_line WAS: {mapping.hook_line!r} — it no longer "
+        f"passes check_hook's opener rule and must be replaced.")
+    feedback = None
+    for _ in range(MAX_HOOK_FIX_RETRIES):
+        user = base_user + (f"\n\nA PREVIOUS ATTEMPT FAILED REVIEW: {feedback}"
+                            if feedback else "")
+        result = ask_json(SYSTEM_STORY_HOOK_FIX, user, HookLineOnly, max_tokens=200,
+                          label="story_hook_fix")
+        verdict = checks.check_hook(result.hook_line, technical_term=mapping.technical_term)
+        if verdict.passed:
+            return result.hook_line
+        feedback = verdict.reason
+    return None
+
+
+def _force_close_up_after_every_reveal(shots: list) -> None:
+    """
+    A LATER FIX (RESTYLE_TO_STORY_REELS.md, following the shot-under-
+    generation/duration fixes): a real run failed checks.check_shot_rhythm
+    3 TIMES IN THE SAME SCRIPT because the shot right after a "reaction"
+    (reveal) shot came back framed 'wide' instead of 'close_up' — a rule
+    the prompt already stated but the model did not reliably follow.
+
+    UNLIKE the shot-count/duration targets (which need judgement — how
+    many shots, how much dialogue), "the shot after a reveal is close_up"
+    is a FULLY MECHANICAL, zero-judgement rule: given `story_beat`, the
+    correct `framing` for the next shot is already determined, with no
+    creative choice involved. So this is not a grader hoping the model
+    complied — it is a deterministic repair, applied in code, immediately
+    after the model's own output comes back, before any check ever sees
+    it. checks.check_shot_rhythm's own reveal rule stays in place as a
+    second, independent confirmation (belt and suspenders — the same
+    "don't only rely on the check catching it after the fact, AND keep
+    the check" reasoning as Step 8's image-reuse-across-a-reveal rule),
+    not because this repair could plausibly miss anything.
+    """
+    for i in range(len(shots) - 1):
+        if shots[i].story_beat == "reaction" and shots[i + 1].framing != "close_up":
+            shots[i + 1].framing = "close_up"
+
+
+def _force_mini_scene_endings_to_lesson_line(shots: list, mapping: ConceptMappingSet) -> None:
+    """
+    STEP 9 FIXES ROUND 4: a real run failed checks.check_scene_coverage on
+    TWO mini-scenes because their last shot's `line` was a thematically
+    similar but NOT verbatim rewrite of the entry's own lesson_line (e.g.
+    "My notepad says one, the board still says zero." instead of the
+    approved "Changing it yourself doesn't tell anyone to look again.").
+
+    Same reasoning as _force_close_up_after_every_reveal above: given
+    `concept_ref`, the correct closing `line` for a mini-scene's last shot
+    is already fully determined by THE APPROVED MAPPING handed to this
+    call — there is no creative judgement left to make once the mapping
+    is approved, so this corrects it in code rather than trusting prompt
+    wording alone. checks.check_scene_coverage's own exact-match rule
+    stays in place as an independent second confirmation.
+    """
+    for m in mapping.mapping:
+        refs = [i for i, s in enumerate(shots) if s.concept_ref == m.concept_rule]
+        if not refs:
+            continue
+        # STEP 9 FIXES ROUND 7: an APPROVED real reel (why_plain_variable_
+        # fails__story) shipped two consecutive shots (different
+        # characters) speaking the EXACT SAME sentence — "Only when the
+        # keeper writes it does the board change." — because the model
+        # had already (correctly, per this same rule) put the lesson_line
+        # on an EARLIER shot in the mini-scene, one this function does not
+        # look at; forcing it onto the true LAST shot (what
+        # checks.check_scene_coverage actually requires) then created a
+        # duplicate rather than a correction. Clearing the lesson_line off
+        # any OTHER shot in the same mini-scene that already carries it
+        # verbatim, before forcing the true last one, fixes this — the
+        # last shot still ends up carrying the line either way, satisfying
+        # check_scene_coverage exactly as before.
+        for i in refs[:-1]:
+            if (shots[i].line or "").strip() == m.lesson_line.strip():
+                shots[i].line = None
+        shots[refs[-1]].line = m.lesson_line
+
+
+def _force_text_card_overlay_from_card_facts(shots: list, card_facts: list[str]) -> None:
+    """
+    STEP 9 FIXES ROUND 4: a real run failed checks.check_text_card_budget
+    because a text_card shot's overlay_text was a paraphrase the model
+    composed instead of the approved card_fact's own words. There is no
+    creative judgement in WHICH words a text_card shows — it must be
+    exactly one of the card_facts THE APPROVED MAPPING already gives — so
+    this assigns each text_card shot, in the order it appears, the next
+    card_fact verbatim, rather than trusting the model's own transcription.
+
+    Only acts when the text_card count already matches len(card_facts) —
+    a count mismatch is a STRUCTURAL problem (the model invented or
+    dropped a text_card shot entirely), which this function cannot safely
+    guess how to repair; checks.check_text_card_budget still catches that
+    case on its own, unchanged.
+    """
+    cards = [s for s in shots if s.kind == "text_card"]
+    if len(cards) != len(card_facts):
+        return
+    for shot, fact in zip(cards, card_facts):
+        shot.overlay_text = fact
+
+
+#: STEP 9 FIXES ROUND 7: words a truncated recap card_line must never be
+#: left ending on. Round 4's original truncation (a flat first-N-words
+#: cut) shipped into an APPROVED real reel as "Changing it yourself tells
+#: no" and "Only the keeper redraws the" — round 4's own docstring called
+#: recap card_lines "never a spoken sentence", which was WRONG: story_audio.
+#: spoken_text() joins and speaks them aloud for the recap's voiceover, so
+#: a dangling cut is not just a blunt-looking card, it is a broken sentence
+#: read out loud. This list is what "dangling" means mechanically: the
+#: truncation below now refuses to end on any of these.
+_RECAP_TRUNCATION_DANGLING_WORDS = {
+    "a", "an", "the", "no", "not", "to", "of", "in", "on", "for", "with",
+    "and", "or", "but", "so", "that", "this", "it", "its", "is", "are",
+    "your", "his", "her", "their", "our", "my",
+}
+
+
+def _truncate_recap_card_lines(shots: list) -> None:
+    """
+    STEP 9 FIXES ROUND 4 (retuned in ROUND 7): a real run had a recap
+    card_line come back at 6 words ("Only the keeper updates the board"),
+    over checks.check_structure_ends's 2-5 word bound
+    (checks.RECAP_LINE_MAX_WORDS). Round 4's fix — cut to the first
+    RECAP_LINE_MAX_WORDS words, always — shipped into an APPROVED real
+    reel as two grammatically broken fragments ("...tells no",
+    "...redraws the"), because a flat word-count cut has no idea whether
+    it lands mid-clause.
+
+    This version tries every cut length from RECAP_LINE_MAX_WORDS down to
+    RECAP_LINE_MIN_WORDS and takes the LONGEST one that does NOT end on a
+    word in _RECAP_TRUNCATION_DANGLING_WORDS — still a mechanical,
+    zero-judgement rule (no new words are ever composed), just a safer
+    one: "don't end on an article/preposition/negation" is checkable
+    without understanding the sentence's meaning. If no cut in that range
+    avoids a dangling word, the line is left UNTOUCHED rather than
+    shipping a fragment — better to fail checks.check_structure_ends and
+    force a human-visible retry than to silently ship broken audio again.
+    Never touches a line that is already in bounds.
+    """
+    for s in shots:
+        if s.kind != "recap":
+            continue
+        fixed_lines = []
+        for line in s.card_lines:
+            words = line.split()
+            if len(words) <= checks.RECAP_LINE_MAX_WORDS:
+                fixed_lines.append(line)
+                continue
+            cut = None
+            for n in range(checks.RECAP_LINE_MAX_WORDS, checks.RECAP_LINE_MIN_WORDS - 1, -1):
+                candidate = words[:n]
+                if candidate[-1].strip(".,!?").lower() not in _RECAP_TRUNCATION_DANGLING_WORDS:
+                    cut = " ".join(candidate)
+                    break
+            fixed_lines.append(cut if cut is not None else line)
+        s.card_lines = fixed_lines
+
+
+def write_story_shots(mapping: ConceptMappingSet, topic: Topic, section: Section,
+                      understanding: SectionUnderstanding | None = None,
+                      source_text: str | None = None,
+                      session_id: str = "") -> StoryScript:
+    """
+    Given an APPROVED mapping (plan_story_mapping's output, already past
+    checks.check_mapping), write the shots that dramatize it.
+
+    Does not re-decide or re-generate the mapping — it is handed back to the
+    model verbatim as THE APPROVED MAPPING and copied, unchanged, onto the
+    returned StoryScript. Only `shots`, `cast` and `lessons` come from this
+    call.
+    """
+    source_text = section.text if source_text is None else source_text
+    mapping_block = "\n\n".join(
+        f"- concept_rule: {m.concept_rule}\n"
+        f"  source_quote: {m.source_quote}\n"
+        f"  actor: {m.actor}\n"
+        f"  metaphor_event: {m.metaphor_event}\n"
+        f"  visible_proof: {m.visible_proof}\n"
+        f"  lesson_line: {m.lesson_line}"
+        for m in mapping.mapping)
+    card_facts_block = ("\n".join(f"  - {c}" for c in mapping.card_facts)
+                        if mapping.card_facts else "  (none)")
+    user = (_story_cast_block() + "\n\n" +
+           _story_material_block(topic, section, understanding, source_text) +
+           f"\n\nSETTING: {mapping.setting}\nPROPS: {mapping.props}\n"
+           f"SYSTEM'S BADGE NAME THIS REEL: {mapping.system_name}\n"
+           f"OPENING HOOK LINE (shot 1's line, spoken by Narrator): {mapping.hook_line}\n"
+           f"TECHNICAL TERM (the Narrator names this, verbatim, exactly once, right "
+           f"after the first mapping entry's mini-scene ends): {mapping.technical_term}\n"
+           f"CARD FACTS (one text_card shot each, at most 2):\n{card_facts_block}\n"
+           f"BRAND HANDLE FOR THE CTA: {config.BRAND_HANDLE}\n"
+           f"TOPIC FOR THE CTA (\"...to learn <this> the simple way.\"): {mapping.system_name}\n"
+           f"\nTHE APPROVED MAPPING (do not change; dramatize exactly this):\n{mapping_block}")
+
+    # ~26-30 shots, each with several fields (characters, emotion, action,
+    # key_prop, camera, framing, ...), is a much larger JSON payload than the
+    # 2-3 beat explainer script this budget was originally sized for.
+    result = ask_json(SYSTEM_STORY_SHOTS, user, StoryShotsSet, max_tokens=8000,
+                      label="story_shots")
+    shots = result.shots
+    _force_close_up_after_every_reveal(shots)
+    _force_mini_scene_endings_to_lesson_line(shots, mapping)
+    _force_text_card_overlay_from_card_facts(shots, mapping.card_facts)
+    _truncate_recap_card_lines(shots)
+    return StoryScript(
+        short_id=topic.id,
+        session_id=session_id,
+        source_section_id=section.section_id,
+        question=topic.topic,
+        # COMPUTED FROM THE SHOTS, NOT MODEL-REPORTED — same reasoning as
+        # Shot.duration_seconds and MetaphorCandidate.total: each shot's own
+        # duration is already derived from its line length, so the total is
+        # arithmetic on numbers already known, not a second guess to trust.
+        estimated_seconds=round(sum(s.duration_seconds for s in shots), 2),
+        cast=result.cast,
+        mapping=mapping.mapping,
+        system_name=mapping.system_name,
+        setting=mapping.setting,
+        props=mapping.props,
+        candidates=mapping.candidates,
+        hook_line=mapping.hook_line,
+        technical_term=mapping.technical_term,
+        extra_entry_reason=mapping.extra_entry_reason,
+        card_facts=mapping.card_facts,
+        shots=shots,
+        lessons=result.lessons or [m.lesson_line for m in mapping.mapping],
+    )

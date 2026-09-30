@@ -685,7 +685,19 @@ class Chatterbox(Provider):
                 continue        # progress bars and library chatter
         return {"ok": False, "error": f"no reply within {timeout:.0f}s"}
 
-    def synth(self, text: str, voice_id: str, speaker: str) -> bytes:
+    def synth(self, text: str, voice_id: str, speaker: str,
+             exaggeration: float | None = None, cfg_weight: float | None = None) -> bytes:
+        """
+        `exaggeration`/`cfg_weight` are OPTIONAL PER-CALL OVERRIDES — every
+        existing caller (tts.py's explainer-mode render loop) omits them and
+        gets exactly the old behaviour, config.CHATTERBOX_EXAGGERATION/
+        CFG_WEIGHT for every line. Added for RESTYLE_TO_STORY_REELS.md Step 7
+        Part 1 #3 (shot.emotion -> delivery), which needs a DIFFERENT value
+        per shot, not one fixed globally for the whole build — the
+        chatterbox_worker.py protocol already accepts these per-request (see
+        its own docstring), this was the only thing hardcoding them from
+        config instead of passing them through.
+        """
         if not voice_id:
             raise RuntimeError(
                 f"no chatterbox reference clip for {speaker} — set "
@@ -696,8 +708,10 @@ class Chatterbox(Provider):
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
                 out = f.name
             req = {"text": text, "ref": voice_id, "out": out,
-                   "exaggeration": config.CHATTERBOX_EXAGGERATION,
-                   "cfg_weight": config.CHATTERBOX_CFG_WEIGHT}
+                   "exaggeration": (config.CHATTERBOX_EXAGGERATION if exaggeration is None
+                                    else exaggeration),
+                   "cfg_weight": (config.CHATTERBOX_CFG_WEIGHT if cfg_weight is None
+                                  else cfg_weight)}
             proc.stdin.write(json.dumps(req) + "\n")
             proc.stdin.flush()
             reply = self._read(proc, config.CHATTERBOX_SYNTH_TIMEOUT)

@@ -15,6 +15,7 @@ from ..schema import (Script, Topic, Section, SectionUnderstanding, QuestionWork
                       QuestionFraming, TeachingApproach,
                       Character, ConceptMapping, ConceptMappingSet, Shot, StoryScript,
                       StoryShotsSet, HookLineOnly,
+                      MotionScript, MotionScriptDraft, MotionHookFix,
                       MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND)
 from ..llm import ask_json
 from .. import revision, checks, config
@@ -2273,3 +2274,230 @@ def write_story_shots(mapping: ConceptMappingSet, topic: Topic, section: Section
         shots=shots,
         lessons=result.lessons or [m.lesson_line for m in mapping.mapping],
     )
+
+
+# =========================================================================== motion
+#
+# REEL_STYLE=motion — RESTYLE_TO_MOTION_REELS.md section 2. Independent of every
+# prompt above: nothing in SYSTEM_EXPLAINER or SYSTEM_STORY changed to make room
+# for it. The script (words + captions) is this call; the scene specs are a
+# second call in phase 3 (SYSTEM_MOTION_SCENES), split the same way story mode
+# splits its mapping from its shots — so a human can approve the shot list
+# before any scene is designed against it.
+#
+# THE RULES HERE ARE GENERAL. The reel it produces can be about paging, CSS, a
+# database index or React state; nothing below may be tuned to one topic. The
+# graders that enforce these rules live in checks.run_motion_script_graders.
+
+SYSTEM_MOTION = """You write the script for ONE short vertical teaching reel (40-60 seconds)
+that answers ONE question from the material below.
+
+FORMAT
+One narrator, talking to the viewer in the second person ("you", "your"), telling a
+short story about a problem the viewer has actually hit. Never a dialogue, never a
+question-and-answer exchange, no speaker labels. ONLY THE HOOK asks a question;
+every other shot is a plain statement.
+
+THE BEATS — every reel has these shots, in exactly this order:
+  1  hook      Show the viewer's real problem happening. Open with a curiosity question
+               ("Have you ever wondered why...", "Why does...", "What actually happens
+               when...") that names a CONCRETE, VISIBLE SYMPTOM (stuck at 0, the page
+               reloads, the query is slow, the style is ignored). Never name the concept.
+  2  title     Name the concept and promise the answer, in one line.
+  3  setup     The code or situation exactly as a beginner would write it.
+  4  break_1   The first reason it fails, shown as a mechanism.
+  5  break_2   OPTIONAL. The second reason — include it ONLY if the material states one.
+  6  fix_idea  The concept that fixes it, as a mental model.
+  7  fix_flow  The fix working step by step: the trigger, the change, the result.
+  8  code_map  The real syntax, each part tied to what it controls.
+  9  payoff    The SAME picture as the hook, now working. Mirror the hook.
+  10 recap     The three takeaways, read aloud (the only place a list is spoken).
+  11 cta       "Follow for more" plus the next topic.
+The reel must ANSWER the hook's question: problem -> why -> fix -> proof it works.
+fix_flow and payoff are never optional.
+
+LENGTH
+- 110 to 170 spoken words in total.
+- Every shot: 8 to 30 words.
+- hook: at most 11 words. title: exactly 8 words. cta: exactly 8 words.
+- Short spoken sentences. Contractions are fine.
+
+WORDS
+- Beginner language. Explain any technical word in the same sentence you use it.
+- No word longer than 4 syllables, except the concept's own name.
+- Every claim must be supported by the MATERIAL. The fix must be the one the material
+  teaches, and concept_name must be written exactly as the material writes it.
+
+SPEECH AND CAPTIONS ARE SEPARATE FIELDS
+- speech: what the narrator says, spelled for text-to-speech. Write code as words:
+  "use State", "set Likes", "query dot filter". Never raw code, brackets or symbols.
+- captions: the SAME words as speech, in the same order, split into chunks — not a
+  paraphrase. The only difference: code is shown as real code (`useState`, `setLikes`).
+- Every chunk is 3 to 5 words, follows a phrase boundary, reads naturally on its own,
+  never splits a code token, and never ends on a small word ("the", "of", "to", "and").
+- Highlight at most 2 keywords per chunk with <b>...</b>. No other tags.
+Example of one shot on a different topic (paging):
+  speech:   "The page table tells the CPU where each page really lives."
+  captions: ["The <b>page table</b> tells", "the CPU where", "each page really lives."]
+
+CODE
+- Only setup and code_map may show code, in `code` (one string per line).
+- At most 3 lines, each at most 30 characters.
+- When the material shows code, code_map must show the real syntax of the concept and
+  contain concept_name. When the material has no code (an OS or CSS rule, a process),
+  leave every `code` empty: code_map then maps each named part to what it does.
+
+VISUAL
+For every shot, `visual` is ONE line saying what is on screen, in these terms only:
+a device mock (phone, browser or terminal), a code window, an entity card (the thing
+that runs), a system panel (the thing that remembers or decides), a connector with a
+pulse, a trigger chip (the call or event that causes change), a status pill, the title
+card, the code map card, the takeaway list, the end card. The payoff's visual is the
+hook's visual, now in its success state.
+
+ICONS
+Pick exactly 3 icons for icon_vocabulary from this list ONLY: __ICONS__
+They appear on the title card, and the recap reuses all three. Give each a 1-2 word
+label. takeaways: exactly 3 rows, one per vocabulary icon — `line` at most 3 words,
+`sub` at most 4 words.
+
+Return JSON:
+{
+  "hook_question": "the hook's question, ending in ?",
+  "concept_name": "exactly as the material writes it",
+  "promise": "the title card's promise line, at most 6 words",
+  "icon_vocabulary": [{"name": "...", "label": "..."}, x3],
+  "takeaways": [{"icon": "...", "line": "...", "sub": "..."}, x3],
+  "shots": [
+    {"id": "s01", "beat": "hook", "speech": "...", "captions": [{"text": "..."}],
+     "visual": "...", "code": []},
+    ...
+  ]
+}"""
+
+
+#: A NARROW REPAIR, the motion counterpart of SYSTEM_STORY_HOOK_FIX: the rest of
+#: the script already passed review, so only the hook is rewritten.
+SYSTEM_MOTION_HOOK_FIX = """You are rewriting ONLY the opening hook shot of a short teaching
+reel. Every other shot is final and not yours to change.
+
+The hook shows the viewer's real problem happening. It is ONE curiosity question that
+opens with "Have you ever wondered why...", "Why does..." or "What actually happens
+when...", names a CONCRETE, VISIBLE SYMPTOM (stuck at 0, the page reloads, the query is
+slow), and never names the concept. 8 to 11 words.
+
+speech is spelled for text-to-speech (code written as words). captions are the SAME
+words split into chunks of 3 to 5 words, at most 2 <b>...</b> highlights per chunk,
+never ending on a small word. hook_question is the question itself, ending in "?".
+
+Return JSON: {"hook_question": "...", "speech": "...", "captions": [{"text": "..."}],
+"visual": "..."}"""
+
+
+def _motion_material_block(topic: Topic, section: Section,
+                           understanding: SectionUnderstanding | None, source_text: str,
+                           approach: TeachingApproach | None, series: str,
+                           next_topic: str) -> str:
+    parts = [
+        f"QUESTION THIS REEL ANSWERS: {topic.topic}",
+        f"\nMATERIAL:\n{source_text}",
+    ]
+    if understanding:
+        parts.append(f"\nCORE IDEA: {understanding.core_idea}")
+        if understanding.key_points:
+            parts.append("KEY POINTS (teaching order):\n" +
+                         "\n".join(f"  - {p}" for p in understanding.key_points))
+    if approach:
+        combined = f" (with {', '.join(approach.combined_with)})" if approach.combined_with else ""
+        parts.append(f"\nTHE APPROVED TEACHING APPROACH: {approach.primary}{combined}"
+                     + (f" — {approach.rationale}" if approach.rationale else ""))
+    parts.append(f"\nSERIES (the cta asks them to follow this): {series}")
+    parts.append("NEXT TOPIC (the cta names it): "
+                 + (next_topic or "none — the cta just asks them to follow"))
+    return "\n".join(parts)
+
+
+def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
+                     short_id: str, series: str, next_topic: str) -> MotionScript:
+    """The draft plus everything set in Python, never asked of the model:
+    shot ids (s01, s02, ... in order), the series label and the next topic."""
+    shots = [s.model_copy(update={"id": f"s{i + 1:02d}"}) for i, s in enumerate(draft.shots)]
+    return MotionScript(
+        short_id=short_id,
+        source_section_id=section.section_id,
+        topic=topic.topic,
+        hook_question=draft.hook_question,
+        concept_name=draft.concept_name,
+        promise=draft.promise,
+        icon_vocabulary=draft.icon_vocabulary,
+        takeaways=draft.takeaways,
+        shots=shots,
+        series=series,
+        next_topic=next_topic,
+    )
+
+
+def regenerate_motion_hook(script: MotionScript, material: str, source_text: str,
+                           results: list) -> tuple[MotionScript | None, list]:
+    """Rewrite only the hook shot, up to config.MAX_MOTION_HOOK_FIX_RETRIES
+    times. Returns (the repaired script, its grader results) once every grader
+    passes, else (None, the last results)."""
+    hook = script.shots[0]
+    feedback = "; ".join(r.reason for r in results if not r.passed)
+    for _ in range(config.MAX_MOTION_HOOK_FIX_RETRIES):
+        user = (material +
+                f"\n\nTHE REST OF THE SCRIPT (final — do not contradict it):\n" +
+                "\n".join(f"  {s.beat}: {s.speech}" for s in script.shots[1:]) +
+                f"\n\nTHE CURRENT HOOK: {hook.speech!r}\nIT FAILED REVIEW: {feedback}")
+        fix = ask_json(SYSTEM_MOTION_HOOK_FIX, user, MotionHookFix, max_tokens=400,
+                       label="motion_hook_fix")
+        new_hook = hook.model_copy(update={
+            "speech": fix.speech, "captions": fix.captions,
+            "visual": fix.visual or hook.visual})
+        candidate = script.model_copy(update={
+            "hook_question": fix.hook_question,
+            "shots": [new_hook] + list(script.shots[1:])})
+        results = checks.run_motion_script_graders(candidate, source_text)
+        if checks.all_passed(results):
+            return candidate, results
+        feedback = "; ".join(r.reason for r in results if not r.passed)
+    return None, results
+
+
+def write_motion_script(topic: Topic, section: Section, *, short_id: str,
+                        source_text: str, understanding: SectionUnderstanding | None = None,
+                        approach: TeachingApproach | None = None,
+                        series: str | None = None,
+                        next_topic: str = "") -> tuple[MotionScript | None, list]:
+    """
+    Write and grade a motion script. Returns (script, grader results) once
+    every free grader passes, or (None, the last attempt's results) after
+    config.MAX_MOTION_SCRIPT_RETRIES full attempts.
+
+    A failure confined to the hook (checks.motion_failures_are_hook_only) is
+    repaired by regenerate_motion_hook rather than a full rewrite — the rest
+    of the script already passed, and a full retry risks breaking it.
+    """
+    from ..motion_library import icon_names
+    series = config.MOTION_SERIES if series is None else series
+    system = SYSTEM_MOTION.replace("__ICONS__", ", ".join(sorted(icon_names())))
+    material = _motion_material_block(topic, section, understanding, source_text,
+                                      approach, series, next_topic)
+    user = material
+    results: list = []
+    for _ in range(config.MAX_MOTION_SCRIPT_RETRIES):
+        draft = ask_json(system, user, MotionScriptDraft, max_tokens=6000,
+                         label="motion_script")
+        script = _assemble_motion(draft, topic, section, short_id, series, next_topic)
+        results = checks.run_motion_script_graders(script, source_text)
+        if checks.all_passed(results):
+            return script, results
+        if checks.motion_failures_are_hook_only(results):
+            fixed, fixed_results = regenerate_motion_hook(script, material, source_text, results)
+            if fixed is not None:
+                return fixed, fixed_results
+            results = fixed_results
+        reasons = "; ".join(r.reason for r in results if not r.passed)
+        user = (material + "\n\nTHE PREVIOUS SCRIPT FAILED REVIEW. Fix these and keep "
+                f"everything that already passed:\n{reasons}")
+    return None, results

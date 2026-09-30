@@ -6,7 +6,8 @@ does not validate, the pipeline stops there instead of pushing a broken object
 further downstream. Design this file first and change it rarely.
 """
 
-from typing import Literal, Optional
+import re
+from typing import Literal, Optional, get_args
 from pydantic import BaseModel, Field, field_validator, computed_field
 
 # Speech pacing. 150 words/min is a conservative average for clear narration.
@@ -2974,3 +2975,152 @@ class QuestionWorkflow(BaseModel):
             "teaching_approach": None,
             "teaching_approach_approval": TeachingApproachApproval(),
         })
+
+
+# =========================================================================== motion
+#
+# REEL_STYLE=motion — see RESTYLE_TO_MOTION_REELS.md. A THIRD style beside
+# explainer and story, and like story it lives in its own models: a
+# MotionScript is not a Script and not a ShortUnit, so nothing above this line
+# changed shape to make room for it, and every explainer/story file on disk
+# still validates exactly as before.
+#
+# One narrator, second person, a fixed beat order. The LLM writes words and
+# picks names out of a fixed library (shorts/motion_library.py); it never
+# draws. Everything here is "can this be represented" only — whether the
+# script is any GOOD is checks.run_motion_script_graders's job.
+
+#: The eleven beats, in the one order every motion reel follows. break_2 is
+#: the only optional one (checks.MOTION_OPTIONAL_BEATS) — used only when the
+#: source material states a second reason.
+MotionBeat = Literal["hook", "title", "setup", "break_1", "break_2", "fix_idea",
+                     "fix_flow", "code_map", "payoff", "recap", "cta"]
+MOTION_BEAT_ORDER: tuple[str, ...] = get_args(MotionBeat)
+
+#: Narration pace for motion reels, used for ESTIMATES only (the real number
+#: comes from recorded Chatterbox audio in phase 3). 2.8 words/s puts the
+#: change request's 110-170 word window at 39-61 s, its stated 40-60 s.
+MOTION_WORDS_PER_SECOND = 2.8
+
+
+def motion_plain_text(text: str) -> str:
+    """Caption text with its <b>...</b> highlight tags removed."""
+    return re.sub(r"</?b>", "", text or "")
+
+
+class CaptionChunk(BaseModel):
+    """One on-screen caption, 3-5 words (checks.check_motion_caption_chunks).
+    May carry up to two <b>...</b> highlighted keywords."""
+    text: str
+
+
+class IconRef(BaseModel):
+    """One icon of a reel's icon_vocabulary: shown as a tile on the title
+    card and reused, exactly, by the recap rows. `name` must be in
+    web/src/motion/icons.json — checked by a grader, not the schema, so a
+    wrong pick comes back to the model as a readable reason."""
+    name: str
+    label: str = ""
+
+
+class MotionTakeaway(BaseModel):
+    """One recap row: an icon from the vocabulary, a short bold line, and a
+    grey sub-line."""
+    icon: str
+    line: str
+    sub: str = ""
+
+
+class MotionShot(BaseModel):
+    """One shot of a motion reel — one beat, one idea."""
+    id: str                      #: "s01", "s02", ... in order
+    beat: MotionBeat
+    #: What the narrator SAYS, spelled for TTS: code is written out as words
+    #: ("use State", "set Likes"), never as code.
+    speech: str
+    #: What the viewer READS: the same words as `speech`, split into 3-5 word
+    #: chunks, with code kept as real code (`useState`, `setLikes`).
+    captions: list[CaptionChunk] = Field(default_factory=list)
+    #: One line saying what is on screen — the brief the scenes call
+    #: (phase 3) turns into a SceneSpec, and what the shot-list gate shows.
+    visual: str = ""
+    #: The code a CodeWindow shows, one string per line. Only setup and
+    #: code_map may carry code (checks.check_motion_code_shots).
+    code: list[str] = Field(default_factory=list)
+    #: The SceneSpec (objects + timeline) — filled by the scenes stage in
+    #: phase 3. None until then.
+    scene: Optional[dict] = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def estimated_seconds(self) -> float:
+        """Planning estimate from word count — never the real duration."""
+        return round(len(self.speech.split()) / MOTION_WORDS_PER_SECOND, 2)
+
+
+class MotionScriptDraft(BaseModel):
+    """What SYSTEM_MOTION's call returns. Not a MotionScript: the ids,
+    series label and next topic are set in Python (skills.script.
+    write_motion_script), never asked of the model."""
+    hook_question: str
+    concept_name: str
+    promise: str
+    icon_vocabulary: list[IconRef] = Field(default_factory=list)
+    takeaways: list[MotionTakeaway] = Field(default_factory=list)
+    shots: list[MotionShot]
+
+    @field_validator("shots")
+    @classmethod
+    def has_shots(cls, v):
+        if not v:
+            raise ValueError("no shots produced")
+        return v
+
+
+class MotionHookFix(BaseModel):
+    """A narrow repair: a replacement hook shot, and nothing else — see
+    skills.script.regenerate_motion_hook."""
+    hook_question: str
+    speech: str
+    captions: list[CaptionChunk] = Field(default_factory=list)
+    visual: str = ""
+
+
+class MotionScript(BaseModel):
+    """A motion reel's script, persisted as output/<short_id>.motion.json.
+
+    Carries its own reel_style / tts_provider / voice_ref — the fields the
+    change request asked every unit to record. They live HERE and not on
+    ShortUnit on purpose: adding them to ShortUnit would change every
+    explainer JSON written from now on, and explainer output must stay
+    byte-identical."""
+    reel_style: Literal["motion"] = "motion"
+    short_id: str
+    source_section_id: str
+    topic: str                  #: the approved question this reel teaches
+    hook_question: str
+    concept_name: str
+    promise: str                #: the title card's one-line promise
+    icon_vocabulary: list[IconRef] = Field(default_factory=list)
+    takeaways: list[MotionTakeaway] = Field(default_factory=list)
+    shots: list[MotionShot]
+    #: Series label and corner mark — from config.MOTION_SERIES, never the LLM.
+    series: str = ""
+    #: The end card's "Up next" — the next unused section title of the source
+    #: document, never the LLM. Blank when there is none.
+    next_topic: str = ""
+    #: Set by the voice stage (phase 3). None until audio exists.
+    tts_provider: Optional[str] = None
+    voice_ref: Optional[str] = None
+
+    @field_validator("shots")
+    @classmethod
+    def has_shots(cls, v):
+        if not v:
+            raise ValueError("motion script has no shots")
+        return v
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def estimated_seconds(self) -> float:
+        return round(sum(s.estimated_seconds for s in self.shots), 2)

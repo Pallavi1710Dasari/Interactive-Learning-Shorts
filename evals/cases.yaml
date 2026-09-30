@@ -8,6 +8,8 @@
 #   code_grader  - deterministic. Runs offline, free, in milliseconds.
 #   llm_judge    - needs meaning. Costs an API call. Run less often.
 #   golden       - a known-good output. Regression guard.
+#   motion_grader - deterministic, REEL_STYLE=motion scripts. A golden fixture
+#                  plus an optional `patch`; see run_evals._apply_patch.
 #
 # Grow this file every time something breaks in production. That is the whole
 # self-evolving loop: bug -> eval case -> prompt fix -> case passes forever.
@@ -2285,6 +2287,383 @@ cases:
     expect:
       must_include_sections: ["3.2", "3.3"]
       topic_count_between: [4, 6]
+
+  # --------------------------------------------------------------- motion reels
+  #
+  # RESTYLE_TO_MOTION_REELS.md section 7. Free and offline. Each bad case is ONE
+  # golden fixture with ONE `patch` — the smallest change that breaks one rule —
+  # so a failure can only be blamed on that rule. The goldens are the change
+  # request's reference reel (tightened to the rules, a user decision on
+  # 2026-09-30) and a non-React reel that must pass the same rules.
+  # payoff_mirrors_hook / change_cadence / color_semantics need scenes and get
+  # their cases in phase 3.
+
+  - id: E129
+    name: The golden useState motion reel passes every motion grader
+    why: "The end-to-end golden case. If a grader change rejects it, the grader is wrong or the golden must be re-derived from the reference — never quietly loosened."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    expect:
+      passed: true
+
+  - id: E130
+    name: A non-React motion reel (the TLB) passes every motion grader
+    why: "Guards against rules only a React/code topic can satisfy. No code in the material, no code shots, break_2 omitted — and it must still pass."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/tlb_golden.json
+    input: content/session_18_paging.md
+    expect:
+      passed: true
+
+  - id: E131
+    name: A motion script that never shows the fix working is rejected
+    why: "The current explainer reel explains why the variable fails and never shows useState. Every motion reel must resolve: problem, why, fix, proof."
+    type: motion_grader
+    grader: has_fix_and_payoff
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.8, remove: true}
+      - {path: shots.6, remove: true}
+    expect:
+      passed: false
+      reason_contains: "never shows the fix"
+
+  - id: E132
+    name: A Q&A-style motion script (questions after the hook) is rejected
+    why: "Motion reels are one narrator telling a story. A question-and-answer rhythm is the interview shape every style bans."
+    type: motion_grader
+    grader: not_qa
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.1.speech, value: "So what is the answer to this? React has one idea."}
+    expect:
+      passed: false
+      reason_contains: "only the hook may"
+
+  - id: E133
+    name: A motion script with a second speaker is rejected
+    why: "A 'Teacher:' or 'Student:' label is a second voice. One narrator only."
+    type: motion_grader
+    grader: not_qa
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.3.speech, value: "Teacher: But on every re-render, React runs your component again from the top."}
+    expect:
+      passed: false
+      reason_contains: "speaker label"
+
+  - id: E134
+    name: A motion hook with no concrete symptom is rejected
+    why: "'How does React handle a button?' gives the viewer nothing they recognise. The hook must show a real, visible problem (stuck at 0, page reloads, slow query)."
+    type: motion_grader
+    grader: hook_curiosity
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.0.speech, value: "Have you ever wondered how React handles a button?"}
+      - {path: hook_question, value: "How does React handle a button?"}
+    expect:
+      passed: false
+      reason_contains: "symptom"
+
+  - id: E135
+    name: A motion hook that is a statement, not a curiosity question, is rejected
+    why: "The current reel opens by stating the setup. The hook must open a question the reel then answers."
+    type: motion_grader
+    grader: hook_curiosity
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.0.speech, value: "Your like button stays stuck at zero every single time."}
+    expect:
+      passed: false
+      reason_contains: "curiosity question"
+
+  - id: E136
+    name: A motion hook that names the concept is rejected
+    why: "The hook is the symptom, not the vocabulary. Naming useState up front spoils the answer and loses viewers who don't know the word yet."
+    type: motion_grader
+    grader: hook_curiosity
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.0.speech, value: "Why does use State matter when your count stays stuck?"}
+    expect:
+      passed: false
+      reason_contains: "names the concept"
+
+  - id: E137
+    name: Caption chunks of 7 words are rejected
+    why: "The current reel shows long full-sentence captions in small text. Motion captions are 3-5 word chunks, large, at the top."
+    type: motion_grader
+    grader: caption_chunks
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - path: shots.0.captions
+        value: [{text: "Ever wondered why your like button stays"}, {text: "stuck at <b>zero</b>?"}]
+    expect:
+      passed: false
+      reason_contains: "7 words"
+
+  - id: E138
+    name: A caption chunk with three highlights is rejected
+    why: "Highlight is emphasis; three in four words is none. At most two keywords per chunk."
+    type: motion_grader
+    grader: caption_chunks
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.5.captions.1.text, value: "<b>React</b> <b>keeps</b> the <b>value</b>"}
+    expect:
+      passed: false
+      reason_contains: "3 highlights"
+
+  - id: E139
+    name: A caption that splits a code token across chunks is rejected
+    why: "'useState(' on one card and '0)' on the next is unreadable code. A code token stays whole inside one chunk."
+    type: motion_grader
+    grader: caption_chunks
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.7.captions.0.text, value: "In code, useState("}
+      - {path: shots.7.captions.1.text, value: "0) gives you two things:"}
+    expect:
+      passed: false
+      reason_contains: "split across chunks"
+
+  - id: E140
+    name: A caption chunk that ends mid-phrase is rejected
+    why: "A chunk ending on 'in' or 'the' reads as cut off. Chunks follow phrase boundaries."
+    type: motion_grader
+    grader: caption_chunks
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.2.captions.1.text, value: "Your likes sit in"}
+      - {path: shots.2.captions.2.text, value: "a <b>plain variable</b>,"}
+    expect:
+      passed: false
+      reason_contains: "mid-phrase"
+
+  - id: E141
+    name: A motion script with three code shots is rejected
+    why: "Code is at most two shots (setup, code_map). A third code window turns the reel into a slide deck."
+    type: motion_grader
+    grader: code_shots
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.3.code, value: ["let likes = 1;"]}
+    expect:
+      passed: false
+      reason_contains: "3 shots show code"
+
+  - id: E142
+    name: A code line longer than 30 characters is rejected
+    why: "At phone size a 40-character line is unreadable. Code lines are 30 characters at most."
+    type: motion_grader
+    grader: code_shots
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.2.code.1, value: "const handleTap = () => likes = likes + 1;"}
+    expect:
+      passed: false
+      reason_contains: "chars"
+
+  - id: E143
+    name: A code_map with no code is rejected when the material has code
+    why: "The code_map beat ties the real syntax to the diagram. When the material shows code, skipping it leaves the learner unable to write the fix."
+    type: motion_grader
+    grader: code_shots
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.7.code, value: []}
+    expect:
+      passed: false
+      reason_contains: "shows no code"
+
+  - id: E144
+    name: Motion beats out of order are rejected
+    why: "Showing the fix flow before the fix idea teaches a mechanism before its name. The beat order is fixed on every reel."
+    type: motion_grader
+    grader: beats_order
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.5.beat, value: fix_flow}
+      - {path: shots.6.beat, value: fix_idea}
+    expect:
+      passed: false
+      reason_contains: "the order needs"
+
+  - id: E145
+    name: A motion script over 170 spoken words is rejected
+    why: "The reference reel ran 178 words, about 80 seconds. Motion reels are 40-60 seconds: 110-170 words."
+    type: motion_grader
+    grader: word_budget
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.3.speech, value: "But on every single re-render, React runs your whole component again from the very top, line by line. The variable starts fresh, back to zero, every time."}
+      - {path: shots.5.speech, value: "use State fixes both of these problems. React keeps the value safe in its own memory, outside your component, and hands it back to you on every render."}
+    expect:
+      passed: false
+      reason_contains: "too long"
+
+  - id: E146
+    name: A motion shot under 8 words is rejected
+    why: "The reference payoff and cta were 7 words. A shot too short to hold one idea flashes past."
+    type: motion_grader
+    grader: word_budget
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.8.speech, value: "Now every tap sticks."}
+    expect:
+      passed: false
+      reason_contains: "needs 8-30"
+
+  - id: E147
+    name: A motion hook longer than 4 seconds is rejected
+    why: "The hook has four seconds to stop the scroll. A 14-word hook is a narrated setup, not a hook."
+    type: motion_grader
+    grader: word_budget
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.0.speech, value: "Have you ever wondered why your like button stays stuck at zero every time?"}
+    expect:
+      passed: false
+      reason_contains: "<= 11 words"
+
+  - id: E148
+    name: Raw code in motion speech is rejected
+    why: "TTS reads 'useState' as one mangled word. Speech spells code for the voice ('use State'); captions keep the code."
+    type: motion_grader
+    grader: speech_vs_caption
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.5.speech, value: "useState fixes both. React keeps the value in its own memory and hands it back on every render."}
+    expect:
+      passed: false
+      reason_contains: "raw code"
+
+  - id: E149
+    name: Captions spelling the concept as spoken words are rejected
+    why: "The viewer must see the real syntax. 'use State' on screen teaches a name that doesn't exist in code."
+    type: motion_grader
+    grader: speech_vs_caption
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.5.captions.0.text, value: "<b>use State</b> fixes both."}
+    expect:
+      passed: false
+      reason_contains: "captions keep the real code"
+
+  - id: E150
+    name: Captions that paraphrase the narration are rejected
+    why: "The reference reel captioned 'most important ideas' as 'biggest ideas'. Reading one thing while hearing another splits attention; captions are the narration, chunked."
+    type: motion_grader
+    grader: captions_match_speech
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - path: shots.1.captions
+        value: [{text: "React's <b>biggest idea</b>"}, {text: "fixes this for you."}]
+    expect:
+      passed: false
+      reason_contains: "does not match the narration"
+
+  - id: E151
+    name: A recap icon outside the icon vocabulary is rejected
+    why: "The recap reuses the icons the title card introduced; a new icon at the end is a picture the viewer never learned."
+    type: motion_grader
+    grader: recap_icons
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: takeaways.2.icon, value: check}
+    expect:
+      passed: false
+      reason_contains: "not in the icon_vocabulary"
+
+  - id: E152
+    name: An icon the player cannot draw is rejected
+    why: "The LLM picks icons by name from web/src/motion/icons.json. A name outside it would render as nothing."
+    type: motion_grader
+    grader: recap_icons
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: icon_vocabulary.2.name, value: rocket}
+      - {path: takeaways.2.icon, value: rocket}
+    expect:
+      passed: false
+      reason_contains: "unknown icon"
+
+  - id: E153
+    name: A recap frame over 24 words is rejected
+    why: "The reference recap showed 23 words and was already dense. The recap is capped at 24 words, heading included."
+    type: motion_grader
+    grader: recap_icons
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: takeaways.0.sub, value: "plain variables start over from zero each time they render again"}
+    expect:
+      passed: false
+      reason_contains: "max 24"
+
+  - id: E154
+    name: A motion word over 4 syllables is rejected
+    why: "Beginner language: 'automatically' is six syllables of nothing a beginner needs. Only the concept's own name may be long."
+    type: motion_grader
+    grader: plain_words
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.3.speech, value: "But on every re-render, React automatically runs your component again from the top. The variable starts fresh, back to zero."}
+    expect:
+      passed: false
+      reason_contains: "syllables"
+
+  - id: E155
+    name: A fix the source material never teaches is rejected
+    why: "Faithfulness: the fix must be the one the material teaches. An invented hook name that isn't in the source is a hallucinated fix."
+    type: motion_grader
+    grader: has_fix_and_payoff
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: concept_name, value: useMemory}
+    expect:
+      passed: false
+      reason_contains: "does not appear in the source"
+
+  - id: E156
+    name: A motion script missing a required beat is rejected
+    why: "Without its recap the reel just stops — the current reel's 'no ending' problem. Only break_2 is optional."
+    type: motion_grader
+    grader: beats_order
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.9, remove: true}
+    expect:
+      passed: false
+      reason_contains: "missing beat"
 
 
 # ============================================================================

@@ -7382,3 +7382,495 @@ def run_script_graders(script: Script, source_text: str | None = None,
 
 def all_passed(results: list[GraderResult]) -> bool:
     return all(r.passed for r in results)
+
+
+# =========================================================================== motion
+#
+# RESTYLE_TO_MOTION_REELS.md section 7 — the free graders for REEL_STYLE=motion.
+# Motion-only, in their own list (run_motion_script_graders), for the same reason
+# run_story_graders is its own list: a MotionScript has no `.beats`, so no
+# explainer grader can run on it, and none of these ever runs on an explainer
+# or story script.
+#
+# These are the SCRIPT graders (phase 1). The three that need scenes or real
+# timing — payoff_mirrors_hook, change_cadence, color_semantics — arrive with
+# SceneSpec in phase 3.
+#
+# Every threshold below is a general rule for every motion reel on any topic.
+# None is tuned to one reel.
+
+MOTION_SHOT_COUNT = (10, 11)                 #: 11 beats, break_2 optional
+MOTION_OPTIONAL_BEATS = frozenset({"break_2"})
+MOTION_TOTAL_WORDS = (110, 170)              #: ~40-60 s at MOTION_WORDS_PER_SECOND
+MOTION_SHOT_WORDS = (8, 30)
+#: Per-beat ceilings from the change request's shot budget, checked against the
+#: word-count ESTIMATE here and against real audio in phase 3.
+MOTION_BEAT_MAX_SECONDS = {"hook": 4.0, "title": 3.0, "cta": 3.0}
+MOTION_CHUNK_WORDS = (3, 5)
+MOTION_MAX_HIGHLIGHTS = 2
+MOTION_CODE_BEATS = ("setup", "code_map")
+MOTION_MAX_CODE_SHOTS = 2
+MOTION_MAX_CODE_LINES = 3
+MOTION_MAX_CODE_CHARS = 30
+MOTION_VOCABULARY_SIZE = 3
+MOTION_TAKEAWAYS = 3
+#: Words visible on the recap frame, heading included. The change request's
+#: general cap is 18; the recap alone is allowed 24 (a user decision, 2026-09-30,
+#: because three icon rows with a line and a sub-line cannot fit in 18).
+MOTION_RECAP_MAX_WORDS = 24
+MOTION_RECAP_HEADING = "Key takeaways"
+MOTION_MAX_SYLLABLES = 4
+
+#: How a motion hook may open. Wider than story mode's HOOK_OPENERS: the change
+#: request names "Why does...", "What actually happens when..." as well as
+#: "Have you ever wondered why...".
+MOTION_HOOK_OPENERS = (
+    "have you ever wondered", "ever wondered why", "ever wonder why",
+    "why does", "why do", "why is", "why are", "why won't", "why doesn't",
+    "why can't", "what actually happens when", "what really happens when",
+)
+#: A concrete, visible symptom — the thing the learner actually sees go wrong.
+#: A mechanical proxy (a word list, or any number), not a reading of meaning:
+#: "why does state matter?" has none; "why does your counter stay stuck at 0?"
+#: has two.
+MOTION_SYMPTOM_WORDS = frozenset({
+    "stuck", "stays", "stay", "never", "freezes", "frozen", "resets", "reset",
+    "reloads", "reload", "refreshes", "slow", "slower", "blank", "empty", "crash",
+    "crashes", "error", "errors", "breaks", "broken", "fails", "wrong", "zero",
+    "disappears", "vanishes", "lost", "forgets", "loses", "hangs", "lags",
+    "flickers", "undefined", "null", "missing", "ignored", "ignores", "overridden",
+    "doesn't", "won't", "can't", "isn't", "nothing", "same", "old", "back",
+})
+#: A caption chunk ending on one of these reads as cut mid-phrase.
+_MOTION_DANGLING = frozenset({
+    "the", "a", "an", "of", "to", "and", "or", "but", "in", "on", "at", "for",
+    "with", "your", "its", "their", "is", "are", "that", "from", "by", "as", "into",
+})
+#: "Student: ..." is a second voice; "Remember: ..." is the narrator talking.
+_MOTION_SPEAKER_LABELS = frozenset({
+    "narrator", "student", "teacher", "interviewer", "host", "guest", "expert",
+    "learner", "speaker", "q", "a", "question", "answer",
+})
+_MOTION_NUMBER_WORDS = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+    "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
+    "twenty": "20", "thirty": "30", "forty": "40", "fifty": "50", "sixty": "60",
+    "hundred": "100",
+}
+
+
+def _motion_words(text: str) -> list[str]:
+    from .schema import motion_plain_text
+    return motion_plain_text(text).split()
+
+
+def _motion_key(token: str) -> str:
+    """A token reduced to lowercase letters and digits, number words as digits."""
+    key = re.sub(r"[^a-z0-9]", "", token.lower())
+    return _MOTION_NUMBER_WORDS.get(key, key)
+
+
+def _is_code_token(token: str) -> bool:
+    """Reads as code rather than a word: camelCase, or code punctuation inside it."""
+    core = token.rstrip(".,!?:;").lstrip("\"'(")
+    return bool(re.search(r"[a-z][A-Z]", core) or re.search(r"[()\[\]{}=;<>_]", core)
+                or re.search(r"\w\.\w", core))
+
+
+def _syllables(word: str) -> int:
+    w = re.sub(r"[^a-z]", "", word.lower())
+    if not w:
+        return 0
+    groups = re.findall(r"[aeiouy]+", w)
+    n = len(groups)
+    if w.endswith("e") and not w.endswith(("le", "ee")) and n > 1:
+        n -= 1
+    return max(1, n)
+
+
+def _shots_by_beat(script) -> dict:
+    return {s.beat: s for s in script.shots}
+
+
+def check_motion_beats_order(script) -> GraderResult:
+    """Every beat once, in the fixed order; break_2 alone may be missing. Ids
+    run s01, s02, ... so every later stage can address a shot by id."""
+    from .schema import MOTION_BEAT_ORDER
+    beats = [s.beat for s in script.shots]
+    problems: list[str] = []
+    lo, hi = MOTION_SHOT_COUNT
+    if not lo <= len(beats) <= hi:
+        problems.append(f"{len(beats)} shots, needs {lo}-{hi}")
+    dupes = sorted({b for b in beats if beats.count(b) > 1})
+    if dupes:
+        problems.append(f"beat(s) used more than once: {dupes}")
+    expected = [b for b in MOTION_BEAT_ORDER
+               if b not in MOTION_OPTIONAL_BEATS or b in beats]
+    missing = [b for b in expected if b not in beats]
+    if missing:
+        problems.append(f"missing beat(s): {missing}")
+    elif not dupes and beats != expected:
+        first = next(i for i, (a, b) in enumerate(zip(beats, expected)) if a != b)
+        problems.append(f"shot {first + 1} is {beats[first]!r}, the order needs "
+                        f"{expected[first]!r} there (order: {' > '.join(expected)})")
+    bad_ids = [s.id for i, s in enumerate(script.shots) if s.id != f"s{i + 1:02d}"]
+    if bad_ids:
+        problems.append(f"shot ids must run s01, s02, ... in order; off: {bad_ids}")
+    if problems:
+        return GraderResult("motion_beats_order", False, "; ".join(problems))
+    return GraderResult("motion_beats_order", True,
+                        f"{len(beats)} shots in the fixed beat order")
+
+
+def check_motion_has_fix_and_payoff(script, source_text: str) -> GraderResult:
+    """The reel must RESOLVE: problem -> why -> fix -> proof. The fix is the
+    concept the source teaches (concept_name appears in the source), it is
+    named on screen while it is shown, and the code map shows its real
+    syntax. The payoff and fix_flow beats carry actual narration."""
+    by_beat = _shots_by_beat(script)
+    problems: list[str] = []
+    for beat in ("fix_idea", "fix_flow", "payoff"):
+        shot = by_beat.get(beat)
+        if shot is None or not shot.speech.strip():
+            problems.append(f"no {beat} shot — the reel never shows the fix working")
+    concept = (script.concept_name or "").strip()
+    if not concept:
+        problems.append("concept_name is blank")
+    else:
+        flat_source = re.sub(r"[`*]", "", source_text or "").lower()
+        if concept.lower() not in flat_source:
+            problems.append(f"concept_name {concept!r} does not appear in the source "
+                            f"material — the fix must be the one the source teaches")
+        shown = any(concept.lower() in " ".join(c.text for c in by_beat[b].captions).lower()
+                    for b in ("fix_idea", "fix_flow", "code_map") if b in by_beat)
+        if not shown:
+            problems.append(f"{concept!r} is never named in the fix_idea, fix_flow or "
+                            f"code_map captions — the fix is not shown on screen")
+        code_map = by_beat.get("code_map")
+        if (code_map and _source_has_code(source_text)
+                and concept.lower() not in " ".join(code_map.code).lower()):
+            problems.append(f"the code_map code does not contain {concept!r}")
+    if problems:
+        return GraderResult("motion_has_fix_and_payoff", False, "; ".join(problems))
+    return GraderResult("motion_has_fix_and_payoff", True,
+                        f"shows {concept!r} fixing it, then the payoff")
+
+
+def check_motion_hook_curiosity(script) -> GraderResult:
+    """The first shot opens a curiosity question about a concrete, visible
+    symptom — and never names the concept (the hook is the problem, not the
+    vocabulary)."""
+    first = script.shots[0] if script.shots else None
+    if first is None or first.beat != "hook":
+        return GraderResult("motion_hook_curiosity", False,
+                            "the first shot is not the hook", {"shots": ["s01"]})
+    speech = first.speech.strip()
+    lower = speech.lower().lstrip("\"'")
+    problems: list[str] = []
+    if not lower.startswith(MOTION_HOOK_OPENERS):
+        problems.append(f"hook {speech[:60]!r} does not open with a curiosity question "
+                        f"(e.g. 'Have you ever wondered why...', 'Why does...', "
+                        f"'What actually happens when...')")
+    if "?" not in speech or not script.hook_question.strip().endswith("?"):
+        problems.append("the hook is not phrased as a question")
+    words = {re.sub(r"[^a-z0-9']", "", w.lower()) for w in speech.split()}
+    if not (words & MOTION_SYMPTOM_WORDS or re.search(r"\d", speech)):
+        problems.append(f"hook {speech[:60]!r} names no concrete symptom (stuck at 0, "
+                        f"page reloads, query is slow, ...)")
+    concept_key = _motion_key(script.concept_name or "")
+    hook_key = _motion_key(speech + " " + " ".join(c.text for c in first.captions))
+    if concept_key and len(concept_key) > 2 and concept_key in hook_key:
+        problems.append(f"the hook names the concept {script.concept_name!r} — it must "
+                        f"be about the symptom, not the vocabulary")
+    if problems:
+        return GraderResult("motion_hook_curiosity", False, "; ".join(problems),
+                            {"shots": [first.id]})
+    return GraderResult("motion_hook_curiosity", True, f"hook {speech[:60]!r}")
+
+
+def check_motion_word_budget(script) -> GraderResult:
+    """110-170 spoken words in total, 8-30 per shot, and the hook/title/cta
+    inside their time budget (estimated from word count)."""
+    from .schema import MOTION_WORDS_PER_SECOND
+    problems: list[str] = []
+    off: list[str] = []
+    total = sum(len(s.speech.split()) for s in script.shots)
+    lo, hi = MOTION_TOTAL_WORDS
+    if not lo <= total <= hi:
+        problems.append(f"{total} spoken words, needs {lo}-{hi} "
+                        f"({'too long' if total > hi else 'too short'})")
+    slo, shi = MOTION_SHOT_WORDS
+    for s in script.shots:
+        n = len(s.speech.split())
+        if not slo <= n <= shi:
+            problems.append(f"{s.id} ({s.beat}) is {n} words, needs {slo}-{shi}")
+            off.append(s.id)
+        cap = MOTION_BEAT_MAX_SECONDS.get(s.beat)
+        if cap is not None:
+            limit = int(cap * MOTION_WORDS_PER_SECOND)
+            if n > limit:
+                problems.append(f"{s.id} ({s.beat}) is {n} words (~{s.estimated_seconds}s), "
+                                f"needs <= {limit} words (<= {cap:g}s)")
+                off.append(s.id)
+    details = {"total_words": total, "shots": sorted(set(off))}
+    if problems:
+        return GraderResult("motion_word_budget", False, "; ".join(problems), details)
+    return GraderResult("motion_word_budget", True, f"{total} spoken words", details)
+
+
+def check_motion_caption_chunks(script) -> GraderResult:
+    """Every caption chunk is 3-5 words, carries at most two <b> highlights,
+    keeps brackets and quotes closed (so no code token is split across two
+    chunks), and does not end mid-phrase."""
+    problems: list[str] = []
+    off: list[str] = []
+    lo, hi = MOTION_CHUNK_WORDS
+    for s in script.shots:
+        if not s.captions:
+            problems.append(f"{s.id} has no captions")
+            off.append(s.id)
+            continue
+        for c in s.captions:
+            text = c.text
+            words = _motion_words(text)
+            bad: list[str] = []
+            if not lo <= len(words) <= hi:
+                bad.append(f"{len(words)} words, needs {lo}-{hi}")
+            opened, closed = text.count("<b>"), text.count("</b>")
+            if opened != closed or re.search(r"<(?!/?b>)", text):
+                bad.append("broken or unknown tags (only <b>...</b> is allowed)")
+            elif opened > MOTION_MAX_HIGHLIGHTS:
+                bad.append(f"{opened} highlights, max {MOTION_MAX_HIGHLIGHTS}")
+            plain = " ".join(words)
+            for a, b in ("()", "[]", "{}"):
+                if plain.count(a) != plain.count(b):
+                    bad.append(f"unbalanced {a}{b} — a code token is split across chunks")
+                    break
+            if plain.count("`") % 2 or plain.count('"') % 2:
+                bad.append("unbalanced quotes — a code token is split across chunks")
+            # Only a BARE last word dangles: "close by." ends a sentence.
+            if (words and not re.search(r"[.,!?;:]$", words[-1])
+                    and re.sub(r"[^a-z']", "", words[-1].lower()) in _MOTION_DANGLING):
+                bad.append(f"ends on {words[-1]!r}, mid-phrase")
+            if bad:
+                problems.append(f"{s.id} caption {text!r}: {', '.join(bad)}")
+                off.append(s.id)
+    if problems:
+        return GraderResult("motion_caption_chunks", False, "; ".join(problems),
+                            {"shots": sorted(set(off))})
+    n = sum(len(s.captions) for s in script.shots)
+    return GraderResult("motion_caption_chunks", True, f"{n} caption chunks, all 3-5 words")
+
+
+def check_motion_captions_match_speech(script) -> GraderResult:
+    """The captions are the narration, split — not a paraphrase of it. Word for
+    word, except a code token in a caption may stand for the words it is
+    spoken as (`useState` <- "use State", `useState(0)` <- "use State of zero")."""
+    problems: list[str] = []
+    off: list[str] = []
+    for s in script.shots:
+        spoken = [k for k in (_motion_key(w) for w in s.speech.split()) if k]
+        shown = [t for c in s.captions for t in _motion_words(c.text)]
+        i = 0
+        mismatch = None
+        for tok in shown:
+            key = _motion_key(tok)
+            if not key:
+                continue
+            code = _is_code_token(tok)
+            acc, j = "", i
+            while j < len(spoken) and len(acc) < len(key):
+                w = spoken[j]
+                j += 1
+                if code and w == "of" and acc and not key[len(acc):].startswith("of"):
+                    continue
+                acc += w
+            if acc != key:
+                mismatch = (f"caption word {tok!r} does not match the narration "
+                            f"at {' '.join(s.speech.split()[i:i + 4])!r}")
+                break
+            i = j
+        if mismatch is None and i < len(spoken):
+            mismatch = f"narration {' '.join(s.speech.split()[i:])!r} is never captioned"
+        if mismatch:
+            problems.append(f"{s.id}: {mismatch}")
+            off.append(s.id)
+    if problems:
+        return GraderResult("motion_captions_match_speech", False, "; ".join(problems),
+                            {"shots": off})
+    return GraderResult("motion_captions_match_speech", True,
+                        "every caption matches its narration word for word")
+
+
+def check_motion_speech_vs_caption(script) -> GraderResult:
+    """Speech is spelled for TTS (no raw code in it); captions keep the real
+    code (a camelCase concept is never captioned as its spoken words)."""
+    problems: list[str] = []
+    off: list[str] = []
+    concept = (script.concept_name or "").strip()
+    spoken_concept = " ".join(re.sub(r"([a-z])([A-Z])", r"\1 \2", concept).split()).lower()
+    for s in script.shots:
+        raw = [w for w in s.speech.split() if _is_code_token(w)]
+        if raw or "<" in s.speech or "`" in s.speech:
+            problems.append(f"{s.id} speech has raw code {raw[:3] or ['<tag or backtick>']} "
+                            f"— spell it for TTS ('use State', 'set Likes')")
+            off.append(s.id)
+        cap = " ".join(" ".join(_motion_words(c.text)) for c in s.captions).lower()
+        if (spoken_concept != concept.lower() and spoken_concept
+                and re.search(rf"\b{re.escape(spoken_concept)}\b", cap)):
+            problems.append(f"{s.id} captions spell {concept!r} as {spoken_concept!r} — "
+                            f"captions keep the real code")
+            off.append(s.id)
+    if problems:
+        return GraderResult("motion_speech_vs_caption", False, "; ".join(problems),
+                            {"shots": sorted(set(off))})
+    return GraderResult("motion_speech_vs_caption", True,
+                        "speech spelled for TTS, captions keep real code")
+
+
+def _source_has_code(source_text: str) -> bool:
+    """The material shows code (a fenced block or an inline `span`). A topic
+    with no code in it — paging, CSS cascade order — has no syntax to map, so
+    its code_map is a card of parts, not a code window."""
+    return "```" in (source_text or "") or bool(re.search(r"`[^`\n]+`", source_text or ""))
+
+
+def check_motion_code_shots(script, source_text: str = "") -> GraderResult:
+    """At most two code shots — setup and code_map only — each <= 3 lines of
+    <= 30 characters. When the material shows code, the code_map must show
+    code too (the real syntax)."""
+    problems: list[str] = []
+    coded = [s for s in script.shots if any(line.strip() for line in s.code)]
+    if len(coded) > MOTION_MAX_CODE_SHOTS:
+        problems.append(f"{len(coded)} shots show code, max {MOTION_MAX_CODE_SHOTS}")
+    for s in coded:
+        if s.beat not in MOTION_CODE_BEATS:
+            problems.append(f"{s.id} ({s.beat}) shows code — only {MOTION_CODE_BEATS} may")
+        if len(s.code) > MOTION_MAX_CODE_LINES:
+            problems.append(f"{s.id} shows {len(s.code)} code lines, max {MOTION_MAX_CODE_LINES}")
+        for line in s.code:
+            if len(line) > MOTION_MAX_CODE_CHARS:
+                problems.append(f"{s.id} code line {line!r} is {len(line)} chars, "
+                                f"max {MOTION_MAX_CODE_CHARS}")
+    code_map = _shots_by_beat(script).get("code_map")
+    if (code_map is not None and _source_has_code(source_text)
+            and not any(line.strip() for line in code_map.code)):
+        problems.append("the code_map shot shows no code, but the material has code "
+                        "to map")
+    if problems:
+        return GraderResult("motion_code_shots", False, "; ".join(problems))
+    return GraderResult("motion_code_shots", True, f"{len(coded)} code shot(s)")
+
+
+def check_motion_recap_icons(script, icon_names=None) -> GraderResult:
+    """Exactly three icons in the vocabulary, all drawable; exactly three
+    takeaways, each reusing a vocabulary icon, together using all three; and
+    the recap frame inside its word cap."""
+    if icon_names is None:
+        from .motion_library import icon_names as _names
+        icon_names = _names()
+    problems: list[str] = []
+    vocab = [i.name for i in script.icon_vocabulary]
+    if len(vocab) != MOTION_VOCABULARY_SIZE or len(set(vocab)) != len(vocab):
+        problems.append(f"icon_vocabulary is {vocab}, needs {MOTION_VOCABULARY_SIZE} "
+                        f"different icons")
+    unknown = sorted({n for n in vocab + [t.icon for t in script.takeaways]
+                      if n not in icon_names})
+    if unknown:
+        problems.append(f"unknown icon(s) {unknown} — pick from {sorted(icon_names)}")
+    if len(script.takeaways) != MOTION_TAKEAWAYS:
+        problems.append(f"{len(script.takeaways)} takeaways, needs exactly {MOTION_TAKEAWAYS}")
+    used = [t.icon for t in script.takeaways]
+    stray = [n for n in used if n not in vocab]
+    if stray:
+        problems.append(f"recap icon(s) {stray} are not in the icon_vocabulary {vocab}")
+    elif vocab and set(used) != set(vocab):
+        problems.append(f"the recap uses {used} but must reuse all of {vocab}")
+    words = len(MOTION_RECAP_HEADING.split()) + sum(
+        len(t.line.split()) + len(t.sub.split()) for t in script.takeaways)
+    if words > MOTION_RECAP_MAX_WORDS:
+        problems.append(f"the recap frame shows {words} words, max {MOTION_RECAP_MAX_WORDS}")
+    if problems:
+        return GraderResult("motion_recap_icons", False, "; ".join(problems))
+    return GraderResult("motion_recap_icons", True,
+                        f"recap reuses {vocab}, {words} words on screen")
+
+
+def check_motion_plain_words(script) -> GraderResult:
+    """Beginner language: no spoken word over four syllables, except the
+    concept's own name."""
+    concept_parts = {_motion_key(p) for p in
+                     re.sub(r"([a-z])([A-Z])", r"\1 \2", script.concept_name or "").split()}
+    concept_parts.add(_motion_key(script.concept_name or ""))
+    long_words = []
+    for s in script.shots:
+        for w in s.speech.split():
+            if _motion_key(w) in concept_parts:
+                continue
+            if _syllables(w) > MOTION_MAX_SYLLABLES:
+                long_words.append(f"{s.id}:{w.strip('.,!?;:')}")
+    if long_words:
+        return GraderResult("motion_plain_words", False,
+                            f"word(s) over {MOTION_MAX_SYLLABLES} syllables: {long_words} — "
+                            f"use plainer words for beginners")
+    return GraderResult("motion_plain_words", True, "plain, beginner-level words")
+
+
+def check_motion_not_qa(script) -> GraderResult:
+    """One narrator telling a story, never a Q&A: no speaker labels, and only
+    the hook asks a question."""
+    problems: list[str] = []
+    for s in script.shots:
+        label = re.match(r"^\s*([A-Za-z]+)\s*:\s", s.speech)
+        if label and (label.group(1).lower() in _MOTION_SPEAKER_LABELS
+                      or label.group(1) in STORY_ACTORS):
+            problems.append(f"{s.id} speech opens with a speaker label — one narrator only")
+        if s.beat != "hook" and "?" in s.speech:
+            problems.append(f"{s.id} ({s.beat}) asks a question — only the hook may")
+    if problems:
+        return GraderResult("motion_not_qa", False, "; ".join(problems))
+    return GraderResult("motion_not_qa", True, "one narrator, no Q&A")
+
+
+#: Graders whose failure a hook-only regeneration can fix — see
+#: skills.script.write_motion_script. A failure counts as hook-only when its
+#: grader is here and every shot it names is the hook.
+MOTION_HOOK_GRADERS = frozenset({
+    "motion_hook_curiosity", "motion_word_budget", "motion_caption_chunks",
+    "motion_captions_match_speech", "motion_speech_vs_caption",
+})
+
+
+def run_motion_script_graders(script, source_text: str, icon_names=None) -> list[GraderResult]:
+    """Motion mode's counterpart to run_script_graders / run_story_graders."""
+    return [
+        check_motion_beats_order(script),
+        check_motion_has_fix_and_payoff(script, source_text),
+        check_motion_hook_curiosity(script),
+        check_motion_word_budget(script),
+        check_motion_caption_chunks(script),
+        check_motion_captions_match_speech(script),
+        check_motion_speech_vs_caption(script),
+        check_motion_code_shots(script, source_text),
+        check_motion_recap_icons(script, icon_names),
+        check_motion_plain_words(script),
+        check_motion_not_qa(script),
+    ]
+
+
+def motion_failures_are_hook_only(results: list[GraderResult], hook_id: str = "s01") -> bool:
+    """True when every failure is one a hook-only regeneration can fix."""
+    failed = [r for r in results if not r.passed]
+    if not failed:
+        return False
+    for r in failed:
+        if r.name not in MOTION_HOOK_GRADERS:
+            return False
+        shots = r.details.get("shots")
+        if r.name == "motion_word_budget" and "total_words" in r.details:
+            lo, hi = MOTION_TOTAL_WORDS
+            if not lo <= r.details["total_words"] <= hi:
+                return False
+        if r.name != "motion_hook_curiosity" and shots != [hook_id]:
+            return False
+    return True

@@ -96,6 +96,22 @@ TOPIC_GRADERS = {
     "topic_matches_understanding": checks.check_topic_matches_understanding,
 }
 
+#: REEL_STYLE=motion's script graders (RESTYLE_TO_MOTION_REELS.md section 7).
+#: "all" runs checks.run_motion_script_graders and passes only if every one does.
+MOTION_GRADERS = {
+    "beats_order":           lambda s, src: checks.check_motion_beats_order(s),
+    "has_fix_and_payoff":    checks.check_motion_has_fix_and_payoff,
+    "hook_curiosity":        lambda s, src: checks.check_motion_hook_curiosity(s),
+    "word_budget":           lambda s, src: checks.check_motion_word_budget(s),
+    "caption_chunks":        lambda s, src: checks.check_motion_caption_chunks(s),
+    "captions_match_speech": lambda s, src: checks.check_motion_captions_match_speech(s),
+    "speech_vs_caption":     lambda s, src: checks.check_motion_speech_vs_caption(s),
+    "code_shots":            checks.check_motion_code_shots,
+    "recap_icons":           lambda s, src: checks.check_motion_recap_icons(s),
+    "plain_words":           lambda s, src: checks.check_motion_plain_words(s),
+    "not_qa":                lambda s, src: checks.check_motion_not_qa(s),
+}
+
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
 
@@ -123,6 +139,56 @@ def run_code_case(case: dict, sections) -> tuple[bool, str]:
         return False, f"reason missing {needle!r}; got: {result.reason}"
 
     return True, result.reason
+
+
+def _apply_patch(data, ops: list[dict]):
+    """Apply a motion case's `patch` ops, in order, to a fixture's JSON.
+
+    Each op has a dotted `path` ("shots.0.speech", list indexes as numbers)
+    and one of: `value` (set it), `remove: true` (delete it), `append` (add to
+    the list at path). This is how one golden fixture yields many bad
+    variants, each differing from a known-good reel by exactly what its case
+    is about — so a failure can only be blamed on that one change."""
+    for op in ops:
+        *parents, last = [int(p) if p.isdigit() else p for p in str(op["path"]).split(".")]
+        target = data
+        for p in parents:
+            target = target[p]
+        if op.get("remove"):
+            del target[last]
+        elif "append" in op:
+            target[last].append(op["append"])
+        else:
+            target[last] = op["value"]
+    return data
+
+
+def run_motion_case(case: dict, sections) -> tuple[bool, str]:
+    """A motion-script case: a MotionScript fixture, optionally patched, graded
+    against the whole `input` document (motion scripts draw on a pool of
+    sections, not one)."""
+    from shorts.schema import MotionScript
+    data = json.loads((ROOT / case["fixture"]).read_text(encoding="utf-8"))
+    script = MotionScript(**_apply_patch(data, case.get("patch", [])))
+    doc = parse_markdown(ROOT / case["input"]) if case.get("input") else sections
+    source = "\n\n".join(s.text for s in doc)
+
+    if case["grader"] == "all":
+        results = checks.run_motion_script_graders(script, source)
+        passed = checks.all_passed(results)
+        reason = ("; ".join(str(r) for r in results if not r.passed)
+                  or f"all {len(results)} motion graders pass")
+    else:
+        result = MOTION_GRADERS[case["grader"]](script, source)
+        passed, reason = result.passed, result.reason
+
+    exp = case["expect"]
+    if passed != exp["passed"]:
+        return False, f"expected passed={exp['passed']}, got {passed} ({reason})"
+    needle = exp.get("reason_contains")
+    if needle and needle.lower() not in reason.lower():
+        return False, f"reason missing {needle!r}; got: {reason}"
+    return True, reason
 
 
 def run_unit_case(case: dict, sections) -> tuple[bool, str]:
@@ -605,6 +671,8 @@ def main():
                 ok, detail = run_topic_case(case, sections)
             elif kind == "revision":
                 ok, detail = run_revision_case(case, sections)
+            elif kind == "motion_grader":
+                ok, detail = run_motion_case(case, sections)
             elif kind == "llm_judge":
                 ok, detail = run_judge_case(case, sections)
             elif kind == "vision_judge":

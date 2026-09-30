@@ -566,6 +566,14 @@ def main():
                         "— reels are still not built for these. Implies "
                         "--gate-teaching-approach.")
     args = ap.parse_args()
+    # RESTYLE_TO_MOTION_REELS.md: motion reels have their own runner with their
+    # own gates and stages. Stop BEFORE selection, so nothing is paid for on the
+    # way to building the wrong kind of reel.
+    if config.REEL_STYLE == "motion":
+        print("REEL_STYLE=motion is built by its own runner, not this one:\n"
+              f"  python -m shorts.motion_reel {args.doc}\n"
+              "See RESTYLE_TO_MOTION_REELS.md.")
+        return
     if args.topics_file and args.selections_file:
         ap.error("--topics-file and --selections-file are mutually exclusive")
     if args.gate_visual_plan:

@@ -548,18 +548,27 @@ REEL_THEME = os.getenv("REEL_THEME", "neon").strip().lower()
 
 # --------------------------------------------------------------------- reel style
 #
-# See RESTYLE_TO_STORY_REELS.md. Two values:
+# See RESTYLE_TO_STORY_REELS.md and RESTYLE_TO_MOTION_REELS.md. Three values:
 #
 #   "explainer"  the original — single-narrator, SVG-diagram pipeline (skills/
 #                script.py's SYSTEM_EXPLAINER, skills/visuals.py, layout.py). Unchanged.
 #   "story"      illustrated character-story reels: skills/script.py's SYSTEM_STORY,
 #                a metaphor mapping stage before any shot is written, a fixed CAST.
+#   "motion"     single-narrator reels drawn by our own React scene library
+#                (web/src/motion), run by shorts/motion_reel.py. No image generation.
 #
 # A SWITCH, not a rewrite — same shape as REEL_THEME above. DEFAULT IS "explainer":
 # every existing shipped reel, and every run that does not set REEL_STYLE, gets
 # byte-identical behaviour to before this existed. Nothing in run.py branches on
 # this until a caller explicitly asks for "story".
+#
+# VALIDATED, unlike before motion existed: an unknown value used to fall through
+# as explainer without a word, so a typo ("motoin") silently built the wrong kind
+# of reel. Now it stops at import, naming the allowed values.
+REEL_STYLES = ("explainer", "story", "motion")
 REEL_STYLE = os.getenv("REEL_STYLE", "explainer").strip().lower()
+if REEL_STYLE not in REEL_STYLES:
+    raise ValueError(f"REEL_STYLE={REEL_STYLE!r} is not one of {REEL_STYLES}")
 
 # The story mode's fixed cast — name -> a short visual/personality descriptor the
 # story prompt (and, later, an illustrator) reads. Deliberately small and fixed
@@ -675,6 +684,25 @@ BRAND = _Brand(
 #: learn {topic} the simple way."). A placeholder until a real account
 #: exists; override once one does.
 BRAND_HANDLE = os.getenv("BRAND_HANDLE", "@learnthesimpleway").strip()
+
+
+# ------------------------------------------------------------------- motion reels
+#
+# RESTYLE_TO_MOTION_REELS.md — REEL_STYLE=motion, run by shorts/motion_reel.py.
+#
+# The series label (title card) and the small corner mark come from HERE, never
+# from the LLM: they are brand text, the same on every reel of a series, and a
+# model asked for them invents a new one each time. Defaults to BRAND_HANDLE so
+# a fresh checkout still shows something true. Set MOTION_SERIES to e.g.
+# "React in 60s" once a real series exists.
+MOTION_SERIES = os.getenv("MOTION_SERIES", "").strip() or BRAND_HANDLE
+
+#: Full-script attempts before write_motion_script gives up, and the separate,
+#: smaller budget for regenerating ONLY a failing hook (the change request's
+#: "max 2 attempts") — a narrower job gets a narrower count, the same split
+#: story mode keeps between MAX_STORY_MAPPING_RETRIES and MAX_HOOK_FIX_RETRIES.
+MAX_MOTION_SCRIPT_RETRIES = _i("MAX_MOTION_SCRIPT_RETRIES", 3)
+MAX_MOTION_HOOK_FIX_RETRIES = _i("MAX_MOTION_HOOK_FIX_RETRIES", 2)
 
 
 # --------------------------------------------------------------- image generation

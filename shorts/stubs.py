@@ -17,7 +17,9 @@ your code, not in a prompt — which is exactly what you want a smoke test to te
 you. These are deliberately dumb. Do not tune them; tune the real prompts.
 """
 import ast
+import json
 import re
+from pathlib import Path
 
 from .schema import MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND
 from .checks import MAX_ANSWER_WORDS, MIN_ANSWERS, MIN_QUOTE_WORDS
@@ -80,6 +82,10 @@ def fake(model_cls, system: str, user: str):
         return model_cls(**_story_eval(user))
     if name == "StoryFrameJudge":
         return model_cls(**_story_frame_judge(user))
+    if name == "MotionScriptDraft":
+        return model_cls(**_motion_script(user))
+    if name == "MotionHookFix":
+        return model_cls(**_motion_hook_fix(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 
@@ -931,3 +937,45 @@ def _story_frame_judge(user: str) -> dict:
     if "score setting_match" in user:
         result["setting_match"] = 5
     return result
+
+
+# =========================================================================== motion
+#
+# A motion script is eleven shots of hand-fitted captions, hook, code and icons —
+# not something a dumb string-splitter can make pass every motion grader from
+# arbitrary text. So the motion stubs are the golden fixtures themselves,
+# evals/fixtures/motion/*_golden.json: the one whose concept_name the material
+# actually teaches. Material no fixture covers raises, naming the fix, rather
+# than handing back a script about a different topic that then fails grounding
+# in a way that looks like a pipeline bug.
+
+_MOTION_FIXTURES = Path(__file__).resolve().parent.parent / "evals" / "fixtures" / "motion"
+_MOTION_DRAFT_FIELDS = ("hook_question", "concept_name", "promise",
+                        "icon_vocabulary", "takeaways", "shots")
+
+
+def _motion_fixture_for(user: str) -> dict:
+    material = (_find(r"MATERIAL:\n(.*?)(?:\n(?:CORE IDEA|THE APPROVED|SERIES)|\Z)",
+                      user, re.S) or user)
+    flat = re.sub(r"[`*]", "", material).lower()
+    for path in sorted(_MOTION_FIXTURES.glob("*_golden.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data["concept_name"].lower() in flat:
+            return data
+    raise NotImplementedError(
+        "no motion stub fixture teaches this material — add an "
+        "evals/fixtures/motion/<name>_golden.json whose concept_name appears in it, "
+        "or unset SHORTS_STUB.")
+
+
+def _motion_script(user: str) -> dict:
+    data = _motion_fixture_for(user)
+    return {k: data[k] for k in _MOTION_DRAFT_FIELDS}
+
+
+def _motion_hook_fix(user: str) -> dict:
+    data = _motion_fixture_for(user)
+    hook = data["shots"][0]
+    return {"hook_question": data["hook_question"],
+            "speech": hook["speech"], "captions": hook["captions"],
+            "visual": hook["visual"]}

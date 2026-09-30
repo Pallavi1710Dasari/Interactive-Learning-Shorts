@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Why your like counter stays at 0: a useState explainer reel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#E6E8F1;--text:#151936;--muted:#666B8A;--btn:#151936;--btnText:#fff;--line:#CBCEDF;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10131F;--text:#ECEEF8;--muted:#A0A5C0;--btn:#ECEEF8;--btnText:#10131F;--line:#2F3450;}}
+:root[data-theme="dark"]{--bg:#10131F;--text:#ECEEF8;--muted:#A0A5C0;--btn:#ECEEF8;--btnText:#10131F;--line:#2F3450;}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Manrope,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px}
+.stage{position:relative;width:min(94vw,calc(84vh*9/16));width:min(94vw,calc(84dvh*9/16));aspect-ratio:9/16;border-radius:22px;overflow:hidden;
+  background:#F3F4F9;box-shadow:0 24px 60px rgba(21,25,54,.28);container-type:inline-size}
+.stage svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.segs{position:absolute;top:3%;left:5%;right:5%;display:flex;gap:4px;z-index:3}
+.seg{flex:1;height:3px;border-radius:2px;background:rgba(21,25,54,.13);overflow:hidden}
+.seg i{display:block;height:100%;width:0;background:#5B4BF5}
+.cap{position:absolute;left:6%;right:6%;top:14.5%;display:flex;justify-content:center;pointer-events:none;z-index:3}
+.cap span{background:#151936;color:#fff;font-weight:700;font-size:5.5cqw;line-height:1.28;padding:.5em .9em;border-radius:.55em;text-align:center;max-width:100%;letter-spacing:-.005em}
+.cap span:empty{display:none}
+.cap b{color:#FFB524;font-weight:800}
+.cap span.in{animation:capIn .3s cubic-bezier(.2,1.3,.4,1) both}
+.mark{position:absolute;right:5.5%;bottom:3.6%;font-size:3.2cqw;font-weight:700;color:#5B4BF5;z-index:3}
+.overlay{position:absolute;inset:0;z-index:5;display:grid;place-items:center;border:0;padding:0;cursor:pointer;font:inherit;color:#151936;
+  background:rgba(243,244,249,.76);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.overlay[hidden]{display:none}
+.overlay .inner{display:flex;flex-direction:column;align-items:center}
+.overlay .play{width:20cqw;height:20cqw;border-radius:50%;background:#5B4BF5;display:grid;place-items:center;box-shadow:0 12px 30px rgba(91,75,245,.42)}
+.overlay p{margin:4cqw 0 0;font-weight:700;font-size:4.4cqw}
+.overlay small{display:block;margin-top:1.4cqw;font-size:3.3cqw;color:#666B8A;font-weight:600}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.controls button{font:inherit;font-weight:700;font-size:14px;padding:10px 18px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--text);cursor:pointer}
+.controls button.primary{background:var(--btn);color:var(--btnText);border-color:var(--btn)}
+button:focus-visible{outline:3px solid #5B4BF5;outline-offset:3px}
+.note{font-size:12.5px;line-height:1.5;color:var(--muted);max-width:400px;text-align:center;margin:0}
+svg .pop{animation:pop .55s cubic-bezier(.22,1.25,.4,1) both;transform-box:fill-box;transform-origin:center}
+svg .pulse{animation:pulse .45s ease-out;transform-box:fill-box;transform-origin:center}
+svg .ripple{animation:ripple .65s ease-out;transform-box:fill-box;transform-origin:center}
+svg .shake{animation:shake .45s ease-in-out}
+svg .floatUp{animation:floatUp 1.2s ease-out forwards}
+svg .blink{animation:blink 1.4s ease-in-out infinite}
+.cam{transition:transform .9s cubic-bezier(.6,.05,.25,1)}
+@keyframes pop{0%{opacity:0;transform:translateY(10px) scale(.94)}100%{opacity:1;transform:none}}
+@keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
+@keyframes ripple{0%{opacity:.8;transform:scale(.4)}100%{opacity:0;transform:scale(1.8)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes floatUp{0%{opacity:0;transform:translateY(0) scale(.6)}25%{opacity:1}100%{opacity:0;transform:translateY(-46px) scale(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes capIn{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.cam{transition:none}svg .blink{animation:none}
+  svg .pop,svg .pulse,svg .ripple,svg .floatUp,svg .shake,.cap span.in{animation-duration:.01s}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <svg id="svg" viewBox="0 0 360 640" role="img" aria-label="Animated explainer reel about React useState">
+    <defs id="defs">
+      <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#151936" flood-opacity=".13"/></filter>
+      <filter id="blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="10"/></filter>
+      <linearGradient id="img" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#DCD7FF"/><stop offset="1" stop-color="#FFE7B8"/></linearGradient>
+      <linearGradient id="av" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5B4BF5"/><stop offset="1" stop-color="#FFB524"/></linearGradient>
+      <linearGradient id="sweep" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5B4BF5" stop-opacity="0"/><stop offset=".75" stop-color="#5B4BF5" stop-opacity=".22"/><stop offset="1" stop-color="#5B4BF5" stop-opacity=".7"/></linearGradient>
+      <linearGradient id="title" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5B4BF5"/><stop offset="1" stop-color="#4234D6"/></linearGradient>
+    </defs>
+    <g id="cam" class="cam"><g id="world"></g></g>
+  </svg>
+  <div class="segs" id="segs"></div>
+  <div class="cap" aria-live="polite"><span id="cap"></span></div>
+  <div class="mark">React in 60s</div>
+  <button class="overlay" id="overlay" aria-label="Play the reel">
+    <span class="inner">
+      <span class="play"><svg width="36%" height="36%" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="#fff"/></svg></span>
+      <p id="ovText">Tap to play with sound</p><small id="ovSub">About 60 seconds</small>
+    </span>
+  </button>
+</div>
+<div class="controls"><button class="primary" id="replay">Replay</button><button id="voice" aria-pressed="true">Voice on</button></div>
+<p class="note">Narration uses your browser's built-in voice as a stand-in for the pipeline's TTS. Content stays clear of the top and bottom app overlays.</p>
+<script>
+const NS='http://www.w3.org/2000/svg';
+const C={ink:'#151936',sub:'#6A6F8E',line:'#E2E4EF',paper:'#F3F4F9',surf:'#FFFFFF',indigo:'#5B4BF5',indigoSoft:'#ECEAFE',amber:'#FFB524',amberSoft:'#FFF3D9',coral:'#F2555A',coralSoft:'#FDE8E8',mint:'#17B27B',mintSoft:'#E2F6EE',grey:'#B7BBD0',code:'#1B1F3B'};
+const MONO='"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace', SANS='Manrope, system-ui, -apple-system, "Segoe UI", sans-serif';
+const camEl=document.getElementById('cam'), world=document.getElementById('world'), defs=document.getElementById('defs');
+const capEl=document.getElementById('cap'), segsEl=document.getElementById('segs'), overlay=document.getElementById('overlay');
+let uid=0;
+function el(tag,a={},p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function txt(p,x,y,s,a={}){const t=el('text',Object.assign({x,y,'font-family':SANS,fill:C.ink},a),p);t.textContent=s;return t;}
+function restart(e,c){e.classList.remove(c);e.getBoundingClientRect();e.classList.add(c);}
+function pop(e,d=0){e.style.animationDelay=d+'ms';restart(e,'pop');}
+function grp(p){return el('g',{},p);}
+function placed(p,x,y,s=1){const o=grp(p);const i=el('g',{transform:`translate(${x},${y}) scale(${s})`},o);return [o,i];}
+function hide(e){e.style.opacity=0;return e;}
+function reveal(e,d=0){e.style.opacity=1;pop(e,d);}
+function cam(cx,cy,s){camEl.style.transform=`translate(180px,340px) scale(${s}) translate(${-cx}px,${-cy}px)`;}
+function camReset(){camEl.style.transition='none';cam(180,340,1);camEl.getBoundingClientRect();camEl.style.transition='';}
+
+const ICONS={heart:'M12 20.3s-7.4-4.5-9.2-9.1C1.6 7.9 3.7 4.6 7 4.6c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.3 0 5.4 3.3 4.2 6.6-1.8 4.6-9.2 9.1-9.2 9.1z',
+  refresh:'M19.5 12a7.5 7.5 0 1 1-2.2-5.3 M19.5 4.5v4.8h-4.8',memory:'M4 4.5h16v6.5H4z M4 13h16v6.5H4z M8 7.75h.01 M8 16.25h.01 M12 7.75h4 M12 16.25h4',
+  bolt:'M13.5 2.5 4.5 13.5h6.5l-1 8 9-11h-6.5z',check:'M5 12.5l4.2 4.2L19 7',x:'M7 7l10 10M17 7 7 17',tap:'M9 11V5.5a2 2 0 0 1 4 0V10l4.3 1a2 2 0 0 1 1.6 2.3l-.9 5.2a2 2 0 0 1-2 1.7H11a2 2 0 0 1-1.6-.8L6 14.8a1.6 1.6 0 0 1 2.4-2.1L9 13.3'};
+function icon(p,n,x,y,size,col,fill='none',sw=2){const g=el('g',{transform:`translate(${x-size/2},${y-size/2}) scale(${size/24})`},p);
+  el('path',{d:ICONS[n],fill,stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'},g);return g;}
+function tile(p,n,x,y,size,bg,col){const [o,i]=placed(p,x,y);el('rect',{x:-size/2,y:-size/2,width:size,height:size,rx:size*.28,fill:bg},i);icon(i,n,0,0,size*.5,col);return o;}
+function pill(p,x,y,str,{bg=C.indigoSoft,col=C.indigo,size=12,mono=false,ic=null}={}){
+  const [o,i]=placed(p,x,y);const w=str.length*size*(mono?.62:.58)+(ic?40:24);
+  el('rect',{x:-w/2,y:-size-3,width:w,height:size*2+6,rx:size+3,fill:bg},i);
+  if(ic)icon(i,ic,-w/2+18,0,size*1.25,col);
+  txt(i,ic?-w/2+30:0,size*.36,str,{'font-size':size,'font-weight':700,fill:col,'text-anchor':ic?'start':'middle','font-family':mono?MONO:SANS});return o;}
+function bg(r,fill=C.paper){el('rect',{x:-400,y:-400,width:1200,height:1500,fill},r);
+  const g=grp(r);for(let x=24;x<360;x+=24)for(let y=168;y<560;y+=24)el('circle',{cx:x,cy:y,r:.9,fill:C.grey,opacity:.45},g);}
+function glow(p,x,y,r,col=C.amber){const g=el('circle',{cx:x,cy:y,r,fill:col,filter:'url(#blur)',opacity:0},p);g.style.transition='opacity .5s';return g;}
+
+/* ---------- phone mockup with a social post ---------- */
+function phone(p,cx,top){
+  const w=176,h=336,l=cx-w/2;const [o,i]=placed(p,0,0);
+  el('rect',{x:l,y:top,width:w,height:h,rx:32,fill:C.ink,filter:'url(#sh)'},i);
+  el('rect',{x:l+7,y:top+7,width:w-14,height:h-14,rx:25,fill:C.surf},i);
+  el('rect',{x:cx-26,y:top+14,width:52,height:14,rx:7,fill:C.ink},i);
+  txt(i,l+22,top+56,'Feed',{'font-size':15,'font-weight':800});
+  icon(i,'heart',l+w-28,top+51,15,C.ink);
+  el('circle',{cx:l+30,cy:top+82,r:11,fill:'url(#av)'},i);
+  txt(i,l+48,top+80,'rahul.codes',{'font-size':10.5,'font-weight':700});
+  txt(i,l+48,top+92,'2 min ago',{'font-size':9,fill:C.sub,'font-weight':600});
+  el('rect',{x:l+17,y:top+104,width:w-34,height:132,rx:14,fill:'url(#img)'},i);
+  el('circle',{cx:l+w-50,cy:top+138,r:14,fill:C.amber,opacity:.9},i);
+  el('path',{d:`M${l+17},${top+222} L${l+62},${top+172} L${l+92},${top+200} L${l+116},${top+180} L${l+w-17},${top+226} V${top+236} H${l+17}Z`,fill:C.indigo,opacity:.55},i);
+  const hx=l+32,hy=top+258;
+  const rip=el('circle',{cx:hx,cy:hy,r:16,fill:C.indigo,opacity:0},i);
+  const hOut=grp(i);const hIc=icon(hOut,'heart',hx,hy,24,C.ink,'none',2);
+  const cnt=txt(i,l+52,top+263,'0 likes',{'font-size':13,'font-weight':800});
+  el('rect',{x:l+20,y:top+280,width:112,height:7,rx:3.5,fill:C.line},i);el('rect',{x:l+20,y:top+294,width:78,height:7,rx:3.5,fill:C.line},i);
+  const fx=grp(i);
+  const touch=el('circle',{cx:hx,cy:hy,r:15,fill:'#fff',stroke:C.ink,'stroke-width':2,opacity:0},i);touch.style.transition='opacity .15s';
+  return {g:o,hx,hy,
+    tap(){touch.style.opacity=.85;setTimeout(()=>touch.style.opacity=0,220);restart(rip,'ripple');restart(hOut,'pulse');},
+    fail(){cnt.setAttribute('fill',C.coral);restart(cnt,'shake');setTimeout(()=>cnt.setAttribute('fill',C.ink),650);},
+    set(n){cnt.textContent=n+(n===1?' like':' likes');cnt.setAttribute('fill',C.ink);restart(cnt,'pulse');
+      hIc.firstChild.setAttribute('fill',C.coral);hIc.firstChild.setAttribute('stroke',C.coral);
+      for(let k=0;k<3;k++){const [fo,fi]=placed(fx,hx+(k-1)*12,hy-8);icon(fi,'heart',0,0,11,C.coral,C.coral);fo.style.animationDelay=(k*80)+'ms';fo.classList.add('floatUp');}}};
+}
+
+/* ---------- component card (what React renders) ---------- */
+function card(p,x,y,w,h,{val=0,code=null}={}){
+  const [o,i]=placed(p,0,0);const id='clip'+(++uid);
+  const cp=el('clipPath',{id},defs);el('rect',{x,y,width:w,height:h,rx:18},cp);
+  el('rect',{x,y,width:w,height:h,rx:18,fill:C.surf,filter:'url(#sh)'},i);
+  const inner=el('g',{'clip-path':`url(#${id})`},i);
+  pill(inner,x+62,y+26,'<LikeButton />',{mono:true,size:11});
+  const bdot=el('circle',{cx:x+w-78,cy:y+26,r:3.5,fill:C.mint},inner);
+  const badge=txt(inner,x+w-70,y+30,'Render 1',{'font-size':11,'font-weight':700,fill:C.sub});
+  el('line',{x1:x,y1:y+46,x2:x+w,y2:y+46,stroke:C.line,'stroke-width':1.5},inner);
+  const body=grp(inner);body.style.transition='opacity .2s';
+  txt(body,x+20,y+68,'On screen',{'font-size':10.5,'font-weight':700,fill:C.sub});
+  const hIc=icon(body,'heart',x+32,y+92,24,C.coral,C.coral);
+  const num=txt(body,x+54,y+102,String(val),{'font-size':30,'font-weight':800});
+  txt(body,x+54+ (String(val).length*19)+6,y+101,'likes',{'font-size':12,'font-weight':700,fill:C.sub}).classList.add('lbl');
+  let row=null,rowT=null,rowN=null;
+  if(code!==null){row=el('rect',{x:x+14,y:y+h-44,width:w-28,height:32,rx:9,fill:C.paper},body);
+    rowT=txt(body,x+26,y+h-23,code,{'font-size':12.5,'font-weight':600,'font-family':MONO});
+    rowN=txt(body,x+w-26,y+h-23,'',{'font-size':10.5,'font-weight':700,fill:C.sub,'text-anchor':'end'});}
+  const sw=el('rect',{x,y:y-70,width:w,height:70,fill:'url(#sweep)',opacity:0},inner);
+  let n=1;
+  return {g:o,
+    display(v,col=C.ink){num.textContent=v;num.setAttribute('fill',col);restart(num,'pulse');},
+    code(s,col=C.ink,note=''){if(!rowT)return;rowT.textContent=s;rowT.setAttribute('fill',col);rowN.textContent=note;
+      row.setAttribute('fill',col===C.coral?C.coralSoft:col===C.amber||col==='#B37700'?C.amberSoft:col===C.indigo?C.indigoSoft:C.paper);restart(rowT,'pulse');},
+    render(mid){n++;sw.style.transition='none';sw.style.opacity=1;sw.style.transform='translateY(0)';sw.getBoundingClientRect();
+      sw.style.transition='transform .85s cubic-bezier(.5,0,.3,1)';sw.style.transform=`translateY(${h+70}px)`;
+      bdot.setAttribute('fill',C.indigo);bdot.classList.add('blink');
+      setTimeout(()=>{body.style.opacity=.15;},180);
+      setTimeout(()=>{badge.textContent='Render '+n;mid&&mid();body.style.opacity=1;},480);
+      setTimeout(()=>{bdot.classList.remove('blink');bdot.setAttribute('fill',C.mint);sw.style.opacity=0;},900);}};
+}
+
+/* ---------- React memory panel ---------- */
+function panel(p,x,y,w,h){
+  const [o,i]=placed(p,0,0);
+  el('rect',{x,y,width:w,height:h,rx:18,fill:C.surf,filter:'url(#sh)'},i);
+  el('rect',{x:x+14,y:y+12,width:28,height:28,rx:8,fill:C.indigo},i);icon(i,'memory',x+28,y+26,16,'#fff');
+  txt(i,x+52,y+31,'React',{'font-size':14,'font-weight':800});
+  const st=grp(i);let stDot,stT,stBg;
+  stBg=el('rect',{x:x+w-112,y:y+15,width:98,height:22,rx:11,fill:C.paper},st);
+  stDot=el('circle',{cx:x+w-100,cy:y+26,r:3.5,fill:C.grey},st);
+  stT=txt(st,x+w-92,y+30,'Idle',{'font-size':10.5,'font-weight':700,fill:C.sub});
+  const empty=txt(i,x+w/2,y+h-28,'No state stored',{'font-size':12,'font-weight':600,fill:C.grey,'text-anchor':'middle'});
+  const slot=grp(i);hide(slot);
+  el('rect',{x:x+14,y:y+52,width:w-28,height:h-66,rx:12,fill:C.paper},slot);
+  txt(slot,x+28,y+52+(h-66)/2+5,'likes',{'font-size':14,'font-weight':600,'font-family':MONO});
+  const gl=glow(slot,x+w-52,y+52+(h-66)/2,26);
+  el('rect',{x:x+w-82,y:y+60,width:60,height:h-82,rx:9,fill:C.amberSoft,stroke:C.amber,'stroke-width':2},slot);
+  const v=txt(slot,x+w-52,y+52+(h-66)/2+7,'0',{'font-size':20,'font-weight':800,'text-anchor':'middle'});
+  return {g:o,
+    status(t,col,soft){stT.textContent=t;stDot.setAttribute('fill',col);stT.setAttribute('fill',col===C.grey?C.sub:col);stBg.setAttribute('fill',soft||C.paper);},
+    showSlot(val=0){empty.style.opacity=0;v.textContent=val;reveal(slot);gl.style.opacity=.9;},
+    set(n){v.textContent=n;restart(v,'pulse');gl.style.opacity=.95;}};
+}
+function travel(path,{rev=false,dur=650,col=C.indigo}={},done){
+  const L=path.getTotalLength(),par=path.parentNode;const h=el('circle',{r:12,fill:col,opacity:.22},par),d=el('circle',{r:5.5,fill:col},par);const t0=performance.now();
+  (function f(t){const k=Math.min(1,(t-t0)/dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2,pt=path.getPointAtLength((rev?1-e:e)*L);
+    [h,d].forEach(c=>{c.setAttribute('cx',pt.x);c.setAttribute('cy',pt.y);});
+    if(k<1)requestAnimationFrame(f);else{h.remove();d.remove();done&&done();}})(t0);
+}
+function editor(p,x,y,w,h,file){
+  const [o,i]=placed(p,0,0);
+  el('rect',{x,y,width:w,height:h,rx:16,fill:C.code,filter:'url(#sh)'},i);
+  el('path',{d:`M${x+16},${y} H${x+w-16} Q${x+w},${y} ${x+w},${y+16} V${y+38} H${x} V${y+16} Q${x},${y} ${x+16},${y}Z`,fill:'#242951'},i);
+  [['#F2555A',18],['#FFB524',32],['#17B27B',46]].forEach(([f,dx])=>el('circle',{cx:x+dx,cy:y+19,r:4.5,fill:f},i));
+  el('rect',{x:x+64,y:y+8,width:file.length*7+24,height:30,rx:7,fill:C.code},i);
+  txt(i,x+76,y+27,file,{'font-size':11,'font-weight':600,'font-family':MONO,fill:'#C9CCF0'});
+  return {g:o,i};
+}
+
+/* ---------- scenes ---------- */
+const scenes=[
+{ say:"Have you ever wondered why your like button stays stuck at zero, no matter how many times you tap it?",
+  cap:["Have you ever wondered","why your like button","stays stuck at <b>zero</b>,","no matter how often you tap?"],
+  build(r){bg(r);const ph=phone(r,180,176);pop(ph.g);let t;
+    return [[.14,()=>ph.tap()],[.18,()=>ph.fail()],[.32,()=>ph.tap()],[.36,()=>ph.fail()],[.5,()=>ph.tap()],[.54,()=>ph.fail()],
+      [.66,()=>{cam(165,420,1.45);t=pill(r,208,405,'Still 0',{bg:C.coralSoft,col:C.coral,size:11,ic:'x'});pop(t);}]];}
+},
+{ say:"The answer is one of React's most important ideas. Let's break it down.",
+  cap:["The answer is one of","React's <b>biggest ideas</b>.","Let's break it down."],
+  build(r){el('rect',{x:-400,y:-400,width:1200,height:1500,fill:'url(#title)'},r);
+    el('circle',{cx:300,cy:190,r:120,fill:'#fff',opacity:.05},r);el('circle',{cx:40,cy:500,r:90,fill:'#fff',opacity:.05},r);
+    const e=pill(r,180,236,'React Hooks  Episode 1',{bg:'rgba(255,255,255,.14)',col:'#fff',size:11});pop(e);
+    const t=txt(r,180,300,'useState',{'font-size':54,'font-weight':800,fill:'#fff','text-anchor':'middle','letter-spacing':'-1.5'});pop(t,120);
+    const s=txt(r,180,334,'Why plain variables forget',{'font-size':16,'font-weight':700,fill:C.amber,'text-anchor':'middle'});pop(s,260);
+    const items=[['refresh','Render',90],['memory','Memory',180],['bolt','Trigger',270]].map(([n,l,x])=>{const [o,i]=placed(r,x,410);
+      el('rect',{x:-30,y:-30,width:60,height:60,rx:17,fill:'#fff'},i);icon(i,n,0,0,28,C.indigo);
+      txt(i,0,50,l,{'font-size':12,'font-weight':700,fill:'#fff','text-anchor':'middle'});return hide(o);});
+    return [[.25,()=>reveal(items[0])],[.45,()=>reveal(items[1])],[.65,()=>reveal(items[2])]];}
+},
+{ say:"Here's the code. The likes live in a plain variable, and every tap adds one.",
+  cap:["Here's the code.","Likes live in a <b>plain variable</b>,","and every tap adds one."],
+  build(r){bg(r);const ed=editor(r,22,210,316,176,'LikeButton.jsx');pop(ed.g);const i=ed.i;
+    const hl=el('rect',{x:22,y:0,width:316,height:30,fill:'#FFB524',opacity:0},i);hl.style.transition='all .4s';
+    const bar=el('rect',{x:22,y:0,width:3,height:30,fill:C.amber,opacity:0},i);bar.style.transition='all .4s';
+    const L=(n,y,html)=>{const g=hide(grp(i));txt(g,40,y,String(n),{'font-size':13,'font-family':MONO,fill:'#5D6390'});
+      const t=el('text',{x:64,y,'font-family':MONO,'font-size':14.5,'font-weight':500,fill:'#E8EAFF'},g);t.innerHTML=html;return g;};
+    const k=(s,c)=>`<tspan fill="${c}">${s}</tspan>`;
+    const l1=L(1,282,`${k('let','#A99CFF')} likes = ${k('0',C.amber)};`),l2=L(2,322,`${k('const','#A99CFF')} ${k('onTap','#7FE0B8')} = () =&gt; likes++;`);
+    const mark=y=>{hl.setAttribute('y',y-20);hl.setAttribute('opacity',.1);bar.setAttribute('y',y-20);bar.setAttribute('opacity',1);};
+    const chip=hide(pill(r,180,424,'Plain variable',{bg:C.amberSoft,col:'#9A6500',size:12}));
+    return [[.08,()=>{reveal(l1);mark(282)}],[.3,()=>reveal(chip)],[.52,()=>{reveal(l2);mark(322)}],[.72,()=>cam(180,300,1.12)]];}
+},
+{ say:"But every time React re-renders, it runs your component again from the top. So the variable is created fresh, back to zero.",
+  cap:["But on every <b>re-render</b>,","React runs your component","again from the top.","The variable starts fresh,","back to <b>zero</b>."],
+  build(r){bg(r);const c=card(r,30,200,300,176,{val:1,code:'let likes = 1'});c.code('let likes = 1','#B37700','after tap');pop(c.g);
+    const note=hide(grp(r));icon(note,'refresh',84,420,16,C.indigo);txt(note,98,425,'Re-render runs the function again',{'font-size':12.5,'font-weight':700,fill:C.sub});
+    return [[.2,()=>{reveal(note);c.render(()=>{c.code('let likes = 0',C.coral,'recreated');c.display(0,C.coral);});}],
+      [.62,()=>cam(180,318,1.1)]];}
+},
+{ say:"Worse, changing a plain variable doesn't even tell React that anything changed. The screen never updates.",
+  cap:["Worse,","React isn't even told","that anything changed.","The screen <b>never updates</b>."],
+  build(r){bg(r);const c=card(r,40,176,280,150,{val:0,code:'let likes = 0'});const pn=panel(r,40,408,280,106);
+    const w=el('path',{d:'M180,326 V408',stroke:C.grey,'stroke-width':2.5,'stroke-dasharray':'5 6',fill:'none'},r);
+    const xm=hide(grp(r));el('circle',{cx:180,cy:367,r:12,fill:C.coralSoft,stroke:C.coral,'stroke-width':2},xm);icon(xm,'x',180,367,14,C.coral);
+    pop(c.g);pop(pn.g,150);
+    return [[.12,()=>c.code('let likes = 1','#B37700','changed')],[.34,()=>reveal(xm)],[.5,()=>pn.status('Idle',C.grey)],
+      [.66,()=>{c.display(0,C.coral);cam(180,300,1.1)}]];}
+},
+{ say:"use State fixes both. React stores the value in its own memory, outside your component, and hands it back on every render.",
+  cap:["<b>useState</b> fixes both.","React keeps the value","in its own memory,","and hands it back","on every render."],
+  build(r){bg(r);const c=card(r,40,176,280,150,{val:0,code:'likes = 0'});c.code('likes = 0',C.indigo,'from React');
+    const pn=panel(r,40,408,280,106);const w=el('path',{d:'M180,408 V326',stroke:C.indigo,'stroke-width':2.5,fill:'none',opacity:.35},r);
+    pop(c.g);pop(pn.g,150);
+    return [[.14,()=>{pn.status('Holding state',C.indigo,C.indigoSoft)}],[.3,()=>pn.showSlot(0)],
+      [.68,()=>travel(w,{},()=>c.render(()=>c.display(0,C.ink)))],[.84,()=>cam(180,345,1.05)]];}
+},
+{ say:"And set Likes is the trigger. Call it, React updates its memory, then re-renders with the new value.",
+  cap:["And <b>setLikes</b> is the trigger.","Call it,","React updates its memory,","then <b>re-renders</b>."],
+  build(r){bg(r);const c=card(r,40,176,280,150,{val:0,code:'likes = 0'});c.code('likes = 0',C.indigo,'from React');
+    const pn=panel(r,40,408,280,106);pn.status('Holding state',C.indigo,C.indigoSoft);pn.showSlot(0);
+    const up=el('path',{d:'M180,408 V326',stroke:C.indigo,'stroke-width':2.5,fill:'none',opacity:.35},r);
+    const trig=el('path',{d:'M262,367 H180 V408',stroke:C.amber,'stroke-width':2.5,fill:'none',opacity:0},r);
+    const chip=hide(pill(r,276,367,'setLikes(1)',{bg:C.amberSoft,col:'#9A6500',size:11,mono:true,ic:'bolt'}));
+    pop(c.g);pop(pn.g,120);
+    return [[.08,()=>{reveal(chip);trig.setAttribute('opacity',.8)}],
+      [.24,()=>travel(trig,{col:C.amber,dur:600},()=>{pn.set(1);pn.status('Update queued',C.amber,C.amberSoft)})],
+      [.56,()=>travel(up,{},()=>c.render(()=>{c.display(1,C.indigo);c.code('likes = 1',C.indigo,'from React');pn.status('Rendered',C.mint,C.mintSoft)}))],
+      [.82,()=>cam(180,330,1.06)]];}
+},
+{ say:"In code, use State of zero gives you two things: the value, and the function that changes it.",
+  cap:["In code,","useState(0) gives you","the <b>value</b>","and its <b>setter</b>."],
+  build(r){bg(r);const cw=10.8,x0=40;const [co,ci]=placed(r,0,0);
+    el('rect',{x:20,y:176,width:320,height:116,rx:18,fill:C.code,filter:'url(#sh)'},ci);
+    const hl=el('rect',{x:0,y:198,width:0,height:30,rx:7,fill:C.amber,opacity:0},ci);hl.style.transition='all .45s cubic-bezier(.5,0,.2,1)';
+    const tk=(x,y,s,f)=>txt(ci,x,y,s,{'font-family':MONO,'font-size':18,'font-weight':500,fill:f});
+    const likesT=tk(x0+7*cw,220,'likes','#E8EAFF'),setT=tk(x0+14*cw,220,'setLikes','#E8EAFF');
+    tk(x0,220,'const','#A99CFF');tk(x0+6*cw,220,'[','#E8EAFF');tk(x0+12*cw,220,',','#E8EAFF');tk(x0+22*cw,220,']','#E8EAFF');
+    tk(x0+2*cw,258,'=','#E8EAFF');tk(x0+4*cw,258,'useState','#7FE0B8');tk(x0+12*cw,258,'(','#E8EAFF');tk(x0+13*cw,258,'0',C.amber);tk(x0+14*cw,258,');','#E8EAFF');
+    pop(co);
+    const row=(y,ic,bgc,col,a,b)=>{const [o,i]=placed(r,0,0);el('rect',{x:20,y:y-32,width:320,height:64,rx:16,fill:C.surf,filter:'url(#sh)'},i);
+      const t=tile(i,ic,56,y,40,bgc,col);txt(i,90,y-3,a,{'font-size':15,'font-weight':800,'font-family':MONO});
+      txt(i,90,y+17,b,{'font-size':12.5,'font-weight':600,fill:C.sub});return hide(o);};
+    const r1=row(350,'memory',C.indigoSoft,C.indigo,'likes','the current value from React'),r2=row(430,'bolt',C.amberSoft,'#9A6500','setLikes','updates it and re-renders');
+    const mark=(t,n)=>{hl.setAttribute('x',t.getAttribute('x')-4);hl.setAttribute('width',n*cw+8);hl.setAttribute('opacity',1);
+      [likesT,setT].forEach(q=>q.setAttribute('fill','#E8EAFF'));t.setAttribute('fill',C.ink);};
+    return [[.42,()=>{mark(likesT,5);reveal(r1)}],[.7,()=>{mark(setT,8);reveal(r2)}]];}
+},
+{ say:"Now every tap sticks. One. Two. Three!",
+  cap:["Now every tap <b>sticks</b>.","One.","Two.","Three!"],
+  build(r){bg(r);const ph=phone(r,180,176);pop(ph.g);
+    return [[.34,()=>{ph.tap();ph.set(1)}],[.55,()=>{ph.tap();ph.set(2)}],[.76,()=>{ph.tap();ph.set(3);const t=pill(r,214,405,'It works',{bg:C.mintSoft,col:C.mint,size:11,ic:'check'});pop(t)}]];}
+},
+{ say:"Remember. Re-renders reset plain variables. use State keeps the value in React's memory. And the setter updates it and re-renders.",
+  cap:["Remember:","re-renders reset plain variables,","<b>useState</b> keeps the value,","the setter updates and re-renders."],
+  build(r){bg(r);const t=txt(r,28,196,'Key takeaways',{'font-size':22,'font-weight':800});pop(t);
+    const rows=[['refresh',C.coralSoft,C.coral,'Re-renders reset','plain variables to their start value'],
+      ['memory',C.indigoSoft,C.indigo,'useState remembers','kept safe between renders'],
+      ['bolt',C.amberSoft,'#9A6500','The setter triggers','update memory, then re-render']]
+      .map(([ic,b,c,a,s],k)=>{const y=252+k*84;const [o,i]=placed(r,0,0);el('rect',{x:20,y:y-34,width:320,height:68,rx:18,fill:C.surf,filter:'url(#sh)'},i);
+        tile(i,ic,58,y,42,b,c);txt(i,92,y-3,a,{'font-size':15.5,'font-weight':800});txt(i,92,y+17,s,{'font-size':12.2,'font-weight':600,fill:C.sub});return hide(o);});
+    return [[.14,()=>reveal(rows[0])],[.44,()=>reveal(rows[1])],[.72,()=>reveal(rows[2])]];}
+},
+{ say:"Follow for more React, in sixty seconds.",
+  cap:["Follow for more","React in <b>60 seconds</b>."],
+  build(r){el('rect',{x:-400,y:-400,width:1200,height:1500,fill:'url(#title)'},r);
+    const t=txt(r,180,262,'Up next',{'font-size':14,'font-weight':700,fill:C.amber,'text-anchor':'middle'});pop(t);
+    const n=txt(r,180,304,'useEffect',{'font-size':40,'font-weight':800,fill:'#fff','text-anchor':'middle','letter-spacing':'-1'});pop(n,120);
+    const [bo,bi]=placed(r,180,366);el('rect',{x:-70,y:-22,width:140,height:44,rx:22,fill:'#fff'},bi);
+    txt(bi,0,6,'Follow',{'font-size':16,'font-weight':800,fill:C.indigo,'text-anchor':'middle'});pop(bo,260);
+    const eps=[['useState',true],['useEffect',false],['useRef',false]].map(([l,d],k)=>{const g=pill(r,72+k*108,440,l,{bg:d?'rgba(255,255,255,.95)':'rgba(255,255,255,.14)',col:d?C.indigo:'#fff',size:11,mono:true,ic:d?'check':null});return hide(g);});
+    return [[.4,()=>eps.forEach((e,k)=>reveal(e,k*120))]];}
+}
+];
+
+/* ---------- player ---------- */
+let voiceOn=true,voice=null,runId=0,timers=[];const canSpeak='speechSynthesis' in window;
+function pickVoice(){if(!canSpeak)return;const vs=speechSynthesis.getVoices();
+  voice=vs.find(v=>/en[-_]IN/i.test(v.lang))||vs.find(v=>/Google US English|Samantha|Aria|Jenny|Natural/i.test(v.name))||vs.find(v=>/^en/i.test(v.lang))||null;}
+if(canSpeak){pickVoice();speechSynthesis.onvoiceschanged=pickVoice;}
+function later(fn,ms){timers.push(setTimeout(fn,ms));}
+function clearTimers(){timers.forEach(clearTimeout);timers=[];}
+function sleep(ms){return new Promise(r=>later(r,ms));}
+function speak(s){return new Promise(res=>{if(!voiceOn||!canSpeak)return res();const u=new SpeechSynthesisUtterance(s);if(voice)u.voice=voice;u.rate=1.03;
+  let done=false;const fin=()=>{if(!done){done=true;res();}};u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);setTimeout(fin,22000);});}
+segsEl.innerHTML=scenes.map(()=>'<div class="seg"><i></i></div>').join('');const bars=[...segsEl.querySelectorAll('i')];
+function showCap(h){capEl.innerHTML=h;capEl.classList.remove('in');capEl.getBoundingClientRect();capEl.classList.add('in');}
+function clearWorld(){world.innerHTML='';defs.querySelectorAll('clipPath').forEach(c=>c.remove());}
+async function runScene(k,id){const sc=scenes[k];
+  world.style.transition='opacity .2s';world.style.opacity=0;await sleep(200);if(id!==runId)return;
+  clearWorld();camReset();const ev=sc.build(world);world.style.opacity=1;
+  const est=Math.max(2.8,sc.say.split(/\s+/).length*.37+.8);
+  bars.forEach((b,j)=>{b.style.transition='none';b.style.width=j<k?'100%':'0';});bars[k].getBoundingClientRect();
+  bars[k].style.transition=`width ${est}s linear`;bars[k].style.width='100%';
+  const cw=sc.cap.map(c=>c.replace(/<[^>]+>/g,'').split(/\s+/).length),tot=cw.reduce((a,b)=>a+b,0);
+  let acc=0;sc.cap.forEach((c,j)=>{later(()=>showCap(c),acc/tot*est*1000);acc+=cw[j];});
+  ev.forEach(([f,fn])=>later(fn,f*est*1000));
+  await Promise.all([sleep(est*1000),speak(sc.say)]);if(id!==runId)return;await sleep(250);}
+async function play(){const id=++runId;clearTimers();if(canSpeak)speechSynthesis.cancel();overlay.hidden=true;
+  for(let k=0;k<scenes.length;k++){if(id!==runId)return;await runScene(k,id);}
+  if(id!==runId)return;document.getElementById('ovText').textContent='Watch again';document.getElementById('ovSub').textContent='Tap to replay';
+  overlay.setAttribute('aria-label','Replay the reel');overlay.hidden=false;}
+overlay.addEventListener('click',play);document.getElementById('replay').addEventListener('click',play);
+const vb=document.getElementById('voice');vb.addEventListener('click',()=>{voiceOn=!voiceOn;vb.textContent=voiceOn?'Voice on':'Voice off';vb.setAttribute('aria-pressed',voiceOn);if(!voiceOn&&canSpeak)speechSynthesis.cancel();});
+scenes[0].build(world);showCap("Have you ever wondered");
+</script>
+</body>
+</html>

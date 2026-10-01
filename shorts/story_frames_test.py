@@ -20,6 +20,9 @@ import re
 import shutil
 from pathlib import Path
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import cast_sheets, config, frame_checks, imagegen, story_frames
 from shorts.imagegen import ImageGenError
 from shorts.schema import Shot, StoryFrameJudge

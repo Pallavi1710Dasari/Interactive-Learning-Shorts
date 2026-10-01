@@ -24,6 +24,9 @@ import subprocess
 import wave
 from pathlib import Path
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import config, story_audio, story_voices
 from shorts.schema import Character, ConceptMapping, Shot, StoryScript
 from shorts.tts import ffmpeg_exe

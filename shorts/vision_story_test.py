@@ -15,6 +15,9 @@ if os.environ.get("SHORTS_STUB", "").strip().lower() not in ("1", "true", "yes")
 
 import time
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import config
 from shorts.schema import StoryFrameJudge
 from shorts.skills import vision

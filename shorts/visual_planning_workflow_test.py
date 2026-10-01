@@ -13,6 +13,9 @@ alongside it — see shorts.stubs._workflow_aware_strategy).
 """
 from unittest.mock import patch
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import config
 from .schema import Section, Topic, TopicList, QuestionWorkflow, TeachingApproach
 from .skills import select, strategy as strategy_mod

@@ -21,6 +21,9 @@ costs real API calls); it is testing that:
 """
 from pydantic import ValidationError
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import config
 from .schema import (Section, Topic, TopicList, QuestionSelection, SelectionReason,
                      SectionUnderstanding, TeachingStep, ConfusionPlan,

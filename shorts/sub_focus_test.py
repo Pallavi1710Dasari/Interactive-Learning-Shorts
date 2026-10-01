@@ -24,6 +24,9 @@ import os
 if os.environ.get("SHORTS_STUB", "").strip().lower() not in ("1", "true", "yes"):
     raise SystemExit("run this with SHORTS_STUB=1 — it never spends real API calls")
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import checks
 from shorts.schema import Beat, BeatStrategy, Cell, Frame, ShortUnit, Visual
 

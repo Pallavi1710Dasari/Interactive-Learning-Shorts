@@ -12,6 +12,9 @@ Script's existing stub handler).
 """
 from unittest.mock import patch
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import config
 from .schema import Section, Topic, TopicList, QuestionWorkflow, SectionUnderstanding
 from .skills import select, framing as framing_mod, teaching_approach as ta_mod, script as script_mod

@@ -12,6 +12,9 @@ the stage-aware validators are a later step).
 import json
 from pydantic import ValidationError
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from .schema import (
     TeachingStage, TeachingStep, Beat, Script, SectionUnderstanding,
 )

@@ -2451,6 +2451,8 @@ WORDS
   sentence ("..., called its vocabulary").
 - Every claim must be supported by the MATERIAL. concept_name is written exactly as the
   material writes it.
+- The explanation — every step, the running example — comes from MATERIAL. When a
+  SUPPORTING MATERIAL block is given, take only numbers and defined terms from it.
 - Real numbers make it concrete, but every number you say must be one the MATERIAL
   states — or a count of the running example's own items ("five tokens").
 
@@ -2508,12 +2510,17 @@ Return JSON: {"hook_question": "...", "speech": "...", "captions": [{"text": "..
 def _motion_material_block(topic: Topic, section: Section,
                            understanding: SectionUnderstanding | None, source_text: str,
                            approach: TeachingApproach | None, series: str,
-                           next_topic: str, template: str = "fix_story") -> str:
+                           next_topic: str, template: str = "fix_story",
+                           supporting_text: str = "") -> str:
     parts = [
         f"TEMPLATE: {template}",
         f"QUESTION THIS REEL ANSWERS: {topic.topic}",
         f"\nMATERIAL:\n{source_text}",
     ]
+    if supporting_text:
+        parts.append("\nSUPPORTING MATERIAL (other sections of the same lesson). Take ONLY "
+                     "numbers and defined terms from here. The explanation itself — every "
+                     f"step and the running example — comes from MATERIAL above:\n{supporting_text}")
     if understanding:
         parts.append(f"\nCORE IDEA: {understanding.core_idea}")
         if understanding.key_points:
@@ -2555,7 +2562,8 @@ def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
 
 
 def regenerate_motion_hook(script: MotionScript, material: str, source_text: str,
-                           results: list) -> tuple[MotionScript | None, list]:
+                           results: list,
+                           main_text: str | None = None) -> tuple[MotionScript | None, list]:
     """Rewrite only the hook shot, up to config.MAX_MOTION_HOOK_FIX_RETRIES
     times. Returns (the repaired script, its grader results) once every grader
     passes, else (None, the last results)."""
@@ -2576,7 +2584,7 @@ def regenerate_motion_hook(script: MotionScript, material: str, source_text: str
         candidate = script.model_copy(update={
             "hook_question": fix.hook_question,
             "shots": [new_hook] + list(script.shots[1:])})
-        results = checks.run_motion_script_graders(candidate, source_text)
+        results = checks.run_motion_script_graders(candidate, source_text, main_text=main_text)
         if checks.all_passed(results):
             return candidate, results
         feedback = "; ".join(r.reason for r in results if not r.passed)
@@ -2588,9 +2596,14 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                         approach: TeachingApproach | None = None,
                         series: str | None = None,
                         next_topic: str = "",
-                        template: str = "fix_story") -> tuple[MotionScript | None, list]:
+                        template: str = "fix_story",
+                        supporting_text: str = "") -> tuple[MotionScript | None, list]:
     """
     Write and grade a motion script in `template` (fix_story or walkthrough).
+    `source_text` is the selected section's own evidence — where the
+    explanation comes from. `supporting_text` (a walkthrough's other session
+    sections) may supply only numbers and defined terms; the graders accept
+    facts from either and check the explanation against source_text alone.
     Returns (script, grader results) once every free grader passes, or (None,
     the last attempt's results) after config.MAX_MOTION_SCRIPT_RETRIES full
     attempts.
@@ -2606,7 +2619,11 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
     system = (SYSTEM_MOTION_WALKTHROUGH if template == "walkthrough"
               else SYSTEM_MOTION.replace("__ICONS__", ", ".join(sorted(icon_names()))))
     material = _motion_material_block(topic, section, understanding, source_text,
-                                      approach, series, next_topic, template)
+                                      approach, series, next_topic, template,
+                                      supporting_text)
+    main_text = source_text if supporting_text else None
+    if supporting_text:
+        source_text = source_text + "\n\n" + supporting_text
     user = material
     results: list = []
     for _ in range(config.MAX_MOTION_SCRIPT_RETRIES):
@@ -2614,11 +2631,12 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                          label="motion_script")
         script = _assemble_motion(draft, topic, section, short_id, series, next_topic,
                                   template)
-        results = checks.run_motion_script_graders(script, source_text)
+        results = checks.run_motion_script_graders(script, source_text, main_text=main_text)
         if checks.all_passed(results):
             return script, results
         if checks.motion_failures_are_hook_only(results):
-            fixed, fixed_results = regenerate_motion_hook(script, material, source_text, results)
+            fixed, fixed_results = regenerate_motion_hook(script, material, source_text, results,
+                                                          main_text)
             if fixed is not None:
                 return fixed, fixed_results
             results = fixed_results

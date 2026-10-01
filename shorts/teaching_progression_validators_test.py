@@ -15,6 +15,9 @@ plan_strategy and render_diagrams are monkeypatched, not the real thing).
 """
 import json
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import checks
 from .schema import (
     Script, Beat, Section, SectionUnderstanding, TeachingStep,

@@ -6,9 +6,12 @@ If this passes, your schema, parser, and graders are wired correctly.
 """
 import json
 from pathlib import Path
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from .schema import Script, ShortUnit, Visual
 from .parse import parse_markdown, find_section
-from . import checks
+from . import checks, config
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -65,10 +68,10 @@ def main():
     except Exception as e:
         print(f"   ok — rejected as expected: {str(e).splitlines()[-1][:70]}")
 
-    out = ROOT / "output" / "smoke_unit.json"
+    out = config.OUTPUT_DIR / "smoke_unit.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(unit.model_dump_json(indent=2), encoding="utf-8")
-    print(f"\nALL OFFLINE CHECKS PASSED. Wrote {out.relative_to(ROOT)}")
+    print(f"\nALL OFFLINE CHECKS PASSED. Wrote {out}")
     print("Next: add your ANTHROPIC_API_KEY to .env and run step 6 in the README.")
 
 

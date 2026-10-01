@@ -12,6 +12,9 @@ import inspect
 
 from pydantic import ValidationError
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import config
 from .schema import (Section, Topic, TopicList, QuestionWorkflow, QuestionFraming,
                      SectionUnderstanding, TeachingStep)

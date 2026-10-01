@@ -10,6 +10,9 @@ already have stub handlers; this step adds no new LLM call of its own).
 """
 from unittest.mock import patch
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import config
 from .schema import Section, Topic, TopicList, QuestionWorkflow
 from .skills import select, framing as framing_mod, teaching_approach as ta_mod

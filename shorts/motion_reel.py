@@ -112,6 +112,10 @@ def motion_path(short_id: str) -> Path:
     return config.OUTPUT_DIR / f"{short_id}.motion.json"
 
 
+def _facts_path(short_id: str) -> Path:
+    return config.OUTPUT_DIR / short_id / "fact_sources.json"
+
+
 def _setup_path(short_id: str) -> Path:
     return config.OUTPUT_DIR / short_id / "setup.json"
 
@@ -256,9 +260,12 @@ def _run_setup(sections: list, doc_text: str, yes: bool,
         sections, topic.source_section_id,
         teaching_sequence=understanding.teaching_sequence if understanding else None)
     pool_ids = list(pool_ids)
-    if template == "walkthrough":
-        pool_ids += [sid for sid in walkthrough_session_ids(sections, topic.source_section_id)
-                     if sid not in pool_ids]
+    # A walkthrough also sees the rest of its numbered session — but only as
+    # SUPPORTING sections, for numbers and defined terms. The explanation
+    # comes from pool_ids, the selected section's own evidence (decision
+    # 2026-10-01; checks.check_walkthrough_main_source).
+    support_ids = ([sid for sid in walkthrough_session_ids(sections, topic.source_section_id)
+                    if sid not in pool_ids] if template == "walkthrough" else [])
     return {
         "topic": topic.model_dump(),
         "section_id": section.section_id,
@@ -266,7 +273,9 @@ def _run_setup(sections: list, doc_text: str, yes: bool,
         "workflow": wf.model_dump(),
         "template": template,
         "pool_ids": list(pool_ids),
-        "next_topic": next_topic_for(sections, section.section_id, list(pool_ids)),
+        "support_ids": support_ids,
+        "next_topic": next_topic_for(sections, section.section_id,
+                                     list(pool_ids) + support_ids),
     }
 
 
@@ -281,6 +290,25 @@ def _load_setup(short_id: str) -> dict:
 
 
 # =================================================================== script
+
+def fact_sources(script: MotionScript, sections: list, state: dict) -> list[dict]:
+    """Every number and long term the script says, with the section it came
+    from (checks.motion_fact_sources), against this reel's own main and
+    supporting sections."""
+    main = [(sid, find_section(sections, sid).text) for sid in state["pool_ids"]]
+    support = [(sid, find_section(sections, sid).text) for sid in state.get("support_ids", [])]
+    return checks.motion_fact_sources(script, main, support)
+
+
+def print_fact_sources(rows: list[dict]) -> None:
+    print("\n  facts (every number and term, with the section it came from):")
+    if not rows:
+        print("      (none)")
+    for r in rows:
+        role = f" ({r['role']})" if r["role"] else ""
+        print(f"      {r['kind']:<6} {r['value']:<14} {r['section']}{role}   "
+              f"shots {', '.join(r['shots'])}")
+
 
 def print_shot_list(script: MotionScript, results: list | None = None) -> None:
     """The shot-list gate's screen: every shot's beat, speech, captions and
@@ -333,12 +361,15 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
                      if state.get("understanding") else None)
     wf = QuestionWorkflow(**state["workflow"])
     source_text = "\n\n".join(find_section(sections, sid).text for sid in state["pool_ids"])
+    supporting_text = "\n\n".join(find_section(sections, sid).text
+                                   for sid in state.get("support_ids", []))
 
     script, results = write_motion_script(
         topic, section, short_id=short_id, source_text=source_text,
         understanding=understanding, approach=wf.approved_teaching_approach,
         next_topic=state.get("next_topic", ""),
-        template=state.get("template", "fix_story"))
+        template=state.get("template", "fix_story"),
+        supporting_text=supporting_text)
     if script is None:
         print("  GIVING UP — no script passed the motion graders:")
         for r in results:
@@ -346,12 +377,15 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
         return None
 
     print_shot_list(script, results)
+    facts = fact_sources(script, sections, state)
+    print_fact_sources(facts)
     if not _confirm("Approve shot list?", yes):
         print(f"Stopped after script — rerun with --topic {short_id} to continue "
               f"(the script was NOT saved — declining means try again, not skip ahead).")
         return None
     # Written ONLY on approval — same reasoning as story_reel.stage_mapping.
     motion_path(short_id).write_text(script.model_dump_json(indent=2), encoding="utf-8")
+    _facts_path(short_id).write_text(json.dumps(facts, indent=2), encoding="utf-8")
     return script
 
 
@@ -430,6 +464,8 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
     spend = usage.since(reel_cursor)
     print(f"\n=== report: {short_id} ===")
     print(f"  {motion_path(short_id)}")
+    print(f"  template: {script.template}   ~{script.estimated_seconds:.1f}s estimated")
+    print_fact_sources(fact_sources(script, sections, state))
     for stage, u in stage_usage.items():
         print(f"  {stage}: {u['calls']} call(s), ${u['cost']:.4f}")
     print(f"  total: {spend['calls']} call(s), ${spend['cost']:.4f}")

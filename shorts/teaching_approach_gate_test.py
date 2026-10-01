@@ -22,6 +22,9 @@ import os
 if os.environ.get("SHORTS_STUB", "").strip().lower() not in ("1", "true", "yes"):
     raise SystemExit("run this with SHORTS_STUB=1 — it never spends real API calls")
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import checks
 import shorts.server as server
 from shorts.step8_hardening_test import _approved_visual_plan_workflow, _finalize_body

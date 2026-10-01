@@ -20,6 +20,9 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 import shorts.server as server
 from shorts import review
 from shorts.skills import framing, teaching_approach

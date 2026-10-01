@@ -39,6 +39,15 @@ import time
 import tempfile
 from pathlib import Path
 
+from shorts.testing import isolate_output
+# a temp output/, never the real one — seeded with one real explainer reel,
+# which the Fix 4 tests below prove a story run leaves byte-for-byte unchanged,
+# and one earlier story JSON (written by story_frames_test's stub run), which
+# the schema-compat test below reloads. Seeded rather than read in place, so
+# this suite no longer depends on which other suite last ran.
+isolate_output(seed=("what_is_a_component.json", "what_is_a_component",
+                     "stub_e2e.story.json"))
+
 from shorts import cast_sheets, checks, config, preflight, story_reel, usage, video
 from shorts.parse import parse_markdown
 from shorts.schema import ConceptMappingSet, MetaphorVerdict, StoryEvalReport, Topic

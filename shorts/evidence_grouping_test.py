@@ -29,6 +29,9 @@ evals/cases.yaml is for that and costs real API calls.
 import tempfile
 from pathlib import Path
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from .parse import (parse_markdown, find_section, group_sections_by_concept,
                     evidence_text, evidence_section_ids)
 from .schema import (Section, Script, Beat, Topic, SectionUnderstanding, ExamplePlan,

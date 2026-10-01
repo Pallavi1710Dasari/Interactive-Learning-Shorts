@@ -1,0 +1,31 @@
+{
+  "_comment": "Where each transition and animation appears in docs/reference/tokenization-reel.mp4 (REFERENCE_STYLE_ADDENDUM.md 4.6 and the corrected times in 8.1). The ONE place these times live in code: python -m shorts.reference_frames cuts each window into web/public/reference/<id>/NNN.jpg, and the #motion-gallery shows those frames beside the matching component. The MP4 itself is git-ignored; the frames are committed.",
+  "source": "docs/reference/tokenization-reel.mp4",
+  "width": 270,
+  "items": [
+    {"id": "type_scatter",      "start": 2.00,   "end": 3.20,   "fps": 15},
+    {"id": "iris",              "start": 6.20,   "end": 7.20,   "fps": 15},
+    {"id": "bar_wipe",          "start": 17.70,  "end": 18.70,  "fps": 15},
+    {"id": "double_bar_wipe",   "start": 49.90,  "end": 50.90,  "fps": 15},
+    {"id": "diagonal_stripes",  "start": 116.90, "end": 117.90, "fps": 15},
+    {"id": "stack_rise",        "start": 159.90, "end": 160.90, "fps": 15},
+    {"id": "chapter_card",      "start": 18.40,  "end": 21.00,  "fps": 10},
+    {"id": "chip_fly_in",       "start": 31.70,  "end": 32.70,  "fps": 15},
+    {"id": "text_scramble",     "start": 8.90,   "end": 9.80,   "fps": 15},
+    {"id": "type_assemble",     "start": 10.30,  "end": 11.50,  "fps": 15},
+    {"id": "arrow_draw",        "start": 8.50,   "end": 9.20,   "fps": 15},
+    {"id": "typewriter_cursor", "start": 14.00,  "end": 16.00,  "fps": 8},
+    {"id": "grid_cascade",      "start": 32.50,  "end": 34.70,  "fps": 10},
+    {"id": "count_up",          "start": 37.80,  "end": 40.40,  "fps": 8},
+    {"id": "category_highlight","start": 42.40,  "end": 44.80,  "fps": 6},
+    {"id": "zoom_cell",         "start": 45.80,  "end": 47.20,  "fps": 10},
+    {"id": "search_type",       "start": 47.50,  "end": 48.70,  "fps": 10},
+    {"id": "stamp",             "start": 48.50,  "end": 49.40,  "fps": 15},
+    {"id": "scan_window",       "start": 58.30,  "end": 64.30,  "fps": 4},
+    {"id": "chip_insert",       "start": 83.30,  "end": 85.70,  "fps": 8},
+    {"id": "ghost_word",        "start": 87.10,  "end": 89.10,  "fps": 8},
+    {"id": "slot_scroll",       "start": 125.40, "end": 126.80, "fps": 10},
+    {"id": "counter_morph",     "start": 177.70, "end": 179.20, "fps": 10},
+    {"id": "stagger_rows",      "start": 182.10, "end": 184.50, "fps": 8}
+  ]
+}

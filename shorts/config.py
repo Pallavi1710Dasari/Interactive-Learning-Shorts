@@ -518,8 +518,11 @@ VOICE_BEAT_GAP = _f("VOICE_BEAT_GAP", 0.45)
 # and this is silence either way, never speech.
 VOICE_CONTINUATION_GAP = _f("VOICE_CONTINUATION_GAP", 0.12)
 
-OUTPUT_DIR = ROOT / "output"
-OUTPUT_DIR.mkdir(exist_ok=True)
+#: Every artifact a run writes. SHORTS_OUTPUT_DIR points it elsewhere — the
+#: test suites set it to a temp folder (shorts/testing.py) so no test ever
+#: writes into the real output/.
+OUTPUT_DIR = Path(os.getenv("SHORTS_OUTPUT_DIR", "").strip() or ROOT / "output")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # --------------------------------------------------------------------- theme
@@ -638,7 +641,8 @@ MASCOT_POSE = os.getenv(
 #: literal duplicated in both cast_sheets.py and skills/visuals.py's
 #: cast_refs_for_shot (Step 5) — the two need to agree on where a sheet is
 #: without skills/visuals.py importing the CLI module that owns it.
-CAST_ASSETS_DIR = ROOT / "assets" / "cast"
+CAST_ASSETS_DIR = Path(os.getenv("SHORTS_CAST_ASSETS_DIR", "").strip()
+                       or ROOT / "assets" / "cast")
 
 #: Where a per-character Chatterbox reference clip lives — <name>.wav,
 #: lowercased. RESTYLE_TO_STORY_REELS.md Step 8 Part 1 — shorts/voice_refs.py

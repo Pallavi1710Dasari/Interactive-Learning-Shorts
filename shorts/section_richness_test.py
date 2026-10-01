@@ -26,6 +26,9 @@ No API key, no network, no cost — pure string processing.
 
     python -m shorts.section_richness_test
 """
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import checks
 
 #: The exact "### Introduction" bullets under "## 2. Understanding Props in

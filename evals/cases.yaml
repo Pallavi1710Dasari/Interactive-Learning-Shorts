@@ -2882,6 +2882,31 @@ cases:
       passed: false
       reason_contains: "holds 2 sentences"
 
+  - id: E173
+    name: The tokenization walkthrough passes with only its selected section as the main source
+    why: "A walkthrough sees its whole numbered session, but the explanation must come from the selected section; the other sections may only supply numbers and defined terms (decision 2026-10-01). Main is 1.1 plus its evidence pool (1.6); 1.2-1.5 are supporting."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    main_sections: ["1.1", "1.6"]
+    expect:
+      passed: true
+
+  - id: E174
+    name: A walkthrough step explained only in a supporting section is rejected
+    why: "The double-hash notation is explained only in section 1.3, a supporting section. A chapter built on it is explanation borrowed from supporting material, which may lend numbers and terms but not steps."
+    type: motion_grader
+    grader: main_source
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    main_sections: ["1.1", "1.6"]
+    patch:
+      - {path: chapters.3.title, value: "Read the double hash"}
+    expect:
+      passed: false
+      reason_contains: "chapter 4 'Read the double hash': ['double', 'hash'] not in the main section"
+
 # ============================================================================
 # RUBRIC — what the LLM judge scores, 1 to 5. Keep the wording stable; changing
 # a rubric invalidates every historical score you have logged.

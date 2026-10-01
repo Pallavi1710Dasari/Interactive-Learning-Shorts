@@ -20,6 +20,9 @@ from pathlib import Path
 
 from PIL import Image
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import config, imagegen, usage
 
 

@@ -114,6 +114,7 @@ MOTION_GRADERS = {
     "not_qa":                lambda s, src: checks.check_motion_not_qa(s),
     "walkthrough_chapters":  lambda s, src: checks.check_walkthrough_chapters(s),
     "running_example":       lambda s, src: checks.check_walkthrough_running_example(s),
+    "main_source":           None,   # needs the case's main_sections — see run_motion_case
     "numbers_sourced":       checks.check_motion_numbers_sourced,
 }
 
@@ -177,12 +178,20 @@ def run_motion_case(case: dict, sections) -> tuple[bool, str]:
     script = MotionScript(**_apply_patch(data, case.get("patch", [])))
     doc = parse_markdown(ROOT / case["input"]) if case.get("input") else sections
     source = "\n\n".join(s.text for s in doc)
+    # A walkthrough case may name its MAIN sections (the selected section's own
+    # evidence); the rest of the document is then supporting material only.
+    main_ids = case.get("main_sections")
+    main_text = ("\n\n".join(find_section(doc, sid).text for sid in main_ids)
+                 if main_ids else None)
 
     if case["grader"] == "all":
-        results = checks.run_motion_script_graders(script, source)
+        results = checks.run_motion_script_graders(script, source, main_text=main_text)
         passed = checks.all_passed(results)
         reason = ("; ".join(str(r) for r in results if not r.passed)
                   or f"all {len(results)} motion graders pass")
+    elif case["grader"] == "main_source":
+        result = checks.check_walkthrough_main_source(script, main_text)
+        passed, reason = result.passed, result.reason
     else:
         result = MOTION_GRADERS[case["grader"]](script, source)
         passed, reason = result.passed, result.reason

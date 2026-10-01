@@ -1,0 +1,69 @@
+// Karaoke captions — REFERENCE_STYLE_ADDENDUM.md section 4.4. One spoken
+// sentence at a time, bottom-left in the 70-80 % band, no background pill.
+// Words already spoken are full ink, words still to come are dimmed to 35 %,
+// and 1-2 <b> keywords per sentence take the field's accent colour.
+//
+// Word timings come from faster-whisper in phase 3. Until then evenWords()
+// spreads a sentence's words over its span, the same approximation
+// story_audio._even_words falls back to.
+
+import { FONT, SAFE, W, theme, type FieldName } from "./tokens";
+import { clamp } from "./time";
+
+export interface CaptionWord { text: string; start: number; end: number; hl: boolean }
+export interface CaptionSentence { words: CaptionWord[]; start: number; end: number }
+
+/** Split "<b>Tokenization</b> matters." into words, keeping which are highlighted. */
+export function parseCaption(text: string): { text: string; hl: boolean }[] {
+  const out: { text: string; hl: boolean }[] = [];
+  let hl = false;
+  for (const part of text.split(/(<\/?b>)/)) {
+    if (part === "<b>") { hl = true; continue; }
+    if (part === "</b>") { hl = false; continue; }
+    for (const w of part.split(/\s+/)) if (w) out.push({ text: w, hl });
+  }
+  return out;
+}
+
+/** A sentence's words spread evenly over [start, end]. */
+export function evenWords(text: string, start: number, end: number): CaptionSentence {
+  const parsed = parseCaption(text);
+  const step = (end - start) / Math.max(1, parsed.length);
+  return {
+    start, end,
+    words: parsed.map((w, i) => ({ ...w, start: start + i * step, end: start + (i + 1) * step })),
+  };
+}
+
+/** The sentence on screen at t: the last one that has started. */
+export function sentenceAt(sentences: CaptionSentence[], t: number): CaptionSentence | null {
+  let cur: CaptionSentence | null = null;
+  for (const s of sentences) if (t >= s.start - 0.05) cur = s;
+  return cur;
+}
+
+export function KaraokeCaption({ sentences, t, field, size = 56 }: {
+  sentences: CaptionSentence[]; t: number; field: FieldName; size?: number;
+}) {
+  const th = theme(field);
+  const s = sentenceAt(sentences, t);
+  if (!s) return null;
+  return (
+    <div style={{ position: "absolute", left: SAFE.side, width: W - SAFE.side * 2, top: SAFE.captionTop,
+                  height: SAFE.captionBottom - SAFE.captionTop, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ fontFamily: FONT.body, fontWeight: 800, fontSize: size, lineHeight: 1.22, letterSpacing: -0.3,
+                    maxWidth: "100%" }}>
+        {s.words.map((w, i) => {
+          // A word lights the moment it starts and fully by a third of its span.
+          const lit = clamp((t - w.start) / Math.max(0.05, (w.end - w.start) / 3));
+          const color = w.hl ? th.accent : th.ink;
+          return (
+            <span key={i} style={{ color, opacity: 0.35 + 0.65 * lit }}>
+              {w.text}{i < s.words.length - 1 ? " " : ""}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

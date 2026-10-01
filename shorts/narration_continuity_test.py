@@ -31,6 +31,9 @@ if os.environ.get("SHORTS_STUB", "").strip().lower() not in ("1", "true", "yes")
 import shutil, tempfile, wave
 from pathlib import Path
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import config, providers, tts
 from shorts.schema import Beat, Script
 

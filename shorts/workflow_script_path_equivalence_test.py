@@ -15,6 +15,9 @@ if os.environ.get("SHORTS_STUB", "").strip().lower() not in ("1", "true", "yes")
 
 from fastapi.testclient import TestClient
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 import shorts.server as server
 import shorts.workflow as workflow
 from shorts import review, checks

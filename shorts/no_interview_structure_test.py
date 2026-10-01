@@ -10,6 +10,9 @@ No API key, no network, no cost — pure string/structure checks.
 
     python -m shorts.no_interview_structure_test
 """
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import checks
 from .schema import Script, Beat
 

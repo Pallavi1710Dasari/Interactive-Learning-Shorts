@@ -12,6 +12,9 @@ reuses it unchanged since it targets the same Script model).
 from pathlib import Path
 from unittest.mock import patch
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import config
 from .schema import Section, Topic, TopicList, QuestionWorkflow, Script, Beat, TeachingApproach
 from .parse import parse_markdown, find_section

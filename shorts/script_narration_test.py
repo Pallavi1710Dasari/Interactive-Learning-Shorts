@@ -18,6 +18,9 @@ and runs the deterministic graders directly.
 
     python -m shorts.script_narration_test
 """
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from .schema import Script, Beat
 from . import checks
 

@@ -12,6 +12,9 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import config, story_voices, voice_refs
 
 # NEVER point this at the real config.CAST_VOICE_DIR (assets/voices/) —

@@ -15,6 +15,9 @@ if os.environ.get("SHORTS_STUB", "").strip().lower() not in ("1", "true", "yes")
 
 from PIL import Image, ImageDraw
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import config, frame_checks
 from shorts.schema import Shot
 

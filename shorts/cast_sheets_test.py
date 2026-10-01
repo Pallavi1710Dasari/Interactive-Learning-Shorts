@@ -17,6 +17,9 @@ import io
 import json
 import shutil
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import cast_sheets, config, imagegen
 
 

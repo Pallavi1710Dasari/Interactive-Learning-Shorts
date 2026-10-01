@@ -8017,17 +8017,17 @@ def check_motion_recap_icons(script, icon_names=None) -> GraderResult:
                         f"recap reuses {vocab}, {words} words on screen")
 
 
-def check_motion_plain_words(script, source_text: str = "") -> GraderResult:
-    """Beginner language: no spoken word over four syllables, except the
-    concept's own name — and up to two extra terms, each one the source uses,
-    shown on screen in that shot's captions, and explained in plain words in
-    the same sentence ("..., called its vocabulary")."""
+def _motion_long_words(script, source_text: str) -> tuple[dict[str, list[str]], list[str]]:
+    """Every spoken word over four syllables that is not the concept's name,
+    split into ACCEPTED terms (the source uses it, it is on screen in that
+    shot's captions, and the same sentence explains it) — term -> the shot
+    ids that say it — and REJECTED words ("s04:automatically")."""
     concept_parts = {_motion_key(p) for p in
                      re.sub(r"([a-z])([A-Z])", r"\1 \2", script.concept_name or "").split()}
     concept_parts.add(_motion_key(script.concept_name or ""))
     flat_source = re.sub(r"[`*]", "", source_text or "").lower()
     long_words: list[str] = []
-    terms: set[str] = set()
+    terms: dict[str, list[str]] = {}
     for s in script.shots:
         shown = _motion_key(" ".join(c.text for c in s.captions))
         for sentence in _sentences(s.speech):
@@ -8039,9 +8039,18 @@ def check_motion_plain_words(script, source_text: str = "") -> GraderResult:
                 explained = any(cue in f" {sentence.lower()} " for cue in MOTION_DEFINER_CUES)
                 if (re.search(rf"\b{re.escape(bare)}\b", flat_source)
                         and key in shown and explained):
-                    terms.add(bare)
+                    terms.setdefault(bare, []).append(s.id)
                 else:
                     long_words.append(f"{s.id}:{w.strip('.,!?;:')}")
+    return terms, long_words
+
+
+def check_motion_plain_words(script, source_text: str = "") -> GraderResult:
+    """Beginner language: no spoken word over four syllables, except the
+    concept's own name — and up to two extra terms, each one the source uses,
+    shown on screen in that shot's captions, and explained in plain words in
+    the same sentence ("..., called its vocabulary")."""
+    terms, long_words = _motion_long_words(script, source_text)
     problems: list[str] = []
     if long_words:
         problems.append(f"word(s) over {MOTION_MAX_SYLLABLES} syllables: {long_words} — use "
@@ -8251,6 +8260,110 @@ def check_motion_numbers_sourced(script, source_text: str) -> GraderResult:
                         "every number is from the source or the running example")
 
 
+#: Words a chapter title can drop without losing what the step is about.
+_MOTION_TITLE_STOPWORDS = frozenset({
+    "the", "a", "an", "each", "every", "for", "to", "of", "in", "on", "into", "with",
+    "your", "its", "it", "and", "or", "go", "get", "make", "from", "at", "by", "up",
+})
+
+
+def _stem(word: str) -> str:
+    """A crude shared stem, so "checks" finds "check" and "swapped" finds "swap"."""
+    w = re.sub(r"[^a-z0-9]", "", word.lower())
+    for suffix in ("ing", "ed", "es", "s"):
+        if len(w) > len(suffix) + 2 and w.endswith(suffix):
+            w = w[: -len(suffix)]
+            break
+    if len(w) > 3 and w[-1] == w[-2]:          # "swapp" -> "swap"
+        w = w[:-1]
+    return w
+
+
+def check_walkthrough_main_source(script, main_text: str | None = None) -> GraderResult:
+    """walkthrough: the reel's main explanation comes from the SELECTED section
+    (decision 2026-10-01). A walkthrough also sees the rest of its numbered
+    session, but those sections may only supply supporting facts — numbers and
+    defined terms. Checked mechanically: the concept, the running example and
+    the key words of every chapter title must all be in the main text. (That
+    the supporting sections supplied nothing BUT facts is the prompt's rule;
+    motion_fact_sources lists every number and term with its section so a
+    reviewer can see it.)"""
+    template = _template(script)
+    if template != "walkthrough":
+        return _not_this_template("walkthrough_main_source", template)
+    if main_text is None:
+        return GraderResult("walkthrough_main_source", True,
+                            "no main/supporting split — the whole source is the main section")
+    flat = re.sub(r"[`*]", "", main_text).lower()
+    stems = {_stem(w) for w in re.findall(r"[a-z0-9]+", flat)}
+    problems: list[str] = []
+    concept = (script.concept_name or "").strip().lower()
+    if concept and concept not in flat:
+        problems.append(f"the concept {script.concept_name!r} is not in the main section")
+    ex = script.running_example
+    if ex is not None and _motion_key(ex.text) not in _motion_key(flat):
+        problems.append(f"the running example {ex.text!r} is not in the main section")
+    for c in script.chapters:
+        words = [w for w in re.findall(r"[a-z0-9]+", c.title.lower())
+                 if w not in _MOTION_TITLE_STOPWORDS]
+        missing = [w for w in words if _stem(w) not in stems]
+        if missing:
+            problems.append(f"chapter {c.n} {c.title!r}: {missing} not in the main section — "
+                            f"each step must be explained there, not only in a supporting one")
+    if problems:
+        return GraderResult("walkthrough_main_source", False, "; ".join(problems))
+    return GraderResult("walkthrough_main_source", True,
+                        f"the concept, the example and all {len(script.chapters)} steps are "
+                        f"in the main section")
+
+
+def motion_fact_sources(script, main_sections: list[tuple[str, str]],
+                        support_sections: list[tuple[str, str]] = ()) -> list[dict]:
+    """Every number and every long term the narration uses, with the section
+    it came from — the motion report's provenance list. Sections are (id,
+    text) pairs; a fact found in a main section is credited to it before any
+    supporting one. A count of the running example or the chapter count is
+    credited to "running example"; a number found nowhere is "NOT IN SOURCE"
+    (which check_motion_numbers_sourced has already failed)."""
+    ordered = [(sid, text, "main") for sid, text in main_sections] + \
+              [(sid, text, "supporting") for sid, text in support_sections]
+    rows: dict[tuple[str, str], dict] = {}
+
+    def _credit(kind: str, value: str, shot_id: str, found) -> None:
+        key = (kind, value)
+        if key not in rows:
+            sid, role = next(((sid, role) for sid, text, role in ordered if found(text)),
+                             (None, None))
+            rows[key] = {"kind": kind, "value": value, "section": sid, "role": role,
+                         "shots": []}
+        if shot_id not in rows[key]["shots"]:
+            rows[key]["shots"].append(shot_id)
+
+    derived = {str(len(script.chapters))} if script.chapters else set()
+    ex = script.running_example
+    states = ([ex.items] if ex else []) + [c.example_in for c in script.chapters] \
+        + [c.example_out for c in script.chapters]
+    derived |= {str(len(st)) for st in states if st}
+    for s in script.shots:
+        if s.beat == "chapter_card":
+            continue
+        for num in _numbers_in(s.speech):
+            _credit("number", num, s.id, lambda text, n=num: n in motion_source_numbers(text))
+            if rows[("number", num)]["section"] is None and num in derived:
+                rows[("number", num)].update(section="running example", role="derived")
+    full = "\n\n".join(text for _sid, text, _role in ordered)
+    terms, _rejected = _motion_long_words(script, full)
+    for term, shot_ids in terms.items():
+        for shot_id in shot_ids:
+            _credit("term", term, shot_id,
+                    lambda text, t=term: re.search(rf"\b{re.escape(t)}\b",
+                                                   re.sub(r"[`*]", "", text).lower()))
+    for row in rows.values():
+        if row["section"] is None:
+            row["section"], row["role"] = "NOT IN SOURCE", None
+    return list(rows.values())
+
+
 #: Graders whose failure a hook-only regeneration can fix — see
 #: skills.script.write_motion_script. A failure counts as hook-only when its
 #: grader is here and every shot it names is the hook.
@@ -8260,8 +8373,12 @@ MOTION_HOOK_GRADERS = frozenset({
 })
 
 
-def run_motion_script_graders(script, source_text: str, icon_names=None) -> list[GraderResult]:
-    """Motion mode's counterpart to run_script_graders / run_story_graders."""
+def run_motion_script_graders(script, source_text: str, icon_names=None,
+                              main_text: str | None = None) -> list[GraderResult]:
+    """Motion mode's counterpart to run_script_graders / run_story_graders.
+    `source_text` is everything the reel may draw on; `main_text` is the
+    selected section's own evidence when a walkthrough also sees supporting
+    sections (None: the whole source is main)."""
     return [
         check_motion_template_beats(script),
         check_motion_duration_cap(script),
@@ -8277,6 +8394,7 @@ def run_motion_script_graders(script, source_text: str, icon_names=None) -> list
         check_motion_not_qa(script),
         check_walkthrough_chapters(script),
         check_walkthrough_running_example(script),
+        check_walkthrough_main_source(script, main_text),
         check_motion_numbers_sourced(script, source_text),
     ]
 

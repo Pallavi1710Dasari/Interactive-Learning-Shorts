@@ -14,6 +14,9 @@ none consumes these yet.
 import json
 from pydantic import ValidationError
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from .schema import (
     Topic, Script, Beat, BeatStrategy, VisualStrategy,
     SelectionReason, QuestionSelection, QuestionApproval, QuestionFraming,

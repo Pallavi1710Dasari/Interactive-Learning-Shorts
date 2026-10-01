@@ -17,6 +17,9 @@ script_workflow_test.py and smoke_test.py already run offline.
 """
 from pathlib import Path
 
+from .testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from . import config, checks
 from .schema import Script, Beat, Topic
 from .parse import parse_markdown

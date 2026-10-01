@@ -26,6 +26,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import checks, config, imagegen, motion_reel, usage
 from shorts.parse import find_section, parse_markdown
 from shorts.schema import MotionScript, MotionScriptDraft, MotionHookFix, Topic
@@ -182,7 +185,7 @@ def test_walkthrough_stub_script_passes_every_grader_at_no_cost():
     script, results = script_mod.write_motion_script(
         topic, section, short_id="t__motion", source_text=source, template="walkthrough")
     assert script is not None, [str(r) for r in results if not r.passed]
-    assert checks.all_passed(results) and len(results) == 15
+    assert checks.all_passed(results) and len(results) == 16
     assert script.template == "walkthrough" and len(script.chapters) == 4
     assert script.running_example is not None
     assert script.estimated_seconds <= checks.MOTION_MAX_SECONDS
@@ -319,6 +322,19 @@ def test_runner_walkthrough_with_template_flag():
         assert setup["template"] == "walkthrough"
         assert "template: walkthrough   (--template)" in text
         assert "chapter 1: Cut the sentence" in text
+        # The selected section's own evidence is main; the rest of the
+        # session is supporting, and every fact is listed with its section.
+        assert setup["pool_ids"] == ["1.1", "1.6"], setup["pool_ids"]
+        assert setup["support_ids"] == ["1.2", "1.3", "1.4", "1.5"], setup["support_ids"]
+        facts = json.loads((out / short_id / "fact_sources.json").read_text(encoding="utf-8"))
+        by_value = {(f["kind"], f["value"]): f for f in facts}
+        assert by_value[("number", "1.2")]["section"] == "1.3"
+        assert by_value[("number", "1.2")]["role"] == "supporting"
+        assert by_value[("number", "101")]["section"] == "1.5"
+        assert by_value[("term", "vocabulary")]["section"] == "1.3"
+        assert by_value[("number", "2")]["section"] == "1.1"
+        assert by_value[("number", "2")]["role"] == "main"
+        assert "facts (every number and term" in text and "number 101" in text
 
         # A resumed reel keeps the template it was set up with.
         code, text = _run_runner("--topic", short_id, "--template", "fix_story", doc=TOKEN_DOC)
@@ -350,6 +366,23 @@ def test_walkthrough_evidence_is_the_whole_numbered_session():
     assert motion_reel.walkthrough_session_ids(sections, "1.1") == \
         ["1.1", "1.2", "1.3", "1.4", "1.5", "1.6"]
     assert motion_reel.walkthrough_session_ids(sections, "intro") == []
+
+
+def test_fact_sources_credit_main_before_supporting():
+    data = json.loads(WALKTHROUGH_GOLDEN.read_text(encoding="utf-8"))
+    script = MotionScript(**data)
+    sections = {s.section_id: s.text for s in parse_markdown(TOKEN_DOC)}
+    rows = checks.motion_fact_sources(
+        script, [("1.1", sections["1.1"])],
+        [(sid, sections[sid]) for sid in ("1.2", "1.3", "1.4", "1.5", "1.6")])
+    by_value = {(r["kind"], r["value"]): r for r in rows}
+    assert by_value[("number", "7")]["section"] == "1.4"        # "seven tokens" is stated
+    assert by_value[("number", "101")]["shots"] == ["s15"]
+    assert all(r["section"] != "NOT IN SOURCE" for r in rows), rows
+    # A number no section states is shown as such.
+    data["shots"][6]["speech"] = data["shots"][6]["speech"].replace("1.2", "3.5")
+    rows = checks.motion_fact_sources(MotionScript(**data), [("1.1", sections["1.1"])], [])
+    assert any(r["value"] == "3.5" and r["section"] == "NOT IN SOURCE" for r in rows)
 
 
 def test_next_topic_comes_from_the_document():

@@ -1,0 +1,8 @@
+/* Motion-reel fonts, all OFL and bundled from node_modules (@fontsource) —
+   never fetched from a font CDN at render time, so a capture is identical
+   offline. Display candidates: Anton and Archivo Black (addendum 4.2). */
+@import "@fontsource-variable/manrope/index.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+@import "@fontsource/anton/400.css";
+@import "@fontsource/archivo-black/400.css";

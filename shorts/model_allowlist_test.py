@@ -24,6 +24,9 @@ if os.environ.get("SHORTS_STUB", "").strip().lower() not in ("1", "true", "yes")
 import tempfile
 from pathlib import Path
 
+from shorts.testing import isolate_output
+isolate_output()   # a temp output/, never the real one
+
 from shorts import config, imagegen
 from shorts.parse import parse_markdown
 from shorts.schema import Section, Shot, Topic

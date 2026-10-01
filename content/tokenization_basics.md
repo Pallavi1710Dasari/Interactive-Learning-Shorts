@@ -8,6 +8,13 @@ is called tokenization, and a tokenizer is the tool that does it. Take one short
 sentence, "Tokenization matters." It is just two words, and we will follow it
 all the way to the numbers the model reads.
 
+The tokenizer works in four steps. First it cuts the sentence into pieces at
+spaces and punctuation. Then it checks each piece against its word shelf, the
+fixed list of pieces the model knows; a word that is not on the shelf is built
+from smaller pieces that are. Next it adds two special tokens, one at the front
+and one at the end. Finally it swaps each token for a number, the token's ID on
+the shelf. The sections below look at each step in turn.
+
 ## 1.2 Cutting the sentence
 
 The tokenizer first cuts the sentence at spaces and punctuation. The full stop

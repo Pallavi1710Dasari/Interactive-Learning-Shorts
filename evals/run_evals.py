@@ -96,20 +96,25 @@ TOPIC_GRADERS = {
     "topic_matches_understanding": checks.check_topic_matches_understanding,
 }
 
-#: REEL_STYLE=motion's script graders (RESTYLE_TO_MOTION_REELS.md section 7).
-#: "all" runs checks.run_motion_script_graders and passes only if every one does.
+#: REEL_STYLE=motion's script graders (RESTYLE_TO_MOTION_REELS.md section 7,
+#: REFERENCE_STYLE_ADDENDUM.md section 6). "all" runs
+#: checks.run_motion_script_graders and passes only if every one does.
 MOTION_GRADERS = {
-    "beats_order":           lambda s, src: checks.check_motion_beats_order(s),
+    "template_beats":        lambda s, src: checks.check_motion_template_beats(s),
+    "duration_cap":          lambda s, src: checks.check_motion_duration_cap(s),
     "has_fix_and_payoff":    checks.check_motion_has_fix_and_payoff,
     "hook_curiosity":        lambda s, src: checks.check_motion_hook_curiosity(s),
     "word_budget":           lambda s, src: checks.check_motion_word_budget(s),
-    "caption_chunks":        lambda s, src: checks.check_motion_caption_chunks(s),
+    "caption_sentences":     lambda s, src: checks.check_motion_caption_sentences(s),
     "captions_match_speech": lambda s, src: checks.check_motion_captions_match_speech(s),
     "speech_vs_caption":     lambda s, src: checks.check_motion_speech_vs_caption(s),
     "code_shots":            checks.check_motion_code_shots,
     "recap_icons":           lambda s, src: checks.check_motion_recap_icons(s),
-    "plain_words":           lambda s, src: checks.check_motion_plain_words(s),
+    "plain_words":           checks.check_motion_plain_words,
     "not_qa":                lambda s, src: checks.check_motion_not_qa(s),
+    "walkthrough_chapters":  lambda s, src: checks.check_walkthrough_chapters(s),
+    "running_example":       lambda s, src: checks.check_walkthrough_running_example(s),
+    "numbers_sourced":       checks.check_motion_numbers_sourced,
 }
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"

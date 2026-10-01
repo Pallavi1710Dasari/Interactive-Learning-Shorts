@@ -16,7 +16,10 @@ THREE HUMAN GATES, all before anything is voiced or drawn:
   1. topic selection — the same approve/reject/regenerate gate as
      `python -m shorts.run --gate-topics` (review.run_question_gate);
   2. teaching approach — the same gate as --gate-teaching-approach
-     (review.run_teaching_approach_gate);
+     (review.run_teaching_approach_gate), followed by the script TEMPLATE:
+     walkthrough when the approved approach is process_demonstration, else
+     fix_story (REFERENCE_STYLE_ADDENDUM.md section 3) — the reviewer can
+     switch it there, or pass --template;
   3. the shot list — beat, speech, captions and visual for every shot, shown
      after the script passes the free motion graders.
 Each writes its artifact ONLY on approval, so declining means "show me this
@@ -40,8 +43,8 @@ from pathlib import Path
 from . import checks, config, preflight, review, usage
 from . import workflow as question_workflow
 from .parse import find_section, parse_markdown, story_evidence_pool
-from .schema import (MotionScript, QuestionWorkflow, SectionUnderstanding, Topic,
-                     motion_plain_text)
+from .schema import (MOTION_TEMPLATES, MotionScript, QuestionWorkflow,
+                     SectionUnderstanding, TeachingApproach, Topic, motion_plain_text)
 from .skills.script import write_motion_script
 from .skills.select import select_topics_with_selections
 from .skills.understanding import understanding_for
@@ -172,7 +175,54 @@ def _decide_approach(workflows: list[QuestionWorkflow], sections: list,
         return workflows
 
 
-def _run_setup(sections: list, doc_text: str, yes: bool) -> dict | None:
+def default_template(approach: TeachingApproach | None) -> str:
+    """The template a teaching approach implies: a walked sequence of steps is
+    a walkthrough ("how does X work"); everything else is a fix_story ("why
+    does X fail"). The reviewer can override it — see _decide_template."""
+    if approach is not None and approach.primary == "process_demonstration":
+        return "walkthrough"
+    return "fix_story"
+
+
+def walkthrough_session_ids(sections: list, section_id: str) -> list[str]:
+    """Every section in the same numbered session as `section_id` ("1.1" ->
+    every "1.x"), in document order. A walkthrough follows a process step by
+    step, and a lesson usually gives each step its own heading — so its
+    evidence is the whole session, not only the heading the topic is filed
+    under. A string-only rule, like story_evidence_pool's own: a section id
+    with no "major.minor" shape adds nothing."""
+    major = section_id.split(".")[0] if "." in section_id else None
+    if not major:
+        return []
+    return [s.section_id for s in sections
+            if "." in s.section_id and s.section_id.split(".")[0] == major]
+
+
+def _decide_template(default: str, yes: bool, override: str | None) -> str:
+    """The template gate: --template wins, then --yes keeps the default, then
+    an interactive reviewer may switch it. Choosing a template spends nothing,
+    so a non-interactive run keeps the default rather than stopping."""
+    if override:
+        print(f"  template: {override}   (--template)")
+        return override
+    if yes or not sys.stdin.isatty():
+        print(f"  template: {default}   (from the teaching approach"
+              + ("; --yes" if yes else "; non-interactive — pass --template to change it")
+              + ")")
+        return default
+    try:
+        answer = input(f"  template [{default}] — Enter to keep, or type "
+                       f"{' / '.join(MOTION_TEMPLATES)}: ").strip().lower()
+    except EOFError:
+        answer = ""
+    if answer and answer not in MOTION_TEMPLATES:
+        print(f"  {answer!r} is not a template — keeping {default}")
+        answer = ""
+    return answer or default
+
+
+def _run_setup(sections: list, doc_text: str, yes: bool,
+               template_override: str | None = None) -> dict | None:
     """Select a topic, gate it, frame it, pick a teaching approach, gate that.
     Returns the setup state, or None when a human declined (or no human was
     available to decide)."""
@@ -200,15 +250,21 @@ def _run_setup(sections: list, doc_text: str, yes: bool) -> dict | None:
         print("\nTEACHING APPROACH GATE — not approved. Rerun from an interactive "
               "terminal, or pass --yes to approve the recommendation.")
         return None
+    template = _decide_template(default_template(approach), yes, template_override)
 
     _pool, pool_ids = story_evidence_pool(
         sections, topic.source_section_id,
         teaching_sequence=understanding.teaching_sequence if understanding else None)
+    pool_ids = list(pool_ids)
+    if template == "walkthrough":
+        pool_ids += [sid for sid in walkthrough_session_ids(sections, topic.source_section_id)
+                     if sid not in pool_ids]
     return {
         "topic": topic.model_dump(),
         "section_id": section.section_id,
         "understanding": understanding.model_dump() if understanding else None,
         "workflow": wf.model_dump(),
+        "template": template,
         "pool_ids": list(pool_ids),
         "next_topic": next_topic_for(sections, section.section_id, list(pool_ids)),
     }
@@ -229,21 +285,32 @@ def _load_setup(short_id: str) -> dict:
 def print_shot_list(script: MotionScript, results: list | None = None) -> None:
     """The shot-list gate's screen: every shot's beat, speech, captions and
     visual. Also what `--from script` prints for an approved script."""
-    print(f"\n=== Shot list: {script.short_id} ({len(script.shots)} shots, "
-          f"~{script.estimated_seconds:.1f}s) ===")
+    print(f"\n=== Shot list: {script.short_id} — {script.template} ({len(script.shots)} "
+          f"shots, ~{script.estimated_seconds:.1f}s) ===")
     print(f"concept: {script.concept_name}   promise: {script.promise!r}")
     print(f"hook question: {script.hook_question}")
-    print(f"icons: {[f'{i.name} ({i.label})' for i in script.icon_vocabulary]}")
+    walkthrough = script.template == "walkthrough"
+    if walkthrough:
+        ex = script.running_example
+        print(f"running example: {ex.text if ex else '(none)'}  {ex.items if ex else ''}")
+        for c in script.chapters:
+            print(f"  chapter {c.n}: {c.title}   {c.example_in} -> {c.example_out}")
+    else:
+        print(f"icons: {[f'{i.name} ({i.label})' for i in script.icon_vocabulary]}")
     for s in script.shots:
-        print(f"\n  {s.id}  {s.beat:<9} ~{s.estimated_seconds:.1f}s")
+        chapter = f" ch{s.chapter}" if s.chapter is not None else ""
+        print(f"\n  {s.id}  {s.beat:<12}{chapter} ~{s.estimated_seconds:.1f}s")
         print(f"      speech:   {s.speech}")
         print(f"      captions: {' | '.join(motion_plain_text(c.text) for c in s.captions)}")
         print(f"      visual:   {s.visual}")
+        if s.example:
+            print(f"      example:  {s.example}")
         for line in s.code:
             print(f"      code:     {line}")
-    print("\n  recap:")
-    for t in script.takeaways:
-        print(f"      [{t.icon}] {t.line} — {t.sub}")
+    if not walkthrough:
+        print("\n  recap:")
+        for t in script.takeaways:
+            print(f"      [{t.icon}] {t.line} — {t.sub}")
     print(f"  series: {script.series!r}   next up: {script.next_topic or '(none)'}")
     if results is not None:
         print("\ncheck results:")
@@ -270,7 +337,8 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
     script, results = write_motion_script(
         topic, section, short_id=short_id, source_text=source_text,
         understanding=understanding, approach=wf.approved_teaching_approach,
-        next_topic=state.get("next_topic", ""))
+        next_topic=state.get("next_topic", ""),
+        template=state.get("template", "fix_story"))
     if script is None:
         print("  GIVING UP — no script passed the motion graders:")
         for r in results:
@@ -290,7 +358,7 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
 # ======================================================================= run
 
 def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
-        force_stage: str | None, yes: bool) -> int:
+        force_stage: str | None, yes: bool, template: str | None = None) -> int:
     print(_MOTION_MODE_BANNER)
     if not config.STUB and not config.ANTHROPIC_API_KEY:
         print("Cannot proceed — ANTHROPIC_API_KEY is not set (every text call goes "
@@ -322,9 +390,14 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
     if short_id and not _needs("setup", True):
         state = _load_setup(short_id)
         print(f"\n=== setup: resumed {short_id} from {_setup_path(short_id)} ===")
+        saved = state.get("template", "fix_story")
+        if template and template != saved:
+            print(f"--template {template} does not match this reel's saved template "
+                  f"{saved!r}. Rerun with --force-stage setup to choose again.")
+            return 1
     else:
         c = usage.mark()
-        state = _run_setup(sections, doc_text, yes)
+        state = _run_setup(sections, doc_text, yes, template)
         stage_usage["setup"] = usage.since(c)
         if state is None:
             return 1
@@ -376,6 +449,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="start here, trusting everything before it is done")
     p.add_argument("--force-stage", dest="force_stage", choices=STAGE_ORDER, default=None,
                    help="redo this stage and every stage after it")
+    p.add_argument("--template", choices=MOTION_TEMPLATES, default=None,
+                   help="the script template (default: walkthrough when the approved "
+                        "teaching approach is process_demonstration, else fix_story)")
     p.add_argument("--yes", action="store_true",
                    help="answer every confirmation automatically (still prints "
                         "every pre-flight summary and every pause screen)")
@@ -385,7 +461,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     return run(args.markdown_path, args.topic_short_id, args.from_stage,
-               args.force_stage, args.yes)
+               args.force_stage, args.yes, args.template)
 
 
 if __name__ == "__main__":

@@ -2990,17 +2990,35 @@ class QuestionWorkflow(BaseModel):
 # draws. Everything here is "can this be represented" only — whether the
 # script is any GOOD is checks.run_motion_script_graders's job.
 
-#: The eleven beats, in the one order every motion reel follows. break_2 is
-#: the only optional one (checks.MOTION_OPTIONAL_BEATS) — used only when the
-#: source material states a second reason.
+#: Two script templates (REFERENCE_STYLE_ADDENDUM.md section 3). fix_story is
+#: "why does X fail" — the original eleven beats. walkthrough is "how does X
+#: work" — one running example carried through 2-4 numbered chapters.
+MotionTemplate = Literal["fix_story", "walkthrough"]
+MOTION_TEMPLATES: tuple[str, ...] = get_args(MotionTemplate)
+
+#: Every beat either template uses. hook, recap and cta are shared.
 MotionBeat = Literal["hook", "title", "setup", "break_1", "break_2", "fix_idea",
-                     "fix_flow", "code_map", "payoff", "recap", "cta"]
-MOTION_BEAT_ORDER: tuple[str, ...] = get_args(MotionBeat)
+                     "fix_flow", "code_map", "payoff", "recap", "cta",
+                     "name_it", "example", "chapter_card", "chapter", "result",
+                     "takeaway"]
+
+#: fix_story's eleven beats, in the one order every fix_story reel follows.
+#: break_2 is the only optional one (checks.MOTION_OPTIONAL_BEATS) — used only
+#: when the source material states a second reason.
+MOTION_BEAT_ORDER: tuple[str, ...] = (
+    "hook", "title", "setup", "break_1", "break_2", "fix_idea", "fix_flow",
+    "code_map", "payoff", "recap", "cta")
+
+#: walkthrough's beats: the opening three, then (chapter_card + 1-3 chapter
+#: shots) x 2-4, then the closing four. checks.check_motion_template_beats
+#: holds the repeat rule.
+MOTION_WALKTHROUGH_OPENING: tuple[str, ...] = ("hook", "name_it", "example")
+MOTION_WALKTHROUGH_CLOSING: tuple[str, ...] = ("result", "takeaway", "recap", "cta")
 
 #: Narration pace for motion reels, used for ESTIMATES only (the real number
-#: comes from recorded Chatterbox audio in phase 3). 2.8 words/s puts the
-#: change request's 110-170 word window at 39-61 s, its stated 40-60 s.
-MOTION_WORDS_PER_SECOND = 2.8
+#: comes from recorded Chatterbox audio in phase 3). REFERENCE_STYLE_ADDENDUM.md
+#: section 2 sets 2.6 words/s.
+MOTION_WORDS_PER_SECOND = 2.6
 
 
 def motion_plain_text(text: str) -> str:
@@ -3009,8 +3027,9 @@ def motion_plain_text(text: str) -> str:
 
 
 class CaptionChunk(BaseModel):
-    """One on-screen caption, 3-5 words (checks.check_motion_caption_chunks).
-    May carry up to two <b>...</b> highlighted keywords."""
+    """One on-screen caption: one spoken sentence of at most 14 words
+    (checks.check_motion_caption_sentences), shown karaoke-style. May carry up
+    to two <b>...</b> highlighted keywords."""
     text: str
 
 
@@ -3038,9 +3057,16 @@ class MotionShot(BaseModel):
     #: What the narrator SAYS, spelled for TTS: code is written out as words
     #: ("use State", "set Likes"), never as code.
     speech: str
-    #: What the viewer READS: the same words as `speech`, split into 3-5 word
-    #: chunks, with code kept as real code (`useState`, `setLikes`).
+    #: What the viewer READS: the same words as `speech`, one caption per
+    #: sentence, with code kept as real code (`useState`, `setLikes`).
     captions: list[CaptionChunk] = Field(default_factory=list)
+    #: walkthrough only: the chapter this shot belongs to (1-based) for
+    #: chapter_card and chapter shots; None for every other shot.
+    chapter: Optional[int] = None
+    #: walkthrough only: the running example's state as this shot shows it,
+    #: one item per token/value ("To", "##ken", ...). Empty when the shot does
+    #: not show the example.
+    example: list[str] = Field(default_factory=list)
     #: One line saying what is on screen — the brief the scenes call
     #: (phase 3) turns into a SceneSpec, and what the shot-list gate shows.
     visual: str = ""
@@ -3058,9 +3084,26 @@ class MotionShot(BaseModel):
         return round(len(self.speech.split()) / MOTION_WORDS_PER_SECOND, 2)
 
 
+class MotionChapter(BaseModel):
+    """One walkthrough chapter: its card title and what it does to the running
+    example. example_in of chapter k+1 must equal example_out of chapter k
+    (checks.check_walkthrough_running_example)."""
+    n: int                       #: 1-based, in order
+    title: str                   #: the chapter card's one-line title
+    example_in: list[str] = Field(default_factory=list)
+    example_out: list[str] = Field(default_factory=list)
+
+
+class MotionExample(BaseModel):
+    """A walkthrough's one running example: the text as the example beat
+    introduces it, and its starting state (chapter 1's example_in)."""
+    text: str
+    items: list[str] = Field(default_factory=list)
+
+
 class MotionScriptDraft(BaseModel):
     """What SYSTEM_MOTION's call returns. Not a MotionScript: the ids,
-    series label and next topic are set in Python (skills.script.
+    series label, next topic and template are set in Python (skills.script.
     write_motion_script), never asked of the model."""
     hook_question: str
     concept_name: str
@@ -3068,6 +3111,8 @@ class MotionScriptDraft(BaseModel):
     icon_vocabulary: list[IconRef] = Field(default_factory=list)
     takeaways: list[MotionTakeaway] = Field(default_factory=list)
     shots: list[MotionShot]
+    chapters: list[MotionChapter] = Field(default_factory=list)
+    running_example: Optional[MotionExample] = None
 
     @field_validator("shots")
     @classmethod
@@ -3095,6 +3140,10 @@ class MotionScript(BaseModel):
     explainer JSON written from now on, and explainer output must stay
     byte-identical."""
     reel_style: Literal["motion"] = "motion"
+    #: Which script template this reel follows — chosen from the approved
+    #: teaching approach in motion_reel, overridable by the reviewer. The
+    #: default keeps every phase 1 script valid as the fix_story it was.
+    template: MotionTemplate = "fix_story"
     short_id: str
     source_section_id: str
     topic: str                  #: the approved question this reel teaches
@@ -3104,6 +3153,9 @@ class MotionScript(BaseModel):
     icon_vocabulary: list[IconRef] = Field(default_factory=list)
     takeaways: list[MotionTakeaway] = Field(default_factory=list)
     shots: list[MotionShot]
+    #: walkthrough only — empty / None on a fix_story script.
+    chapters: list[MotionChapter] = Field(default_factory=list)
+    running_example: Optional[MotionExample] = None
     #: Series label and corner mark — from config.MOTION_SERIES, never the LLM.
     series: str = ""
     #: The end card's "Up next" — the next unused section title of the source

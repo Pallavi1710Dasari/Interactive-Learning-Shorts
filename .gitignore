@@ -8,3 +8,6 @@ output/
 web/node_modules/
 web/dist/
 web/.ssr/
+
+# The 23 MB reference video stays local; its extracted frames are committed.
+docs/reference/tokenization-reel.mp4

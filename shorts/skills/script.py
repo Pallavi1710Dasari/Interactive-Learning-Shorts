@@ -15,7 +15,7 @@ from ..schema import (Script, Topic, Section, SectionUnderstanding, QuestionWork
                       QuestionFraming, TeachingApproach,
                       Character, ConceptMapping, ConceptMappingSet, Shot, StoryScript,
                       StoryShotsSet, HookLineOnly,
-                      MotionScript, MotionScriptDraft, MotionHookFix,
+                      MotionScript, MotionScriptDraft, MotionHookFix, MOTION_TEMPLATES,
                       MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND)
 from ..llm import ask_json
 from .. import revision, checks, config
@@ -2289,8 +2289,8 @@ def write_story_shots(mapping: ConceptMappingSet, topic: Topic, section: Section
 # database index or React state; nothing below may be tuned to one topic. The
 # graders that enforce these rules live in checks.run_motion_script_graders.
 
-SYSTEM_MOTION = """You write the script for ONE short vertical teaching reel (40-60 seconds)
-that answers ONE question from the material below.
+SYSTEM_MOTION = """You write the script for ONE short vertical teaching reel (40-75 seconds)
+that answers ONE "why does this fail" question from the material below.
 
 FORMAT
 One narrator, talking to the viewer in the second person ("you", "your"), telling a
@@ -2317,28 +2317,32 @@ The reel must ANSWER the hook's question: problem -> why -> fix -> proof it work
 fix_flow and payoff are never optional.
 
 LENGTH
-- 110 to 170 spoken words in total.
+- 110 to 195 spoken words in total (at most 75 seconds spoken).
 - Every shot: 8 to 30 words.
-- hook: at most 11 words. title: exactly 8 words. cta: exactly 8 words.
+- hook: at most 10 words. title: exactly 8 words. cta: exactly 8 words.
 - Short spoken sentences. Contractions are fine.
 
 WORDS
 - Beginner language. Explain any technical word in the same sentence you use it.
-- No word longer than 4 syllables, except the concept's own name.
+- No word longer than 4 syllables, except the concept's own name and at most 2 other
+  terms the material itself uses — each explained in plain words in the same sentence
+  ("..., called its vocabulary").
 - Every claim must be supported by the MATERIAL. The fix must be the one the material
   teaches, and concept_name must be written exactly as the material writes it.
+- Every number you say must be one the MATERIAL states. Never invent a figure.
 
 SPEECH AND CAPTIONS ARE SEPARATE FIELDS
 - speech: what the narrator says, spelled for text-to-speech. Write code as words:
   "use State", "set Likes", "query dot filter". Never raw code, brackets or symbols.
-- captions: the SAME words as speech, in the same order, split into chunks — not a
-  paraphrase. The only difference: code is shown as real code (`useState`, `setLikes`).
-- Every chunk is 3 to 5 words, follows a phrase boundary, reads naturally on its own,
-  never splits a code token, and never ends on a small word ("the", "of", "to", "and").
-- Highlight at most 2 keywords per chunk with <b>...</b>. No other tags.
+- captions: the SAME words as speech, in the same order — not a paraphrase. The only
+  difference: code is shown as real code (`useState`, `setLikes`).
+- ONE CAPTION PER SPOKEN SENTENCE. Each caption is one whole sentence, ending in its
+  own . ! or ?, at most 14 words, and never splits a code token. Keep sentences short
+  enough to fit.
+- Highlight at most 2 keywords per caption with <b>...</b>. No other tags.
 Example of one shot on a different topic (paging):
-  speech:   "The page table tells the CPU where each page really lives."
-  captions: ["The <b>page table</b> tells", "the CPU where", "each page really lives."]
+  speech:   "The page table tells the CPU where each page lives. It sits in memory."
+  captions: ["The <b>page table</b> tells the CPU where each page lives.", "It sits in memory."]
 
 CODE
 - Only setup and code_map may show code, in `code` (one string per line).
@@ -2384,21 +2388,129 @@ reel. Every other shot is final and not yours to change.
 The hook shows the viewer's real problem happening. It is ONE curiosity question that
 opens with "Have you ever wondered why...", "Why does..." or "What actually happens
 when...", names a CONCRETE, VISIBLE SYMPTOM (stuck at 0, the page reloads, the query is
-slow), and never names the concept. 8 to 11 words.
+slow), and never names the concept. 8 to 10 words.
 
 speech is spelled for text-to-speech (code written as words). captions are the SAME
-words split into chunks of 3 to 5 words, at most 2 <b>...</b> highlights per chunk,
-never ending on a small word. hook_question is the question itself, ending in "?".
+words, one caption per sentence, each at most 14 words with at most 2 <b>...</b>
+highlights. hook_question is the question itself, ending in "?".
 
 Return JSON: {"hook_question": "...", "speech": "...", "captions": [{"text": "..."}],
 "visual": "..."}"""
 
 
+
+#: The second template (REFERENCE_STYLE_ADDENDUM.md section 3B): "how does X work".
+#: Its own prompt rather than a branch inside SYSTEM_MOTION, so neither template's
+#: rules can leak into the other's reels.
+SYSTEM_MOTION_WALKTHROUGH = """You write the script for ONE short vertical teaching reel (60-120 seconds)
+that answers ONE "how does this work" question from the material below, by following
+ONE running example through every step of the process.
+
+FORMAT
+One narrator, talking to the viewer in the second person ("you", "your"). Never a
+dialogue, no speaker labels. The hook asks the question. Inside a chapter you may ask
+at most ONE short rhetorical question (at most 6 words), answered by the very next
+sentence ("Token? Not on the shelf."). Every other shot is a plain statement.
+
+THE BEATS — in exactly this order:
+  hook          A question about how something works ("How does...", "What happens
+                when..."), then a surprising one-line answer ("It only reads numbers.").
+                Never name the concept. At most 16 words.
+  name_it       Name the concept: "This is called ...". 3 to 8 words.
+  example       Introduce the ONE running example: "Let's follow one sentence: ...".
+  then 2 to 4 CHAPTERS, each:
+    chapter_card  "Step one. <the chapter title, short>." 3 to 5 words.
+    chapter       1 to 3 shots: what this step does to the running example.
+  result        The before and after of the running example ("two words became seven
+                tokens").
+  takeaway      One practical rule the viewer can use.
+  recap         "<concept> in <n> steps: ..." naming each step, in one sentence.
+  cta           "Follow for more" plus the next topic. Exactly 8 words.
+If the material needs more than 4 steps, keep the first 4 and stop there — the rest
+becomes a later reel.
+
+THE RUNNING EXAMPLE
+- running_example.text is the example as the example shot says it; running_example.items
+  is its starting state as a list (one item per word, token or value).
+- Every chapter transforms it: chapters[k].example_in is EXACTLY chapters[k-1].example_out,
+  and chapters[0].example_in is running_example.items.
+- Every chapter shot that shows the example sets `example` to the state at the END of
+  that shot — the chapter's example_in or its example_out, and the chapter's last
+  example shown is its example_out. The result and recap shots show the final state.
+- Give every chapter_card and chapter shot its chapter number in `chapter` (1, 2, ...).
+
+LENGTH
+- 160 to 300 spoken words in total (at most 120 seconds spoken — a hard limit).
+- Every chapter: at most 60 spoken words, card included.
+- Every shot: 8 to 30 words, except name_it and chapter_card (3 or more).
+- Short spoken sentences. Contractions are fine.
+
+WORDS
+- Beginner language. No word longer than 4 syllables, except the concept's own name and
+  at most 2 other terms the material uses — each explained in plain words in the same
+  sentence ("..., called its vocabulary").
+- Every claim must be supported by the MATERIAL. concept_name is written exactly as the
+  material writes it.
+- Real numbers make it concrete, but every number you say must be one the MATERIAL
+  states — or a count of the running example's own items ("five tokens").
+
+SPEECH AND CAPTIONS ARE SEPARATE FIELDS
+- speech: what the narrator says, spelled for text-to-speech. Write code as words.
+- captions: the SAME words as speech, in the same order — not a paraphrase. Code and
+  tokens are shown as they really are (`[CLS]`, `##ken`).
+- ONE CAPTION PER SPOKEN SENTENCE, ending in its own . ! or ?, at most 14 words, never
+  splitting a code token. At most 2 <b>...</b> highlights per caption. No other tags.
+
+CODE
+Only chapter shots may show code, in `code`: at most 2 shots, at most 3 lines each,
+each at most 30 characters. Most walkthroughs show none.
+
+VISUAL
+For every shot, `visual` is ONE line saying what is on screen: the colour field (navy,
+blue, paper or yellow — the field changes at chapter changes), the objects (kinetic
+title, chapter card, token row of chips, YES/NO tags, a stamp, a lookup grid, a lookup
+table, a matrix grid, a big counter, a bracket or callout, the recap grid), and what
+moves.
+
+Return JSON:
+{
+  "hook_question": "the hook's question, ending in ?",
+  "concept_name": "exactly as the material writes it",
+  "promise": "one line, at most 6 words",
+  "running_example": {"text": "...", "items": ["..."]},
+  "chapters": [{"n": 1, "title": "at most 6 words", "example_in": [...], "example_out": [...]}, ...],
+  "shots": [
+    {"id": "s01", "beat": "hook", "speech": "...", "captions": [{"text": "..."}],
+     "visual": "...", "code": []},
+    {"id": "s04", "beat": "chapter_card", "chapter": 1, "speech": "...", ...},
+    {"id": "s05", "beat": "chapter", "chapter": 1, "speech": "...", "example": [...], ...},
+    ...
+  ]
+}"""
+
+
+#: The walkthrough's hook repair — same narrow contract as SYSTEM_MOTION_HOOK_FIX.
+SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX = """You are rewriting ONLY the opening hook shot of a short
+teaching reel that walks through how something works. Every other shot is final and
+not yours to change.
+
+The hook is ONE question about how something works ("How does...", "What happens
+when..."), then a surprising one-line answer that is not a question ("It only reads
+numbers."). It never names the concept. 8 to 16 words.
+
+speech is spelled for text-to-speech (code written as words). captions are the SAME
+words, one caption per sentence, each at most 14 words with at most 2 <b>...</b>
+highlights. hook_question is the question itself, ending in "?".
+
+Return JSON: {"hook_question": "...", "speech": "...", "captions": [{"text": "..."}],
+"visual": "..."}"""
+
 def _motion_material_block(topic: Topic, section: Section,
                            understanding: SectionUnderstanding | None, source_text: str,
                            approach: TeachingApproach | None, series: str,
-                           next_topic: str) -> str:
+                           next_topic: str, template: str = "fix_story") -> str:
     parts = [
+        f"TEMPLATE: {template}",
         f"QUESTION THIS REEL ANSWERS: {topic.topic}",
         f"\nMATERIAL:\n{source_text}",
     ]
@@ -2418,11 +2530,14 @@ def _motion_material_block(topic: Topic, section: Section,
 
 
 def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
-                     short_id: str, series: str, next_topic: str) -> MotionScript:
+                     short_id: str, series: str, next_topic: str,
+                     template: str = "fix_story") -> MotionScript:
     """The draft plus everything set in Python, never asked of the model:
-    shot ids (s01, s02, ... in order), the series label and the next topic."""
+    shot ids (s01, s02, ... in order), the template, the series label and the
+    next topic."""
     shots = [s.model_copy(update={"id": f"s{i + 1:02d}"}) for i, s in enumerate(draft.shots)]
     return MotionScript(
+        template=template,
         short_id=short_id,
         source_section_id=section.section_id,
         topic=topic.topic,
@@ -2432,6 +2547,8 @@ def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
         icon_vocabulary=draft.icon_vocabulary,
         takeaways=draft.takeaways,
         shots=shots,
+        chapters=draft.chapters,
+        running_example=draft.running_example,
         series=series,
         next_topic=next_topic,
     )
@@ -2443,13 +2560,15 @@ def regenerate_motion_hook(script: MotionScript, material: str, source_text: str
     times. Returns (the repaired script, its grader results) once every grader
     passes, else (None, the last results)."""
     hook = script.shots[0]
+    system = (SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX if script.template == "walkthrough"
+              else SYSTEM_MOTION_HOOK_FIX)
     feedback = "; ".join(r.reason for r in results if not r.passed)
     for _ in range(config.MAX_MOTION_HOOK_FIX_RETRIES):
         user = (material +
                 f"\n\nTHE REST OF THE SCRIPT (final — do not contradict it):\n" +
                 "\n".join(f"  {s.beat}: {s.speech}" for s in script.shots[1:]) +
                 f"\n\nTHE CURRENT HOOK: {hook.speech!r}\nIT FAILED REVIEW: {feedback}")
-        fix = ask_json(SYSTEM_MOTION_HOOK_FIX, user, MotionHookFix, max_tokens=400,
+        fix = ask_json(system, user, MotionHookFix, max_tokens=400,
                        label="motion_hook_fix")
         new_hook = hook.model_copy(update={
             "speech": fix.speech, "captions": fix.captions,
@@ -2468,27 +2587,33 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                         source_text: str, understanding: SectionUnderstanding | None = None,
                         approach: TeachingApproach | None = None,
                         series: str | None = None,
-                        next_topic: str = "") -> tuple[MotionScript | None, list]:
+                        next_topic: str = "",
+                        template: str = "fix_story") -> tuple[MotionScript | None, list]:
     """
-    Write and grade a motion script. Returns (script, grader results) once
-    every free grader passes, or (None, the last attempt's results) after
-    config.MAX_MOTION_SCRIPT_RETRIES full attempts.
+    Write and grade a motion script in `template` (fix_story or walkthrough).
+    Returns (script, grader results) once every free grader passes, or (None,
+    the last attempt's results) after config.MAX_MOTION_SCRIPT_RETRIES full
+    attempts.
 
     A failure confined to the hook (checks.motion_failures_are_hook_only) is
     repaired by regenerate_motion_hook rather than a full rewrite — the rest
     of the script already passed, and a full retry risks breaking it.
     """
     from ..motion_library import icon_names
+    if template not in MOTION_TEMPLATES:
+        raise ValueError(f"template {template!r} is not one of {MOTION_TEMPLATES}")
     series = config.MOTION_SERIES if series is None else series
-    system = SYSTEM_MOTION.replace("__ICONS__", ", ".join(sorted(icon_names())))
+    system = (SYSTEM_MOTION_WALKTHROUGH if template == "walkthrough"
+              else SYSTEM_MOTION.replace("__ICONS__", ", ".join(sorted(icon_names()))))
     material = _motion_material_block(topic, section, understanding, source_text,
-                                      approach, series, next_topic)
+                                      approach, series, next_topic, template)
     user = material
     results: list = []
     for _ in range(config.MAX_MOTION_SCRIPT_RETRIES):
         draft = ask_json(system, user, MotionScriptDraft, max_tokens=6000,
                          label="motion_script")
-        script = _assemble_motion(draft, topic, section, short_id, series, next_topic)
+        script = _assemble_motion(draft, topic, section, short_id, series, next_topic,
+                                  template)
         results = checks.run_motion_script_graders(script, source_text)
         if checks.all_passed(results):
             return script, results

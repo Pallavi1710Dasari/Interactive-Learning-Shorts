@@ -2399,24 +2399,23 @@ cases:
       reason_contains: "names the concept"
 
   - id: E137
-    name: Caption chunks of 7 words are rejected
-    why: "The current reel shows long full-sentence captions in small text. Motion captions are 3-5 word chunks, large, at the top."
+    name: A caption sentence over 14 words is rejected
+    why: "Captions are one spoken sentence each, karaoke-style, in at most two lines at the bottom (REFERENCE_STYLE_ADDENDUM.md 4.4). A 16-word sentence wraps to three lines and covers the diagram."
     type: motion_grader
-    grader: caption_chunks
+    grader: caption_sentences
     fixture: evals/fixtures/motion/usestate_golden.json
     input: content/react_usestate_basics.md
     patch:
-      - path: shots.0.captions
-        value: [{text: "Ever wondered why your like button stays"}, {text: "stuck at <b>zero</b>?"}]
+      - {path: shots.4.captions.0.text, value: "Worse, changing a plain variable in your code never tells React that anything changed at all."}
     expect:
       passed: false
-      reason_contains: "7 words"
+      reason_contains: "16 words"
 
   - id: E138
     name: A caption chunk with three highlights is rejected
-    why: "Highlight is emphasis; three in four words is none. At most two keywords per chunk."
+    why: "Highlight is emphasis; three in four words is none. At most two keywords per caption."
     type: motion_grader
-    grader: caption_chunks
+    grader: caption_sentences
     fixture: evals/fixtures/motion/usestate_golden.json
     input: content/react_usestate_basics.md
     patch:
@@ -2426,32 +2425,32 @@ cases:
       reason_contains: "3 highlights"
 
   - id: E139
-    name: A caption that splits a code token across chunks is rejected
-    why: "'useState(' on one card and '0)' on the next is unreadable code. A code token stays whole inside one chunk."
+    name: A caption that splits a code token across captions is rejected
+    why: "'useState(' on one caption and '0)' on the next is unreadable code. A code token stays whole inside one caption."
     type: motion_grader
-    grader: caption_chunks
+    grader: caption_sentences
     fixture: evals/fixtures/motion/usestate_golden.json
     input: content/react_usestate_basics.md
     patch:
-      - {path: shots.7.captions.0.text, value: "In code, useState("}
-      - {path: shots.7.captions.1.text, value: "0) gives you two things:"}
+      - path: shots.7.captions
+        value: [{text: "In code, useState("}, {text: "0) gives you two things: the value and its <b>setter</b>."}]
     expect:
       passed: false
-      reason_contains: "split across chunks"
+      reason_contains: "split across captions"
 
   - id: E140
-    name: A caption chunk that ends mid-phrase is rejected
-    why: "A chunk ending on 'in' or 'the' reads as cut off. Chunks follow phrase boundaries."
+    name: A caption that stops mid-sentence is rejected
+    why: "The old rule cut captions into 3-5 word chunks. Karaoke captions show one whole sentence at a time, so a caption that stops at a comma leaves the viewer reading half a thought."
     type: motion_grader
-    grader: caption_chunks
+    grader: caption_sentences
     fixture: evals/fixtures/motion/usestate_golden.json
     input: content/react_usestate_basics.md
     patch:
-      - {path: shots.2.captions.1.text, value: "Your likes sit in"}
-      - {path: shots.2.captions.2.text, value: "a <b>plain variable</b>,"}
+      - path: shots.2.captions
+        value: [{text: "Here's the code."}, {text: "Your likes sit in a <b>plain variable</b>,"}, {text: "and each tap adds one."}]
     expect:
       passed: false
-      reason_contains: "mid-phrase"
+      reason_contains: "cut mid-sentence"
 
   - id: E141
     name: A motion script with three code shots is rejected
@@ -2496,7 +2495,7 @@ cases:
     name: Motion beats out of order are rejected
     why: "Showing the fix flow before the fix idea teaches a mechanism before its name. The beat order is fixed on every reel."
     type: motion_grader
-    grader: beats_order
+    grader: template_beats
     fixture: evals/fixtures/motion/usestate_golden.json
     input: content/react_usestate_basics.md
     patch:
@@ -2507,18 +2506,22 @@ cases:
       reason_contains: "the order needs"
 
   - id: E145
-    name: A motion script over 170 spoken words is rejected
-    why: "The reference reel ran 178 words, about 80 seconds. Motion reels are 40-60 seconds: 110-170 words."
+    name: A fix_story script over 75 seconds is rejected, even under 200 words
+    why: "A fix_story reel is 40-75 s AND 110-200 words (REFERENCE_STYLE_ADDENDUM.md section 2); both apply (decision 2026-10-01). 198 words is under the word cap but ~76 s at 2.6 words/s, so the seconds bound is the one that bites."
     type: motion_grader
     grader: word_budget
     fixture: evals/fixtures/motion/usestate_golden.json
     input: content/react_usestate_basics.md
     patch:
+      - {path: shots.2.speech, value: "Here's the code you'd write first. Your likes sit in a plain variable, and each tap on the button adds one."}
       - {path: shots.3.speech, value: "But on every single re-render, React runs your whole component again from the very top, line by line. The variable starts fresh, back to zero, every time."}
+      - {path: shots.4.speech, value: "Worse, changing a plain variable never tells React that anything changed at all. So the screen never updates, no matter how often you tap."}
       - {path: shots.5.speech, value: "use State fixes both of these problems. React keeps the value safe in its own memory, outside your component, and hands it back to you on every render."}
+      - {path: shots.6.speech, value: "And set Likes is the trigger you call. Call it, and React updates its memory first, then re-renders the whole component using the new value."}
+      - {path: shots.9.speech, value: "Remember: re-renders reset plain variables every time. use State keeps the value safe in memory. And the setter updates it, then React re-renders."}
     expect:
       passed: false
-      reason_contains: "too long"
+      reason_contains: "needs 40-75s (too long)"
 
   - id: E146
     name: A motion shot under 8 words is rejected
@@ -2535,7 +2538,7 @@ cases:
 
   - id: E147
     name: A motion hook longer than 4 seconds is rejected
-    why: "The hook has four seconds to stop the scroll. A 14-word hook is a narrated setup, not a hook."
+    why: "The hook has four seconds to stop the scroll (10 words at 2.6 words/s). A 14-word hook is a narrated setup, not a hook."
     type: motion_grader
     grader: word_budget
     fixture: evals/fixtures/motion/usestate_golden.json
@@ -2544,7 +2547,7 @@ cases:
       - {path: shots.0.speech, value: "Have you ever wondered why your like button stays stuck at zero every time?"}
     expect:
       passed: false
-      reason_contains: "<= 11 words"
+      reason_contains: "<= 10 words"
 
   - id: E148
     name: Raw code in motion speech is rejected
@@ -2656,7 +2659,7 @@ cases:
     name: A motion script missing a required beat is rejected
     why: "Without its recap the reel just stops — the current reel's 'no ending' problem. Only break_2 is optional."
     type: motion_grader
-    grader: beats_order
+    grader: template_beats
     fixture: evals/fixtures/motion/usestate_golden.json
     input: content/react_usestate_basics.md
     patch:
@@ -2665,6 +2668,219 @@ cases:
       passed: false
       reason_contains: "missing beat"
 
+
+  # -------------------------------------------------- walkthrough (phase 1b)
+  # REFERENCE_STYLE_ADDENDUM.md sections 2, 3B and 6: the second template, the
+  # 120 s cap, and the graders that hold a running example together.
+
+  - id: E157
+    name: The golden tokenization walkthrough passes every motion grader
+    why: "The tokenization reference cut to the addendum's rules: 4 chapters instead of 6, ~81 s instead of 194 s. If a grader change rejects it, the grader is wrong or the golden must be re-derived — never quietly loosened."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    expect:
+      passed: true
+
+  - id: E158
+    name: A good 3-chapter walkthrough on another topic passes every motion grader
+    why: "Guards against walkthrough rules only the tokenization reel can satisfy: a hash table lookup, 3 chapters, a different running example ('dog' -> 2 -> [cat, dog] -> dog)."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/hash_table_golden.json
+    input: content/hash_table_basics.md
+    expect:
+      passed: true
+
+  - id: E159
+    name: A 6-chapter walkthrough is rejected
+    why: "The tokenization reel ran 6 chapters and 194 s. A walkthrough is 2-4 chapters; a topic that needs more is split into a series, never compressed past readability."
+    type: motion_grader
+    grader: walkthrough_chapters
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: chapters, append: {n: 5, title: "Pad the batch", example_in: ["101"], example_out: ["101"]}}
+      - {path: chapters, append: {n: 6, title: "Turn numbers into meaning", example_in: ["101"], example_out: ["101"]}}
+    expect:
+      passed: false
+      reason_contains: "6 chapters, needs 2-4"
+
+  - id: E160
+    name: A 130-second motion script is rejected by the hard cap
+    why: "Every motion reel is 120 seconds or less, either template — a hard fail above it (addendum section 2). This script is ~130 s by its word count."
+    type: motion_grader
+    grader: duration_cap
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.4.speech, value: "The tokenizer cuts the sentence at every space and at every mark of punctuation it finds. The full stop at the very end becomes its own small piece, standing all alone after the last word of the sentence."}
+      - {path: shots.6.speech, value: "Every model has a fixed list of word pieces it knows, called its vocabulary. Ours knows about 1.2 lakh pieces. Common words are kept whole on the shelf, and rare words are built out of smaller pieces that are already there."}
+      - {path: shots.7.speech, value: "Matters is on the shelf, but tokenization is not. So the tokenizer has to build it from smaller pieces, one at a time, starting at the front of the word and working its way along to the very end."}
+      - {path: shots.10.speech, value: "CLS goes at the front, and SEP goes at the end. They are special tokens the tokenizer adds to every sentence it sees. Two words are now seven tokens, and each one still has to become a number."}
+      - {path: shots.13.speech, value: "Every shelf piece has a fixed ID, like a roll number in class. The tokenizer looks each token up on the shelf, one after another, and writes down the number it finds next to that piece."}
+      - {path: shots.14.speech, value: "For example, CLS is 101. The number has no meaning by itself. It only ever points to one row of the shelf, and nothing more than that."}
+    expect:
+      passed: false
+      reason_contains: "over the hard cap of 120s"
+
+  - id: E161
+    name: A running example that changes between chapters is rejected
+    why: "A walkthrough follows ONE example: what chapter k hands on is exactly what chapter k+1 starts from. Here chapter 3 starts from pieces chapter 2 never produced, so the viewer loses the thread."
+    type: motion_grader
+    grader: running_example
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: chapters.2.example_in, value: ["Token", "##ization", "matters", "."]}
+    expect:
+      passed: false
+      reason_contains: "the example changed between chapters"
+
+  - id: E162
+    name: A number the source never states is rejected
+    why: "Real numbers make a reel concrete ('about 1.2 lakh pieces'), but an invented one is a hallucinated fact. Every number in the narration must come from the source."
+    type: motion_grader
+    grader: numbers_sourced
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.6.speech, value: "Every model has a fixed list of word pieces it knows, called its vocabulary. Ours knows about 50,000 pieces."}
+    expect:
+      passed: false
+      reason_contains: "says 50000, which the source never states"
+
+  - id: E163
+    name: A walkthrough hook that names the concept is rejected
+    why: "The walkthrough hook asks how something works and answers with a surprise ('It only reads numbers'). Naming tokenization in the hook spends the name_it beat before the viewer cares."
+    type: motion_grader
+    grader: hook_curiosity
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.0.speech, value: "How does tokenization read your text? It only reads numbers."}
+    expect:
+      passed: false
+      reason_contains: "names the concept"
+
+  - id: E164
+    name: A walkthrough hook with no answer line is rejected
+    why: "The walkthrough hook is a question AND a surprising one-line answer (addendum 3B). A bare question gives the viewer nothing to be surprised by."
+    type: motion_grader
+    grader: hook_curiosity
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.0.speech, value: "How does AI read your text when you type a message?"}
+    expect:
+      passed: false
+      reason_contains: "no answer line"
+
+  - id: E165
+    name: A walkthrough chapter with two rhetorical questions is rejected
+    why: "A walkthrough chapter may ask ONE short rhetorical question, answered in the next sentence (decision 2026-10-01). The reference reel's 'Token? No. Tok? No. To? Yes.' is three, which turns the chapter into a quiz."
+    type: motion_grader
+    grader: not_qa
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.8.speech, value: "Token? Not on the shelf. Tok? Not there either. It takes the longest piece that fits."}
+    expect:
+      passed: false
+      reason_contains: "second question in chapter 2"
+
+  - id: E166
+    name: A rhetorical question that is not answered next is rejected
+    why: "A question the narrator leaves hanging reads as a Q&A pause. The answer must be the very next sentence."
+    type: motion_grader
+    grader: not_qa
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.11.speech, value: "The model gathers a summary of the whole sentence into CLS. Why?"}
+    expect:
+      passed: false
+      reason_contains: "not answered in the very next sentence"
+
+  - id: E167
+    name: A question outside a walkthrough chapter is rejected
+    why: "Only the hook and the chapters may ask. A question in the result beat breaks the one-narrator story at the moment it should land."
+    type: motion_grader
+    grader: not_qa
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.15.speech, value: "And the result? Two words became seven tokens, and then seven numbers."}
+    expect:
+      passed: false
+      reason_contains: "only the hook may, or one per walkthrough chapter"
+
+  - id: E168
+    name: A walkthrough chapter with no chapter card is rejected
+    why: "Every chapter opens with its numbered card (addendum 3B, 4.3). Without it the viewer never sees which step they are on."
+    type: motion_grader
+    grader: walkthrough_chapters
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.9.beat, value: chapter}
+    expect:
+      passed: false
+      reason_contains: "chapter 3 needs exactly one chapter_card"
+
+  - id: E169
+    name: A walkthrough chapter over 60 words is rejected
+    why: "A chapter is at most 60 spoken words (addendum section 2). Past that one step becomes a lecture and the reel loses its rhythm of cards."
+    type: motion_grader
+    grader: walkthrough_chapters
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.7.speech, value: "Matters is on the shelf, but tokenization is not. So it is built from smaller pieces, one at a time."}
+    expect:
+      passed: false
+      reason_contains: "chapter 2 is 62 spoken words, max 60"
+
+  - id: E170
+    name: A walkthrough that skips the result beat is rejected
+    why: "The result beat is the before-and-after the whole walkthrough builds to ('two words became seven tokens'). The closing order is result, takeaway, recap, cta."
+    type: motion_grader
+    grader: template_beats
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.15, remove: true}
+    expect:
+      passed: false
+      reason_contains: "needs ['result', 'takeaway', 'recap', 'cta']"
+
+  - id: E171
+    name: A long term the same sentence does not explain is rejected
+    why: "A reel may use up to two terms over four syllables if the source uses them, they are on screen, and the same sentence explains them (decision 2026-10-01). 'Vocabulary' with no explanation is jargon."
+    type: motion_grader
+    grader: plain_words
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    input: content/tokenization_basics.md
+    patch:
+      - {path: shots.6.speech, value: "Every model keeps a fixed vocabulary of word pieces. Ours knows about 1.2 lakh pieces."}
+    expect:
+      passed: false
+      reason_contains: "syllables"
+
+  - id: E172
+    name: A caption that holds two sentences is rejected
+    why: "Karaoke captions show one sentence at a time (addendum 4.4). Two sentences in one caption fill both lines and the second one is read before it is spoken."
+    type: motion_grader
+    grader: caption_sentences
+    fixture: evals/fixtures/motion/usestate_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - path: shots.6.captions
+        value: [{text: "And <b>setLikes</b> is the trigger. Call it."}, {text: "React updates its memory, then <b>re-renders</b> using the new value."}]
+    expect:
+      passed: false
+      reason_contains: "holds 2 sentences"
 
 # ============================================================================
 # RUBRIC — what the LLM judge scores, 1 to 5. Keep the wording stable; changing

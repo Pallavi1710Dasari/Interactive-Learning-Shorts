@@ -4,8 +4,10 @@ RESTYLE_TO_MOTION_REELS.md phase 1: the motion script contract.
 Covers write_motion_script's retry and hook-only repair paths, the
 motion_reel runner's setup -> script stages and resume, the REEL_STYLE
 switch, and the change request's "no image generation and no paid calls in
-motion mode" rule. The graders themselves are covered case by case in
-evals/cases.yaml (E129-E156).
+motion mode" rule — and, since phase 1b (REFERENCE_STYLE_ADDENDUM.md), the
+walkthrough template: its prompt and stub, the template gate and --template,
+and the long-term cap. The graders themselves are covered case by case in
+evals/cases.yaml (E129-E172).
 
 No API key, no network, no real LLM calls. The runner is pointed at a temp
 directory, so nothing under output/ is created or touched.
@@ -31,7 +33,9 @@ from shorts.skills import script as script_mod
 
 ROOT = Path(__file__).resolve().parent.parent
 REACT_DOC = ROOT / "content" / "react_usestate_basics.md"
+TOKEN_DOC = ROOT / "content" / "tokenization_basics.md"
 GOLDEN = ROOT / "evals" / "fixtures" / "motion" / "usestate_golden.json"
+WALKTHROUGH_GOLDEN = ROOT / "evals" / "fixtures" / "motion" / "tokenization_golden.json"
 
 
 def _golden() -> dict:
@@ -40,7 +44,16 @@ def _golden() -> dict:
 
 def _draft(data: dict) -> MotionScriptDraft:
     return MotionScriptDraft(**{k: data[k] for k in (
-        "hook_question", "concept_name", "promise", "icon_vocabulary", "takeaways", "shots")})
+        "hook_question", "concept_name", "promise", "icon_vocabulary", "takeaways", "shots",
+        "chapters", "running_example") if k in data})
+
+
+def _token_inputs():
+    sections = parse_markdown(TOKEN_DOC)
+    section = find_section(sections, "1.1")
+    topic = Topic(id="how_ai_reads_text", topic="How does an AI model read your text?",
+                  why_it_matters="w", source_section_id="1.1", difficulty="easy")
+    return topic, section, "\n\n".join(s.text for s in sections)
 
 
 def _react_inputs():
@@ -56,11 +69,11 @@ def _react_inputs():
 def _fake_ask_json(answers: list):
     """Replace skills.script.ask_json with one that hands back `answers` in
     order, recording (schema name, user prompt) for every call."""
-    calls: list[tuple[str, str]] = []
+    calls: list[tuple[str, str, str]] = []
     real = script_mod.ask_json
 
     def fake(system, user, model_cls, **kw):
-        calls.append((model_cls.__name__, user))
+        calls.append((model_cls.__name__, user, system))
         return answers.pop(0)
     script_mod.ask_json = fake
     try:
@@ -161,12 +174,118 @@ def test_hook_fix_budget_is_two_attempts():
     assert script is not None
 
 
+# ---------------------------------------------------------------- walkthrough
+
+def test_walkthrough_stub_script_passes_every_grader_at_no_cost():
+    topic, section, source = _token_inputs()
+    cursor = usage.mark()
+    script, results = script_mod.write_motion_script(
+        topic, section, short_id="t__motion", source_text=source, template="walkthrough")
+    assert script is not None, [str(r) for r in results if not r.passed]
+    assert checks.all_passed(results) and len(results) == 15
+    assert script.template == "walkthrough" and len(script.chapters) == 4
+    assert script.running_example is not None
+    assert script.estimated_seconds <= checks.MOTION_MAX_SECONDS
+    spend = usage.since(cursor)
+    assert spend["calls"] == 0 and spend["cost"] == 0.0, spend
+
+
+def test_walkthrough_uses_its_own_prompts():
+    topic, section, source = _token_inputs()
+    data = json.loads(WALKTHROUGH_GOLDEN.read_text(encoding="utf-8"))
+    good_hook = data["shots"][0]
+    bad = json.loads(json.dumps(data))
+    bad["shots"][0]["speech"] = "How does AI read your text when you type?"
+    bad["shots"][0]["captions"] = [{"text": "How does AI read your text when you type?"}]
+    fix = MotionHookFix(hook_question=data["hook_question"], speech=good_hook["speech"],
+                        captions=good_hook["captions"], visual=good_hook["visual"])
+    with _fake_ask_json([_draft(bad), fix]) as calls:
+        script, results = script_mod.write_motion_script(
+            topic, section, short_id="t__motion", source_text=source, template="walkthrough")
+    assert script is not None and checks.all_passed(results)
+    assert [c[0] for c in calls] == ["MotionScriptDraft", "MotionHookFix"], calls
+    assert calls[0][2] == script_mod.SYSTEM_MOTION_WALKTHROUGH
+    assert calls[1][2] == script_mod.SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX
+    assert "TEMPLATE: walkthrough" in calls[0][1]
+    assert [s.speech for s in script.shots[1:]] == [s["speech"] for s in data["shots"][1:]]
+
+
+def test_fix_story_keeps_its_own_prompt():
+    topic, section, source = _react_inputs()
+    with _fake_ask_json([_draft(_golden())]) as calls:
+        script, _ = script_mod.write_motion_script(
+            topic, section, short_id="t__motion", source_text=source)
+    assert script is not None and script.template == "fix_story"
+    assert calls[0][2].startswith(script_mod.SYSTEM_MOTION.split("__ICONS__")[0])
+    assert "TEMPLATE: fix_story" in calls[0][1]
+
+
+def test_unknown_template_is_refused_before_any_call():
+    topic, section, source = _react_inputs()
+    with _fake_ask_json([]) as calls:
+        try:
+            script_mod.write_motion_script(topic, section, short_id="t__motion",
+                                           source_text=source, template="listicle")
+        except ValueError as e:
+            assert "listicle" in str(e)
+        else:
+            raise AssertionError("an unknown template was accepted")
+    assert calls == []
+
+
+def test_stub_names_the_missing_fixture_for_a_template():
+    topic, section, source = _react_inputs()
+    try:
+        script_mod.write_motion_script(topic, section, short_id="t__motion",
+                                       source_text=source, template="walkthrough")
+    except NotImplementedError as e:
+        assert "no walkthrough motion stub fixture" in str(e)
+        assert "usestate_golden.json (fix_story)" in str(e)
+    else:
+        raise AssertionError("the stub handed back a script for the wrong template")
+
+
+def test_default_template_follows_the_teaching_approach():
+    from shorts.schema import TeachingApproach
+    walk = TeachingApproach(primary="process_demonstration")
+    assert motion_reel.default_template(walk) == "walkthrough"
+    for kind in ("analogy", "code", "direct_explanation", "comparison"):
+        assert motion_reel.default_template(TeachingApproach(primary=kind)) == "fix_story"
+    assert motion_reel.default_template(None) == "fix_story"
+
+
+def test_phase_1_scripts_still_load_as_fix_story():
+    data = _golden()
+    data.pop("template")
+    for s in data["shots"]:
+        s.pop("chapter", None)
+        s.pop("example", None)
+    script = MotionScript(**data)
+    assert script.template == "fix_story" and script.chapters == []
+    assert script.running_example is None
+
+
+def test_long_terms_are_capped_at_two_per_reel():
+    data = json.loads(WALKTHROUGH_GOLDEN.read_text(encoding="utf-8"))
+    source = "\n\n".join(s.text for s in parse_markdown(TOKEN_DOC))
+    source += "\nIdentification and documentation are both explained here."
+    # s05 gains two more explained long terms; with 'vocabulary' that is three.
+    data["shots"][4]["speech"] = ("The tokenizer cuts at spaces, called identification "
+                                  "points, and keeps documentation, which is a list of rules.")
+    data["shots"][4]["captions"] = [{"text": data["shots"][4]["speech"]}]
+    result = checks.check_motion_plain_words(MotionScript(**data), source)
+    assert not result.passed and "3 long terms" in result.reason, result.reason
+    data = json.loads(WALKTHROUGH_GOLDEN.read_text(encoding="utf-8"))
+    ok = checks.check_motion_plain_words(MotionScript(**data), source)
+    assert ok.passed and "vocabulary" in ok.reason, ok.reason
+
+
 # --------------------------------------------------------------------- runner
 
-def _run_runner(*args: str) -> tuple[int, str]:
+def _run_runner(*args: str, doc: Path = REACT_DOC) -> tuple[int, str]:
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
-        code = motion_reel.main([str(REACT_DOC), *args])
+        code = motion_reel.main([str(doc), *args])
     return code, buf.getvalue()
 
 
@@ -181,10 +300,29 @@ def test_runner_setup_and_script_then_resume():
         script = MotionScript.model_validate_json(motion_file.read_text(encoding="utf-8"))
         assert script.reel_style == "motion" and len(script.shots) == 11
         assert "Approve shot list?" in text and "scenes: not built yet" in text
+        assert script.template == "fix_story" and "template: fix_story" in text
 
         code, text = _run_runner("--topic", short_id)
         assert code == 0, text
         assert "setup: resumed" in text and "script: resumed" in text
+
+
+def test_runner_walkthrough_with_template_flag():
+    with _temp_output() as out:
+        code, text = _run_runner("--yes", "--template", "walkthrough", doc=TOKEN_DOC)
+        assert code == 0, text
+        [motion_file] = list(out.glob("*.motion.json"))
+        short_id = motion_file.name[: -len(".motion.json")]
+        script = MotionScript.model_validate_json(motion_file.read_text(encoding="utf-8"))
+        assert script.template == "walkthrough" and len(script.chapters) == 4
+        setup = json.loads((out / short_id / "setup.json").read_text(encoding="utf-8"))
+        assert setup["template"] == "walkthrough"
+        assert "template: walkthrough   (--template)" in text
+        assert "chapter 1: Cut the sentence" in text
+
+        # A resumed reel keeps the template it was set up with.
+        code, text = _run_runner("--topic", short_id, "--template", "fix_story", doc=TOKEN_DOC)
+        assert code == 1 and "--force-stage setup" in text, text
 
 
 def test_runner_declined_gate_saves_nothing():
@@ -205,6 +343,13 @@ def test_runner_ids_never_collide_with_other_styles():
         (out / "topic_x.json").write_text("{}", encoding="utf-8")
         (out / "topic_x__motion.story.json").write_text("{}", encoding="utf-8")
         assert motion_reel._next_free_motion_id("topic_x") == "topic_x__motion_2"
+
+
+def test_walkthrough_evidence_is_the_whole_numbered_session():
+    sections = parse_markdown(TOKEN_DOC)
+    assert motion_reel.walkthrough_session_ids(sections, "1.1") == \
+        ["1.1", "1.2", "1.3", "1.4", "1.5", "1.6"]
+    assert motion_reel.walkthrough_session_ids(sections, "intro") == []
 
 
 def test_next_topic_comes_from_the_document():

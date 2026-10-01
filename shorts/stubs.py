@@ -951,26 +951,36 @@ def _story_frame_judge(user: str) -> dict:
 
 _MOTION_FIXTURES = Path(__file__).resolve().parent.parent / "evals" / "fixtures" / "motion"
 _MOTION_DRAFT_FIELDS = ("hook_question", "concept_name", "promise",
-                        "icon_vocabulary", "takeaways", "shots")
+                        "icon_vocabulary", "takeaways", "shots", "chapters",
+                        "running_example")
 
 
 def _motion_fixture_for(user: str) -> dict:
+    """The golden fixture whose concept_name the material teaches AND whose
+    template is the one asked for (the TEMPLATE: line of the material block).
+    A walkthrough asked of useState material has no fixture, and says so,
+    rather than handing back a fix_story the walkthrough graders then fail."""
     material = (_find(r"MATERIAL:\n(.*?)(?:\n(?:CORE IDEA|THE APPROVED|SERIES)|\Z)",
                       user, re.S) or user)
+    template = _find(r"^TEMPLATE:\s*(\w+)", user, re.M) or "fix_story"
     flat = re.sub(r"[`*]", "", material).lower()
+    taught = []
     for path in sorted(_MOTION_FIXTURES.glob("*_golden.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         if data["concept_name"].lower() in flat:
-            return data
+            if data.get("template", "fix_story") == template:
+                return data
+            taught.append(f"{path.name} ({data.get('template', 'fix_story')})")
     raise NotImplementedError(
-        "no motion stub fixture teaches this material — add an "
-        "evals/fixtures/motion/<name>_golden.json whose concept_name appears in it, "
-        "or unset SHORTS_STUB.")
+        f"no {template} motion stub fixture teaches this material"
+        + (f" (only {', '.join(taught)})" if taught else "")
+        + f" — add an evals/fixtures/motion/<name>_golden.json with template "
+        f"{template!r} whose concept_name appears in it, or unset SHORTS_STUB.")
 
 
 def _motion_script(user: str) -> dict:
     data = _motion_fixture_for(user)
-    return {k: data[k] for k in _MOTION_DRAFT_FIELDS}
+    return {k: data[k] for k in _MOTION_DRAFT_FIELDS if k in data}
 
 
 def _motion_hook_fix(user: str) -> dict:

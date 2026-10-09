@@ -76,8 +76,10 @@ export function FieldTransition({ kind, from, to, t, outgoing, incoming, origin 
   if (kind === "iris") {
     const [ox, oy] = origin;
     const rMax = Math.max(Math.hypot(ox, oy), Math.hypot(W - ox, oy), Math.hypot(ox, H - oy), Math.hypot(W - ox, H - oy));
-    const outer = rMax * 1.05 * p;
-    const inner = rMax * clamp((p - 0.18) / 0.82);
+    // The ring holds for a few frames before the new field opens inside it
+    // (findings 8.3): the inner edge lags the outer by a third of the move.
+    const outer = rMax * 1.05 * ease.outCubic(clamp(p / 0.8));
+    const inner = rMax * ease.inCubic(clamp((p - 0.35) / 0.65));
     shapes = <circle cx={ox} cy={oy} r={outer} fill={lead} />;
     clip = `circle(${inner}px at ${ox}px ${oy}px)`;
   } else if (kind === "bar_wipe") {

@@ -11,6 +11,7 @@ import { StepBuild } from "./StepBuild";
 import { VoiceLab } from "./VoiceLab";
 import { CaptureStage } from "./CaptureStage";
 import { StoryCaptureStage } from "./StoryStage";
+import { MotionGallery } from "./motion/gallery/Gallery";
 import { pickVoices, useVoices } from "./useNarration";
 import type { Feedback, QuestionWorkflow, StoryReel, Unit } from "./types";
 
@@ -33,6 +34,9 @@ export default function App() {
   // page, so anything drawn here ends up in the file someone posts.
   const capture = useCaptureRoute();
   if (capture) return <CaptureRoute shortId={capture} />;
+  // #motion-gallery — the motion library, checked frame by frame. A dev page:
+  // no API calls, so it works with only the Vite server running.
+  if (location.hash.startsWith("#motion-gallery")) return <MotionGallery />;
 
   return <Workspace />;
 }

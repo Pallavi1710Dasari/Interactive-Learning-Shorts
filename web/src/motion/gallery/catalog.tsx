@@ -50,11 +50,13 @@ const SHELF_WORDS = ("the of and to in is it you that was for on are with as his
   "sound no most people my over know water than call first who may down side been now find any new work part take get place " +
   "made live where after back little only round man year came show every good me give our under name very through just form " +
   "##s ##ed ##ing ##able ##ly ##er matters ##ken ##ization dream rain train piece city").split(" ");
-const SHELF: GridSpec = {
-  cells: SHELF_WORDS.slice(0, 84), cols: 6, x: 60, y: 260, w: 960, cellH: 62, gap: 12,
-  readable: [39, 40, 45, 46, 51, 52, 57, 58, 63, 64, 69, 70],
-};
-const MATTERS = SHELF_WORDS.indexOf("matters");
+const READABLE = [39, 40, 45, 46, 51, 52, 57, 58, 63, 64, 69, 70];
+// The demo's own words go into readable cells; the rest are texture.
+const SHELF_CELLS = SHELF_WORDS.slice(0, 84);
+["dream", "##able", "matters", "down", "rain", "##ken", "##ization", "water", "train", "piece", "##ing", "city"]
+  .forEach((w, i) => { SHELF_CELLS[READABLE[i]] = w; });
+const SHELF: GridSpec = { cells: SHELF_CELLS, cols: 6, x: 60, y: 260, w: 960, cellH: 62, gap: 12, readable: READABLE };
+const MATTERS = SHELF_CELLS.indexOf("matters");
 
 const SENTENCE: RowItem[] = [{ text: "Tokenization" }, { text: "matters" }, { text: "." }];
 const TOKENS: RowItem[] = [{ text: "To" }, { text: "##ken" }, { text: "##ization" }, { text: "matters" }, { text: "." }];
@@ -297,7 +299,7 @@ export const ENTRIES: Entry[] = [
       const tt = CHAPTER_CARD.exitAt - 0.2 + t;
       const handed = tt >= CHAPTER_CARD.exitAt + CHAPTER_CARD.fly;
       return <Frame field={f}><ChapterCard n={2} of={4} title="Check the word shelf" field={f} t={tt} />
-        <StepChip n={2} of={4} field={f} p={seg(tt, CHAPTER_CARD.exitAt + CHAPTER_CARD.fly * 0.6, 0.25)} hideNumber={!handed} /></Frame>;
+        <StepChip n={2} of={4} field={f} p={seg(tt, CHAPTER_CARD.exitAt + CHAPTER_CARD.fly - 0.05, 0.2)} hideNumber={!handed} /></Frame>;
     } },
 
   // ------------------------------------------------------------- animations

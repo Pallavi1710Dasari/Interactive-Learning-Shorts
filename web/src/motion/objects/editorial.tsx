@@ -355,7 +355,8 @@ export function MatrixGrid({ cells, x, y, cell = 78, gap = 10, field, rowLabels,
   return (
     <At x={x} y={y}>
       {label && <div style={{ position: "absolute", left: lx + bx, top: -60, fontFamily: FONT.display, fontSize: 40,
-                             color: th.dark ? C.yellow : FIELDS_BLUE, textTransform: "uppercase" }}>{label}</div>}
+                             color: th.dark ? C.yellow : FIELDS_BLUE, textTransform: "uppercase",
+                             whiteSpace: "nowrap" }}>{label}</div>}
       {rowLabels?.map((l, r) => (
         <div key={l} style={{ position: "absolute", left: 0, top: r * (cell + gap) + cell / 2 - 14, fontFamily: FONT.mono,
                               fontSize: 24, fontWeight: 700, color: th.dark ? "rgba(255,255,255,0.7)" : C.sub }}>{l}</div>

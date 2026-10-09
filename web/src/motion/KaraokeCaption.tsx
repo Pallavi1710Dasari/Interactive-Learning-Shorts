@@ -17,10 +17,19 @@ export interface CaptionSentence { words: CaptionWord[]; start: number; end: num
 export function parseCaption(text: string): { text: string; hl: boolean }[] {
   const out: { text: string; hl: boolean }[] = [];
   let hl = false;
+  let lastChar = " ";   // the last character of real text seen, tags skipped
   for (const part of text.split(/(<\/?b>)/)) {
     if (part === "<b>") { hl = true; continue; }
     if (part === "</b>") { hl = false; continue; }
-    for (const w of part.split(/\s+/)) if (w) out.push({ text: w, hl });
+    if (!part) continue;
+    part.split(/\s+/).forEach((w, i) => {
+      if (!w) return;
+      // Text touching the previous word across a tag ("vocabulary</b>.")
+      // belongs to that word, so it renders "vocabulary." not "vocabulary ."
+      if (i === 0 && out.length && !/\s/.test(lastChar) && !/^\s/.test(part)) out[out.length - 1].text += w;
+      else out.push({ text: w, hl });
+    });
+    lastChar = part[part.length - 1];
   }
   return out;
 }

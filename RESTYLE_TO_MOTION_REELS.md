@@ -1,6 +1,6 @@
 # Restyle: motion reels (`REEL_STYLE=motion`)
 
-Status: **Phase 1 and phase 1b of 5 done (script contract, both templates).** Built and verified with `SHORTS_STUB=1` only; no real LLM call has been made in motion mode yet.
+Status: **Phases 1, 1b and 2 of 5 done (script contract, both templates, scene library).** Built and verified with `SHORTS_STUB=1` only; no real LLM call has been made in motion mode yet.
 
 **Read `REFERENCE_STYLE_ADDENDUM.md` with this file. Where they disagree, the addendum wins.** It adds the second reference reel (tokenization), the `walkthrough` template, the 120 s cap, karaoke sentence captions, and the motion system phase 2 builds.
 
@@ -36,7 +36,7 @@ These follow the addendum and its section 8.4. Where one changes a decision abov
 | Questions | Only the hook asks in fix_story. A walkthrough chapter may ask one question of ≤ 6 words, answered by the next sentence. |
 | Long words | Up to 2 terms over 4 syllables per reel, besides the concept's name, if the source uses them, they are on screen, and the same sentence explains them. |
 | Numbers | Every spoken number is in the source, except a chapter card's step number, the chapter count, and counts of the running example's own states. The word "one" is not checked (it is rarely a quantity); a digit 1 is. |
-| Walkthrough evidence | A walkthrough's source is its evidence pool **plus every section of the same numbered session** (filed under 1.1 → all 1.x), because a process lesson gives each step its own heading. fix_story's pool is unchanged. |
+| Walkthrough evidence | A walkthrough also sees **every section of the same numbered session** (filed under 1.1 → all 1.x), but only as SUPPORTING material. **The main explanation comes from the selected section's own evidence pool**; supporting sections may supply only numbers and defined terms (decision 2026-10-01, revised). `walkthrough_main_source` checks the concept, the running example and every chapter title's key words are in the main text, and the shot-list gate and report list every number and term with the section it came from (`output/<id>/fact_sources.json`). fix_story's pool is unchanged. |
 | Series split | Deferred. More than 4 chapters fails. |
 | Golden fixtures | The useState fixture says no number its source section does not: the payoff no longer counts "one, two, three" aloud, and the code map says "the value and its setter". |
 
@@ -120,9 +120,30 @@ python -m evals.run_evals
 
 The stubs return a golden fixture, so a stub run works only on material that a fixture's `concept_name` appears in, in the template asked for (fix_story: useState, the TLB; walkthrough: tokenization, the hash table). Other material raises and names the fix: add a fixture.
 
+## Phase 2: scene library
+
+Everything is React in `web/src/motion/`, drawn in 1080 x 1920 design units, and **every component is a pure function of `t`**: no CSS animations or transitions, no timers, no `Math.random`. The capture renderer can therefore seek to any frame and get exactly that frame.
+
+| File | What |
+|---|---|
+| `tokens.ts`, `time.ts` | Fields, colour meanings, fonts, safe lines; easing, spans, seeded random, polyline geometry. |
+| `Stage.tsx`, `fonts.css` | `Frame`, `Fit` (scale to any width), `Icon` (from `icons.json`), `Overlay`. Fonts are OFL `@fontsource` packages, bundled — never fetched at render. |
+| `objects/reference.tsx` | Set 1 (the useState reference): DeviceMock, EntityCard, SystemPanel, Connector, CodeWindow, TriggerChip, StatusPill, IconTile, TitleCard, CodeMapCard, TakeawayList, EndCard, DotGrid. |
+| `objects/editorial.tsx` | Set 2 (the tokenization reference): KineticTitle, ChapterCard (entrance + chip fly-in), Chip/TokenRow/ChipTag, Stamp, LookupGrid + SearchBar, LookupTable, MatrixGrid, BigCounter, Bracket, Callout, RecapGrid, TextureBackground. |
+| `chrome.tsx` | StepChip, ProgressSegments, SectionLabel, CornerMark. |
+| `KaraokeCaption.tsx` | One sentence at a time, spoken words full ink, the rest 35 %. Even word timings until phase 3. |
+| `transitions.tsx` | The 6 transitions, each an exit dim plus 0.55 s of field-colour shapes; `planTransitions` never repeats back to back. |
+| `animations.tsx` | The 13 in-shot animations, `count_up` (14th), category highlight, zoom into a cell and the scan line. |
+| `gallery/` | `#motion-gallery`: every entry with a frame scrubber beside the reference frames; `/fonts`, `/strip/<id>`, `/frame/<id>?t=`. |
+| `motion.test.tsx` | `npm run test:motion`: every entry pure in `t` and moving; transition and number-format rules. |
+| `shorts/reference_frames.py`, `web/public/reference/` | The timestamp manifest and the frames cut from the (git-ignored) reference MP4. |
+
+Screenshots of every entry next to the reference are in `docs/reference/phase2/`.
+
+Also in phase 2: every test suite now writes to a temp folder (`shorts/testing.py`, `SHORTS_OUTPUT_DIR` / `SHORTS_CAST_ASSETS_DIR`) instead of `output/` and `assets/cast/`.
+
 ## Phases still to come
 
-2. **Scene library.** Tokens, icons, both object sets, chapter fields, karaoke captions, the 6 chapter transitions, the chapter-card entrance and the 14 in-shot animations (addendum 4.6 and 8), `MotionStage` driven only by `t`, and a `#motion-gallery` page with a frame scrubber beside the reference frames.
-3. **Scenes and timing.** `SYSTEM_MOTION_SCENES`, SceneSpec validation and the `revision.py` loop, per-shot Chatterbox narration, and whisper-aligned timelines. Also adds the three scene graders.
+3. **Scenes and timing.** `MotionStage` (the player that lays a script's shots, transitions and captions on one timeline — moved here from phase 2 because SceneSpec defines what it plays), `SYSTEM_MOTION_SCENES`, SceneSpec validation and the `revision.py` loop, per-shot Chatterbox narration, and whisper-aligned timelines. Also adds the three scene graders.
 4. **Render and QA.** Motion capture, MP4, frame checks (word count from the page, safe zones), motion judge rubrics, and the report.
 5. **Polish.** A motion view in the web UI, `docs/RUNBOOK_MOTION.md`, and cleanup.

@@ -595,7 +595,15 @@ def stage_scenes(short_id: str, script: MotionScript, yes: bool,
                                      len(SYSTEM_MOTION_SCENES) // 3 + 3500, 6000))]
     if not _money_gate("scenes", short_id, plan, yes, reel_cursor):
         return None
-    scripted, results = write_motion_scenes(script)
+    attempts: list = []
+    try:
+        scripted, results = write_motion_scenes(script, attempts=attempts)
+    finally:
+        # every attempt's scenes, per-shot reasons and fallbacks — kept even
+        # when the stage gives up, so a failed run can be diagnosed from disk
+        scenes_attempts_path(short_id).write_text(json.dumps(
+            {"short_id": short_id, "attempts": attempts}, indent=1), encoding="utf-8")
+    print(f"  attempts: {scenes_attempts_path(short_id)}")
     print_scenes(scripted, results)
     if not checks.all_passed(results):
         print("  GIVING UP — the scenes do not pass the scene graders (see above).")
@@ -609,6 +617,12 @@ def stage_scenes(short_id: str, script: MotionScript, yes: bool,
 
 
 # ============================================================ voice, timing
+
+def scenes_attempts_path(short_id: str) -> Path:
+    path = config.OUTPUT_DIR / short_id / "scenes_attempts.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
 
 def plan_path(short_id: str) -> Path:
     return config.OUTPUT_DIR / short_id / "plan.json"
@@ -954,7 +968,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="python -m shorts.motion_reel",
         description="Run one motion reel: setup -> theme -> script -> scenes -> voice -> "
                     "timing -> render -> report.")
-    p.add_argument("markdown_path")
+    p.add_argument("markdown_path", nargs="?", default=None)
     p.add_argument("--topic", dest="topic_short_id", default=None,
                    help="resume an in-progress motion reel by its short_id "
                         "(output/<short_id>/setup.json must already exist)")
@@ -982,6 +996,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="the character preset that plays the reel's language, for this reel only "
                         "(a language id, or an extra such as riya — shorts/motion_character_"
                         "presets.yaml); implies --characters")
+    p.add_argument("--check-models", action="store_true",
+                   help="make ONE tiny call per model in shorts/motion_models.yaml with its "
+                        "reasoning setting, and report OK or the exact error with its cost "
+                        "(about $0.03 in all; no document needed). With SHORTS_STUB=1 it "
+                        "only shows what it would send.")
     p.add_argument("--estimate", action="store_true",
                    help="print the whole reel's estimated cost per step and model, and stop "
                         "(free — no call is made)")
@@ -992,7 +1011,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.check_models:
+        from . import motion_models
+        rows = motion_models.check_models(dry_run=config.STUB)
+        return 0 if motion_models.print_check(rows) else 1
+    if not args.markdown_path:
+        parser.error("markdown_path is required (except with --check-models)")
     if args.character:
         from . import motion_character_presets
         if args.character not in motion_character_presets.ids():

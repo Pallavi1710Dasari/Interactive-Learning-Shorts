@@ -13,6 +13,26 @@ models:
   deliberate: anthropic/claude-opus-5.5    # judgement: what to teach, how, in what format
   mechanical: anthropic/claude-sonnet-5.5  # wording and repair of something already decided
 
+# Reasoning ("extended thinking") per model, for motion runs only.
+#   thinking: on   send thinking={"type":"enabled","budget_tokens":N}. Required
+#                  for a model whose endpoint refuses to disable it — Opus 5.5 on
+#                  OpenRouter answers "Reasoning is mandatory for this endpoint
+#                  and cannot be disabled." (400) to thinking off.
+#   thinking: off  send thinking={"type":"disabled"}: cheapest and fastest, where
+#                  the endpoint allows it. If it does not, the call fails with that
+#                  400 — `python -m shorts.motion_reel --check-models` finds out
+#                  for one tiny call per model.
+# Size the thinking with `effort` (low / medium / high -> the budgets below) or
+# an explicit `budget` (tokens, at least 1024, the API minimum). The budget is
+# ADDED to each call's max_tokens, so thinking never takes the answer's room.
+# Thinking is billed as output tokens; the estimate counts `typical_share` of
+# the budget per call as typical and the whole budget as worst case.
+reasoning:
+  anthropic/claude-opus-5.5:   {thinking: "on", effort: low}
+  anthropic/claude-sonnet-5.5: {thinking: "on", effort: low}
+effort_budgets: {low: 1024, medium: 4096, high: 12000}
+typical_share: 0.6
+
 # Every LLM call a motion reel can make, by its llm.ask_json label -> a tier
 # above (or a full model id). Everything else in the pipeline — parsing the
 # document, tags, variety, layout, cue timing, every grader — is plain code and

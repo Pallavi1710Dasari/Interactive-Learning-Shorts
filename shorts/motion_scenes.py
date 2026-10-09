@@ -70,7 +70,9 @@ def resolve_cues(shot: MotionShot, scene: MotionScene | None = None) -> list[int
         if a.at.strip().lower() == "start":
             out.append(-1)
             continue
-        cue = [_key(w) for w in a.at.split() if _key(w)]
+        # a cue copied with the caption's markup ("<b>remember</b>") is the
+        # same words: drop the tags before matching
+        cue = [_key(w) for w in re.sub(r"</?b>", " ", a.at).split() if _key(w)]
         if prev_cue is not None and cue and cue == prev_cue and out and out[-1] is not None:
             out.append(out[-1])
             continue
@@ -379,11 +381,14 @@ def _kinetic(text: str, cap: int = 54) -> str:
 
 
 def _whole_title(shot: MotionShot, script) -> str:
-    """The hook's kinetic title: its first sentence, or the reel's question,
-    whichever fits the title's lines WHOLE — a hook cut mid-phrase ("…STAYS
-    STUCK AT") reads as a mistake. Cut only if neither fits."""
+    """The hook's kinetic title: the hook's own question sentence, the reel's
+    question, or its first sentence — the first that fits the title's lines
+    WHOLE. A hook cut mid-phrase ("…STAYS STUCK AT") reads as a mistake, and a
+    lead-in ("SAME CLICK.") says nothing; the question is the hook. Cut only
+    if none fits."""
     k = lib.library()["kinetic"]
-    for text in (_first_sentence(shot), script.hook_question):
+    questions = [motion_plain_text(c.text) for c in shot.captions if motion_plain_text(c.text).rstrip().endswith("?")]
+    for text in (*questions, script.hook_question, _first_sentence(shot)):
         t = (text or "").upper().strip()
         if t and len(kinetic_lines(t)) <= k["max_lines"] and len(t) <= 54:
             return t
@@ -436,24 +441,40 @@ class _Builder:
         self.actions.append(MotionSceneAction(at=cue, do=do, target=target, **kw))
 
 
+#: Symptom words too vague to name a failure on their own ("Same click" is
+#: not what goes wrong).
+_WEAK_SYMPTOMS = {"same", "old", "back", "nothing"}
+
+
 def _symptom(shot: MotionShot) -> str:
-    """A short phrase naming what goes wrong: a highlight, else the words
-    around the first symptom word, else the first four words."""
+    """A short phrase naming what goes wrong: a highlight that names the
+    symptom ("stuck at zero"), else the words around the first strong symptom
+    word INSIDE one sentence (never across "." or "?"), else the last
+    highlight, else the first four words."""
     from .checks import MOTION_SYMPTOM_WORDS
     hl = _highlights(shot)
-    words = motion_plain_text(" ".join(c.text for c in shot.captions)).split()
+
+    def symptomatic(w: str) -> bool:
+        return (_key(w) in MOTION_SYMPTOM_WORDS and _key(w) not in _WEAK_SYMPTOMS) or bool(re.search(r"\d", w))
+
+    for h in hl:
+        if any(symptomatic(w) for w in h.split()):
+            return _fit(h[:1].upper() + h[1:], 26)
     small = {"at", "to", "in", "on", "of", "the", "a", "an", "and", "back"}
-    for i, w in enumerate(words):
-        if _key(w) in MOTION_SYMPTOM_WORDS or re.search(r"\d", w):
-            j = min(len(words), i + 3)
-            # never end on a little word: "stuck at" -> "stuck at zero"
-            while j < len(words) and j - i < 5 and _key(words[j - 1]) in small:
-                j += 1
-            phrase = " ".join(words[i:j]).strip(" .,!?")
-            return _fit(phrase[:1].upper() + phrase[1:], 26)
+    for sentence in re.split(r"(?<=[.!?])\s+", motion_plain_text(" ".join(c.text for c in shot.captions))):
+        words = sentence.split()
+        for i, w in enumerate(words):
+            if symptomatic(w):
+                j = min(len(words), i + 3)
+                # never end on a little word: "stuck at" -> "stuck at zero"
+                while j < len(words) and j - i < 5 and _key(words[j - 1]) in small:
+                    j += 1
+                phrase = " ".join(words[i:j]).strip(" .,!?")
+                return _fit(phrase[:1].upper() + phrase[1:], 26)
     if hl:
         return _fit(hl[-1][:1].upper() + hl[-1][1:], 26)
-    return _fit(" ".join(words[:4]), 26)
+    words = motion_plain_text(" ".join(c.text for c in shot.captions)).split()
+    return _fit(" ".join(words[:4]).strip(" .,!?"), 26)
 
 
 def _rotation_after(prev: str | None, used: list[str]) -> str:
@@ -849,6 +870,43 @@ def default_scenes(script: MotionScript) -> list[MotionScene]:
             sc.transition = last
         prev_field = sc.field
     return scenes
+
+
+def fix_transitions(script: MotionScript) -> MotionScript:
+    """Make every shot's TRANSITION legal for the fields actually in sequence,
+    touching nothing else: a hard cut inside one field, a field transition on
+    a field change, type_scatter only out of the hook, never the same field
+    transition twice in a row (checks.check_motion_scene_valid). Transitions
+    are mechanical — they follow from the fields — so a scene mixed from
+    several sources (a first attempt, a repair, a fallback) is made
+    consistent here rather than sent back to the model."""
+    shots = list(script.shots)
+    prev = None
+    last: str | None = None
+    used: list[str] = []
+    for i, sh in enumerate(shots):
+        sc = sh.scene
+        if sc is None:
+            prev = sh
+            continue
+        t = sc.transition
+        if prev is not None and prev.scene is not None:
+            if sc.field == prev.scene.field:
+                t = "cut"
+            elif (t == "cut" or t not in lib.transitions() or t == last
+                  or (t == "type_scatter" and prev.beat != "hook")):
+                t = _rotation_after(last, used)
+                if t == last:
+                    t = _rotation_after(t, used)
+        elif t not in lib.transitions():
+            t = "cut"
+        if t != sc.transition:
+            shots[i] = sh.model_copy(update={"scene": sc.model_copy(update={"transition": t})})
+        if t != "cut":
+            last = t
+            used.append(t)
+        prev = shots[i]
+    return script.model_copy(update={"shots": shots})
 
 
 def with_default_scenes(script: MotionScript) -> MotionScript:

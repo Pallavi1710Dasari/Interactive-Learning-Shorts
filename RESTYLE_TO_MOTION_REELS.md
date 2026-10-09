@@ -531,6 +531,22 @@ The second command has no `SHORTS_STUB`. It shows the estimate and asks before a
 
 **Saved presets are tracked.** `shorts/motion_character_presets.saved.yaml` is committed (empty until the designer saves), and a test fails if it goes missing or a `.gitignore` rule hides it.
 
+## Reasoning fix: the first real reel's 400 (2026-10-09)
+
+**What failed.** The first real motion reel stopped on its first call (select). OpenRouter answered `anthropic/claude-opus-5.5` with `thinking={"type":"disabled"}` with a 400: "Reasoning is mandatory for this endpoint and cannot be disabled." `llm._reasoning()` sent thinking off to every Anthropic model.
+
+**Fix.**
+- **Per-model reasoning** in `shorts/motion_models.yaml` (`reasoning`), applied by `motion_models.use()` for a motion run only:
+  - Opus 5.5: `thinking: "on"` with `effort: low` (a 1024-token budget, the API minimum). This sends `thinking={"type":"enabled","budget_tokens":1024}`.
+  - Sonnet 5.5: `thinking: "off"`.
+  - `effort` is low / medium / high (1024 / 4096 / 12000 tokens); or give a `budget` directly.
+  - The budget is added to each call's `max_tokens`, so thinking never takes the room the JSON needs.
+  - The YAML is validated: every model a run uses needs a setting.
+- **Explainer and story are unchanged.** Outside a motion run the map is empty, so their requests are byte-for-byte as before. `llm_reasoning_test` checks this.
+- **Thinking never reaches a parser.** `llm.visible_text()` reads only `text` blocks (not `thinking`, `redacted_thinking` or `reasoning`) and strips any `<thinking>`/`<think>`/`<reasoning>` text a gateway inlines. `ask_json` and `text_of` both use it.
+- **The estimate counts thinking.** Thinking is billed as output: a typical call counts 60% of its budget (`typical_share`), the worst case all of it. For the useState lesson: **$0.63 typical, $1.77 worst** (was $0.56 / $1.38), under `MAX_REEL_USD` ($2.00).
+- **Preflight.** `python -m shorts.motion_reel --check-models` makes ONE tiny call per model with its reasoning setting, and reports OK or the exact error, with its billed cost: at most about $0.02 in all. With `SHORTS_STUB=1` it is a dry run that shows what it would send.
+
 ## Phases still to come
 
 4. **Render and QA.** Motion capture of `#motion-reel` through `window.__capture.seek`, the MP4 with `audio/reel.wav`, frame checks (word count from the page, safe zones), motion judge rubrics, and the report. Record the real voice slot clips (`voices/motion/<slot>.wav`).

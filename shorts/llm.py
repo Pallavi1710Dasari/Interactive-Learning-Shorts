@@ -27,6 +27,19 @@ the model as an empty assistant turn.
 
 Pass think=True on a call that genuinely needs deliberation (the judge does).
 
+MODELS THAT CANNOT THINK "OFF". anthropic/claude-opus-5.5 through OpenRouter
+answers thinking={"type":"disabled"} with a hard 400 ("Reasoning is mandatory
+for this endpoint and cannot be disabled.") — the first real motion reel died
+on its first call that way. A motion run therefore sets reasoning PER MODEL
+from shorts/motion_models.yaml (set_model_reasoning(), via motion_models.use()):
+on with an explicit budget, or off where the model allows it. The budget is
+ADDED to the call's max_tokens, so thinking never eats the room the JSON needs.
+Outside a motion run that map is empty and every request is exactly as before.
+
+THINKING NEVER REACHES A PARSER. Only `text` blocks are read (thinking and
+redacted_thinking blocks are skipped), and reasoning a gateway inlines into the
+text as <thinking>/<think>/<reasoning> tags is stripped — visible_text().
+
 REASONING CONTROL IS NOT PORTABLE — see _reasoning() below. "Thinking off" is an
 Anthropic spelling, and two of the three families this project now runs on answer
 it differently. Never hand-write thinking={...} at a call site; ask _reasoning().
@@ -96,9 +109,30 @@ _REASONING_MANDATORY_RE = re.compile(r"gemini-\d+(?:\.\d+)*-pro")
 MIN_REASONING_TOKENS = 1024
 
 
+#: model -> {"thinking": "on"|"off", "budget": int}, set by motion_models.use()
+#: for a motion run only (shorts/motion_models.yaml `reasoning`). Empty outside
+#: one, so explainer and story requests are unchanged.
+_MODEL_REASONING: dict[str, dict] = {}
+
+
+def set_model_reasoning(mapping: dict[str, dict]) -> None:
+    _MODEL_REASONING.clear()
+    _MODEL_REASONING.update(mapping)
+
+
+def thinking_budget(model: str) -> int:
+    """Extra output tokens a configured model may spend thinking (0 if off or
+    not configured). Added to max_tokens so the answer keeps its own room."""
+    r = _MODEL_REASONING.get(model)
+    return int(r["budget"]) if r and r.get("thinking") == "on" else 0
+
+
 def _reasoning(model: str, think: bool) -> dict:
     """
     The reasoning kwargs for one model, given whether this call wants to deliberate.
+
+    A model configured for this run (_MODEL_REASONING, a motion run) gets exactly
+    its setting: thinking on with its budget, or off. Otherwise, as before:
 
     Three behaviours, discovered by asking the gateway rather than by reading docs:
 
@@ -113,6 +147,11 @@ def _reasoning(model: str, think: bool) -> dict:
     think=True sends nothing and lets the provider deliberate as it sees fit, which
     is what the judge wants on every family.
     """
+    configured = _MODEL_REASONING.get(model)
+    if configured is not None:
+        if configured.get("thinking") == "on":
+            return {"thinking": {"type": "enabled", "budget_tokens": int(configured["budget"])}}
+        return {"thinking": {"type": "disabled"}}
     if think:
         return {}
     if any(m in model for m in _REASONING_MANDATORY) \
@@ -208,15 +247,28 @@ def call(system: str, user: str, model: str | None = None, max_tokens: int = 400
     model = model or config.MODEL_GENERATOR
     started = time.perf_counter()
     resp = client().messages.create(
-        model=model, max_tokens=max_tokens, system=_system(system, model),
+        model=model, max_tokens=max_tokens + thinking_budget(model), system=_system(system, model),
         messages=[{"role": "user", "content": user}], **_reasoning(model, think),
     )
     usage.record(label, model, resp, duration_seconds=time.perf_counter() - started)
     return resp
 
 
+#: Reasoning a gateway may inline into the text instead of sending as its own
+#: block. Stripped whole, tags and contents.
+_INLINE_REASONING = re.compile(r"<(thinking|think|reasoning)>.*?</\1>\s*", re.S | re.I)
+
+
+def visible_text(resp) -> str:
+    """The answer only: the `text` blocks, never thinking / redacted_thinking /
+    reasoning blocks, with any inlined <thinking>…</thinking> removed."""
+    text = "".join(getattr(b, "text", "") or "" for b in (resp.content or [])
+                   if getattr(b, "type", None) == "text")
+    return _INLINE_REASONING.sub("", text)
+
+
 def text_of(resp) -> str:
-    return "".join(b.text for b in resp.content if b.type == "text")
+    return visible_text(resp)
 
 
 #: label -> model, set by motion_models.use() for a motion run only. A routed
@@ -273,12 +325,12 @@ def ask_json(
     for attempt in range(retries + 1):
         started = time.perf_counter()
         resp = client().messages.create(
-            model=model, max_tokens=budget, system=_system(system, model),
+            model=model, max_tokens=budget + thinking_budget(model), system=_system(system, model),
             messages=messages,
             **_reasoning(model, think),
         )
         usage.record(label, model, resp, duration_seconds=time.perf_counter() - started)
-        raw = "".join(b.text for b in resp.content if b.type == "text")
+        raw = visible_text(resp)
 
         if not raw.strip():
             # No text at all. Either the budget went entirely on thinking tokens or

@@ -1,0 +1,319 @@
+{
+ "reel_style": "motion",
+ "template": "fix_story",
+ "short_id": "what_state_means__motion",
+ "source_section_id": "7.4",
+ "topic": "What makes a piece of data state in a React component, and how does it differ from every other value inside the component?",
+ "hook_question": "Why does one counter stay stuck at zero?",
+ "concept_name": "State",
+ "promise": "Know what React remembers",
+ "icon_vocabulary": [
+  {
+   "name": "refresh",
+   "label": "Rebuilt"
+  },
+  {
+   "name": "memory",
+   "label": "Remembered"
+  },
+  {
+   "name": "bolt",
+   "label": "Re-render"
+  }
+ ],
+ "takeaways": [
+  {
+   "icon": "refresh",
+   "line": "Plain values rebuild",
+   "sub": "Fresh every render"
+  },
+  {
+   "icon": "memory",
+   "line": "React keeps state",
+   "sub": "Survives the rebuild"
+  },
+  {
+   "icon": "bolt",
+   "line": "Change triggers render",
+   "sub": "Only state asks"
+  }
+ ],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "speech": "Same click. Why does one counter stay stuck at zero?",
+   "captions": [
+    {
+     "text": "Same <b>click</b>.",
+     "speaker": null
+    },
+    {
+     "text": "Why does one counter stay <b>stuck at zero</b>?",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "Two phone mocks side by side, each with a counter button; the left status pill reads 0 after a tap chip, the right climbs.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 3.85
+  },
+  {
+   "id": "s02",
+   "beat": "title",
+   "speech": "State is the value React keeps between renders.",
+   "captions": [
+    {
+     "text": "<b>State</b> is the value React keeps between renders.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "The title card with the refresh, memory and bolt icons.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 3.08
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "speech": "Here's the before. Inside Counter, you write let count equals zero. Your click handler adds one to count.",
+   "captions": [
+    {
+     "text": "Here's the <b>before</b>.",
+     "speaker": null
+    },
+    {
+     "text": "Inside <b>Counter</b>, you write let count equals zero.",
+     "speaker": null
+    },
+    {
+     "text": "Your click handler adds one to <b>count</b>.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "A code window showing the plain variable and the click handler inside Counter.",
+   "code": [
+    "let count = 0;",
+    "count = count + 1;"
+   ],
+   "scene": null,
+   "estimated_seconds": 6.92
+  },
+  {
+   "id": "s04",
+   "beat": "break_1",
+   "speech": "Each render, meaning each time React runs your function, builds count from nothing. Your click changes a number nobody watches. Nothing asks React to run again.",
+   "captions": [
+    {
+     "text": "Each <b>render</b>, meaning each time React runs your function, builds count from nothing.",
+     "speaker": null
+    },
+    {
+     "text": "Your click changes a number <b>nobody watches</b>.",
+     "speaker": null
+    },
+    {
+     "text": "Nothing asks React to run again.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "A tap chip hits the Counter entity card; the connector to the React system panel stays dark with no pulse.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 10.0
+  },
+  {
+   "id": "s05",
+   "beat": "break_2",
+   "speech": "And on the next render, the old count is thrown away. A brand new count starts back at zero. The label freezes.",
+   "captions": [
+    {
+     "text": "And on the next render, the old count is <b>thrown away</b>.",
+     "speaker": null
+    },
+    {
+     "text": "A brand new count starts <b>back at zero</b>.",
+     "speaker": null
+    },
+    {
+     "text": "The label freezes.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "The Counter entity card is torn down and rebuilt, its status pill resetting to 0.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 8.46
+  },
+  {
+   "id": "s06",
+   "beat": "fix_idea",
+   "speech": "The after uses state instead. Think of it as a value React holds for you, outside your function. It survives the rebuild, and changing it asks for one.",
+   "captions": [
+    {
+     "text": "The after uses <b>state</b> instead.",
+     "speaker": null
+    },
+    {
+     "text": "Think of it as a value <b>React holds</b> for you, outside your function.",
+     "speaker": null
+    },
+    {
+     "text": "It survives the rebuild, and changing it asks for one.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "A system panel labeled React holds the count value beside the Counter entity card, linked by a connector.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 10.77
+  },
+  {
+   "id": "s07",
+   "beat": "fix_flow",
+   "speech": "You click. The handler changes the state value. React sees the change and runs Counter again. React hands back the new value, so the label shows it.",
+   "captions": [
+    {
+     "text": "You <b>click</b>.",
+     "speaker": null
+    },
+    {
+     "text": "The handler changes the state value.",
+     "speaker": null
+    },
+    {
+     "text": "React sees the change and <b>runs Counter again</b>.",
+     "speaker": null
+    },
+    {
+     "text": "React hands back the new value, so the label shows it.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "A tap chip fires, a pulse travels the connector to the React system panel, then back to Counter, and the status pill updates.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 10.38
+  },
+  {
+   "id": "s08",
+   "beat": "code_map",
+   "speech": "Use State asks React to remember count. React keeps that value between renders. Set Count changes it, and that change triggers the re-render.",
+   "captions": [
+    {
+     "text": "`useState` asks React to <b>remember</b> count.",
+     "speaker": null
+    },
+    {
+     "text": "React keeps that value between renders.",
+     "speaker": null
+    },
+    {
+     "text": "`setCount` changes it, and that change <b>triggers the re-render</b>.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "The code map card linking useState to the React system panel and setCount to a trigger chip.",
+   "code": [
+    "const [count, setCount] =",
+    "  useState(0);"
+   ],
+   "scene": null,
+   "estimated_seconds": 8.85
+  },
+  {
+   "id": "s09",
+   "beat": "payoff",
+   "speech": "Same click, side by side. The plain variable stays stuck at zero. The state value climbs, because React remembers it and runs Counter again.",
+   "captions": [
+    {
+     "text": "Same click, <b>side by side</b>.",
+     "speaker": null
+    },
+    {
+     "text": "The plain variable stays stuck at zero.",
+     "speaker": null
+    },
+    {
+     "text": "The <b>state</b> value climbs, because React remembers it and runs Counter again.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "The two phone mocks again; the state counter's status pill now shows a success state as it climbs.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 9.23
+  },
+  {
+   "id": "s10",
+   "beat": "recap",
+   "speech": "Plain variables are rebuilt every render. State is kept alive by React. Changing state triggers the re-render.",
+   "captions": [
+    {
+     "text": "Plain variables are <b>rebuilt</b> every render.",
+     "speaker": null
+    },
+    {
+     "text": "State is <b>kept alive</b> by React.",
+     "speaker": null
+    },
+    {
+     "text": "Changing state <b>triggers</b> the re-render.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "The takeaway list with the refresh, memory and bolt rows.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 6.54
+  },
+  {
+   "id": "s11",
+   "beat": "cta",
+   "speech": "Follow at learn the simple way for more.",
+   "captions": [
+    {
+     "text": "Follow at <b>learn the simple way</b> for more.",
+     "speaker": null
+    }
+   ],
+   "chapter": null,
+   "example": [],
+   "visual": "The end card showing @learnthesimpleway.",
+   "code": [],
+   "scene": null,
+   "estimated_seconds": 3.08
+  }
+ ],
+ "chapters": [],
+ "running_example": null,
+ "series": "@learnthesimpleway",
+ "next_topic": "",
+ "tts_provider": null,
+ "voice_ref": null,
+ "theme": "before_vs_after",
+ "language": "react",
+ "speakers": [],
+ "estimated_seconds": 81.16,
+ "_comment": "The script of the first real motion reel (output/what_state_means__motion, 2026-10-09), copied unchanged as a fixture: its scenes stage failed (s01 fell back, then the payoff no longer mirrored the hook). shorts/motion_scenes_fix_test.py replays that."
+}

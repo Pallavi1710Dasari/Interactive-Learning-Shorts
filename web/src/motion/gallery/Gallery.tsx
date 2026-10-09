@@ -19,9 +19,8 @@ import { Fit, Frame } from "../Stage";
 import { DISPLAY_FONTS, FPS, W, type DisplayFont, type FieldName } from "../tokens";
 import { ENTRIES, GROUPS, SETTLED, type Entry } from "./catalog";
 import { ChapterCard, KineticTitle, BigCounter } from "../objects/editorial";
-import { AvatarSheet } from "../avatars/AvatarSheet";
 
-interface Route { view: "overview" | "fonts" | "strip" | "frame" | "avatars"; id?: string; q: URLSearchParams }
+interface Route { view: "overview" | "fonts" | "strip" | "frame"; id?: string; q: URLSearchParams }
 
 function parseRoute(): Route {
   const raw = location.hash.replace(/^#/, "");
@@ -29,7 +28,6 @@ function parseRoute(): Route {
   const parts = path.split("/").slice(1);
   const q = new URLSearchParams(query);
   if (parts[0] === "fonts") return { view: "fonts", q };
-  if (parts[0] === "avatars") return { view: "avatars", id: parts[1], q };
   if ((parts[0] === "strip" || parts[0] === "frame") && parts[1]) return { view: parts[0], id: parts[1], q };
   return { view: "overview", q };
 }
@@ -52,17 +50,6 @@ export function MotionGallery() {
   if (route.view === "frame" && route.id) return <div style={vars}><SingleFrame route={route} /></div>;
   if (route.view === "strip" && route.id) return <div style={{ ...page, ...vars }}><Strip route={route} /></div>;
   if (route.view === "fonts") return <div style={page}><Fonts /></div>;
-  if (route.view === "avatars") return (
-    <div style={page}>
-      <div style={{ display: "flex", gap: 18, marginBottom: 14, fontSize: 14 }}>
-        <a href="#motion" onClick={(e) => { e.preventDefault(); location.hash = "#motion"; location.reload(); }}
-           style={{ color: "#FDD13E" }}>← Motion reels</a>
-        <a href="#motion-gallery" style={{ color: "#B9A8FF" }}>Scene library</a>
-        <a href="#motion-gallery/avatars" style={{ color: "#B9A8FF" }}>All avatars</a>
-      </div>
-      <AvatarSheet id={route.id} t={Number(route.q.get("t") ?? 1.3)} field={(route.q.get("field") as FieldName) || "paper"} />
-    </div>
-  );
 
   return (
     <div style={{ ...page, ...vars }}>
@@ -77,7 +64,8 @@ export function MotionGallery() {
           </select>
         </label>
         <a href="#motion-gallery/fonts" style={{ color: "#B9A8FF", fontSize: 14 }}>Compare fonts</a>
-        <a href="#motion-gallery/avatars" style={{ color: "#B9A8FF", fontSize: 14 }}>Avatars</a>
+        <a href="#motion/identities" onClick={(e) => { e.preventDefault(); location.hash = "#motion/identities"; location.reload(); }}
+           style={{ color: "#B9A8FF", fontSize: 14 }}>Language identities</a>
         <a href="#motion" onClick={(e) => { e.preventDefault(); location.hash = "#motion"; location.reload(); }}
            style={{ color: "#FDD13E", fontSize: 14 }}>← Motion reels</a>
       </header>

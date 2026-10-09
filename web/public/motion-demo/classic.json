@@ -1,5 +1,5 @@
 {
- "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+ "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_4",
  "template": "fix_story",
  "theme": "classic_explainer",
  "series": "@learnthesimpleway",
@@ -7,7 +7,62 @@
  "duration": 68.46,
  "audio": null,
  "timing_source": "even",
+ "identity": {
+  "id": "react",
+  "name": "React",
+  "colour": "#12B5DE",
+  "on_dark": "#12B9E3",
+  "on_light": "#0D83A1",
+  "text_on_dark": "#76DBF4",
+  "text_on_light": "#0A647B",
+  "file": "App.jsx",
+  "symbol": [
+   {
+    "path": "M50 30 L26 70 M50 30 L74 70",
+    "r": 0,
+    "stroke": 7.0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     50.0,
+     24.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     26.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     74.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "soft"
+   }
+  ]
+ },
+ "theme_label": "Explainer",
+ "tags": [
+  "#react",
+  "#explainer",
+  "#rerender",
+  "#state",
+  "#component"
+ ],
+ "intro": 0.0,
  "cast": [],
+ "characters": [],
  "shots": [
   {
    "id": "s01",
@@ -19,30 +74,42 @@
    "transition": "cut",
    "label": "",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
+     "kind": "identity_title",
+     "props": {},
+     "box": {
+      "x": 60.0,
+      "y": 417.4,
+      "w": 960.0,
+      "h": 270.0
+     }
+    },
+    {
+     "id": "o2",
      "kind": "kinetic_title",
      "props": {
-      "text": "EVER WONDERED WHY YOUR LIKE BUTTON STAYS STUCK AT",
+      "text": "WHY DOES YOUR LIKE BUTTON STAY STUCK AT ZERO?",
       "accent": [
        "ZERO"
       ],
       "lines": [
-       "EVER WONDERED WHY",
-       "YOUR LIKE BUTTON",
-       "STAYS STUCK AT"
+       "WHY DOES YOUR LIKE",
+       "BUTTON STAY STUCK",
+       "AT ZERO?"
       ]
      },
      "box": {
       "x": 60.0,
-      "y": 576.4,
+      "y": 735.4,
       "w": 960.0,
       "h": 319.2
      }
     },
     {
-     "id": "o2",
+     "id": "o3",
      "kind": "status_pill",
      "props": {
       "text": "Stays stuck at zero",
@@ -51,7 +118,7 @@
      },
      "box": {
       "x": 60.0,
-      "y": 943.6,
+      "y": 1102.6,
       "w": 960.0,
       "h": 80.0
      }
@@ -67,17 +134,17 @@
      "cue": "start"
     },
     {
-     "t": 1.119,
-     "do": "highlight",
-     "target": "o1",
-     "value": "1",
+     "t": 0.0,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
      "tone": null,
-     "cue": "why"
+     "cue": "start"
     },
     {
      "t": 2.658,
      "do": "enter",
-     "target": "o2",
+     "target": "o3",
      "value": null,
      "tone": null,
      "cue": "Stays stuck at"
@@ -165,6 +232,7 @@
    "transition": "iris",
    "label": "",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -278,6 +346,7 @@
    "transition": "bar_wipe",
    "label": "THE CODE",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -460,6 +529,7 @@
    "transition": "cut",
    "label": "WHY IT FAILS",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -692,6 +762,7 @@
    "transition": "cut",
    "label": "AND ALSO",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -890,6 +961,7 @@
    "transition": "double_bar_wipe",
    "label": "THE FIX",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1101,6 +1173,7 @@
    "transition": "diagonal_stripes",
    "label": "HOW IT WORKS",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1348,6 +1421,7 @@
    "transition": "cut",
    "label": "gives you the value",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1484,6 +1558,7 @@
    "transition": "stack_rise",
    "label": "",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1624,6 +1699,7 @@
    "transition": "iris",
    "label": "",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1813,12 +1889,13 @@
    "transition": "bar_wipe",
    "label": "",
    "layout": "solo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
      "kind": "end_card",
      "props": {
-      "up_next": "How useState creates"
+      "up_next": "How useState creates and updates state"
      },
      "box": null
     }

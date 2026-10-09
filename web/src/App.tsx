@@ -206,6 +206,13 @@ function Workspace() {
           <Crumb n={5} label="Reels" on={step === "reels" || step === "building"} done={false}
                  disabled={!shorts.length && step !== "building"} onClick={() => setStep("reels")} />
         </nav>
+        {/* The Motion section (#motion): every motion reel with its player,
+            theme, script and cost. App picks its screen once per page load,
+            so this reloads at the new hash rather than swapping in place. */}
+        <button className="ghost sm" title="motion reels, scene library and avatars"
+                onClick={() => { location.hash = "#motion"; location.reload(); }}>
+          Motion
+        </button>
         <span className="spacer" />
         {total && costOpen && <CostPill total={total} delta={delta} />}
         <button className="ghost sm costtoggle" onClick={() => setCostOpen((v) => !v)}

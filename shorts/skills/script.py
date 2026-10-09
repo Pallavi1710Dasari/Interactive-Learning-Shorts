@@ -2643,7 +2643,7 @@ def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
                      language: str | None = None) -> MotionScript:
     """The draft plus everything set in Python, never asked of the model:
     shot ids (s01, s02, ... in order), the template, the theme, its cast of
-    avatars, the language, the series label and the next topic."""
+    speakers, the language, the series label and the next topic."""
     from ..motion_themes import cast_speakers
     shots = [s.model_copy(update={"id": f"s{i + 1:02d}"}) for i, s in enumerate(draft.shots)]
     return MotionScript(
@@ -2724,7 +2724,7 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
     `theme` (phase 2b) is an id from shorts/motion_themes.yaml; it must use
     `template`. A non-base theme rewrites the prompt's FORMAT and THE BEATS
     from its beat template; every other rule stays. `language` casts a
-    two-speaker theme's avatars. None for both writes the script exactly as
+    two-speaker theme's speakers. None for both writes the script exactly as
     before themes existed.
     """
     from ..motion_themes import registry

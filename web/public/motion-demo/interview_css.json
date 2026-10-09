@@ -1,0 +1,1944 @@
+{
+ "short_id": "stub_how_the_browser_scores_a_selector__motion",
+ "template": "fix_story",
+ "theme": "interview",
+ "series": "@learnthesimpleway",
+ "concept_name": "specificity",
+ "duration": 63.261,
+ "audio": null,
+ "timing_source": "even",
+ "identity": {
+  "id": "css",
+  "name": "CSS",
+  "colour": "#BA369F",
+  "on_dark": "#DE8DCD",
+  "on_light": "#BA369F",
+  "text_on_dark": "#EDC0E4",
+  "text_on_light": "#9A2D84",
+  "file": "styles.css",
+  "symbol": [
+   {
+    "rect": [
+     10.0,
+     10.0,
+     80.0,
+     80.0
+    ],
+    "r": 14.0,
+    "stroke": 6.0,
+    "tone": "soft"
+   },
+   {
+    "rect": [
+     24.0,
+     24.0,
+     52.0,
+     52.0
+    ],
+    "r": 10.0,
+    "stroke": 7.0,
+    "tone": "main"
+   },
+   {
+    "rect": [
+     38.0,
+     38.0,
+     24.0,
+     24.0
+    ],
+    "r": 5.0,
+    "tone": "main"
+   }
+  ]
+ },
+ "theme_label": "Interview",
+ "tags": [
+  "#css",
+  "#interview",
+  "#specificity",
+  "#selector",
+  "#browser"
+ ],
+ "intro": 0.0,
+ "cast": [
+  {
+   "role": "INTERVIEWER",
+   "side": "left",
+   "label": "Interviewer",
+   "voice_slot": "motion_host",
+   "identity": {
+    "id": "host",
+    "name": "Host",
+    "colour": "#6C6F7A",
+    "on_dark": "#A6A8B0",
+    "on_light": "#6C6F7A",
+    "text_on_dark": "#CCCDD2",
+    "text_on_light": "#595B64",
+    "file": "",
+    "symbol": [
+     {
+      "rect": [
+       36.0,
+       12.0,
+       28.0,
+       46.0
+      ],
+      "r": 14.0,
+      "tone": "main"
+     },
+     {
+      "path": "M24 44 C24 66 76 66 76 44",
+      "r": 0,
+      "stroke": 8.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       46.0,
+       64.0,
+       8.0,
+       18.0
+      ],
+      "r": 3.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       32.0,
+       80.0,
+       36.0,
+       8.0
+      ],
+      "r": 4.0,
+      "tone": "main"
+     }
+    ]
+   }
+  },
+  {
+   "role": "CANDIDATE",
+   "side": "right",
+   "label": "Candidate",
+   "voice_slot": "motion_char_1",
+   "identity": {
+    "id": "css",
+    "name": "CSS",
+    "colour": "#BA369F",
+    "on_dark": "#DE8DCD",
+    "on_light": "#BA369F",
+    "text_on_dark": "#EDC0E4",
+    "text_on_light": "#9A2D84",
+    "file": "styles.css",
+    "symbol": [
+     {
+      "rect": [
+       10.0,
+       10.0,
+       80.0,
+       80.0
+      ],
+      "r": 14.0,
+      "stroke": 6.0,
+      "tone": "soft"
+     },
+     {
+      "rect": [
+       24.0,
+       24.0,
+       52.0,
+       52.0
+      ],
+      "r": 10.0,
+      "stroke": 7.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       38.0,
+       38.0,
+       24.0,
+       24.0
+      ],
+      "r": 5.0,
+      "tone": "main"
+     }
+    ]
+   }
+  }
+ ],
+ "characters": [],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "chapter": null,
+   "start": 0.0,
+   "end": 3.877,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "identity_title",
+     "props": {},
+     "box": {
+      "x": 60.0,
+      "y": 341.0,
+      "w": 960.0,
+      "h": 270.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Ignored",
+      "tone": "bad",
+      "icon": "alert"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 659.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 0.0,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 1.889,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "class"
+    },
+    {
+     "t": 3.042,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Ignored"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Why does my new class rule get <b>ignored</b>?",
+     "speaker": "INTERVIEWER",
+     "start": 0.35,
+     "end": 3.427,
+     "words": [
+      {
+       "text": "Why",
+       "start": 0.35,
+       "end": 0.735,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 0.735,
+       "end": 1.119,
+       "hl": false
+      },
+      {
+       "text": "my",
+       "start": 1.119,
+       "end": 1.504,
+       "hl": false
+      },
+      {
+       "text": "new",
+       "start": 1.504,
+       "end": 1.889,
+       "hl": false
+      },
+      {
+       "text": "class",
+       "start": 1.889,
+       "end": 2.273,
+       "hl": false
+      },
+      {
+       "text": "rule",
+       "start": 2.273,
+       "end": 2.658,
+       "hl": false
+      },
+      {
+       "text": "get",
+       "start": 2.658,
+       "end": 3.042,
+       "hl": false
+      },
+      {
+       "text": "ignored?",
+       "start": 3.042,
+       "end": 3.427,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "beat": "title",
+   "chapter": null,
+   "start": 3.877,
+   "end": 7.754,
+   "field": "blue",
+   "transition": "iris",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "title_card",
+     "props": {
+      "title": "specificity",
+      "promise": "Why your class rule loses",
+      "icons": [
+       {
+        "name": "grid",
+        "label": "Score"
+       },
+       {
+        "name": "layers",
+        "label": "Order"
+       },
+       {
+        "name": "check",
+        "label": "Winner"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 3.877,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 6.15,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "selector"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Because the browser scores each selector by <b>specificity</b>.",
+     "speaker": "CANDIDATE",
+     "start": 4.227,
+     "end": 7.304,
+     "words": [
+      {
+       "text": "Because",
+       "start": 4.227,
+       "end": 4.612,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 4.612,
+       "end": 4.996,
+       "hl": false
+      },
+      {
+       "text": "browser",
+       "start": 4.996,
+       "end": 5.381,
+       "hl": false
+      },
+      {
+       "text": "scores",
+       "start": 5.381,
+       "end": 5.766,
+       "hl": false
+      },
+      {
+       "text": "each",
+       "start": 5.766,
+       "end": 6.15,
+       "hl": false
+      },
+      {
+       "text": "selector",
+       "start": 6.15,
+       "end": 6.535,
+       "hl": false
+      },
+      {
+       "text": "by",
+       "start": 6.535,
+       "end": 6.919,
+       "hl": false
+      },
+      {
+       "text": "specificity.",
+       "start": 6.919,
+       "end": 7.304,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "chapter": null,
+   "start": 7.754,
+   "end": 16.162,
+   "field": "paper",
+   "transition": "bar_wipe",
+   "label": "THE CODE",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_window",
+     "props": {
+      "file": "styles.css",
+      "lines": [
+       "#nav .item a { color: red }",
+       ".item .link a { color: blue }"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 333.0,
+      "w": 960.0,
+      "h": 414.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 7.754,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 7.754,
+     "do": "type",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 9.258,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "rules"
+    },
+    {
+     "t": 11.331,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "One"
+    },
+    {
+     "t": 13.254,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "other"
+    },
+    {
+     "t": 14.558,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "Which"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Here are two rules for the same link.",
+     "speaker": "INTERVIEWER",
+     "start": 8.104,
+     "end": 11.181,
+     "words": [
+      {
+       "text": "Here",
+       "start": 8.104,
+       "end": 8.489,
+       "hl": false
+      },
+      {
+       "text": "are",
+       "start": 8.489,
+       "end": 8.873,
+       "hl": false
+      },
+      {
+       "text": "two",
+       "start": 8.873,
+       "end": 9.258,
+       "hl": false
+      },
+      {
+       "text": "rules",
+       "start": 9.258,
+       "end": 9.643,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 9.643,
+       "end": 10.027,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 10.027,
+       "end": 10.412,
+       "hl": false
+      },
+      {
+       "text": "same",
+       "start": 10.412,
+       "end": 10.796,
+       "hl": false
+      },
+      {
+       "text": "link.",
+       "start": 10.796,
+       "end": 11.181,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "One uses an id, the other adds classes.",
+     "speaker": "INTERVIEWER",
+     "start": 11.331,
+     "end": 14.408,
+     "words": [
+      {
+       "text": "One",
+       "start": 11.331,
+       "end": 11.716,
+       "hl": false
+      },
+      {
+       "text": "uses",
+       "start": 11.716,
+       "end": 12.1,
+       "hl": false
+      },
+      {
+       "text": "an",
+       "start": 12.1,
+       "end": 12.485,
+       "hl": false
+      },
+      {
+       "text": "id,",
+       "start": 12.485,
+       "end": 12.87,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 12.87,
+       "end": 13.254,
+       "hl": false
+      },
+      {
+       "text": "other",
+       "start": 13.254,
+       "end": 13.639,
+       "hl": false
+      },
+      {
+       "text": "adds",
+       "start": 13.639,
+       "end": 14.023,
+       "hl": false
+      },
+      {
+       "text": "classes.",
+       "start": 14.023,
+       "end": 14.408,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Which color wins?",
+     "speaker": "INTERVIEWER",
+     "start": 14.558,
+     "end": 15.712,
+     "words": [
+      {
+       "text": "Which",
+       "start": 14.558,
+       "end": 14.943,
+       "hl": false
+      },
+      {
+       "text": "color",
+       "start": 14.943,
+       "end": 15.327,
+       "hl": false
+      },
+      {
+       "text": "wins?",
+       "start": 15.327,
+       "end": 15.712,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "break_1",
+   "chapter": null,
+   "start": 16.162,
+   "end": 24.035,
+   "field": "paper",
+   "transition": "cut",
+   "label": "WHY IT FAILS",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "ids",
+       "classes",
+       "beats"
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 502.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 16.162,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 18.051,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "first"
+    },
+    {
+     "t": 19.974,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "element"
+    },
+    {
+     "t": 21.662,
+     "do": "state",
+     "target": "o1",
+     "value": "plain,plain,bad",
+     "tone": null,
+     "cue": "beats"
+    },
+    {
+     "t": 23.2,
+     "do": "highlight",
+     "target": "o1",
+     "value": "3",
+     "tone": null,
+     "cue": "classes"
+    }
+   ],
+   "captions": [
+    {
+     "text": "The browser counts <b>ids</b> first, then <b>classes</b>, then plain element names.",
+     "speaker": "CANDIDATE",
+     "start": 16.512,
+     "end": 20.743,
+     "words": [
+      {
+       "text": "The",
+       "start": 16.512,
+       "end": 16.897,
+       "hl": false
+      },
+      {
+       "text": "browser",
+       "start": 16.897,
+       "end": 17.281,
+       "hl": false
+      },
+      {
+       "text": "counts",
+       "start": 17.281,
+       "end": 17.666,
+       "hl": false
+      },
+      {
+       "text": "ids",
+       "start": 17.666,
+       "end": 18.051,
+       "hl": true
+      },
+      {
+       "text": "first,",
+       "start": 18.051,
+       "end": 18.435,
+       "hl": false
+      },
+      {
+       "text": "then",
+       "start": 18.435,
+       "end": 18.82,
+       "hl": false
+      },
+      {
+       "text": "classes,",
+       "start": 18.82,
+       "end": 19.204,
+       "hl": true
+      },
+      {
+       "text": "then",
+       "start": 19.204,
+       "end": 19.589,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 19.589,
+       "end": 19.974,
+       "hl": false
+      },
+      {
+       "text": "element",
+       "start": 19.974,
+       "end": 20.358,
+       "hl": false
+      },
+      {
+       "text": "names.",
+       "start": 20.358,
+       "end": 20.743,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "One id <b>beats</b> any number of classes.",
+     "speaker": "CANDIDATE",
+     "start": 20.893,
+     "end": 23.585,
+     "words": [
+      {
+       "text": "One",
+       "start": 20.893,
+       "end": 21.278,
+       "hl": false
+      },
+      {
+       "text": "id",
+       "start": 21.278,
+       "end": 21.662,
+       "hl": false
+      },
+      {
+       "text": "beats",
+       "start": 21.662,
+       "end": 22.047,
+       "hl": true
+      },
+      {
+       "text": "any",
+       "start": 22.047,
+       "end": 22.431,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 22.431,
+       "end": 22.816,
+       "hl": false
+      },
+      {
+       "text": "of",
+       "start": 22.816,
+       "end": 23.2,
+       "hl": false
+      },
+      {
+       "text": "classes.",
+       "start": 23.2,
+       "end": 23.585,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "beat": "fix_idea",
+   "chapter": null,
+   "start": 24.035,
+   "end": 32.592,
+   "field": "blue",
+   "transition": "double_bar_wipe",
+   "label": "THE FIX",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "SPECIFICITY",
+      "accent": [
+       "SPECIFICITY"
+      ],
+      "lines": [
+       "SPECIFICITY"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 486.8,
+      "w": 960.0,
+      "h": 106.4
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 24.035,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 25.924,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "make"
+    },
+    {
+     "t": 27.762,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "Raise"
+    },
+    {
+     "t": 28.916,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "specificity"
+    },
+    {
+     "t": 30.604,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "wins"
+    }
+   ],
+   "captions": [
+    {
+     "text": "So how do I make my rule win?",
+     "speaker": "INTERVIEWER",
+     "start": 24.385,
+     "end": 27.462,
+     "words": [
+      {
+       "text": "So",
+       "start": 24.385,
+       "end": 24.77,
+       "hl": false
+      },
+      {
+       "text": "how",
+       "start": 24.77,
+       "end": 25.154,
+       "hl": false
+      },
+      {
+       "text": "do",
+       "start": 25.154,
+       "end": 25.539,
+       "hl": false
+      },
+      {
+       "text": "I",
+       "start": 25.539,
+       "end": 25.924,
+       "hl": false
+      },
+      {
+       "text": "make",
+       "start": 25.924,
+       "end": 26.308,
+       "hl": false
+      },
+      {
+       "text": "my",
+       "start": 26.308,
+       "end": 26.693,
+       "hl": false
+      },
+      {
+       "text": "rule",
+       "start": 26.693,
+       "end": 27.077,
+       "hl": false
+      },
+      {
+       "text": "win?",
+       "start": 27.077,
+       "end": 27.462,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Raise your rule's <b>specificity</b>.",
+     "speaker": "CANDIDATE",
+     "start": 27.762,
+     "end": 29.3,
+     "words": [
+      {
+       "text": "Raise",
+       "start": 27.762,
+       "end": 28.147,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 28.147,
+       "end": 28.531,
+       "hl": false
+      },
+      {
+       "text": "rule's",
+       "start": 28.531,
+       "end": 28.916,
+       "hl": false
+      },
+      {
+       "text": "specificity.",
+       "start": 28.916,
+       "end": 29.3,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The higher score wins, whatever the order.",
+     "speaker": "CANDIDATE",
+     "start": 29.45,
+     "end": 32.142,
+     "words": [
+      {
+       "text": "The",
+       "start": 29.45,
+       "end": 29.835,
+       "hl": false
+      },
+      {
+       "text": "higher",
+       "start": 29.835,
+       "end": 30.219,
+       "hl": false
+      },
+      {
+       "text": "score",
+       "start": 30.219,
+       "end": 30.604,
+       "hl": false
+      },
+      {
+       "text": "wins,",
+       "start": 30.604,
+       "end": 30.988,
+       "hl": false
+      },
+      {
+       "text": "whatever",
+       "start": 30.988,
+       "end": 31.373,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 31.373,
+       "end": 31.757,
+       "hl": false
+      },
+      {
+       "text": "order.",
+       "start": 31.757,
+       "end": 32.142,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "beat": "fix_flow",
+   "chapter": null,
+   "start": 32.592,
+   "end": 38.927,
+   "field": "paper",
+   "transition": "diagonal_stripes",
+   "label": "HOW IT WORKS",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "trigger_chip",
+     "props": {
+      "label": "winner"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 398.0,
+      "w": 960.0,
+      "h": 84.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "It updates",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 602.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "connector",
+     "props": {
+      "from": "o1",
+      "to": "o2",
+      "tone": "info",
+      "points": [
+       [
+        540.0,
+        492.0
+       ],
+       [
+        540.0,
+        592.0
+       ]
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 32.592,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 34.481,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "scores"
+    },
+    {
+     "t": 36.554,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "first"
+    },
+    {
+     "t": 38.092,
+     "do": "enter",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "winner"
+    },
+    {
+     "t": 38.092,
+     "do": "pulse",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "winner"
+    }
+   ],
+   "captions": [
+    {
+     "text": "The browser compares the scores left to right.",
+     "speaker": "CANDIDATE",
+     "start": 32.942,
+     "end": 36.019,
+     "words": [
+      {
+       "text": "The",
+       "start": 32.942,
+       "end": 33.327,
+       "hl": false
+      },
+      {
+       "text": "browser",
+       "start": 33.327,
+       "end": 33.711,
+       "hl": false
+      },
+      {
+       "text": "compares",
+       "start": 33.711,
+       "end": 34.096,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 34.096,
+       "end": 34.481,
+       "hl": false
+      },
+      {
+       "text": "scores",
+       "start": 34.481,
+       "end": 34.865,
+       "hl": false
+      },
+      {
+       "text": "left",
+       "start": 34.865,
+       "end": 35.25,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 35.25,
+       "end": 35.634,
+       "hl": false
+      },
+      {
+       "text": "right.",
+       "start": 35.634,
+       "end": 36.019,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The first difference decides the <b>winner</b>.",
+     "speaker": "CANDIDATE",
+     "start": 36.169,
+     "end": 38.477,
+     "words": [
+      {
+       "text": "The",
+       "start": 36.169,
+       "end": 36.554,
+       "hl": false
+      },
+      {
+       "text": "first",
+       "start": 36.554,
+       "end": 36.938,
+       "hl": false
+      },
+      {
+       "text": "difference",
+       "start": 36.938,
+       "end": 37.323,
+       "hl": false
+      },
+      {
+       "text": "decides",
+       "start": 37.323,
+       "end": 37.708,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 37.708,
+       "end": 38.092,
+       "hl": false
+      },
+      {
+       "text": "winner.",
+       "start": 38.092,
+       "end": 38.477,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s07",
+   "beat": "code_map",
+   "chapter": null,
+   "start": 38.927,
+   "end": 47.1,
+   "field": "paper",
+   "transition": "cut",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_map",
+     "props": {
+      "lines": [
+       "/* specificity: 1,1,1 */",
+       "/* specificity: 0,2,1 */"
+      ],
+      "parts": [
+       {
+        "code": "specificity",
+        "icon": "grid",
+        "label": "Score"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 38.927,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 40.431,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "scores"
+    },
+    {
+     "t": 42.269,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "has"
+    },
+    {
+     "t": 44.342,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "rule"
+    },
+    {
+     "t": 46.265,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "loses"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Show me the scores.",
+     "speaker": "INTERVIEWER",
+     "start": 39.277,
+     "end": 40.815,
+     "words": [
+      {
+       "text": "Show",
+       "start": 39.277,
+       "end": 39.662,
+       "hl": false
+      },
+      {
+       "text": "me",
+       "start": 39.662,
+       "end": 40.046,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 40.046,
+       "end": 40.431,
+       "hl": false
+      },
+      {
+       "text": "scores.",
+       "start": 40.431,
+       "end": 40.815,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The id rule has <b>one id</b>.",
+     "speaker": "CANDIDATE",
+     "start": 41.115,
+     "end": 43.423,
+     "words": [
+      {
+       "text": "The",
+       "start": 41.115,
+       "end": 41.5,
+       "hl": false
+      },
+      {
+       "text": "id",
+       "start": 41.5,
+       "end": 41.884,
+       "hl": false
+      },
+      {
+       "text": "rule",
+       "start": 41.884,
+       "end": 42.269,
+       "hl": false
+      },
+      {
+       "text": "has",
+       "start": 42.269,
+       "end": 42.654,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 42.654,
+       "end": 43.038,
+       "hl": true
+      },
+      {
+       "text": "id.",
+       "start": 43.038,
+       "end": 43.423,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The class rule has none, so it <b>loses</b>.",
+     "speaker": "CANDIDATE",
+     "start": 43.573,
+     "end": 46.65,
+     "words": [
+      {
+       "text": "The",
+       "start": 43.573,
+       "end": 43.958,
+       "hl": false
+      },
+      {
+       "text": "class",
+       "start": 43.958,
+       "end": 44.342,
+       "hl": false
+      },
+      {
+       "text": "rule",
+       "start": 44.342,
+       "end": 44.727,
+       "hl": false
+      },
+      {
+       "text": "has",
+       "start": 44.727,
+       "end": 45.111,
+       "hl": false
+      },
+      {
+       "text": "none,",
+       "start": 45.111,
+       "end": 45.496,
+       "hl": false
+      },
+      {
+       "text": "so",
+       "start": 45.496,
+       "end": 45.881,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 45.881,
+       "end": 46.265,
+       "hl": false
+      },
+      {
+       "text": "loses.",
+       "start": 46.265,
+       "end": 46.65,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "payoff",
+   "chapter": null,
+   "start": 47.1,
+   "end": 52.515,
+   "field": "navy",
+   "transition": "stack_rise",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "NOW THE BROWSER PICKS THE WINNER BY SCORE, AND YOUR",
+      "accent": [
+       "APPLIES"
+      ],
+      "lines": [
+       "NOW THE BROWSER",
+       "PICKS THE WINNER",
+       "BY SCORE, AND YOUR"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 316.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Applies",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 683.6,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 47.1,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 48.219,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "browser"
+    },
+    {
+     "t": 49.373,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "winner"
+    },
+    {
+     "t": 50.142,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "score"
+    },
+    {
+     "t": 51.68,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "applies"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Now the browser picks the winner by score, and your rule <b>applies</b>.",
+     "speaker": "CANDIDATE",
+     "start": 47.45,
+     "end": 52.065,
+     "words": [
+      {
+       "text": "Now",
+       "start": 47.45,
+       "end": 47.835,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 47.835,
+       "end": 48.219,
+       "hl": false
+      },
+      {
+       "text": "browser",
+       "start": 48.219,
+       "end": 48.604,
+       "hl": false
+      },
+      {
+       "text": "picks",
+       "start": 48.604,
+       "end": 48.988,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 48.988,
+       "end": 49.373,
+       "hl": false
+      },
+      {
+       "text": "winner",
+       "start": 49.373,
+       "end": 49.758,
+       "hl": false
+      },
+      {
+       "text": "by",
+       "start": 49.758,
+       "end": 50.142,
+       "hl": false
+      },
+      {
+       "text": "score,",
+       "start": 50.142,
+       "end": 50.527,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 50.527,
+       "end": 50.911,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 50.911,
+       "end": 51.296,
+       "hl": false
+      },
+      {
+       "text": "rule",
+       "start": 51.296,
+       "end": 51.68,
+       "hl": false
+      },
+      {
+       "text": "applies.",
+       "start": 51.68,
+       "end": 52.065,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s09",
+   "beat": "recap",
+   "chapter": null,
+   "start": 52.515,
+   "end": 59.384,
+   "field": "paper",
+   "transition": "iris",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "takeaway_list",
+     "props": {
+      "heading": "Key takeaways",
+      "rows": [
+       {
+        "icon": "grid",
+        "line": "Ids beat classes",
+        "sub": "first part decides"
+       },
+       {
+        "icon": "layers",
+        "line": "Compare left first",
+        "sub": "left to right"
+       },
+       {
+        "icon": "check",
+        "line": "Higher score wins",
+        "sub": "whatever the order"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 52.515,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 56.091,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "right"
+    },
+    {
+     "t": 57.011,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "higher"
+    },
+    {
+     "t": 58.165,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "over"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Remember: ids beat classes.",
+     "speaker": "INTERVIEWER",
+     "start": 52.865,
+     "end": 54.403,
+     "words": [
+      {
+       "text": "Remember:",
+       "start": 52.865,
+       "end": 53.25,
+       "hl": false
+      },
+      {
+       "text": "ids",
+       "start": 53.25,
+       "end": 53.634,
+       "hl": false
+      },
+      {
+       "text": "beat",
+       "start": 53.634,
+       "end": 54.019,
+       "hl": false
+      },
+      {
+       "text": "classes.",
+       "start": 54.019,
+       "end": 54.403,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Scores compare left to right.",
+     "speaker": "INTERVIEWER",
+     "start": 54.553,
+     "end": 56.476,
+     "words": [
+      {
+       "text": "Scores",
+       "start": 54.553,
+       "end": 54.938,
+       "hl": false
+      },
+      {
+       "text": "compare",
+       "start": 54.938,
+       "end": 55.322,
+       "hl": false
+      },
+      {
+       "text": "left",
+       "start": 55.322,
+       "end": 55.707,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 55.707,
+       "end": 56.091,
+       "hl": false
+      },
+      {
+       "text": "right.",
+       "start": 56.091,
+       "end": 56.476,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The higher score wins over order.",
+     "speaker": "INTERVIEWER",
+     "start": 56.626,
+     "end": 58.934,
+     "words": [
+      {
+       "text": "The",
+       "start": 56.626,
+       "end": 57.011,
+       "hl": false
+      },
+      {
+       "text": "higher",
+       "start": 57.011,
+       "end": 57.395,
+       "hl": false
+      },
+      {
+       "text": "score",
+       "start": 57.395,
+       "end": 57.78,
+       "hl": false
+      },
+      {
+       "text": "wins",
+       "start": 57.78,
+       "end": 58.165,
+       "hl": false
+      },
+      {
+       "text": "over",
+       "start": 58.165,
+       "end": 58.549,
+       "hl": false
+      },
+      {
+       "text": "order.",
+       "start": 58.549,
+       "end": 58.934,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "beat": "cta",
+   "chapter": null,
+   "start": 59.384,
+   "end": 63.261,
+   "field": "blue",
+   "transition": "bar_wipe",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "end_card",
+     "props": {
+      "up_next": "When specificity ties"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 59.384,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 62.426,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "time"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time.",
+     "speaker": "INTERVIEWER",
+     "start": 59.734,
+     "end": 62.811,
+     "words": [
+      {
+       "text": "Follow",
+       "start": 59.734,
+       "end": 60.119,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 60.119,
+       "end": 60.503,
+       "hl": false
+      },
+      {
+       "text": "more,",
+       "start": 60.503,
+       "end": 60.888,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 60.888,
+       "end": 61.273,
+       "hl": false
+      },
+      {
+       "text": "idea",
+       "start": 61.273,
+       "end": 61.657,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 61.657,
+       "end": 62.042,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 62.042,
+       "end": 62.426,
+       "hl": false
+      },
+      {
+       "text": "time.",
+       "start": 62.426,
+       "end": 62.811,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  }
+ ]
+}

@@ -10,8 +10,10 @@ import { clamp } from "./time";
  * when the card leaves (findings 8.2, "chip fly-in"). */
 export const STEP_CHIP = { x: 60, y: 54, numberX: 150, numberY: 42, numberSize: 60 } as const;
 
-export function StepChip({ n, of, field, p = 1, hideNumber = false }: {
+export function StepChip({ n, of, field, p = 1, hideNumber = false, color }: {
   n: number; of: number; field: FieldName; p?: number; hideNumber?: boolean;
+  /** The filled segments' colour — the reel's language tone (phase 3 badges). */
+  color?: string;
 }) {
   const th = theme(field);
   const q = clamp(p);
@@ -31,7 +33,7 @@ export function StepChip({ n, of, field, p = 1, hideNumber = false }: {
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         {Array.from({ length: of }, (_, i) => (
           <span key={i} style={{ width: 44, height: 7, borderRadius: 4,
-                                 background: i < n ? th.accent : th.dark ? "rgba(255,255,255,0.22)" : "rgba(21,25,54,0.15)" }} />
+                                 background: i < n ? (color ?? th.accent) : th.dark ? "rgba(255,255,255,0.22)" : "rgba(21,25,54,0.15)" }} />
         ))}
       </div>
     </div>
@@ -40,8 +42,10 @@ export function StepChip({ n, of, field, p = 1, hideNumber = false }: {
 
 /** fix_story's full-width progress segments: one per shot, the current one
  * filling with `progress`. */
-export function ProgressSegments({ count, index, progress, field }: {
+export function ProgressSegments({ count, index, progress, field, color }: {
   count: number; index: number; progress: number; field: FieldName;
+  /** The fill colour — the reel's language tone (phase 3 badges). */
+  color?: string;
 }) {
   const th = theme(field);
   return (
@@ -49,7 +53,7 @@ export function ProgressSegments({ count, index, progress, field }: {
       {Array.from({ length: count }, (_, i) => (
         <div key={i} style={{ flex: 1, height: 9, borderRadius: 6, overflow: "hidden",
                               background: th.dark ? "rgba(255,255,255,0.2)" : "rgba(21,25,54,0.13)" }}>
-          <div style={{ height: "100%", background: th.dark ? C.yellow : C.indigo,
+          <div style={{ height: "100%", background: color ?? (th.dark ? C.yellow : C.indigo),
                         width: `${i < index ? 100 : i === index ? clamp(progress) * 100 : 0}%` }} />
         </div>
       ))}

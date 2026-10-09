@@ -5,19 +5,22 @@
 # The theme is the FORMAT of the reel: who speaks and what it feels like
 # (interview, story, ...). The two combine. Loaded and validated by
 # shorts/motion_themes.py. ADDING A THEME IS ONE NEW ENTRY HERE AND NO CODE
-# CHANGE, as long as it uses a template, hook style and avatar kind that already
-# exist (motion_themes.TEMPLATES / HOOK_STYLES / AVATAR_KINDS).
+# CHANGE, as long as it uses a template, hook style and identity kind that already
+# exist (motion_themes.TEMPLATES / HOOK_STYLES / IDENTITY_KINDS).
 #
 # Every entry has:
 #   tag             the reel's theme hashtag: lowercase letters and digits only
 #   template        the beat contract the script follows: fix_story (11 beats,
 #                   only break_2 optional) or walkthrough (chapters)
 #   description     what the reel is, in a sentence (shown to the LLM and the reviewer)
+#   label           the theme's short display name, shown in the hook chip
+#                   ("REACT · INTERVIEW"); defaults to the id in words
 #   speakers        1 or 2 roles. role is the label on every caption line of a
-#                   two-speaker reel. avatar is "language" (the course
-#                   language's own character) or "host" (the shared host
-#                   character); a one-speaker theme has no avatar. asks: the
-#                   role may ask questions outside the hook.
+#                   two-speaker reel. identity is "host" (the neutral grey host
+#                   badge) or "language" (the badge in the reel's language
+#                   colour) — shorts/motion_identities.yaml; a one-speaker
+#                   theme has none. asks: the role may ask questions outside
+#                   the hook.
 #   needs_code      the selected section must show code (a fenced block, or an
 #                   inline span with code punctuation)
 #   suits           the kinds of concepts it suits (guidance for the LLM)
@@ -51,6 +54,7 @@ fallback:
 themes:
 
   classic_explainer:
+    label: Explainer
     tag: explainer
     template: fix_story
     description: >-
@@ -69,6 +73,7 @@ themes:
     beats: fix_story
 
   narrative:
+    label: Narrative
     tag: narrative
     template: fix_story
     description: >-
@@ -99,6 +104,7 @@ themes:
       cta:      {does: "Follow for more plus the next topic."}
 
   interview:
+    label: Interview
     tag: interview
     template: fix_story
     description: >-
@@ -106,8 +112,8 @@ themes:
       candidate explains why it happens and how to fix it, and the
       interviewer pushes with follow-up questions.
     speakers:
-      - {role: INTERVIEWER, avatar: host, asks: true}
-      - {role: CANDIDATE, avatar: language}
+      - {role: INTERVIEWER, identity: host, asks: true}
+      - {role: CANDIDATE, identity: language}
     needs_code: false
     suits: ["classic interview questions", "why does X fail", "concepts with a crisp correct answer"]
     works_with: [code, direct_explanation, comparison, conceptual_visual]
@@ -131,14 +137,15 @@ themes:
       cta:      {speakers: [INTERVIEWER], does: "Follow for more plus the next topic."}
 
   interview_rapid_fire:
+    label: Rapid fire
     tag: rapidfire
     template: fix_story
     description: >-
       A fast interview round: short, sharp questions from the interviewer,
       each answered in a sentence or two by the candidate.
     speakers:
-      - {role: INTERVIEWER, avatar: host, asks: true}
-      - {role: CANDIDATE, avatar: language}
+      - {role: INTERVIEWER, identity: host, asks: true}
+      - {role: CANDIDATE, identity: language}
     needs_code: false
     suits: ["facts with crisp answers", "definitions and rules", "revision of a concept the learner half knows"]
     works_with: [direct_explanation, code, comparison]
@@ -162,14 +169,15 @@ themes:
       cta:      {speakers: [INTERVIEWER], does: "Follow for more plus the next topic."}
 
   peer_discussion:
+    label: Peer discussion
     tag: discussion
     template: fix_story
     description: >-
       Two peers work it out together: one has hit the problem, the other has
       figured it out, and they talk it through like friends at a desk.
     speakers:
-      - {role: PEER_A, avatar: host, asks: true}
-      - {role: PEER_B, avatar: language, asks: true}
+      - {role: PEER_A, identity: host, asks: true}
+      - {role: PEER_B, identity: language, asks: true}
     needs_code: false
     suits: ["confusing behaviour", "concepts with a common wrong mental model", "anything better talked through"]
     works_with: [analogy, comparison, conceptual_visual, direct_explanation, code]
@@ -193,14 +201,15 @@ themes:
       cta:      {speakers: [PEER_A], does: "Follow for more plus the next topic."}
 
   mentor_student:
+    label: Mentor & student
     tag: mentor
     template: fix_story
     description: >-
       A student brings a problem to a mentor, who explains it patiently,
       checking the student follows each step.
     speakers:
-      - {role: STUDENT, avatar: host, asks: true}
-      - {role: MENTOR, avatar: language, asks: true}
+      - {role: STUDENT, identity: host, asks: true}
+      - {role: MENTOR, identity: language, asks: true}
     needs_code: false
     suits: ["foundational concepts", "ideas that need a mental model first", "beginner confusion"]
     works_with: [analogy, direct_explanation, conceptual_visual, code, real_world_example]
@@ -224,6 +233,7 @@ themes:
       cta:      {speakers: [MENTOR], does: "Follow for more plus the next topic."}
 
   bug_hunt:
+    label: Bug hunt
     tag: bughunt
     template: fix_story
     description: >-
@@ -254,6 +264,7 @@ themes:
       cta:      {does: "Follow for more plus the next topic."}
 
   myth_vs_fact:
+    label: Myth vs fact
     tag: mythvsfact
     template: fix_story
     description: >-
@@ -284,6 +295,7 @@ themes:
       cta:      {does: "Follow for more plus the next topic."}
 
   common_mistakes:
+    label: Common mistakes
     tag: mistakes
     template: fix_story
     description: >-
@@ -314,6 +326,7 @@ themes:
       cta:      {does: "Follow for more plus the next topic."}
 
   predict_the_output:
+    label: Predict the output
     tag: predict
     template: fix_story
     description: >-
@@ -344,6 +357,7 @@ themes:
       cta:      {does: "Follow for more plus the next topic."}
 
   under_the_hood:
+    label: Under the hood
     tag: underthehood
     template: fix_story
     description: >-
@@ -374,6 +388,7 @@ themes:
       cta:      {does: "Follow for more plus the next topic."}
 
   step_by_step_walkthrough:
+    label: Walkthrough
     tag: walkthrough
     template: walkthrough
     description: >-
@@ -392,6 +407,7 @@ themes:
     beats: walkthrough
 
   real_world_scenario:
+    label: Real world
     tag: realworld
     template: fix_story
     description: >-
@@ -422,6 +438,7 @@ themes:
       cta:      {does: "Follow for more plus the next topic."}
 
   before_vs_after:
+    label: Before & after
     tag: beforeafter
     template: fix_story
     description: >-

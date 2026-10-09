@@ -125,13 +125,8 @@
      "objects": [
       {
        "id": "o1",
-       "kind": "kinetic_title",
-       "props": {
-        "text": "WHY DOES THIS LIKE COUNTER STAY STUCK AT ZERO?",
-        "accent": [
-         "ZERO"
-        ]
-       }
+       "kind": "identity_title",
+       "props": {}
       },
       {
        "id": "o2",
@@ -149,13 +144,6 @@
        "do": "enter",
        "target": "o1",
        "value": null,
-       "tone": null
-      },
-      {
-       "at": "like",
-       "do": "highlight",
-       "target": "o1",
-       "value": "1",
        "tone": null
       },
       {
@@ -956,7 +944,7 @@
        "id": "o1",
        "kind": "end_card",
        "props": {
-        "up_next": "How useState creates"
+        "up_next": "How useState creates and updates state"
        }
       }
      ],
@@ -991,15 +979,15 @@
   "speakers": [
    {
     "role": "INTERVIEWER",
-    "avatar": "host",
-    "name": "Juno",
+    "identity": "host",
+    "label": "Interviewer",
     "voice_slot": "motion_host"
    },
    {
     "role": "CANDIDATE",
-    "avatar": "react",
-    "name": "Rae",
-    "voice_slot": "motion_react"
+    "identity": "react",
+    "label": "Candidate",
+    "voice_slot": "motion_char_1"
    }
   ],
   "estimated_seconds": 61.15
@@ -1021,8 +1009,8 @@
   "short_id": "stub_how_a_state_update_triggers_a_re_render__motion",
   "runs": [
    {
-    "started": "2026-10-09T07:46:22+00:00",
-    "ended": "2026-10-09T07:46:22+00:00",
+    "started": "2026-10-09T11:41:38+00:00",
+    "ended": "2026-10-09T11:41:38+00:00",
     "stub": true,
     "calls": [],
     "cost": 0

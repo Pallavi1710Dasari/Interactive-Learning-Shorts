@@ -7,27 +7,37 @@ Nothing here has been recorded or downloaded. This page is for you to decide whi
 | Voice slot | Who uses it | Why it is separate |
 |---|---|---|
 | `motion_narrator` | every one-narrator reel (classic_explainer, narrative, bug_hunt, myth_vs_fact, common_mistakes, predict_the_output, under_the_hood, step_by_step_walkthrough, real_world_scenario, before_vs_after) | the series' own voice |
-| `motion_host` | **Juno**, the asking role in every two-speaker reel (INTERVIEWER, PEER_A, STUDENT) | must differ from every character, so two speakers always sound like two people |
-| `motion_char_1` | 8 of the 15 language characters (below) | first character voice |
-| `motion_char_2` | the other 7 language characters | second character voice, clearly different from voice 1 |
+| `motion_host` | the grey **host** identity, the asking role in every two-speaker reel (INTERVIEWER, PEER_A, STUDENT) | must differ from every character, so two speakers always sound like two people |
+| `motion_char_1` | 8 of the 15 language identities (below) | first character voice |
+| `motion_char_2` | the other 7 language identities | second character voice, clearly different from voice 1 |
 
-- **Fewer still: 3 voices.** Juno also narrates (`motion_narrator` = `motion_host`). This works because a narrator and the host never speak in the same reel. The cost: the solo reels and the interviews sound like the same person.
-- **The registry rule** (enforced since this review): characters may share a voice, but no character may share the host's. Any two-speaker reel therefore always has two distinct voices.
+- **Fewer still: 3 voices.** The host also narrates (`motion_narrator` = `motion_host`). This works because a narrator and the host never speak in the same reel. The cost: the solo reels and the interviews sound like the same person.
+- **The registry rule:** the four slots must all differ (`shorts/motion_identities.py` refuses a repeat), so any two-speaker reel always has two distinct voices.
 
-### Proposed character mapping (edit freely)
+### Slots belong to identities (phase 3 badges, approved 4-slot plan)
 
-I split the characters by the registers their designs suggest. The split is a suggestion only; you choose.
+There are no drawn characters any more. The speaker of a two-speaker reel is the reel's **language identity**, and the identity carries the voice. `shorts/motion_identities.yaml` sets this:
 
-| `motion_char_1` (brighter / higher register) | `motion_char_2` (deeper / lower register) |
+```yaml
+voices:
+  narrator: motion_narrator
+  host: motion_host
+  character_1: motion_char_1
+  character_2: motion_char_2
+```
+
+Each language picks `voice: character_1` or `voice: character_2`:
+
+| `character_1` → `motion_char_1` | `character_2` → `motion_char_2` |
 |---|---|
-| Ivy (python), Tess (typescript), Rae (react), Dara (django), Sia (css), Cass (cpp), Nova (cs), Quinn (sql) | Jett (javascript), Odell (node), Hart (html), Jorah (java), Cy (c), Kit (docker), Orin (os) |
+| Python, TypeScript, React, Django, CSS, SQL, C++, CS | JavaScript, Node, HTML, Java, C, Docker, OS |
 
-**To apply a decision:**
-1. Set each character's `voice_slot` in `shorts/motion_avatars.yaml`.
+**To change it:**
+1. Edit a language's `voice:` in `shorts/motion_identities.yaml`.
 2. Put the clips at `voices/motion/<slot>.wav`.
-3. Run `python -m shorts.motion_themes export-avatars`.
+3. Run `python -m shorts.motion_identities export`.
 
-Until a slot's clip exists, the reel falls back to the project's current clips: `voices/interviewer.wav` for the narrator and the host, and `voices/student.wav` for the characters. Every fallback is logged.
+Until a slot's clip exists, the reel falls back to the project's current clips: `voices/interviewer.wav` for the narrator and the host, and `voices/student.wav` for the two character slots. Every fallback is logged.
 
 ## What each Chatterbox reference clip needs
 

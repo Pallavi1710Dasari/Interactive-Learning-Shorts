@@ -1,0 +1,664 @@
+{
+ "_comment": "GENERATED from shorts/motion_identities.yaml by `python -m shorts.motion_identities export` \u2014 do not edit by hand.",
+ "host": {
+  "id": "host",
+  "name": "Host",
+  "colour": "#6C6F7A",
+  "on_dark": "#A6A8B0",
+  "on_light": "#6C6F7A",
+  "text_on_dark": "#CCCDD2",
+  "text_on_light": "#595B64",
+  "file": "",
+  "symbol": [
+   {
+    "rect": [
+     36.0,
+     12.0,
+     28.0,
+     46.0
+    ],
+    "r": 14.0,
+    "tone": "main"
+   },
+   {
+    "path": "M24 44 C24 66 76 66 76 44",
+    "r": 0,
+    "stroke": 8.0,
+    "tone": "main"
+   },
+   {
+    "rect": [
+     46.0,
+     64.0,
+     8.0,
+     18.0
+    ],
+    "r": 3.0,
+    "tone": "main"
+   },
+   {
+    "rect": [
+     32.0,
+     80.0,
+     36.0,
+     8.0
+    ],
+    "r": 4.0,
+    "tone": "main"
+   }
+  ]
+ },
+ "languages": {
+  "python": {
+   "id": "python",
+   "name": "Python",
+   "colour": "#2268C3",
+   "on_dark": "#7CABE8",
+   "on_light": "#2268C3",
+   "text_on_dark": "#B5CFF2",
+   "text_on_light": "#1E5CAD",
+   "file": "main.py",
+   "symbol": [
+    {
+     "rect": [
+      12.0,
+      16.0,
+      58.0,
+      15.0
+     ],
+     "r": 7.5,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      30.0,
+      42.0,
+      56.0,
+      15.0
+     ],
+     "r": 7.5,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      30.0,
+      68.0,
+      38.0,
+      15.0
+     ],
+     "r": 7.5,
+     "tone": "soft"
+    }
+   ]
+  },
+  "javascript": {
+   "id": "javascript",
+   "name": "JavaScript",
+   "colour": "#C9951D",
+   "on_dark": "#D69F1F",
+   "on_light": "#987116",
+   "text_on_dark": "#ECC97A",
+   "text_on_light": "#745611",
+   "file": "app.js",
+   "symbol": [
+    {
+     "path": "M40 14 C28 14 28 22 28 32 L28 42 C28 47 23 50 16 50 C23 50 28 53 28 58 L28 68 C28 78 28 86 40 86",
+     "r": 0,
+     "stroke": 9.0,
+     "tone": "main"
+    },
+    {
+     "path": "M60 14 C72 14 72 22 72 32 L72 42 C72 47 77 50 84 50 C77 50 72 53 72 58 L72 68 C72 78 72 86 60 86",
+     "r": 0,
+     "stroke": 9.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "typescript": {
+   "id": "typescript",
+   "name": "TypeScript",
+   "colour": "#29668E",
+   "on_dark": "#74B0D7",
+   "on_light": "#29668E",
+   "text_on_dark": "#AFD2E8",
+   "text_on_light": "#276086",
+   "file": "app.ts",
+   "symbol": [
+    {
+     "rect": [
+      14.0,
+      14.0,
+      72.0,
+      72.0
+     ],
+     "r": 16.0,
+     "stroke": 9.0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      50.0,
+      38.0,
+      7.0
+     ],
+     "r": 0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      50.0,
+      62.0,
+      7.0
+     ],
+     "r": 0,
+     "tone": "main"
+    }
+   ]
+  },
+  "react": {
+   "id": "react",
+   "name": "React",
+   "colour": "#12B5DE",
+   "on_dark": "#12B9E3",
+   "on_light": "#0D83A1",
+   "text_on_dark": "#76DBF4",
+   "text_on_light": "#0A647B",
+   "file": "App.jsx",
+   "symbol": [
+    {
+     "path": "M50 30 L26 70 M50 30 L74 70",
+     "r": 0,
+     "stroke": 7.0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      50.0,
+      24.0,
+      13.0
+     ],
+     "r": 0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      26.0,
+      74.0,
+      13.0
+     ],
+     "r": 0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      74.0,
+      74.0,
+      13.0
+     ],
+     "r": 0,
+     "tone": "soft"
+    }
+   ]
+  },
+  "node": {
+   "id": "node",
+   "name": "Node",
+   "colour": "#60B82E",
+   "on_dark": "#64C030",
+   "on_light": "#468722",
+   "text_on_dark": "#A0DE7D",
+   "text_on_light": "#35661A",
+   "file": "server.js",
+   "symbol": [
+    {
+     "path": "M74 34 A30 30 0 1 0 80 56",
+     "r": 0,
+     "stroke": 9.0,
+     "tone": "main"
+    },
+    {
+     "path": "M62 30 L76 34 L72 20",
+     "r": 0,
+     "stroke": 9.0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      50.0,
+      50.0,
+      8.0
+     ],
+     "r": 0,
+     "tone": "main"
+    }
+   ]
+  },
+  "django": {
+   "id": "django",
+   "name": "Django",
+   "colour": "#2E8A3A",
+   "on_dark": "#40BF51",
+   "on_light": "#2D8638",
+   "text_on_dark": "#98DDA1",
+   "text_on_light": "#23682C",
+   "file": "views.py",
+   "symbol": [
+    {
+     "rect": [
+      14.0,
+      14.0,
+      32.0,
+      32.0
+     ],
+     "r": 7.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      54.0,
+      14.0,
+      32.0,
+      32.0
+     ],
+     "r": 7.0,
+     "stroke": 7.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      14.0,
+      54.0,
+      32.0,
+      32.0
+     ],
+     "r": 7.0,
+     "stroke": 7.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      54.0,
+      54.0,
+      32.0,
+      32.0
+     ],
+     "r": 7.0,
+     "tone": "soft"
+    }
+   ]
+  },
+  "html": {
+   "id": "html",
+   "name": "HTML",
+   "colour": "#CF6017",
+   "on_dark": "#ED945A",
+   "on_light": "#C15A15",
+   "text_on_dark": "#F5C4A4",
+   "text_on_light": "#934410",
+   "file": "index.html",
+   "symbol": [
+    {
+     "path": "M34 26 L14 50 L34 74",
+     "r": 0,
+     "stroke": 9.0,
+     "tone": "main"
+    },
+    {
+     "path": "M66 26 L86 50 L66 74",
+     "r": 0,
+     "stroke": 9.0,
+     "tone": "main"
+    },
+    {
+     "path": "M57 20 L43 80",
+     "r": 0,
+     "stroke": 8.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "css": {
+   "id": "css",
+   "name": "CSS",
+   "colour": "#BA369F",
+   "on_dark": "#DE8DCD",
+   "on_light": "#BA369F",
+   "text_on_dark": "#EDC0E4",
+   "text_on_light": "#9A2D84",
+   "file": "styles.css",
+   "symbol": [
+    {
+     "rect": [
+      10.0,
+      10.0,
+      80.0,
+      80.0
+     ],
+     "r": 14.0,
+     "stroke": 6.0,
+     "tone": "soft"
+    },
+    {
+     "rect": [
+      24.0,
+      24.0,
+      52.0,
+      52.0
+     ],
+     "r": 10.0,
+     "stroke": 7.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      38.0,
+      38.0,
+      24.0,
+      24.0
+     ],
+     "r": 5.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "sql": {
+   "id": "sql",
+   "name": "SQL",
+   "colour": "#BDB828",
+   "on_dark": "#BDB828",
+   "on_light": "#7E7B1B",
+   "text_on_dark": "#D7D241",
+   "text_on_light": "#605E14",
+   "file": "query.sql",
+   "symbol": [
+    {
+     "rect": [
+      12.0,
+      18.0,
+      76.0,
+      64.0
+     ],
+     "r": 10.0,
+     "stroke": 7.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      12.0,
+      18.0,
+      76.0,
+      20.0
+     ],
+     "r": 8.0,
+     "tone": "main"
+    },
+    {
+     "path": "M12 60 L88 60 M42 38 L42 82",
+     "r": 0,
+     "stroke": 6.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "java": {
+   "id": "java",
+   "name": "Java",
+   "colour": "#A53C27",
+   "on_dark": "#E39787",
+   "on_light": "#A53C27",
+   "text_on_dark": "#EFC5BD",
+   "text_on_light": "#A13B26",
+   "file": "Main.java",
+   "symbol": [
+    {
+     "rect": [
+      16.0,
+      12.0,
+      68.0,
+      76.0
+     ],
+     "r": 10.0,
+     "stroke": 8.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      16.0,
+      12.0,
+      68.0,
+      24.0
+     ],
+     "r": 8.0,
+     "tone": "main"
+    },
+    {
+     "path": "M16 62 L84 62",
+     "r": 0,
+     "stroke": 7.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "c": {
+   "id": "c",
+   "name": "C",
+   "colour": "#566B8F",
+   "on_dark": "#9CABC3",
+   "on_light": "#566B8F",
+   "text_on_dark": "#C5CEDC",
+   "text_on_light": "#4B5D7C",
+   "file": "main.c",
+   "symbol": [
+    {
+     "rect": [
+      56.0,
+      26.0,
+      32.0,
+      48.0
+     ],
+     "r": 6.0,
+     "tone": "main"
+    },
+    {
+     "path": "M12 50 L44 50 M34 40 L46 50 L34 60",
+     "r": 0,
+     "stroke": 8.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "cpp": {
+   "id": "cpp",
+   "name": "C++",
+   "colour": "#9B734B",
+   "on_dark": "#C3A384",
+   "on_light": "#987049",
+   "text_on_dark": "#DCCAB7",
+   "text_on_light": "#755739",
+   "file": "main.cpp",
+   "symbol": [
+    {
+     "rect": [
+      10.0,
+      30.0,
+      36.0,
+      40.0
+     ],
+     "r": 7.0,
+     "tone": "main"
+    },
+    {
+     "path": "M58 40 L58 60 M48 50 L68 50",
+     "r": 0,
+     "stroke": 7.0,
+     "tone": "main"
+    },
+    {
+     "path": "M82 40 L82 60 M72 50 L92 50",
+     "r": 0,
+     "stroke": 7.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "docker": {
+   "id": "docker",
+   "name": "Docker",
+   "colour": "#5E9CBA",
+   "on_dark": "#7EB0C8",
+   "on_light": "#427D99",
+   "text_on_dark": "#B7D3E0",
+   "text_on_light": "#346279",
+   "file": "Dockerfile",
+   "symbol": [
+    {
+     "rect": [
+      10.0,
+      62.0,
+      24.0,
+      22.0
+     ],
+     "r": 4.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      38.0,
+      62.0,
+      24.0,
+      22.0
+     ],
+     "r": 4.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      66.0,
+      62.0,
+      24.0,
+      22.0
+     ],
+     "r": 4.0,
+     "tone": "main"
+    },
+    {
+     "rect": [
+      24.0,
+      36.0,
+      24.0,
+      22.0
+     ],
+     "r": 4.0,
+     "tone": "soft"
+    },
+    {
+     "rect": [
+      52.0,
+      36.0,
+      24.0,
+      22.0
+     ],
+     "r": 4.0,
+     "tone": "soft"
+    },
+    {
+     "rect": [
+      38.0,
+      10.0,
+      24.0,
+      22.0
+     ],
+     "r": 4.0,
+     "tone": "main"
+    }
+   ]
+  },
+  "os": {
+   "id": "os",
+   "name": "OS",
+   "colour": "#2F6B6B",
+   "on_dark": "#59B6B6",
+   "on_light": "#2F6B6B",
+   "text_on_dark": "#A4D7D7",
+   "text_on_light": "#2C6464",
+   "file": "kernel.c",
+   "symbol": [
+    {
+     "circle": [
+      50.0,
+      50.0,
+      40.0
+     ],
+     "r": 0,
+     "stroke": 6.0,
+     "tone": "soft"
+    },
+    {
+     "circle": [
+      50.0,
+      50.0,
+      25.0
+     ],
+     "r": 0,
+     "stroke": 7.0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      50.0,
+      50.0,
+      10.0
+     ],
+     "r": 0,
+     "tone": "main"
+    }
+   ]
+  },
+  "cs": {
+   "id": "cs",
+   "name": "CS",
+   "colour": "#A82454",
+   "on_dark": "#E78EAE",
+   "on_light": "#A82454",
+   "text_on_dark": "#F2C0D2",
+   "text_on_light": "#A82454",
+   "file": "example.txt",
+   "symbol": [
+    {
+     "path": "M50 22 L22 74 L78 74 Z",
+     "r": 0,
+     "stroke": 6.0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      50.0,
+      22.0,
+      12.0
+     ],
+     "r": 0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      22.0,
+      74.0,
+      12.0
+     ],
+     "r": 0,
+     "tone": "main"
+    },
+    {
+     "circle": [
+      78.0,
+      74.0,
+      12.0
+     ],
+     "r": 0,
+     "tone": "soft"
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,188 @@
+# The motion-reel LANGUAGE IDENTITY registry (RESTYLE_TO_MOTION_REELS.md, phase 3
+# badges). REEL_STYLE=motion only. It replaces the retired avatar registry
+# (motion_avatars.yaml, in git history at 257df1c): motion reels draw no people,
+# like both reference reels.
+#
+# Every course language gets an identity, which is how a viewer knows within
+# the first second which language the reel is about:
+#   name     the display name (badge, hook chip, end card)
+#   colour   the signature colour, #RRGGBB. The player never draws it raw on a
+#            field: shorts/motion_identities.py derives a lighter tone for the
+#            dark fields (navy, blue) and a darker tone for the light fields
+#            (paper, yellow), each with at least 3:1 contrast against both of
+#            its fields, and refuses a colour whose signature or tones sit
+#            within 60 RGB units of coral (#F2555A), mint (#17B27B) or lavender
+#            (#B9A8FF), the reserved failure / success / system-added colours.
+#   symbol   an ORIGINAL geometric mark on a 100 x 100 grid, built from simple
+#            shapes. Never the language's official logo or mascot, and never a
+#            look-alike of one: no snakes, no coffee cups, no atom orbits, no
+#            whales, no shields, no hexagons for Node, no "JS" square.
+#            Shapes: {rect: [x, y, w, h], r} | {circle: [cx, cy, r]} |
+#            {path: "<svg path>", stroke: w}; add `stroke: w` to outline a rect or
+#            circle instead of filling it, and `tone: soft` to draw it at 35 %.
+#   file     the code editor tab's file name for this language
+#   voice    which shared character voice speaks this language's lines in a
+#            two-speaker reel (voices.character_1 or voices.character_2)
+#
+# Voices belong to IDENTITIES, not people (user decision 2026-10-09, the 4-slot
+# plan in docs/reference/phase3/voices.md): one narrator voice, one host voice,
+# and two character voices shared across the languages. A slot's clip is
+# voices/motion/<slot>.wav; until it exists the old fallback clips are used.
+
+voices:
+  narrator: motion_narrator        # every one-narrator reel
+  host: motion_host                # the asking role in every two-speaker reel
+  character_1: motion_char_1       # the brighter / higher character voice
+  character_2: motion_char_2       # the deeper / lower character voice
+
+# The shared host of every two-speaker reel (interviewer, peer, student): a
+# neutral grey identity, so the language speaker is the only colour on screen.
+host:
+  name: Host
+  colour: "#6C6F7A"
+  symbol:
+    - {rect: [36, 12, 28, 46], r: 14}
+    - {path: "M24 44 C24 66 76 66 76 44", stroke: 8}
+    - {rect: [46, 64, 8, 18], r: 3}
+    - {rect: [32, 80, 36, 8], r: 4}
+
+languages:
+  python:
+    name: Python
+    colour: "#2268C3"
+    file: main.py
+    voice: character_1
+    symbol:                          # indentation: three bars, stepping in
+      - {rect: [12, 16, 58, 15], r: 7.5}
+      - {rect: [30, 42, 56, 15], r: 7.5}
+      - {rect: [30, 68, 38, 15], r: 7.5, tone: soft}
+  javascript:
+    name: JavaScript
+    colour: "#C9951D"
+    file: app.js
+    voice: character_2
+    symbol:                          # braces
+      - {path: "M40 14 C28 14 28 22 28 32 L28 42 C28 47 23 50 16 50 C23 50 28 53 28 58 L28 68 C28 78 28 86 40 86", stroke: 9}
+      - {path: "M60 14 C72 14 72 22 72 32 L72 42 C72 47 77 50 84 50 C77 50 72 53 72 58 L72 68 C72 78 72 86 60 86", stroke: 9}
+  typescript:
+    name: TypeScript
+    colour: "#29668E"
+    file: app.ts
+    voice: character_1
+    symbol:                          # a type box with a colon
+      - {rect: [14, 14, 72, 72], r: 16, stroke: 9}
+      - {circle: [50, 38, 7]}
+      - {circle: [50, 62, 7]}
+  react:
+    name: React
+    colour: "#12B5DE"
+    file: App.jsx
+    voice: character_1
+    symbol:                          # a component tree: one parent, two children
+      - {path: "M50 30 L26 70 M50 30 L74 70", stroke: 7}
+      - {circle: [50, 24, 13]}
+      - {circle: [26, 74, 13]}
+      - {circle: [74, 74, 13], tone: soft}
+  node:
+    name: Node
+    colour: "#60B82E"
+    file: server.js
+    voice: character_2
+    symbol:                          # the event loop: a ring that comes round
+      - {path: "M74 34 A30 30 0 1 0 80 56", stroke: 9}
+      - {path: "M62 30 L76 34 L72 20", stroke: 9}
+      - {circle: [50, 50, 8]}
+  django:
+    name: Django
+    colour: "#2E8A3A"
+    file: views.py
+    voice: character_1
+    symbol:                          # a page of templates: a 2 x 2 grid, one filled
+      - {rect: [14, 14, 32, 32], r: 7}
+      - {rect: [54, 14, 32, 32], r: 7, stroke: 7}
+      - {rect: [14, 54, 32, 32], r: 7, stroke: 7}
+      - {rect: [54, 54, 32, 32], r: 7, tone: soft}
+  html:
+    name: HTML
+    colour: "#CF6017"
+    file: index.html
+    voice: character_2
+    symbol:                          # an element: angle brackets around a slash
+      - {path: "M34 26 L14 50 L34 74", stroke: 9}
+      - {path: "M66 26 L86 50 L66 74", stroke: 9}
+      - {path: "M57 20 L43 80", stroke: 8}
+  css:
+    name: CSS
+    colour: "#BA369F"
+    file: styles.css
+    voice: character_1
+    symbol:                          # the box model: margin, border, content
+      - {rect: [10, 10, 80, 80], r: 14, stroke: 6, tone: soft}
+      - {rect: [24, 24, 52, 52], r: 10, stroke: 7}
+      - {rect: [38, 38, 24, 24], r: 5}
+  sql:
+    name: SQL
+    colour: "#BDB828"
+    file: query.sql
+    voice: character_1
+    symbol:                          # a table with a header row
+      - {rect: [12, 18, 76, 64], r: 10, stroke: 7}
+      - {rect: [12, 18, 76, 20], r: 8}
+      - {path: "M12 60 L88 60 M42 38 L42 82", stroke: 6}
+  java:
+    name: Java
+    colour: "#A53C27"
+    file: Main.java
+    voice: character_2
+    symbol:                          # a class box: name, fields, methods
+      - {rect: [16, 12, 68, 76], r: 10, stroke: 8}
+      - {rect: [16, 12, 68, 24], r: 8}
+      - {path: "M16 62 L84 62", stroke: 7}
+  c:
+    name: C
+    colour: "#566B8F"
+    file: main.c
+    voice: character_2
+    symbol:                          # a pointer: an arrow into a memory cell
+      - {rect: [56, 26, 32, 48], r: 6}
+      - {path: "M12 50 L44 50 M34 40 L46 50 L34 60", stroke: 8}
+  cpp:
+    name: C++
+    colour: "#9B734B"
+    file: main.cpp
+    voice: character_1
+    symbol:                          # a cell and two plus signs
+      - {rect: [10, 30, 36, 40], r: 7}
+      - {path: "M58 40 L58 60 M48 50 L68 50", stroke: 7}
+      - {path: "M82 40 L82 60 M72 50 L92 50", stroke: 7}
+  docker:
+    name: Docker
+    colour: "#5E9CBA"
+    file: Dockerfile
+    voice: character_2
+    symbol:                          # stacked boxes, three then two then one
+      - {rect: [10, 62, 24, 22], r: 4}
+      - {rect: [38, 62, 24, 22], r: 4}
+      - {rect: [66, 62, 24, 22], r: 4}
+      - {rect: [24, 36, 24, 22], r: 4, tone: soft}
+      - {rect: [52, 36, 24, 22], r: 4, tone: soft}
+      - {rect: [38, 10, 24, 22], r: 4}
+  os:
+    name: OS
+    colour: "#2F6B6B"
+    file: kernel.c
+    voice: character_2
+    symbol:                          # privilege rings around a kernel
+      - {circle: [50, 50, 40], stroke: 6, tone: soft}
+      - {circle: [50, 50, 25], stroke: 7}
+      - {circle: [50, 50, 10]}
+  cs:
+    name: CS
+    colour: "#A82454"
+    file: example.txt
+    voice: character_1
+    symbol:                          # a graph: three nodes, three edges
+      - {path: "M50 22 L22 74 L78 74 Z", stroke: 6}
+      - {circle: [50, 22, 12]}
+      - {circle: [22, 74, 12]}
+      - {circle: [78, 74, 12], tone: soft}

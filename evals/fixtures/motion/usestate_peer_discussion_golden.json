@@ -82,7 +82,7 @@
   "tts_provider": null,
   "voice_ref": null,
   "speakers": [
-    {"role": "PEER_A", "avatar": "host", "name": "Juno", "voice_slot": "motion_host"},
-    {"role": "PEER_B", "avatar": "react", "name": "Rae", "voice_slot": "motion_react"}
+    {"role": "PEER_A", "identity": "host", "label": "Peer A", "voice_slot": "motion_host"},
+    {"role": "PEER_B", "identity": "react", "label": "Peer B", "voice_slot": "motion_char_1"}
   ]
 }

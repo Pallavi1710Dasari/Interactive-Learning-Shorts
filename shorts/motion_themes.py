@@ -1,15 +1,16 @@
 """
-Motion-reel THEMES, TAGS and AVATARS (RESTYLE_TO_MOTION_REELS.md, phase 2b).
+Motion-reel THEMES and TAGS (RESTYLE_TO_MOTION_REELS.md, phase 2b).
 REEL_STYLE=motion only — nothing in the explainer or story paths imports this.
 
 The teaching approach is HOW the idea is explained; the theme is the FORMAT of
 the reel (who speaks, what it feels like). This module is everything about a
 theme that is a FIXED RULE rather than a judgement:
 
-  - the registries: shorts/motion_themes.yaml and shorts/motion_avatars.yaml,
-    loaded and validated here. Adding a theme is one YAML entry and no code
-    change, as long as it uses a template, hook style and avatar kind that
-    already exist (TEMPLATES, HOOK_STYLES, AVATAR_KINDS below);
+  - the theme registry, shorts/motion_themes.yaml, loaded and validated
+    here. Adding a theme is one YAML entry and no code change, as long as it
+    uses a template, hook style and identity kind that already exist
+    (TEMPLATES, HOOK_STYLES, IDENTITY_KINDS below). Languages, their badges
+    and voices are shorts/motion_identities.py;
   - the language a reel is in, and its tags;
   - the reel history (earlier reels' tags.json) and the VARIETY rule;
   - the FIT CHECK (theme_problems): requirements, incompatible approaches,
@@ -31,7 +32,6 @@ APPROACH_KINDS: tuple[str, ...] = get_args(TeachingApproachKind)
 
 ROOT = Path(__file__).resolve().parent
 THEMES_PATH = ROOT / "motion_themes.yaml"
-AVATARS_PATH = ROOT / "motion_avatars.yaml"
 
 TEMPLATES = MOTION_TEMPLATES
 #: How a hook may open. symptom_question and how_question are the two base
@@ -41,13 +41,9 @@ TEMPLATES = MOTION_TEMPLATES
 #:   claim     opens with an opener; a statement, a question is optional
 #:   scene     opens with an opener; drops the viewer into a moment
 HOOK_STYLES = ("symptom_question", "how_question", "question", "claim", "scene")
-AVATAR_KINDS = ("language", "host")
-#: Colours with a fixed meaning in every motion reel (web/src/motion/tokens.ts):
-#: coral failure, mint success, lavender system-added. No avatar may wear them.
-RESERVED_COLOURS = frozenset({"#f2555a", "#17b27b", "#b9a8ff"})
-#: The four field colours (web/src/motion/tokens.ts FIELDS).
-FIELD_COLOURS = ("#091025", "#283EE6", "#ECF0F7", "#FDD13E")
-
+#: Who a speaker of a two-speaker theme is drawn as: the neutral host badge,
+#: or the badge in the reel's language colour (shorts/motion_identities.yaml).
+IDENTITY_KINDS = ("language", "host")
 TAG_RE = re.compile(r"^#[a-z0-9]+$")
 MAX_CONCEPT_TAGS = 3
 
@@ -56,8 +52,13 @@ MAX_CONCEPT_TAGS = 3
 
 class ThemeSpeaker(BaseModel):
     role: str
-    avatar: str | None = None
+    identity: str | None = None
     asks: bool = False
+
+    @property
+    def label(self) -> str:
+        """"INTERVIEWER" -> "Interviewer", "PEER_A" -> "Peer A"."""
+        return self.role.replace("_", " ").title()
 
     @field_validator("role")
     @classmethod
@@ -93,6 +94,12 @@ class ThemeSpec(BaseModel):
     tag: str
     template: str
     description: str
+    label: str = ""
+
+    @property
+    def display(self) -> str:
+        """The theme's display name ("Interview"), for the hook chip."""
+        return self.label or self.id.replace("_", " ").capitalize()
     speakers: list[ThemeSpeaker]
     needs_code: bool = False
     suits: list[str] = Field(default_factory=list)
@@ -134,12 +141,12 @@ class ThemeSpec(BaseModel):
         if len(set(self.roles)) != len(self.roles):
             problems.append(f"speaker roles repeat: {self.roles}")
         for s in self.speakers:
-            if self.two_speaker and s.avatar not in AVATAR_KINDS:
-                problems.append(f"speaker {s.role} needs an avatar, one of {AVATAR_KINDS}")
-            if not self.two_speaker and s.avatar is not None:
-                problems.append("a one-speaker theme has no avatar")
-        if self.two_speaker and {s.avatar for s in self.speakers} != set(AVATAR_KINDS):
-            problems.append("a two-speaker theme casts one 'host' and one 'language' avatar "
+            if self.two_speaker and s.identity not in IDENTITY_KINDS:
+                problems.append(f"speaker {s.role} needs an identity, one of {IDENTITY_KINDS}")
+            if not self.two_speaker and s.identity is not None:
+                problems.append("a one-speaker theme has no speaker identity")
+        if self.two_speaker and {s.identity for s in self.speakers} != set(IDENTITY_KINDS):
+            problems.append("a two-speaker theme has one 'host' and one 'language' speaker "
                             "(two characters, two voices)")
         for kind in self.works_with + self.incompatible_with:
             if kind not in APPROACH_KINDS:
@@ -277,159 +284,26 @@ def theme_for_script(script) -> ThemeSpec:
     return reg.base_for(getattr(script, "template", "fix_story") or "fix_story")
 
 
-# ================================================================== avatars
-
-class AvatarPalette(BaseModel):
-    primary: str
-    secondary: str
-    accent: str
-    ink: str
-
-    @model_validator(mode="after")
-    def no_reserved(self):
-        for name, colour in self.model_dump().items():
-            if not re.fullmatch(r"#[0-9A-Fa-f]{6}", colour):
-                raise ValueError(f"palette {name} {colour!r} is not a #RRGGBB colour")
-            if colour.lower() in RESERVED_COLOURS:
-                raise ValueError(f"palette {name} {colour} is reserved (coral = failure, "
-                                 f"mint = success, lavender = system-added)")
-        fields = {c.lower() for c in FIELD_COLOURS}
-        if self.primary.lower() in fields:
-            raise ValueError(f"palette primary {self.primary} is a field colour — the body "
-                             f"would vanish on that field")
-        return self
-
-
-class AvatarArt(BaseModel):
-    """What the player draws (web/src/motion/avatars/Avatar.tsx), from the
-    art vocabulary in web/src/motion/library.json."""
-    body: str
-    head: str
-    hair: str
-    skin: str
-    accessories: list[str] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def known(self):
-        from .motion_library import library
-        vocab = library()["avatar"]
-        problems = [f"{name} {value!r} is not one of {vocab[key] if key != 'skins' else list(vocab[key])}"
-                    for name, value, key in (("body", self.body, "bodies"), ("head", self.head, "heads"),
-                                             ("hair", self.hair, "hair"), ("skin", self.skin, "skins"))
-                    if value not in vocab[key]]
-        problems += [f"accessory {a!r} is not one of {vocab['accessories']}"
-                     for a in self.accessories if a not in vocab["accessories"]]
-        if problems:
-            raise ValueError("; ".join(problems))
-        return self
-
-
-class Avatar(BaseModel):
-    id: str
-    name: str
-    look: str
-    art: AvatarArt
-    palette: AvatarPalette
-    voice_slot: str
-
-    @property
-    def voice_path(self) -> str:
-        return f"voices/motion/{self.voice_slot}.wav"
-
-    def spec(self):
-        """The player's view of this avatar (schema.MotionAvatarSpec)."""
-        from .schema import MotionAvatarSpec
-        return MotionAvatarSpec(id=self.id, name=self.name, body=self.art.body,
-                                head=self.art.head, hair=self.art.hair, skin=self.art.skin,
-                                accessories=list(self.art.accessories),
-                                palette=self.palette.model_dump())
-
-
-class AvatarRegistry(BaseModel):
-    languages: list[str]
-    host: Avatar
-    characters: dict[str, Avatar]
-    narrator_slot: str = "motion_narrator"
-
-    @model_validator(mode="after")
-    def one_per_language(self):
-        problems: list[str] = []
-        for lang in self.languages:
-            if not TAG_RE.match("#" + lang):
-                problems.append(f"language {lang!r} must be lowercase letters and digits")
-        missing = [l for l in self.languages if l not in self.characters]
-        extra = [l for l in self.characters if l not in self.languages]
-        if missing or extra:
-            problems.append(f"one character per course language (missing {missing}, "
-                            f"not a language {extra})")
-        # Voices may be SHARED between characters (a few character voices for
-        # fifteen languages — see docs/reference/phase3/voices.md). The one
-        # rule: the host never shares a voice with a character, so the two
-        # speakers of any two-speaker reel always sound different.
-        clash = sorted({a.id for a in self.characters.values()
-                        if a.voice_slot == self.host.voice_slot})
-        if clash:
-            problems.append(f"the host's voice slot {self.host.voice_slot!r} is also used by "
-                            f"{clash} — a two-speaker reel would have one voice")
-        names = [self.host.name] + [a.name for a in self.characters.values()]
-        if len(set(names)) != len(names):
-            problems.append("character names repeat")
-        looks = [(a.art.body, a.art.head, a.art.hair, tuple(a.art.accessories))
-                 for a in [self.host, *self.characters.values()]]
-        if len(set(looks)) != len(looks):
-            problems.append("two characters share the same body, head, hair and accessories")
-        if problems:
-            raise ValueError("motion avatar registry: " + "; ".join(problems))
-        return self
-
-
-@lru_cache(maxsize=1)
-def avatars() -> AvatarRegistry:
-    data = yaml.safe_load(AVATARS_PATH.read_text(encoding="utf-8")) or {}
-    host = Avatar(id="host", **{k: v for k, v in data["host"].items() if k != "id"})
-    chars = {lang: Avatar(id=lang, **spec) for lang, spec in (data.get("characters") or {}).items()}
-    return AvatarRegistry(languages=data.get("languages") or [], host=host, characters=chars,
-                          narrator_slot=(data.get("narrator") or {}).get("voice_slot",
-                                                                         "motion_narrator"))
-
+# =============================================================== identities
 
 def language_tags() -> list[str]:
-    return list(avatars().languages)
-
-
-#: The player's copy of the avatar registry, for pages that draw avatars with
-#: no plan loaded (the gallery). Written by `python -m shorts.motion_themes
-#: export-avatars`; motion_scene_test checks it matches the YAML.
-AVATARS_JSON = ROOT.parent / "web" / "src" / "motion" / "avatars" / "avatars.generated.json"
-
-
-def avatars_json() -> str:
-    import json
-    reg = avatars()
-    data = {"_comment": "GENERATED from shorts/motion_avatars.yaml by `python -m shorts.motion_themes "
-                        "export-avatars` — do not edit by hand.",
-            "host": reg.host.spec().model_dump(),
-            "characters": {k: a.spec().model_dump() for k, a in reg.characters.items()}}
-    return json.dumps(data, indent=2) + "\n"
-
-
-def export_avatars() -> Path:
-    AVATARS_JSON.parent.mkdir(parents=True, exist_ok=True)
-    AVATARS_JSON.write_text(avatars_json(), encoding="utf-8")
-    return AVATARS_JSON
-
+    """The course languages, as tags — shorts/motion_identities.yaml."""
+    from .motion_identities import languages
+    return languages()
 
 
 def cast_speakers(theme: ThemeSpec, language: str) -> list[MotionSpeaker]:
-    """Each role of a two-speaker theme and the avatar that plays it: the
-    shared host, or the language's own character. [] for a one-narrator theme."""
+    """Each role of a two-speaker theme, the identity that badges it (the
+    host, or the language) and the voice slot that speaks it. [] for a
+    one-narrator theme."""
+    from .motion_identities import voice_slot
     if not theme.two_speaker:
         return []
-    reg = avatars()
     out = []
     for s in theme.speakers:
-        a = reg.host if s.avatar == "host" else reg.characters[language]
-        out.append(MotionSpeaker(role=s.role, avatar=a.id, name=a.name, voice_slot=a.voice_slot))
+        ident = "host" if s.identity == "host" else language
+        out.append(MotionSpeaker(role=s.role, identity=ident, label=s.label,
+                                 voice_slot=voice_slot(ident)))
     return out
 
 
@@ -792,8 +666,8 @@ def theme_problems(theme_id: str, *, approach: str | None, has_code: bool,
                    language: str | None = None) -> list[str]:
     """Every rule a theme must pass for this reel. Each problem starts with
     its rule: unknown, requirement, incompatible, template, variety.
-      - requirement: needs_code with no code in the section; a two-speaker
-        theme with no avatar for the language;
+      - requirement: needs_code with no code in the section; a language
+        with no identity (shorts/motion_identities.yaml);
       - incompatible: the approved teaching approach is in the theme's
         incompatible_with;
       - template: a human pinned the template (--template, or the reviewer at
@@ -806,8 +680,8 @@ def theme_problems(theme_id: str, *, approach: str | None, has_code: bool,
     problems: list[str] = []
     if spec.needs_code and not has_code:
         problems.append(f"requirement: {theme_id} needs code in the section, and it has none")
-    if spec.two_speaker and language and language not in avatars().characters:
-        problems.append(f"requirement: {theme_id} needs an avatar for {language!r}")
+    if language and language not in language_tags():
+        problems.append(f"requirement: {language!r} has no identity in motion_identities.yaml")
     if approach and approach in spec.incompatible_with:
         problems.append(f"incompatible: {theme_id} does not work with the "
                         f"{approach} teaching approach")
@@ -825,11 +699,3 @@ def eligible_themes(*, approach: str | None, has_code: bool, template: str | Non
     return [t for t in registry().ids()
             if not theme_problems(t, approach=approach, has_code=has_code,
                                   template=template, history=history, language=language)]
-
-
-if __name__ == "__main__":
-    import sys
-    if sys.argv[1:] == ["export-avatars"]:
-        print(f"wrote {export_avatars()}")
-    else:
-        raise SystemExit("usage: python -m shorts.motion_themes export-avatars")

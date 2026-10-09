@@ -1,0 +1,921 @@
+{
+ "short_id": "stub_the_tlb__motion",
+ "topic": "How does the TLB work?",
+ "stub": true,
+ "theme": "mentor_student",
+ "template": "fix_story",
+ "teaching_approach": "direct_explanation",
+ "tags": [
+  "#os",
+  "#mentor",
+  "#virtualmemory",
+  "#tlb",
+  "#paging"
+ ],
+ "language": "os",
+ "duration": 65.037,
+ "cost": 0,
+ "cost_estimated": false,
+ "stage": "timing",
+ "has_plan": true,
+ "approach": {
+  "primary": "direct_explanation",
+  "combined_with": [],
+  "alternatives": [],
+  "rationale": "Stub: explaining How does the TLB work? plainly, with no device chosen."
+ },
+ "theme_choice": {
+  "theme": "mentor_student",
+  "reason": "chosen by the reviewer (--theme)",
+  "tags": [
+   "#os",
+   "#mentor",
+   "#virtualmemory",
+   "#tlb",
+   "#paging"
+  ],
+  "fit_check": {
+   "passed": true,
+   "attempts": 0,
+   "rejected": [],
+   "fallback": false,
+   "fallback_reason": "",
+   "overrides": []
+  },
+  "source": "flag",
+  "template": "fix_story",
+  "language": "os",
+  "teaching_approach": "direct_explanation",
+  "eligible": [
+   "classic_explainer",
+   "narrative",
+   "interview",
+   "interview_rapid_fire",
+   "peer_discussion",
+   "mentor_student",
+   "myth_vs_fact",
+   "common_mistakes",
+   "under_the_hood",
+   "step_by_step_walkthrough",
+   "real_world_scenario",
+   "before_vs_after"
+  ]
+ },
+ "script": {
+  "reel_style": "motion",
+  "template": "fix_story",
+  "short_id": "stub_the_tlb__motion",
+  "source_section_id": "3.4",
+  "topic": "How does the TLB work?",
+  "hook_question": "Why does every memory lookup feel twice as slow?",
+  "concept_name": "TLB",
+  "promise": "Why lookups need a cache",
+  "icon_vocabulary": [
+   {
+    "name": "grid",
+    "label": "Page table"
+   },
+   {
+    "name": "memory",
+    "label": "TLB"
+   },
+   {
+    "name": "bolt",
+    "label": "Hit"
+   }
+  ],
+  "takeaways": [
+   {
+    "icon": "grid",
+    "line": "Table in memory",
+    "sub": "every lookup reads it"
+   },
+   {
+    "icon": "memory",
+    "line": "TLB caches answers",
+    "sub": "recent page to frame"
+   },
+   {
+    "icon": "bolt",
+    "line": "Hits skip walks",
+    "sub": "one memory read"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s01",
+    "beat": "hook",
+    "speech": "Why does every memory lookup feel twice as slow?",
+    "captions": [
+     {
+      "text": "Why does every memory lookup feel twice as <b>slow</b>?",
+      "speaker": "STUDENT"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Student badge asks; a memory lookup bar fills twice as long as it should; status pill 'Twice as slow'.",
+    "code": [],
+    "scene": {
+     "field": "navy",
+     "transition": "cut",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "identity_title",
+       "props": {}
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Slow",
+        "tone": "bad",
+        "icon": "alert"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "lookup",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "Slow",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.46
+   },
+   {
+    "id": "s02",
+    "beat": "title",
+    "speech": "One small cache fixes this. Here is how.",
+    "captions": [
+     {
+      "text": "One small cache fixes this.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "Here is how.",
+      "speaker": "MENTOR"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Title card: series label, 'TLB', the promise line, three icon tiles.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "iris",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "title_card",
+       "props": {
+        "title": "TLB",
+        "promise": "Why lookups need a cache",
+        "icons": [
+         {
+          "name": "grid",
+          "label": "Page table"
+         },
+         {
+          "name": "memory",
+          "label": "TLB"
+         },
+         {
+          "name": "bolt",
+          "label": "Hit"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "Here",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.08
+   },
+   {
+    "id": "s03",
+    "beat": "setup",
+    "speech": "Your program asks for one address. The page table says which frame holds that page. So where does the time go?",
+    "captions": [
+     {
+      "text": "Your program asks for one address.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "The <b>page table</b> says which frame holds that page.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "So where does the time go?",
+      "speaker": "STUDENT"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Program chip asks for an address; a page table panel lights the matching frame.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "bar_wipe",
+     "label": "THE SETUP",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "token_row",
+       "props": {
+        "items": [
+         "page table"
+        ],
+        "tones": [
+         "plain"
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "one",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "says",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "page",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "does",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 8.08
+   },
+   {
+    "id": "s04",
+    "beat": "break_1",
+    "speech": "But the page table lives in memory too. So every lookup first reads the table, then the data.",
+    "captions": [
+     {
+      "text": "But the page table lives in memory too.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "So every lookup first reads the table, then the data.",
+      "speaker": "MENTOR"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Two memory reads in a row: the table, then the data; status pill 'Two reads'.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "cut",
+     "label": "WHY IT FAILS",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "token_row",
+       "props": {
+        "items": [
+         "But the page"
+        ],
+        "tones": [
+         "plain"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "But the page table",
+        "tone": "bad",
+        "icon": "x"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "But the page",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "table",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "memory",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "first",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "table",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.92
+   },
+   {
+    "id": "s05",
+    "beat": "fix_idea",
+    "speech": "Meet the TLB, a small cache. It keeps recent page to frame answers close by.",
+    "captions": [
+     {
+      "text": "Meet the <b>TLB</b>, a <b>small cache</b>.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "It keeps recent page to frame answers close by.",
+      "speaker": "MENTOR"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "A small cache panel 'TLB' beside memory, holding recent page to frame pairs.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "double_bar_wipe",
+     "label": "THE FIX",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "kinetic_title",
+       "props": {
+        "text": "TLB",
+        "accent": [
+         "TLB"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "token_row",
+       "props": {
+        "items": [
+         "small cache"
+        ],
+        "tones": [
+         "info"
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "TLB",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "small cache",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "page",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "close",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 5.77
+   },
+   {
+    "id": "s06",
+    "beat": "fix_flow",
+    "speech": "On a TLB hit, the frame number is ready at once. So I skip the table walk?",
+    "captions": [
+     {
+      "text": "On a <b>TLB hit</b>, the frame number is ready at once.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "So I skip the <b>table walk</b>?",
+      "speaker": "STUDENT"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Trigger chip 'TLB hit' pulses straight to the frame; the table walk is skipped.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "diagonal_stripes",
+     "label": "HOW IT WORKS",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "trigger_chip",
+       "props": {
+        "label": "TLB hit"
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Table walk",
+        "tone": "ok",
+        "icon": "check"
+       }
+      },
+      {
+       "id": "o3",
+       "kind": "connector",
+       "props": {
+        "from": "o1",
+        "to": "o2",
+        "tone": "info"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "TLB hit",
+       "do": "enter",
+       "target": "o3",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "TLB hit",
+       "do": "pulse",
+       "target": "o3",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "frame",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "ready",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "once",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "skip",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "table walk",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.54
+   },
+   {
+    "id": "s07",
+    "beat": "code_map",
+    "speech": "Each entry maps a page number to a frame number. A miss walks the table once, then saves it.",
+    "captions": [
+     {
+      "text": "Each entry maps a page number to a frame number.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "A <b>miss</b> walks the table once, then saves it.",
+      "speaker": "MENTOR"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Icon row: page table, TLB, hit \u2014 each lit as it is named.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "cut",
+     "label": "HOW IT MAPS",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "icon_row",
+       "props": {
+        "icons": [
+         {
+          "name": "grid",
+          "label": "Page table",
+          "tone": "info"
+         },
+         {
+          "name": "memory",
+          "label": "TLB",
+          "tone": "info"
+         },
+         {
+          "name": "bolt",
+          "label": "Hit",
+          "tone": "info"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "page",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "frame",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      },
+      {
+       "at": "miss",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "once",
+       "do": "highlight",
+       "target": "o1",
+       "value": "3",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 7.31
+   },
+   {
+    "id": "s08",
+    "beat": "payoff",
+    "speech": "Now the same lookup reads memory once, and my program runs fast.",
+    "captions": [
+     {
+      "text": "Now the same lookup reads memory once, and my program runs <b>fast</b>.",
+      "speaker": "STUDENT"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "The hook's lookup bar again, now one short read; status pill 'Fast'.",
+    "code": [],
+    "scene": {
+     "field": "navy",
+     "transition": "stack_rise",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "kinetic_title",
+       "props": {
+        "text": "NOW THE SAME LOOKUP READS MEMORY ONCE, AND",
+        "accent": [
+         "FAST"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Fast",
+        "tone": "ok",
+        "icon": "check"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "reads",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "once",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      },
+      {
+       "at": "fast",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 4.62
+   },
+   {
+    "id": "s09",
+    "beat": "recap",
+    "speech": "Remember: the page table lives in memory. The TLB caches recent answers. A hit skips the walk.",
+    "captions": [
+     {
+      "text": "Remember: the page table lives in memory.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "The <b>TLB</b> caches recent answers.",
+      "speaker": "MENTOR"
+     },
+     {
+      "text": "A hit skips the walk.",
+      "speaker": "MENTOR"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Takeaway list: three rows with the grid, memory and bolt icons.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "iris",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "takeaway_list",
+       "props": {
+        "heading": "Key takeaways",
+        "rows": [
+         {
+          "icon": "grid",
+          "line": "Table in memory",
+          "sub": "every lookup reads it"
+         },
+         {
+          "icon": "memory",
+          "line": "TLB caches answers",
+          "sub": "recent page to frame"
+         },
+         {
+          "icon": "bolt",
+          "line": "Hits skip walks",
+          "sub": "one memory read"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "recent",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "skips",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.54
+   },
+   {
+    "id": "s10",
+    "beat": "cta",
+    "speech": "Follow for more, one idea at a time.",
+    "captions": [
+     {
+      "text": "Follow for more, one idea at a time.",
+      "speaker": "MENTOR"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "End card: Up next, Follow button, tags.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "bar_wipe",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "end_card",
+       "props": {
+        "up_next": "Internal fragmentation in paging"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "time",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.08
+   }
+  ],
+  "chapters": [],
+  "running_example": null,
+  "series": "@learnthesimpleway",
+  "next_topic": "Internal fragmentation in paging",
+  "tts_provider": null,
+  "voice_ref": null,
+  "theme": "mentor_student",
+  "language": "os",
+  "speakers": [
+   {
+    "role": "STUDENT",
+    "identity": "host",
+    "label": "Student",
+    "voice_slot": "motion_host"
+   },
+   {
+    "role": "MENTOR",
+    "identity": "os",
+    "label": "Mentor",
+    "voice_slot": "motion_char_2"
+   }
+  ],
+  "estimated_seconds": 55.4
+ },
+ "facts": [],
+ "cost_log": {
+  "short_id": "stub_the_tlb__motion",
+  "runs": [
+   {
+    "started": "2026-10-09T11:41:38+00:00",
+    "ended": "2026-10-09T11:41:38+00:00",
+    "stub": true,
+    "calls": [],
+    "cost": 0
+   }
+  ],
+  "total": {
+   "calls": 0,
+   "cost": 0,
+   "estimated": false,
+   "by_label": {}
+  }
+ },
+ "plan_url": "/motion-demo/mentor_os.json",
+ "audio_url": null,
+ "demo": "mentor_os"
+}

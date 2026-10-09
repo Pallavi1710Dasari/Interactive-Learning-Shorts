@@ -41,7 +41,7 @@ LIBRARY_PATH = ICONS_PATH.parent / "library.json"
 def library() -> dict:
     """The whole scene vocabulary: frame regions, fields, tones, transitions,
     object kinds (props, layout, height, max lengths, allowed actions),
-    action kinds and the avatar art vocabulary."""
+    action kinds and the identity symbol vocabulary."""
     return json.loads(LIBRARY_PATH.read_text(encoding="utf-8"))
 
 

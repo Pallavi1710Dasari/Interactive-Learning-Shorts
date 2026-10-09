@@ -154,7 +154,7 @@ def stack_height(scene: MotionScene) -> float:
 
 def layout_scene(scene: MotionScene, duo: bool) -> list[MotionPlacedObject]:
     """Where everything goes. Placed objects stack top to bottom in the
-    region (solo: the middle of the frame; duo: above the two avatars),
+    region (solo: the middle of the frame; duo: above the chat),
     centred vertically, each content_w wide. A connector's points run from
     one object's bottom edge to the next one's top edge. A stamp sits on the
     region's centre. Full-frame objects draw themselves."""
@@ -378,6 +378,18 @@ def _kinetic(text: str, cap: int = 54) -> str:
     return text
 
 
+def _whole_title(shot: MotionShot, script) -> str:
+    """The hook's kinetic title: its first sentence, or the reel's question,
+    whichever fits the title's lines WHOLE — a hook cut mid-phrase ("…STAYS
+    STUCK AT") reads as a mistake. Cut only if neither fits."""
+    k = lib.library()["kinetic"]
+    for text in (_first_sentence(shot), script.hook_question):
+        t = (text or "").upper().strip()
+        if t and len(kinetic_lines(t)) <= k["max_lines"] and len(t) <= 54:
+            return t
+    return _kinetic(_first_sentence(shot).upper())
+
+
 def _first_sentence(shot: MotionShot) -> str:
     return motion_plain_text(shot.captions[0].text) if shot.captions else shot.speech
 
@@ -597,12 +609,11 @@ def _chips(items: list[str], cap: int = 44) -> list[str]:
 #: then paper, then yellow, then paper — navy is the hook's).
 CHAPTER_FIELDS = ("blue", "paper", "yellow", "paper")
 
-#: The code window's file name by course language — a plausible file, never
-#: the concept's name.
-_CODE_FILES = {"python": "main.py", "django": "views.py", "javascript": "app.js", "node": "server.js",
-               "typescript": "app.ts", "react": "App.jsx", "html": "index.html", "css": "styles.css",
-               "sql": "query.sql", "java": "Main.java", "c": "main.c", "cpp": "main.cpp",
-               "docker": "Dockerfile"}
+def _code_file(language: str | None) -> str:
+    """The code window's tab: a real file name for the reel's language
+    (shorts/motion_identities.yaml), never the concept's name."""
+    from .motion_identities import languages, identity
+    return identity(language).file if language in languages() else ""
 
 
 def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionScene:
@@ -618,9 +629,16 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
 
     if beat == "hook":
         field = "navy"
-        o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()),
-                   accent=[h.upper() for h in hl[:2]])
-        b.act("enter", o1)
+        # The language mark first, so the language is clear within the first
+        # second (phase 3 badges). In a two-speaker reel the question is in the
+        # chat bubble, so the hook shows the mark and the symptom only.
+        mark = b.add("identity_title")
+        b.act("enter", mark)
+        duo = bool(script.speakers)
+        o1 = None if duo else b.add("kinetic_title", text=_whole_title(shot, script),
+                                    accent=[h.upper() for h in hl[:2]])
+        if o1:
+            b.act("enter", o1)
         if walk:
             rest = [motion_plain_text(c.text) for c in shot.captions[1:]]
             if rest:
@@ -629,7 +647,9 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         else:
             o2 = b.add("status_pill", text=_symptom(shot), tone="bad", icon="alert")
             b.act("enter", o2, _cue_for(_symptom(shot)) if _symptom(shot) else "start")
-        primary_nudge = (o1, "highlight")
+            if o1 is None:
+                o1 = mark          # two speakers: the mark pulses on the spoken words
+        primary_nudge = (o1, "highlight") if o1 else None
     elif beat == "title":
         field = "blue"
         icons = [{"name": i.name, "label": _fit(i.label, 12)} for i in script.icon_vocabulary[:3]]
@@ -639,7 +659,7 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         if icons:
             primary_nudge = (o1, "highlight")
     elif beat in ("setup", "chapter") and shot.code:
-        o1 = b.add("code_window", file=_CODE_FILES.get(script.language or "", ""), lines=shot.code)
+        o1 = b.add("code_window", file=_code_file(script.language), lines=shot.code)
         b.act("enter", o1)
         b.act("type", o1)
         for i, h in enumerate(hl[:2]):
@@ -683,12 +703,14 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
             items = _chips(hl or [_fit(_first_sentence(shot), 14)])
             o1 = b.add("token_row", items=items, tones=["plain"] * len(items))
             b.act("enter", o1)
-            if fail:
-                o2 = b.add("status_pill", text=_symptom(shot), tone="bad", icon="x")
-                b.act("enter", o2, _cue_for(_symptom(shot)))
-                if len(items) > 1:
-                    tones = ["plain"] * (len(items) - 1) + ["bad"]
-                    b.act("state", o1, _cue_for(items[-1]), value=",".join(tones))
+            symptom = _symptom(shot)
+            if fail and _key(symptom) not in {_key(i) for i in items}:
+                # (a pill that only repeats a chip says nothing new)
+                o2 = b.add("status_pill", text=symptom, tone="bad", icon="x")
+                b.act("enter", o2, _cue_for(symptom))
+            if fail and len(items) > 1:
+                tones = ["plain"] * (len(items) - 1) + ["bad"]
+                b.act("state", o1, _cue_for(items[-1]), value=",".join(tones))
             primary_nudge = (o1, "highlight")
     elif beat == "code_map":
         if shot.code:
@@ -741,7 +763,7 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         primary_nudge = (o1, "highlight")
     elif beat == "cta":
         field = "blue"
-        o1 = b.add("end_card", up_next=_fit(script.next_topic, 22))
+        o1 = b.add("end_card", up_next=_fit(script.next_topic, 40))
         b.act("enter", o1)
         primary_nudge = (o1, "pulse")
     elif beat == "name_it":

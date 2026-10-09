@@ -8195,7 +8195,7 @@ def _themed_not_qa(script, theme) -> GraderResult:
 
 def check_motion_theme_speakers(script) -> GraderResult:
     """The script speaks the way its theme says (phase 2b). A one-narrator
-    theme: no caption carries a speaker and no avatar is cast. A two-speaker
+    theme: no caption carries a speaker and no speaker is cast. A two-speaker
     theme: every caption is labelled with one of the theme's roles, each
     beat uses only the speakers its beat template names and is opened by the
     first of them, both roles speak, and both are cast. The script's template
@@ -8218,7 +8218,7 @@ def check_motion_theme_speakers(script) -> GraderResult:
             problems.append(f"shot(s) {labelled} label a speaker — {theme.id} has one narrator")
             off += labelled
         if cast:
-            problems.append(f"{theme.id} has one narrator, but avatars are cast for {cast}")
+            problems.append(f"{theme.id} has one narrator, but speakers are cast: {cast}")
     else:
         beats = theme.beats if isinstance(theme.beats, dict) else {}
         spoke: set[str] = set()
@@ -8662,7 +8662,8 @@ def _scene_tones(shot) -> list[tuple[str, str]]:
 
 def check_motion_scene_valid(script) -> GraderResult:
     """Every shot has a drawable scene (motion_scenes.scene_problems: kinds,
-    props, lengths, targets, actions, word cues, it fits its region), and the
+    props, lengths, targets, actions, word cues, it fits its region), the hook
+    and only the hook shows the language mark (identity_title), and the
     transitions follow the rules: a field change needs a field transition, a
     same-field shot is a hard cut, type_scatter only leaves the hook, the same
     transition never runs twice in a row, and at most one stamp per reel."""
@@ -8682,6 +8683,14 @@ def check_motion_scene_valid(script) -> GraderResult:
             continue
         sc = s.scene
         stamps += sum(1 for o in sc.objects if o.kind == "stamp")
+        marks = [o.id for o in sc.objects if o.kind == "identity_title"]
+        if s.beat == "hook" and not marks:
+            problems.append(f"{s.id}: the hook shows no identity_title — the language must be "
+                            f"clear within the first second")
+            off.append(s.id)
+        if s.beat != "hook" and marks:
+            problems.append(f"{s.id} ({s.beat}): identity_title belongs on the hook only")
+            off.append(s.id)
         if prev is not None and prev.scene is not None:
             same = prev.scene.field == sc.field
             if same and sc.transition != "cut":
@@ -8733,7 +8742,8 @@ def check_motion_payoff_mirrors_hook(script) -> GraderResult:
     if not hook or not pay or hook.scene is None or pay.scene is None:
         return GraderResult("motion_payoff_mirrors_hook", False, "hook or payoff has no scene")
     problems: list[str] = []
-    hk = {o.kind for o in hook.scene.objects}
+    # The hook's language mark is the reel's opening, not part of its picture.
+    hk = {o.kind for o in hook.scene.objects} - {"identity_title"}
     pk = {o.kind for o in pay.scene.objects}
     if not hk <= pk:
         problems.append(f"the payoff shows {sorted(pk)} but the hook showed {sorted(hk)} — "

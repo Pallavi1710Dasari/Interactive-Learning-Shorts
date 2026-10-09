@@ -1,5 +1,5 @@
 {
- "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+ "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_4",
  "topic": "How does how a state update triggers a re-render work?",
  "stub": true,
  "theme": "classic_explainer",
@@ -65,7 +65,7 @@
  "script": {
   "reel_style": "motion",
   "template": "fix_story",
-  "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+  "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_4",
   "source_section_id": "7.1",
   "topic": "How does how a state update triggers a re-render work?",
   "hook_question": "Why does your like button stay stuck at zero?",
@@ -124,16 +124,21 @@
      "objects": [
       {
        "id": "o1",
+       "kind": "identity_title",
+       "props": {}
+      },
+      {
+       "id": "o2",
        "kind": "kinetic_title",
        "props": {
-        "text": "EVER WONDERED WHY YOUR LIKE BUTTON STAYS STUCK AT",
+        "text": "WHY DOES YOUR LIKE BUTTON STAY STUCK AT ZERO?",
         "accent": [
          "ZERO"
         ]
        }
       },
       {
-       "id": "o2",
+       "id": "o3",
        "kind": "status_pill",
        "props": {
         "text": "Stays stuck at zero",
@@ -151,16 +156,16 @@
        "tone": null
       },
       {
-       "at": "why",
-       "do": "highlight",
-       "target": "o1",
-       "value": "1",
+       "at": "start",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
        "tone": null
       },
       {
        "at": "Stays stuck at",
        "do": "enter",
-       "target": "o2",
+       "target": "o3",
        "value": null,
        "tone": null
       }
@@ -906,7 +911,7 @@
        "id": "o1",
        "kind": "end_card",
        "props": {
-        "up_next": "How useState creates"
+        "up_next": "How useState creates and updates state"
        }
       }
      ],
@@ -955,11 +960,11 @@
   }
  ],
  "cost_log": {
-  "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+  "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_4",
   "runs": [
    {
-    "started": "2026-10-09T07:46:22+00:00",
-    "ended": "2026-10-09T07:46:22+00:00",
+    "started": "2026-10-09T11:41:38+00:00",
+    "ended": "2026-10-09T11:41:38+00:00",
     "stub": true,
     "calls": [],
     "cost": 0

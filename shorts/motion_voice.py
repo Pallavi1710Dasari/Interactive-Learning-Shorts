@@ -4,9 +4,10 @@ Motion narration (RESTYLE_TO_MOTION_REELS.md phase 3). REEL_STYLE=motion only.
 ONE CLIP PER CAPTION. A caption is one spoken sentence and, in a two-speaker
 reel, has one speaker — so a caption is the unit that gets a voice. Each is
 synthesized by Chatterbox (local, free) from its speaker's VOICE SLOT
-(shorts/motion_avatars.yaml): the narrator's slot for a one-narrator reel,
-the host's and the language character's for a two-speaker one. Two speakers,
-two slots, two voices.
+(shorts/motion_identities.yaml, voices belong to identities): the narrator's
+slot for a one-narrator reel; for a two-speaker one, the host's slot and the
+shared character voice of the reel's language. Two speakers, two slots, two
+voices.
 
 A slot's reference clip is voices/motion/<slot>.wav. Until those are
 recorded, a slot falls back to the clips the project already has — the host
@@ -31,7 +32,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import config, motion_themes
+from . import config
 from .schema import MOTION_WORDS_PER_SECOND, MotionScript, MotionShot, motion_plain_text
 
 SAMPLE_RATE = 24000
@@ -44,8 +45,8 @@ SLOT_DIR = config.VOICE_DIR / "motion"
 
 def speaker_slots(script: MotionScript) -> dict[str | None, str]:
     """caption speaker role (None for the narrator) -> voice slot."""
-    reg = motion_themes.avatars()
-    slots: dict[str | None, str] = {None: reg.narrator_slot}
+    from .motion_identities import narrator_slot
+    slots: dict[str | None, str] = {None: narrator_slot()}
     for sp in script.speakers:
         slots[sp.role] = sp.voice_slot
     return slots
@@ -64,8 +65,9 @@ def slot_reference(slot: str) -> tuple[str | None, str]:
         clips = _REGISTRY["chatterbox"].resolve()
     except Exception:
         clips = {}
-    reg = motion_themes.avatars()
-    asking = slot in (reg.narrator_slot, reg.host.voice_slot)
+    from .motion_identities import registry
+    voices = registry().voices
+    asking = slot in (voices["narrator"], voices["host"])
     fallback = clips.get("interviewer" if asking else "student")
     if fallback and Path(fallback).exists():
         return fallback, f"fallback: {'interviewer' if asking else 'student'} clip"

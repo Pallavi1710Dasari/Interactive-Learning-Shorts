@@ -1,7 +1,8 @@
 """
-RESTYLE_TO_MOTION_REELS.md phase 2b: themes, tags and the avatar contract.
+RESTYLE_TO_MOTION_REELS.md phase 2b: themes and tags (and, since the phase 3
+badge change, the language identities that replaced the avatars).
 
-Covers the theme and avatar registries (and that a new theme is a registry
+Covers the theme and identity registries (and that a new theme is a registry
 entry, not a code change), the fit check, the variety rule, the one retry and
 the classic_explainer fallback, --theme, tags, language detection, the
 theme-aware prompts and graders, and the runner's theme stage — including stub
@@ -188,34 +189,50 @@ def test_a_new_theme_is_only_a_registry_entry():
         assert not r.passed and "quiz_show hook" in r.reason, r.reason
 
 
-# =================================================================== avatars
+# ================================================================ identities
 
-def test_one_avatar_per_course_language():
-    reg = mt.avatars()
-    assert reg.languages == mt.language_tags()
-    assert sorted(reg.characters) == sorted(reg.languages)
-    # Voices may be shared between characters, never with the host.
-    assert all(a.voice_slot != reg.host.voice_slot for a in reg.characters.values())
-    for a in [reg.host, *reg.characters.values()]:
-        assert a.voice_path == f"voices/motion/{a.voice_slot}.wav"
-        assert not {c.lower() for c in a.palette.model_dump().values()} & mt.RESERVED_COLOURS
-
-
-def test_avatar_palettes_refuse_reserved_colours():
-    try:
-        mt.AvatarPalette(primary="#F2555A", secondary="#000000", accent="#FFFFFF",
-                         ink="#151936")
-    except ValueError as e:
-        assert "reserved" in str(e)
-    else:
-        raise AssertionError("coral was accepted as an avatar colour")
+def test_every_language_has_an_identity():
+    from shorts import motion_identities as mi
+    reg = mi.registry()
+    assert mt.language_tags() == list(reg.languages)
+    assert len({reg.voices[k] for k in ("narrator", "host", "character_1", "character_2")}) == 4
+    for k, ident in [("host", reg.host), *reg.languages.items()]:
+        on_dark, on_light = ident.tones
+        for f in mi.DARK_FIELDS:
+            assert mi.contrast(on_dark, mi.FIELDS[f]) >= 3, (k, f)
+        for f in mi.LIGHT_FIELDS:
+            assert mi.contrast(on_light, mi.FIELDS[f]) >= 3, (k, f)
+        for c in (ident.colour, on_dark, on_light):
+            assert min(mi.distance(c, r) for r in mi.RESERVED.values()) >= mi.RESERVED_DISTANCE, (k, c)
+        if k != "host":
+            assert ident.file and ident.voice in mi.VOICE_KEYS, k
 
 
-def test_only_two_speaker_themes_cast_avatars():
+def test_the_identity_registry_refuses_bad_entries():
+    import yaml
+    from shorts import motion_identities as mi
+    def broken(change: dict, lang: str = "python") -> str:
+        data = yaml.safe_load(mi.PATH.read_text(encoding="utf-8"))
+        data["languages"][lang].update(change)
+        try:
+            mi.parse(data)
+        except ValueError as e:
+            return str(e)
+        raise AssertionError(f"accepted {change}")
+    assert "too close to coral" in broken({"colour": "#F0585C"})
+    assert "too close to mint" in broken({"colour": "#19B07D"})
+    assert "outside the 100 x 100 grid" in broken({"symbol": [{"rect": [80, 80, 40, 40]}]})
+    assert "drawn as a stroke" in broken({"symbol": [{"path": "M10 10 L90 90"}]})
+    assert "is not one of" in broken({"voice": "character_9"})
+
+
+def test_only_two_speaker_themes_cast_speakers():
     reg = mt.registry()
     cast = mt.cast_speakers(reg.themes["interview"], "python")
-    assert [(s.role, s.avatar) for s in cast] == [("INTERVIEWER", "host"), ("CANDIDATE", "python")]
-    assert cast[0].voice_slot != cast[1].voice_slot          # two voices
+    assert [(s.role, s.identity, s.label, s.voice_slot) for s in cast] == [
+        ("INTERVIEWER", "host", "Interviewer", "motion_host"),
+        ("CANDIDATE", "python", "Candidate", "motion_char_1")]
+    assert mt.cast_speakers(reg.themes["interview"], "java")[1].voice_slot == "motion_char_2"
     assert mt.cast_speakers(reg.themes["bug_hunt"], "python") == []
     assert mt.cast_speakers(reg.themes["classic_explainer"], "python") == []
 
@@ -580,7 +597,7 @@ def test_a_themed_hook_failure_is_repaired_with_the_themed_prompt():
     assert "FORMAT — THEME: interview" in calls[0][1] and "THEME: interview" in calls[0][2]
     assert "interview format" in calls[1][1] and '"speaker": "INTERVIEWER"' in calls[1][1]
     assert script.theme == "interview" and script.language == "react"
-    assert [sp.name for sp in script.speakers] == ["Juno", "Rae"]
+    assert [(sp.label, sp.identity) for sp in script.speakers] == [("Interviewer", "host"), ("Candidate", "react")]
 
 
 def test_write_motion_script_refuses_a_theme_of_the_wrong_template():
@@ -622,7 +639,7 @@ def test_stub_reels_in_five_themes_at_no_cost():
             assert f"=== Theme: {theme} (flag) ===" in text and "Approve theme?" in text
             seen[theme] = script
         assert [sp.role for sp in seen["interview"].speakers] == ["INTERVIEWER", "CANDIDATE"]
-        assert [sp.avatar for sp in seen["peer_discussion"].speakers] == ["host", "react"]
+        assert [sp.identity for sp in seen["peer_discussion"].speakers] == ["host", "react"]
         assert seen["bug_hunt"].speakers == []
         assert "INTERVIEWER: Why does this like counter" in _run_runner(
             "--topic", next(p.parent.name for p in out.glob("*/theme.json")

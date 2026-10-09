@@ -1,0 +1,1860 @@
+{
+ "short_id": "stub_the_tlb__motion_3",
+ "template": "fix_story",
+ "theme": "classic_explainer",
+ "series": "@learnthesimpleway",
+ "concept_name": "TLB",
+ "duration": 61.894,
+ "audio": null,
+ "timing_source": "even",
+ "identity": {
+  "id": "os",
+  "name": "OS",
+  "colour": "#2F6B6B",
+  "on_dark": "#59B6B6",
+  "on_light": "#2F6B6B",
+  "text_on_dark": "#A4D7D7",
+  "text_on_light": "#2C6464",
+  "file": "kernel.c",
+  "symbol": [
+   {
+    "circle": [
+     50.0,
+     50.0,
+     40.0
+    ],
+    "r": 0,
+    "stroke": 6.0,
+    "tone": "soft"
+   },
+   {
+    "circle": [
+     50.0,
+     50.0,
+     25.0
+    ],
+    "r": 0,
+    "stroke": 7.0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     50.0,
+     50.0,
+     10.0
+    ],
+    "r": 0,
+    "tone": "main"
+   }
+  ]
+ },
+ "theme_label": "Explainer",
+ "tags": [
+  "#os",
+  "#explainer",
+  "#virtualmemory",
+  "#tlb",
+  "#paging"
+ ],
+ "intro": 0.0,
+ "cast": [],
+ "characters": [],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "chapter": null,
+   "start": 0.0,
+   "end": 4.262,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "identity_title",
+     "props": {},
+     "box": {
+      "x": 60.0,
+      "y": 417.4,
+      "w": 960.0,
+      "h": 270.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "WHY DOES EVERY MEMORY LOOKUP FEEL TWICE AS SLOW?",
+      "accent": [
+       "SLOW"
+      ],
+      "lines": [
+       "WHY DOES EVERY",
+       "MEMORY LOOKUP FEEL",
+       "TWICE AS SLOW?"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 735.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "status_pill",
+     "props": {
+      "text": "Slow",
+      "tone": "bad",
+      "icon": "alert"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 1102.6,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 0.0,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 0.0,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 1.889,
+     "do": "highlight",
+     "target": "o2",
+     "value": "1",
+     "tone": null,
+     "cue": "lookup"
+    },
+    {
+     "t": 3.427,
+     "do": "enter",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "Slow"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Why does every memory lookup feel twice as <b>slow</b>?",
+     "speaker": null,
+     "start": 0.35,
+     "end": 3.812,
+     "words": [
+      {
+       "text": "Why",
+       "start": 0.35,
+       "end": 0.735,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 0.735,
+       "end": 1.119,
+       "hl": false
+      },
+      {
+       "text": "every",
+       "start": 1.119,
+       "end": 1.504,
+       "hl": false
+      },
+      {
+       "text": "memory",
+       "start": 1.504,
+       "end": 1.889,
+       "hl": false
+      },
+      {
+       "text": "lookup",
+       "start": 1.889,
+       "end": 2.273,
+       "hl": false
+      },
+      {
+       "text": "feel",
+       "start": 2.273,
+       "end": 2.658,
+       "hl": false
+      },
+      {
+       "text": "twice",
+       "start": 2.658,
+       "end": 3.043,
+       "hl": false
+      },
+      {
+       "text": "as",
+       "start": 3.043,
+       "end": 3.427,
+       "hl": false
+      },
+      {
+       "text": "slow?",
+       "start": 3.427,
+       "end": 3.812,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "beat": "title",
+   "chapter": null,
+   "start": 4.262,
+   "end": 8.289,
+   "field": "blue",
+   "transition": "iris",
+   "label": "",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "title_card",
+     "props": {
+      "title": "TLB",
+      "promise": "Why lookups need a cache",
+      "icons": [
+       {
+        "name": "grid",
+        "label": "Page table"
+       },
+       {
+        "name": "memory",
+        "label": "TLB"
+       },
+       {
+        "name": "bolt",
+        "label": "Hit"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 4.262,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 6.685,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "Here"
+    }
+   ],
+   "captions": [
+    {
+     "text": "One small cache fixes this.",
+     "speaker": null,
+     "start": 4.612,
+     "end": 6.535,
+     "words": [
+      {
+       "text": "One",
+       "start": 4.612,
+       "end": 4.997,
+       "hl": false
+      },
+      {
+       "text": "small",
+       "start": 4.997,
+       "end": 5.381,
+       "hl": false
+      },
+      {
+       "text": "cache",
+       "start": 5.381,
+       "end": 5.766,
+       "hl": false
+      },
+      {
+       "text": "fixes",
+       "start": 5.766,
+       "end": 6.15,
+       "hl": false
+      },
+      {
+       "text": "this.",
+       "start": 6.15,
+       "end": 6.535,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Here is how.",
+     "speaker": null,
+     "start": 6.685,
+     "end": 7.839,
+     "words": [
+      {
+       "text": "Here",
+       "start": 6.685,
+       "end": 7.07,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 7.07,
+       "end": 7.454,
+       "hl": false
+      },
+      {
+       "text": "how.",
+       "start": 7.454,
+       "end": 7.839,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "chapter": null,
+   "start": 8.289,
+   "end": 15.009,
+   "field": "paper",
+   "transition": "bar_wipe",
+   "label": "THE SETUP",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "page table"
+      ],
+      "tones": [
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 8.289,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 10.178,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "one"
+    },
+    {
+     "t": 12.251,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "says"
+    },
+    {
+     "t": 13.405,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "holds"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Your program asks for one address.",
+     "speaker": null,
+     "start": 8.639,
+     "end": 10.947,
+     "words": [
+      {
+       "text": "Your",
+       "start": 8.639,
+       "end": 9.024,
+       "hl": false
+      },
+      {
+       "text": "program",
+       "start": 9.024,
+       "end": 9.408,
+       "hl": false
+      },
+      {
+       "text": "asks",
+       "start": 9.408,
+       "end": 9.793,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 9.793,
+       "end": 10.178,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 10.178,
+       "end": 10.562,
+       "hl": false
+      },
+      {
+       "text": "address.",
+       "start": 10.562,
+       "end": 10.947,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The <b>page table</b> says which frame holds that page.",
+     "speaker": null,
+     "start": 11.097,
+     "end": 14.559,
+     "words": [
+      {
+       "text": "The",
+       "start": 11.097,
+       "end": 11.482,
+       "hl": false
+      },
+      {
+       "text": "page",
+       "start": 11.482,
+       "end": 11.866,
+       "hl": true
+      },
+      {
+       "text": "table",
+       "start": 11.866,
+       "end": 12.251,
+       "hl": true
+      },
+      {
+       "text": "says",
+       "start": 12.251,
+       "end": 12.636,
+       "hl": false
+      },
+      {
+       "text": "which",
+       "start": 12.636,
+       "end": 13.02,
+       "hl": false
+      },
+      {
+       "text": "frame",
+       "start": 13.02,
+       "end": 13.405,
+       "hl": false
+      },
+      {
+       "text": "holds",
+       "start": 13.405,
+       "end": 13.79,
+       "hl": false
+      },
+      {
+       "text": "that",
+       "start": 13.79,
+       "end": 14.174,
+       "hl": false
+      },
+      {
+       "text": "page.",
+       "start": 14.174,
+       "end": 14.559,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "break_1",
+   "chapter": null,
+   "start": 15.009,
+   "end": 22.882,
+   "field": "paper",
+   "transition": "cut",
+   "label": "WHY IT FAILS",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "But the page"
+      ],
+      "tones": [
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 698.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "But the page table",
+      "tone": "bad",
+      "icon": "x"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 822.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 15.009,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 15.359,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "But the page"
+    },
+    {
+     "t": 16.513,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "table"
+    },
+    {
+     "t": 17.667,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "memory"
+    },
+    {
+     "t": 19.74,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "first"
+    },
+    {
+     "t": 20.894,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "table"
+    }
+   ],
+   "captions": [
+    {
+     "text": "But the page table lives in memory too.",
+     "speaker": null,
+     "start": 15.359,
+     "end": 18.436,
+     "words": [
+      {
+       "text": "But",
+       "start": 15.359,
+       "end": 15.744,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 15.744,
+       "end": 16.128,
+       "hl": false
+      },
+      {
+       "text": "page",
+       "start": 16.128,
+       "end": 16.513,
+       "hl": false
+      },
+      {
+       "text": "table",
+       "start": 16.513,
+       "end": 16.898,
+       "hl": false
+      },
+      {
+       "text": "lives",
+       "start": 16.898,
+       "end": 17.282,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 17.282,
+       "end": 17.667,
+       "hl": false
+      },
+      {
+       "text": "memory",
+       "start": 17.667,
+       "end": 18.051,
+       "hl": false
+      },
+      {
+       "text": "too.",
+       "start": 18.051,
+       "end": 18.436,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "So every lookup first reads the table, then the data.",
+     "speaker": null,
+     "start": 18.586,
+     "end": 22.432,
+     "words": [
+      {
+       "text": "So",
+       "start": 18.586,
+       "end": 18.971,
+       "hl": false
+      },
+      {
+       "text": "every",
+       "start": 18.971,
+       "end": 19.355,
+       "hl": false
+      },
+      {
+       "text": "lookup",
+       "start": 19.355,
+       "end": 19.74,
+       "hl": false
+      },
+      {
+       "text": "first",
+       "start": 19.74,
+       "end": 20.124,
+       "hl": false
+      },
+      {
+       "text": "reads",
+       "start": 20.124,
+       "end": 20.509,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 20.509,
+       "end": 20.894,
+       "hl": false
+      },
+      {
+       "text": "table,",
+       "start": 20.894,
+       "end": 21.278,
+       "hl": false
+      },
+      {
+       "text": "then",
+       "start": 21.278,
+       "end": 21.663,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 21.663,
+       "end": 22.047,
+       "hl": false
+      },
+      {
+       "text": "data.",
+       "start": 22.047,
+       "end": 22.432,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "beat": "fix_idea",
+   "chapter": null,
+   "start": 22.882,
+   "end": 29.602,
+   "field": "blue",
+   "transition": "double_bar_wipe",
+   "label": "THE FIX",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "TLB",
+      "accent": [
+       "TLB"
+      ],
+      "lines": [
+       "TLB"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 684.8,
+      "w": 960.0,
+      "h": 106.4
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "small cache"
+      ],
+      "tones": [
+       "info"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 839.2,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 24.001,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "TLB"
+    },
+    {
+     "t": 24.771,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "small cache"
+    },
+    {
+     "t": 26.844,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "page"
+    },
+    {
+     "t": 28.383,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "close"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Meet the <b>TLB</b>, a <b>small cache</b>.",
+     "speaker": null,
+     "start": 23.232,
+     "end": 25.54,
+     "words": [
+      {
+       "text": "Meet",
+       "start": 23.232,
+       "end": 23.617,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 23.617,
+       "end": 24.001,
+       "hl": false
+      },
+      {
+       "text": "TLB,",
+       "start": 24.001,
+       "end": 24.386,
+       "hl": true
+      },
+      {
+       "text": "a",
+       "start": 24.386,
+       "end": 24.771,
+       "hl": false
+      },
+      {
+       "text": "small",
+       "start": 24.771,
+       "end": 25.155,
+       "hl": true
+      },
+      {
+       "text": "cache.",
+       "start": 25.155,
+       "end": 25.54,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "It keeps recent page to frame answers close by.",
+     "speaker": null,
+     "start": 25.69,
+     "end": 29.152,
+     "words": [
+      {
+       "text": "It",
+       "start": 25.69,
+       "end": 26.075,
+       "hl": false
+      },
+      {
+       "text": "keeps",
+       "start": 26.075,
+       "end": 26.459,
+       "hl": false
+      },
+      {
+       "text": "recent",
+       "start": 26.459,
+       "end": 26.844,
+       "hl": false
+      },
+      {
+       "text": "page",
+       "start": 26.844,
+       "end": 27.229,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 27.229,
+       "end": 27.613,
+       "hl": false
+      },
+      {
+       "text": "frame",
+       "start": 27.613,
+       "end": 27.998,
+       "hl": false
+      },
+      {
+       "text": "answers",
+       "start": 27.998,
+       "end": 28.383,
+       "hl": false
+      },
+      {
+       "text": "close",
+       "start": 28.383,
+       "end": 28.767,
+       "hl": false
+      },
+      {
+       "text": "by.",
+       "start": 28.767,
+       "end": 29.152,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "beat": "fix_flow",
+   "chapter": null,
+   "start": 29.602,
+   "end": 36.706,
+   "field": "paper",
+   "transition": "diagonal_stripes",
+   "label": "HOW IT WORKS",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "trigger_chip",
+     "props": {
+      "label": "TLB hit"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 658.0,
+      "w": 960.0,
+      "h": 84.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Table walk",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 862.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "connector",
+     "props": {
+      "from": "o1",
+      "to": "o2",
+      "tone": "info",
+      "points": [
+       [
+        540.0,
+        752.0
+       ],
+       [
+        540.0,
+        852.0
+       ]
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 29.602,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 30.721,
+     "do": "enter",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "TLB hit"
+    },
+    {
+     "t": 30.721,
+     "do": "pulse",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "TLB hit"
+    },
+    {
+     "t": 31.875,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "frame"
+    },
+    {
+     "t": 33.029,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "ready"
+    },
+    {
+     "t": 34.718,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "skip"
+    },
+    {
+     "t": 35.487,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "table walk"
+    }
+   ],
+   "captions": [
+    {
+     "text": "On a <b>TLB hit</b>, the frame number is ready at once.",
+     "speaker": null,
+     "start": 29.952,
+     "end": 34.183,
+     "words": [
+      {
+       "text": "On",
+       "start": 29.952,
+       "end": 30.337,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 30.337,
+       "end": 30.721,
+       "hl": false
+      },
+      {
+       "text": "TLB",
+       "start": 30.721,
+       "end": 31.106,
+       "hl": true
+      },
+      {
+       "text": "hit,",
+       "start": 31.106,
+       "end": 31.491,
+       "hl": true
+      },
+      {
+       "text": "the",
+       "start": 31.491,
+       "end": 31.875,
+       "hl": false
+      },
+      {
+       "text": "frame",
+       "start": 31.875,
+       "end": 32.26,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 32.26,
+       "end": 32.644,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 32.644,
+       "end": 33.029,
+       "hl": false
+      },
+      {
+       "text": "ready",
+       "start": 33.029,
+       "end": 33.414,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 33.414,
+       "end": 33.798,
+       "hl": false
+      },
+      {
+       "text": "once.",
+       "start": 33.798,
+       "end": 34.183,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "You skip the <b>table walk</b>.",
+     "speaker": null,
+     "start": 34.333,
+     "end": 36.256,
+     "words": [
+      {
+       "text": "You",
+       "start": 34.333,
+       "end": 34.718,
+       "hl": false
+      },
+      {
+       "text": "skip",
+       "start": 34.718,
+       "end": 35.102,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 35.102,
+       "end": 35.487,
+       "hl": false
+      },
+      {
+       "text": "table",
+       "start": 35.487,
+       "end": 35.871,
+       "hl": true
+      },
+      {
+       "text": "walk.",
+       "start": 35.871,
+       "end": 36.256,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s07",
+   "beat": "code_map",
+   "chapter": null,
+   "start": 36.706,
+   "end": 44.964,
+   "field": "paper",
+   "transition": "cut",
+   "label": "HOW IT MAPS",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "icon_row",
+     "props": {
+      "icons": [
+       {
+        "name": "grid",
+        "label": "Page table",
+        "tone": "info"
+       },
+       {
+        "name": "memory",
+        "label": "TLB",
+        "tone": "info"
+       },
+       {
+        "name": "bolt",
+        "label": "Hit",
+        "tone": "info"
+       }
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 685.0,
+      "w": 960.0,
+      "h": 230.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 36.706,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 38.594,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "page"
+    },
+    {
+     "t": 40.133,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "frame"
+    },
+    {
+     "t": 41.437,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "miss"
+    },
+    {
+     "t": 42.975,
+     "do": "highlight",
+     "target": "o1",
+     "value": "3",
+     "tone": null,
+     "cue": "once"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Each entry maps a page number to a frame number.",
+     "speaker": null,
+     "start": 37.056,
+     "end": 40.902,
+     "words": [
+      {
+       "text": "Each",
+       "start": 37.056,
+       "end": 37.441,
+       "hl": false
+      },
+      {
+       "text": "entry",
+       "start": 37.441,
+       "end": 37.825,
+       "hl": false
+      },
+      {
+       "text": "maps",
+       "start": 37.825,
+       "end": 38.21,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 38.21,
+       "end": 38.594,
+       "hl": false
+      },
+      {
+       "text": "page",
+       "start": 38.594,
+       "end": 38.979,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 38.979,
+       "end": 39.364,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 39.364,
+       "end": 39.748,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 39.748,
+       "end": 40.133,
+       "hl": false
+      },
+      {
+       "text": "frame",
+       "start": 40.133,
+       "end": 40.517,
+       "hl": false
+      },
+      {
+       "text": "number.",
+       "start": 40.517,
+       "end": 40.902,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "A <b>miss</b> walks the table once, then saves it.",
+     "speaker": null,
+     "start": 41.052,
+     "end": 44.514,
+     "words": [
+      {
+       "text": "A",
+       "start": 41.052,
+       "end": 41.437,
+       "hl": false
+      },
+      {
+       "text": "miss",
+       "start": 41.437,
+       "end": 41.821,
+       "hl": true
+      },
+      {
+       "text": "walks",
+       "start": 41.821,
+       "end": 42.206,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 42.206,
+       "end": 42.591,
+       "hl": false
+      },
+      {
+       "text": "table",
+       "start": 42.591,
+       "end": 42.975,
+       "hl": false
+      },
+      {
+       "text": "once,",
+       "start": 42.975,
+       "end": 43.36,
+       "hl": false
+      },
+      {
+       "text": "then",
+       "start": 43.36,
+       "end": 43.745,
+       "hl": false
+      },
+      {
+       "text": "saves",
+       "start": 43.745,
+       "end": 44.129,
+       "hl": false
+      },
+      {
+       "text": "it.",
+       "start": 44.129,
+       "end": 44.514,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "payoff",
+   "chapter": null,
+   "start": 44.964,
+   "end": 50.379,
+   "field": "navy",
+   "transition": "stack_rise",
+   "label": "",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "NOW THE SAME LOOKUP READS MEMORY ONCE, AND",
+      "accent": [
+       "FAST"
+      ],
+      "lines": [
+       "NOW THE SAME",
+       "LOOKUP READS",
+       "MEMORY ONCE, AND"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 576.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Fast",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 943.6,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 44.964,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 46.852,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "reads"
+    },
+    {
+     "t": 47.622,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "once"
+    },
+    {
+     "t": 49.544,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "fast"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Now the same lookup reads memory once, and your program runs <b>fast</b>.",
+     "speaker": null,
+     "start": 45.314,
+     "end": 49.929,
+     "words": [
+      {
+       "text": "Now",
+       "start": 45.314,
+       "end": 45.699,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 45.699,
+       "end": 46.083,
+       "hl": false
+      },
+      {
+       "text": "same",
+       "start": 46.083,
+       "end": 46.468,
+       "hl": false
+      },
+      {
+       "text": "lookup",
+       "start": 46.468,
+       "end": 46.852,
+       "hl": false
+      },
+      {
+       "text": "reads",
+       "start": 46.852,
+       "end": 47.237,
+       "hl": false
+      },
+      {
+       "text": "memory",
+       "start": 47.237,
+       "end": 47.622,
+       "hl": false
+      },
+      {
+       "text": "once,",
+       "start": 47.622,
+       "end": 48.006,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 48.006,
+       "end": 48.391,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 48.391,
+       "end": 48.775,
+       "hl": false
+      },
+      {
+       "text": "program",
+       "start": 48.775,
+       "end": 49.16,
+       "hl": false
+      },
+      {
+       "text": "runs",
+       "start": 49.16,
+       "end": 49.544,
+       "hl": false
+      },
+      {
+       "text": "fast.",
+       "start": 49.544,
+       "end": 49.929,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s09",
+   "beat": "recap",
+   "chapter": null,
+   "start": 50.379,
+   "end": 58.017,
+   "field": "paper",
+   "transition": "iris",
+   "label": "",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "takeaway_list",
+     "props": {
+      "heading": "Key takeaways",
+      "rows": [
+       {
+        "icon": "grid",
+        "line": "Table in memory",
+        "sub": "every lookup reads it"
+       },
+       {
+        "icon": "memory",
+        "line": "TLB caches answers",
+        "sub": "recent page to frame"
+       },
+       {
+        "icon": "bolt",
+        "line": "Hits skip walks",
+        "sub": "one memory read"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 50.379,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 54.725,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "recent"
+    },
+    {
+     "t": 56.413,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "skips"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Remember: the page table lives in memory.",
+     "speaker": null,
+     "start": 50.729,
+     "end": 53.421,
+     "words": [
+      {
+       "text": "Remember:",
+       "start": 50.729,
+       "end": 51.114,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 51.114,
+       "end": 51.498,
+       "hl": false
+      },
+      {
+       "text": "page",
+       "start": 51.498,
+       "end": 51.883,
+       "hl": false
+      },
+      {
+       "text": "table",
+       "start": 51.883,
+       "end": 52.267,
+       "hl": false
+      },
+      {
+       "text": "lives",
+       "start": 52.267,
+       "end": 52.652,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 52.652,
+       "end": 53.036,
+       "hl": false
+      },
+      {
+       "text": "memory.",
+       "start": 53.036,
+       "end": 53.421,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The <b>TLB</b> caches recent answers.",
+     "speaker": null,
+     "start": 53.571,
+     "end": 55.494,
+     "words": [
+      {
+       "text": "The",
+       "start": 53.571,
+       "end": 53.956,
+       "hl": false
+      },
+      {
+       "text": "TLB",
+       "start": 53.956,
+       "end": 54.34,
+       "hl": true
+      },
+      {
+       "text": "caches",
+       "start": 54.34,
+       "end": 54.725,
+       "hl": false
+      },
+      {
+       "text": "recent",
+       "start": 54.725,
+       "end": 55.109,
+       "hl": false
+      },
+      {
+       "text": "answers.",
+       "start": 55.109,
+       "end": 55.494,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "A hit skips the walk.",
+     "speaker": null,
+     "start": 55.644,
+     "end": 57.567,
+     "words": [
+      {
+       "text": "A",
+       "start": 55.644,
+       "end": 56.029,
+       "hl": false
+      },
+      {
+       "text": "hit",
+       "start": 56.029,
+       "end": 56.413,
+       "hl": false
+      },
+      {
+       "text": "skips",
+       "start": 56.413,
+       "end": 56.798,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 56.798,
+       "end": 57.182,
+       "hl": false
+      },
+      {
+       "text": "walk.",
+       "start": 57.182,
+       "end": 57.567,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "beat": "cta",
+   "chapter": null,
+   "start": 58.017,
+   "end": 61.894,
+   "field": "blue",
+   "transition": "bar_wipe",
+   "label": "",
+   "layout": "solo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "end_card",
+     "props": {
+      "up_next": "Internal fragmentation in paging"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 58.017,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 61.059,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "time"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time.",
+     "speaker": null,
+     "start": 58.367,
+     "end": 61.444,
+     "words": [
+      {
+       "text": "Follow",
+       "start": 58.367,
+       "end": 58.752,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 58.752,
+       "end": 59.136,
+       "hl": false
+      },
+      {
+       "text": "more,",
+       "start": 59.136,
+       "end": 59.521,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 59.521,
+       "end": 59.906,
+       "hl": false
+      },
+      {
+       "text": "idea",
+       "start": 59.906,
+       "end": 60.29,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 60.29,
+       "end": 60.675,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 60.675,
+       "end": 61.059,
+       "hl": false
+      },
+      {
+       "text": "time.",
+       "start": 61.059,
+       "end": 61.444,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  }
+ ]
+}

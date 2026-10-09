@@ -7,52 +7,168 @@
  "duration": 72.204,
  "audio": null,
  "timing_source": "even",
+ "identity": {
+  "id": "react",
+  "name": "React",
+  "colour": "#12B5DE",
+  "on_dark": "#12B9E3",
+  "on_light": "#0D83A1",
+  "text_on_dark": "#76DBF4",
+  "text_on_light": "#0A647B",
+  "file": "App.jsx",
+  "symbol": [
+   {
+    "path": "M50 30 L26 70 M50 30 L74 70",
+    "r": 0,
+    "stroke": 7.0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     50.0,
+     24.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     26.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     74.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "soft"
+   }
+  ]
+ },
+ "theme_label": "Interview",
+ "tags": [
+  "#react",
+  "#interview",
+  "#rerender",
+  "#state",
+  "#component"
+ ],
+ "intro": 0.0,
  "cast": [
   {
    "role": "INTERVIEWER",
    "side": "left",
+   "label": "Interviewer",
    "voice_slot": "motion_host",
-   "avatar": {
+   "identity": {
     "id": "host",
-    "name": "Juno",
-    "body": "rounded",
-    "head": "rounded_square",
-    "hair": "swept",
-    "skin": "s3",
-    "accessories": [
-     "headset"
-    ],
-    "palette": {
-     "primary": "#2F6F8F",
-     "secondary": "#091025",
-     "accent": "#FDD13E",
-     "ink": "#151936"
-    }
+    "name": "Host",
+    "colour": "#6C6F7A",
+    "on_dark": "#A6A8B0",
+    "on_light": "#6C6F7A",
+    "text_on_dark": "#CCCDD2",
+    "text_on_light": "#595B64",
+    "file": "",
+    "symbol": [
+     {
+      "rect": [
+       36.0,
+       12.0,
+       28.0,
+       46.0
+      ],
+      "r": 14.0,
+      "tone": "main"
+     },
+     {
+      "path": "M24 44 C24 66 76 66 76 44",
+      "r": 0,
+      "stroke": 8.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       46.0,
+       64.0,
+       8.0,
+       18.0
+      ],
+      "r": 3.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       32.0,
+       80.0,
+       36.0,
+       8.0
+      ],
+      "r": 4.0,
+      "tone": "main"
+     }
+    ]
    }
   },
   {
    "role": "CANDIDATE",
    "side": "right",
-   "voice_slot": "motion_react",
-   "avatar": {
+   "label": "Candidate",
+   "voice_slot": "motion_char_1",
+   "identity": {
     "id": "react",
-    "name": "Rae",
-    "body": "rounded",
-    "head": "round",
-    "hair": "ponytail",
-    "skin": "s5",
-    "accessories": [
-     "lanyard"
-    ],
-    "palette": {
-     "primary": "#5B4BF5",
-     "secondary": "#ECEAFE",
-     "accent": "#FFB524",
-     "ink": "#151936"
-    }
+    "name": "React",
+    "colour": "#12B5DE",
+    "on_dark": "#12B9E3",
+    "on_light": "#0D83A1",
+    "text_on_dark": "#76DBF4",
+    "text_on_light": "#0A647B",
+    "file": "App.jsx",
+    "symbol": [
+     {
+      "path": "M50 30 L26 70 M50 30 L74 70",
+      "r": 0,
+      "stroke": 7.0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       50.0,
+       24.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       26.0,
+       74.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       74.0,
+       74.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "soft"
+     }
+    ]
    }
   }
  ],
+ "characters": [],
  "shots": [
   {
    "id": "s01",
@@ -64,26 +180,17 @@
    "transition": "cut",
    "label": "",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
-     "kind": "kinetic_title",
-     "props": {
-      "text": "WHY DOES THIS LIKE COUNTER STAY STUCK AT ZERO?",
-      "accent": [
-       "ZERO"
-      ],
-      "lines": [
-       "WHY DOES THIS LIKE",
-       "COUNTER STAY STUCK",
-       "AT ZERO?"
-      ]
-     },
+     "kind": "identity_title",
+     "props": {},
      "box": {
       "x": 60.0,
-      "y": 316.4,
+      "y": 341.0,
       "w": 960.0,
-      "h": 319.2
+      "h": 270.0
      }
     },
     {
@@ -96,7 +203,7 @@
      },
      "box": {
       "x": 60.0,
-      "y": 683.6,
+      "y": 659.0,
       "w": 960.0,
       "h": 80.0
      }
@@ -110,14 +217,6 @@
      "value": null,
      "tone": null,
      "cue": "start"
-    },
-    {
-     "t": 1.504,
-     "do": "highlight",
-     "target": "o1",
-     "value": "1",
-     "tone": null,
-     "cue": "like"
     },
     {
      "t": 2.273,
@@ -204,6 +303,7 @@
    "transition": "iris",
    "label": "",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -317,6 +417,7 @@
    "transition": "bar_wipe",
    "label": "THE CODE",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -534,6 +635,7 @@
    "transition": "cut",
    "label": "WHY IT FAILS",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -760,6 +862,7 @@
    "transition": "cut",
    "label": "AND ALSO",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -973,6 +1076,7 @@
    "transition": "double_bar_wipe",
    "label": "THE FIX",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1231,6 +1335,7 @@
    "transition": "diagonal_stripes",
    "label": "HOW IT WORKS",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1478,6 +1583,7 @@
    "transition": "cut",
    "label": "gives you the value",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1649,6 +1755,7 @@
    "transition": "stack_rise",
    "label": "",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1789,6 +1896,7 @@
    "transition": "iris",
    "label": "",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
@@ -1978,12 +2086,13 @@
    "transition": "bar_wipe",
    "label": "",
    "layout": "duo",
+   "characters": false,
    "objects": [
     {
      "id": "o1",
      "kind": "end_card",
      "props": {
-      "up_next": "How useState creates"
+      "up_next": "How useState creates and updates state"
      },
      "box": null
     }

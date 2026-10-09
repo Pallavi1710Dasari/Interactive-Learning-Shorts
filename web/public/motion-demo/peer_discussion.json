@@ -1,0 +1,2193 @@
+{
+ "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+ "template": "fix_story",
+ "theme": "peer_discussion",
+ "series": "@learnthesimpleway",
+ "concept_name": "useState",
+ "duration": 74.045,
+ "audio": null,
+ "timing_source": "even",
+ "identity": {
+  "id": "react",
+  "name": "React",
+  "colour": "#12B5DE",
+  "on_dark": "#12B9E3",
+  "on_light": "#0D83A1",
+  "text_on_dark": "#76DBF4",
+  "text_on_light": "#0A647B",
+  "file": "App.jsx",
+  "symbol": [
+   {
+    "path": "M50 30 L26 70 M50 30 L74 70",
+    "r": 0,
+    "stroke": 7.0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     50.0,
+     24.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     26.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     74.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "soft"
+   }
+  ]
+ },
+ "theme_label": "Peer discussion",
+ "tags": [
+  "#react",
+  "#discussion",
+  "#rerender",
+  "#state",
+  "#component"
+ ],
+ "intro": 0.0,
+ "cast": [
+  {
+   "role": "PEER_A",
+   "side": "left",
+   "label": "Peer A",
+   "voice_slot": "motion_host",
+   "identity": {
+    "id": "host",
+    "name": "Host",
+    "colour": "#6C6F7A",
+    "on_dark": "#A6A8B0",
+    "on_light": "#6C6F7A",
+    "text_on_dark": "#CCCDD2",
+    "text_on_light": "#595B64",
+    "file": "",
+    "symbol": [
+     {
+      "rect": [
+       36.0,
+       12.0,
+       28.0,
+       46.0
+      ],
+      "r": 14.0,
+      "tone": "main"
+     },
+     {
+      "path": "M24 44 C24 66 76 66 76 44",
+      "r": 0,
+      "stroke": 8.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       46.0,
+       64.0,
+       8.0,
+       18.0
+      ],
+      "r": 3.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       32.0,
+       80.0,
+       36.0,
+       8.0
+      ],
+      "r": 4.0,
+      "tone": "main"
+     }
+    ]
+   }
+  },
+  {
+   "role": "PEER_B",
+   "side": "right",
+   "label": "Peer B",
+   "voice_slot": "motion_char_1",
+   "identity": {
+    "id": "react",
+    "name": "React",
+    "colour": "#12B5DE",
+    "on_dark": "#12B9E3",
+    "on_light": "#0D83A1",
+    "text_on_dark": "#76DBF4",
+    "text_on_light": "#0A647B",
+    "file": "App.jsx",
+    "symbol": [
+     {
+      "path": "M50 30 L26 70 M50 30 L74 70",
+      "r": 0,
+      "stroke": 7.0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       50.0,
+       24.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       26.0,
+       74.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       74.0,
+       74.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "soft"
+     }
+    ]
+   }
+  }
+ ],
+ "characters": [],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "chapter": null,
+   "start": 0.0,
+   "end": 4.262,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "identity_title",
+     "props": {},
+     "box": {
+      "x": 60.0,
+      "y": 341.0,
+      "w": 960.0,
+      "h": 270.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Stay stuck at zero",
+      "tone": "bad",
+      "icon": "alert"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 659.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 0.0,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 2.273,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Stay stuck at"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Wait, why does my counter stay stuck at <b>zero</b>?",
+     "speaker": "PEER_A",
+     "start": 0.35,
+     "end": 3.812,
+     "words": [
+      {
+       "text": "Wait,",
+       "start": 0.35,
+       "end": 0.735,
+       "hl": false
+      },
+      {
+       "text": "why",
+       "start": 0.735,
+       "end": 1.119,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 1.119,
+       "end": 1.504,
+       "hl": false
+      },
+      {
+       "text": "my",
+       "start": 1.504,
+       "end": 1.889,
+       "hl": false
+      },
+      {
+       "text": "counter",
+       "start": 1.889,
+       "end": 2.273,
+       "hl": false
+      },
+      {
+       "text": "stay",
+       "start": 2.273,
+       "end": 2.658,
+       "hl": false
+      },
+      {
+       "text": "stuck",
+       "start": 2.658,
+       "end": 3.043,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 3.043,
+       "end": 3.427,
+       "hl": false
+      },
+      {
+       "text": "zero?",
+       "start": 3.427,
+       "end": 3.812,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "beat": "title",
+   "chapter": null,
+   "start": 4.262,
+   "end": 8.139,
+   "field": "blue",
+   "transition": "iris",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "title_card",
+     "props": {
+      "title": "useState",
+      "promise": "Why plain variables forget",
+      "icons": [
+       {
+        "name": "refresh",
+        "label": "Render"
+       },
+       {
+        "name": "memory",
+        "label": "Memory"
+       },
+       {
+        "name": "bolt",
+        "label": "Trigger"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 4.262,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 6.92,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "plain"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Because your count lives in a <b>plain variable</b>.",
+     "speaker": "PEER_B",
+     "start": 4.612,
+     "end": 7.689,
+     "words": [
+      {
+       "text": "Because",
+       "start": 4.612,
+       "end": 4.997,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 4.997,
+       "end": 5.381,
+       "hl": false
+      },
+      {
+       "text": "count",
+       "start": 5.381,
+       "end": 5.766,
+       "hl": false
+      },
+      {
+       "text": "lives",
+       "start": 5.766,
+       "end": 6.151,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 6.151,
+       "end": 6.535,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 6.535,
+       "end": 6.92,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 6.92,
+       "end": 7.304,
+       "hl": true
+      },
+      {
+       "text": "variable.",
+       "start": 7.304,
+       "end": 7.689,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "chapter": null,
+   "start": 8.139,
+   "end": 15.928,
+   "field": "paper",
+   "transition": "bar_wipe",
+   "label": "THE CODE",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_window",
+     "props": {
+      "file": "App.jsx",
+      "lines": [
+       "let count = 0;",
+       "count = count + 1;"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 333.0,
+      "w": 960.0,
+      "h": 414.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 8.139,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 8.139,
+     "do": "type",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 9.258,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "code"
+    },
+    {
+     "t": 10.562,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "count"
+    },
+    {
+     "t": 12.485,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "each"
+    },
+    {
+     "t": 14.324,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "Looks"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Here's my code.",
+     "speaker": "PEER_A",
+     "start": 8.489,
+     "end": 9.643,
+     "words": [
+      {
+       "text": "Here's",
+       "start": 8.489,
+       "end": 8.874,
+       "hl": false
+      },
+      {
+       "text": "my",
+       "start": 8.874,
+       "end": 9.258,
+       "hl": false
+      },
+      {
+       "text": "code.",
+       "start": 9.258,
+       "end": 9.643,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "A plain <b>count</b> starts at zero, and each click adds one.",
+     "speaker": "PEER_A",
+     "start": 9.793,
+     "end": 14.024,
+     "words": [
+      {
+       "text": "A",
+       "start": 9.793,
+       "end": 10.178,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 10.178,
+       "end": 10.562,
+       "hl": false
+      },
+      {
+       "text": "count",
+       "start": 10.562,
+       "end": 10.947,
+       "hl": true
+      },
+      {
+       "text": "starts",
+       "start": 10.947,
+       "end": 11.332,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 11.332,
+       "end": 11.716,
+       "hl": false
+      },
+      {
+       "text": "zero,",
+       "start": 11.716,
+       "end": 12.101,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 12.101,
+       "end": 12.485,
+       "hl": false
+      },
+      {
+       "text": "each",
+       "start": 12.485,
+       "end": 12.87,
+       "hl": false
+      },
+      {
+       "text": "click",
+       "start": 12.87,
+       "end": 13.255,
+       "hl": false
+      },
+      {
+       "text": "adds",
+       "start": 13.255,
+       "end": 13.639,
+       "hl": false
+      },
+      {
+       "text": "one.",
+       "start": 13.639,
+       "end": 14.024,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Looks fine, right?",
+     "speaker": "PEER_B",
+     "start": 14.324,
+     "end": 15.478,
+     "words": [
+      {
+       "text": "Looks",
+       "start": 14.324,
+       "end": 14.709,
+       "hl": false
+      },
+      {
+       "text": "fine,",
+       "start": 14.709,
+       "end": 15.093,
+       "hl": false
+      },
+      {
+       "text": "right?",
+       "start": 15.093,
+       "end": 15.478,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "break_1",
+   "chapter": null,
+   "start": 15.928,
+   "end": 24.486,
+   "field": "paper",
+   "transition": "cut",
+   "label": "WHY IT FAILS",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "never changes"
+      ],
+      "tones": [
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 438.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Nothing tells React",
+      "tone": "bad",
+      "icon": "x"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 562.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 15.928,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 16.663,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Nothing tells React"
+    },
+    {
+     "t": 17.432,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "React"
+    },
+    {
+     "t": 18.971,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "component"
+    },
+    {
+     "t": 21.044,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "never"
+    },
+    {
+     "t": 22.882,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "click"
+    }
+   ],
+   "captions": [
+    {
+     "text": "But nothing tells React to run your component again.",
+     "speaker": "PEER_B",
+     "start": 16.278,
+     "end": 19.74,
+     "words": [
+      {
+       "text": "But",
+       "start": 16.278,
+       "end": 16.663,
+       "hl": false
+      },
+      {
+       "text": "nothing",
+       "start": 16.663,
+       "end": 17.047,
+       "hl": false
+      },
+      {
+       "text": "tells",
+       "start": 17.047,
+       "end": 17.432,
+       "hl": false
+      },
+      {
+       "text": "React",
+       "start": 17.432,
+       "end": 17.817,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 17.817,
+       "end": 18.201,
+       "hl": false
+      },
+      {
+       "text": "run",
+       "start": 18.201,
+       "end": 18.586,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 18.586,
+       "end": 18.971,
+       "hl": false
+      },
+      {
+       "text": "component",
+       "start": 18.971,
+       "end": 19.355,
+       "hl": false
+      },
+      {
+       "text": "again.",
+       "start": 19.355,
+       "end": 19.74,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "So the screen <b>never changes</b>.",
+     "speaker": "PEER_B",
+     "start": 19.89,
+     "end": 21.813,
+     "words": [
+      {
+       "text": "So",
+       "start": 19.89,
+       "end": 20.275,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 20.275,
+       "end": 20.659,
+       "hl": false
+      },
+      {
+       "text": "screen",
+       "start": 20.659,
+       "end": 21.044,
+       "hl": false
+      },
+      {
+       "text": "never",
+       "start": 21.044,
+       "end": 21.428,
+       "hl": true
+      },
+      {
+       "text": "changes.",
+       "start": 21.428,
+       "end": 21.813,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "So the click does nothing?",
+     "speaker": "PEER_A",
+     "start": 22.113,
+     "end": 24.036,
+     "words": [
+      {
+       "text": "So",
+       "start": 22.113,
+       "end": 22.498,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 22.498,
+       "end": 22.882,
+       "hl": false
+      },
+      {
+       "text": "click",
+       "start": 22.882,
+       "end": 23.267,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 23.267,
+       "end": 23.651,
+       "hl": false
+      },
+      {
+       "text": "nothing?",
+       "start": 23.651,
+       "end": 24.036,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "beat": "break_2",
+   "chapter": null,
+   "start": 24.486,
+   "end": 33.429,
+   "field": "paper",
+   "transition": "cut",
+   "label": "AND ALSO",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "zero"
+      ],
+      "tones": [
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 438.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Back at zero",
+      "tone": "bad",
+      "icon": "x"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 562.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 24.486,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 26.375,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "run"
+    },
+    {
+     "t": 28.213,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "count"
+    },
+    {
+     "t": 29.367,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Back at zero"
+    },
+    {
+     "t": 31.44,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "variable"
+    }
+   ],
+   "captions": [
+    {
+     "text": "And if it did run again?",
+     "speaker": "PEER_A",
+     "start": 24.836,
+     "end": 27.144,
+     "words": [
+      {
+       "text": "And",
+       "start": 24.836,
+       "end": 25.221,
+       "hl": false
+      },
+      {
+       "text": "if",
+       "start": 25.221,
+       "end": 25.605,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 25.605,
+       "end": 25.99,
+       "hl": false
+      },
+      {
+       "text": "did",
+       "start": 25.99,
+       "end": 26.375,
+       "hl": false
+      },
+      {
+       "text": "run",
+       "start": 26.375,
+       "end": 26.759,
+       "hl": false
+      },
+      {
+       "text": "again?",
+       "start": 26.759,
+       "end": 27.144,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Then your count starts fresh, back at <b>zero</b>.",
+     "speaker": "PEER_B",
+     "start": 27.444,
+     "end": 30.521,
+     "words": [
+      {
+       "text": "Then",
+       "start": 27.444,
+       "end": 27.829,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 27.829,
+       "end": 28.213,
+       "hl": false
+      },
+      {
+       "text": "count",
+       "start": 28.213,
+       "end": 28.598,
+       "hl": false
+      },
+      {
+       "text": "starts",
+       "start": 28.598,
+       "end": 28.982,
+       "hl": false
+      },
+      {
+       "text": "fresh,",
+       "start": 28.982,
+       "end": 29.367,
+       "hl": false
+      },
+      {
+       "text": "back",
+       "start": 29.367,
+       "end": 29.752,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 29.752,
+       "end": 30.136,
+       "hl": false
+      },
+      {
+       "text": "zero.",
+       "start": 30.136,
+       "end": 30.521,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The old variable is thrown away.",
+     "speaker": "PEER_B",
+     "start": 30.671,
+     "end": 32.979,
+     "words": [
+      {
+       "text": "The",
+       "start": 30.671,
+       "end": 31.056,
+       "hl": false
+      },
+      {
+       "text": "old",
+       "start": 31.056,
+       "end": 31.44,
+       "hl": false
+      },
+      {
+       "text": "variable",
+       "start": 31.44,
+       "end": 31.825,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 31.825,
+       "end": 32.21,
+       "hl": false
+      },
+      {
+       "text": "thrown",
+       "start": 32.21,
+       "end": 32.594,
+       "hl": false
+      },
+      {
+       "text": "away.",
+       "start": 32.594,
+       "end": 32.979,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "beat": "fix_idea",
+   "chapter": null,
+   "start": 33.429,
+   "end": 42.372,
+   "field": "blue",
+   "transition": "double_bar_wipe",
+   "label": "THE FIX",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "USESTATE",
+      "accent": [
+       "USESTATE"
+      ],
+      "lines": [
+       "USESTATE"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 424.8,
+      "w": 960.0,
+      "h": 106.4
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "memory"
+      ],
+      "tones": [
+       "info"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 579.2,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 33.429,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 35.318,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "fix"
+    },
+    {
+     "t": 36.964,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "useState"
+    },
+    {
+     "t": 38.845,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "count"
+    },
+    {
+     "t": 40.383,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "memory"
+    }
+   ],
+   "captions": [
+    {
+     "text": "So how do I fix it?",
+     "speaker": "PEER_A",
+     "start": 33.779,
+     "end": 36.087,
+     "words": [
+      {
+       "text": "So",
+       "start": 33.779,
+       "end": 34.164,
+       "hl": false
+      },
+      {
+       "text": "how",
+       "start": 34.164,
+       "end": 34.548,
+       "hl": false
+      },
+      {
+       "text": "do",
+       "start": 34.548,
+       "end": 34.933,
+       "hl": false
+      },
+      {
+       "text": "I",
+       "start": 34.933,
+       "end": 35.318,
+       "hl": false
+      },
+      {
+       "text": "fix",
+       "start": 35.318,
+       "end": 35.702,
+       "hl": false
+      },
+      {
+       "text": "it?",
+       "start": 35.702,
+       "end": 36.087,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "With <b>useState</b>.",
+     "speaker": "PEER_B",
+     "start": 36.387,
+     "end": 37.541,
+     "words": [
+      {
+       "text": "With",
+       "start": 36.387,
+       "end": 36.964,
+       "hl": false
+      },
+      {
+       "text": "useState.",
+       "start": 36.964,
+       "end": 37.541,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "React keeps your count in its own <b>memory</b>, across every render.",
+     "speaker": "PEER_B",
+     "start": 37.691,
+     "end": 41.922,
+     "words": [
+      {
+       "text": "React",
+       "start": 37.691,
+       "end": 38.076,
+       "hl": false
+      },
+      {
+       "text": "keeps",
+       "start": 38.076,
+       "end": 38.46,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 38.46,
+       "end": 38.845,
+       "hl": false
+      },
+      {
+       "text": "count",
+       "start": 38.845,
+       "end": 39.23,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 39.23,
+       "end": 39.614,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 39.614,
+       "end": 39.999,
+       "hl": false
+      },
+      {
+       "text": "own",
+       "start": 39.999,
+       "end": 40.383,
+       "hl": false
+      },
+      {
+       "text": "memory,",
+       "start": 40.383,
+       "end": 40.768,
+       "hl": true
+      },
+      {
+       "text": "across",
+       "start": 40.768,
+       "end": 41.153,
+       "hl": false
+      },
+      {
+       "text": "every",
+       "start": 41.153,
+       "end": 41.537,
+       "hl": false
+      },
+      {
+       "text": "render.",
+       "start": 41.537,
+       "end": 41.922,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s07",
+   "beat": "fix_flow",
+   "chapter": null,
+   "start": 42.372,
+   "end": 52.468,
+   "field": "paper",
+   "transition": "diagonal_stripes",
+   "label": "HOW IT WORKS",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "trigger_chip",
+     "props": {
+      "label": "setCount"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 398.0,
+      "w": 960.0,
+      "h": 84.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "It updates",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 602.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "connector",
+     "props": {
+      "from": "o1",
+      "to": "o2",
+      "tone": "info",
+      "points": [
+       [
+        540.0,
+        492.0
+       ],
+       [
+        540.0,
+        592.0
+       ]
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 42.372,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 43.162,
+     "do": "enter",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "setCount"
+    },
+    {
+     "t": 43.162,
+     "do": "pulse",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "setCount"
+    },
+    {
+     "t": 45.359,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "memory"
+    },
+    {
+     "t": 46.718,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "runs"
+    },
+    {
+     "t": 47.487,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "component"
+    },
+    {
+     "t": 49.026,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "new"
+    },
+    {
+     "t": 50.864,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "screen"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Call <b>setCount</b>, and React updates that memory.",
+     "speaker": "PEER_B",
+     "start": 42.722,
+     "end": 45.799,
+     "words": [
+      {
+       "text": "Call",
+       "start": 42.722,
+       "end": 43.162,
+       "hl": false
+      },
+      {
+       "text": "setCount,",
+       "start": 43.162,
+       "end": 43.601,
+       "hl": true
+      },
+      {
+       "text": "and",
+       "start": 43.601,
+       "end": 44.041,
+       "hl": false
+      },
+      {
+       "text": "React",
+       "start": 44.041,
+       "end": 44.48,
+       "hl": false
+      },
+      {
+       "text": "updates",
+       "start": 44.48,
+       "end": 44.92,
+       "hl": false
+      },
+      {
+       "text": "that",
+       "start": 44.92,
+       "end": 45.359,
+       "hl": false
+      },
+      {
+       "text": "memory.",
+       "start": 45.359,
+       "end": 45.799,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Then it runs your component again with the new value.",
+     "speaker": "PEER_B",
+     "start": 45.949,
+     "end": 49.795,
+     "words": [
+      {
+       "text": "Then",
+       "start": 45.949,
+       "end": 46.334,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 46.334,
+       "end": 46.718,
+       "hl": false
+      },
+      {
+       "text": "runs",
+       "start": 46.718,
+       "end": 47.103,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 47.103,
+       "end": 47.487,
+       "hl": false
+      },
+      {
+       "text": "component",
+       "start": 47.487,
+       "end": 47.872,
+       "hl": false
+      },
+      {
+       "text": "again",
+       "start": 47.872,
+       "end": 48.257,
+       "hl": false
+      },
+      {
+       "text": "with",
+       "start": 48.257,
+       "end": 48.641,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 48.641,
+       "end": 49.026,
+       "hl": false
+      },
+      {
+       "text": "new",
+       "start": 49.026,
+       "end": 49.41,
+       "hl": false
+      },
+      {
+       "text": "value.",
+       "start": 49.41,
+       "end": 49.795,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "And the screen catches up.",
+     "speaker": "PEER_A",
+     "start": 50.095,
+     "end": 52.018,
+     "words": [
+      {
+       "text": "And",
+       "start": 50.095,
+       "end": 50.48,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 50.48,
+       "end": 50.864,
+       "hl": false
+      },
+      {
+       "text": "screen",
+       "start": 50.864,
+       "end": 51.249,
+       "hl": false
+      },
+      {
+       "text": "catches",
+       "start": 51.249,
+       "end": 51.633,
+       "hl": false
+      },
+      {
+       "text": "up.",
+       "start": 51.633,
+       "end": 52.018,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "code_map",
+   "chapter": null,
+   "start": 52.468,
+   "end": 58.268,
+   "field": "paper",
+   "transition": "cut",
+   "label": "gives you the count",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_map",
+     "props": {
+      "lines": [
+       "const [count, setCount] =",
+       "  useState(0);"
+      ],
+      "parts": [
+       {
+        "code": "useState(0)",
+        "icon": "refresh",
+        "label": "gives you the count"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 52.468,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 53.818,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "useState(0)"
+    },
+    {
+     "t": 55.818,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "count"
+    },
+    {
+     "t": 57.318,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "setter"
+    }
+   ],
+   "captions": [
+    {
+     "text": "In code, <b>useState(0)</b> gives you the count and its <b>setter</b>.",
+     "speaker": "PEER_B",
+     "start": 52.818,
+     "end": 57.818,
+     "words": [
+      {
+       "text": "In",
+       "start": 52.818,
+       "end": 53.318,
+       "hl": false
+      },
+      {
+       "text": "code,",
+       "start": 53.318,
+       "end": 53.818,
+       "hl": false
+      },
+      {
+       "text": "useState(0)",
+       "start": 53.818,
+       "end": 54.318,
+       "hl": true
+      },
+      {
+       "text": "gives",
+       "start": 54.318,
+       "end": 54.818,
+       "hl": false
+      },
+      {
+       "text": "you",
+       "start": 54.818,
+       "end": 55.318,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 55.318,
+       "end": 55.818,
+       "hl": false
+      },
+      {
+       "text": "count",
+       "start": 55.818,
+       "end": 56.318,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 56.318,
+       "end": 56.818,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 56.818,
+       "end": 57.318,
+       "hl": false
+      },
+      {
+       "text": "setter.",
+       "start": 57.318,
+       "end": 57.818,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s09",
+   "beat": "payoff",
+   "chapter": null,
+   "start": 58.268,
+   "end": 62.53,
+   "field": "navy",
+   "transition": "stack_rise",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "NOW EVERY CLICK COUNTS, AND THE NUMBER KEEPS",
+      "accent": [
+       "COUNTS"
+      ],
+      "lines": [
+       "NOW EVERY CLICK",
+       "COUNTS, AND THE",
+       "NUMBER KEEPS"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 316.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Counts",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 683.6,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 58.268,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 59.772,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "counts"
+    },
+    {
+     "t": 61.311,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "keeps"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Now every click <b>counts</b>, and the number keeps climbing.",
+     "speaker": "PEER_A",
+     "start": 58.618,
+     "end": 62.08,
+     "words": [
+      {
+       "text": "Now",
+       "start": 58.618,
+       "end": 59.003,
+       "hl": false
+      },
+      {
+       "text": "every",
+       "start": 59.003,
+       "end": 59.387,
+       "hl": false
+      },
+      {
+       "text": "click",
+       "start": 59.387,
+       "end": 59.772,
+       "hl": false
+      },
+      {
+       "text": "counts,",
+       "start": 59.772,
+       "end": 60.157,
+       "hl": true
+      },
+      {
+       "text": "and",
+       "start": 60.157,
+       "end": 60.541,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 60.541,
+       "end": 60.926,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 60.926,
+       "end": 61.311,
+       "hl": false
+      },
+      {
+       "text": "keeps",
+       "start": 61.311,
+       "end": 61.695,
+       "hl": false
+      },
+      {
+       "text": "climbing.",
+       "start": 61.695,
+       "end": 62.08,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "beat": "recap",
+   "chapter": null,
+   "start": 62.53,
+   "end": 70.168,
+   "field": "paper",
+   "transition": "iris",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "takeaway_list",
+     "props": {
+      "heading": "Key takeaways",
+      "rows": [
+       {
+        "icon": "refresh",
+        "line": "Re-renders reset",
+        "sub": "plain variables start over"
+       },
+       {
+        "icon": "memory",
+        "line": "useState remembers",
+        "sub": "kept between renders"
+       },
+       {
+        "icon": "bolt",
+        "line": "Setters trigger",
+        "sub": "update, then re-render"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 62.53,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 66.395,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "value"
+    },
+    {
+     "t": 68.18,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "updates"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Remember: re-renders reset plain variables.",
+     "speaker": "PEER_B",
+     "start": 62.88,
+     "end": 64.803,
+     "words": [
+      {
+       "text": "Remember:",
+       "start": 62.88,
+       "end": 63.265,
+       "hl": false
+      },
+      {
+       "text": "re-renders",
+       "start": 63.265,
+       "end": 63.649,
+       "hl": false
+      },
+      {
+       "text": "reset",
+       "start": 63.649,
+       "end": 64.034,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 64.034,
+       "end": 64.418,
+       "hl": false
+      },
+      {
+       "text": "variables.",
+       "start": 64.418,
+       "end": 64.803,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "<b>useState</b> keeps the value.",
+     "speaker": "PEER_B",
+     "start": 64.953,
+     "end": 66.876,
+     "words": [
+      {
+       "text": "useState",
+       "start": 64.953,
+       "end": 65.434,
+       "hl": true
+      },
+      {
+       "text": "keeps",
+       "start": 65.434,
+       "end": 65.915,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 65.915,
+       "end": 66.395,
+       "hl": false
+      },
+      {
+       "text": "value.",
+       "start": 66.395,
+       "end": 66.876,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "And the setter updates it and re-renders.",
+     "speaker": "PEER_B",
+     "start": 67.026,
+     "end": 69.718,
+     "words": [
+      {
+       "text": "And",
+       "start": 67.026,
+       "end": 67.411,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 67.411,
+       "end": 67.795,
+       "hl": false
+      },
+      {
+       "text": "setter",
+       "start": 67.795,
+       "end": 68.18,
+       "hl": false
+      },
+      {
+       "text": "updates",
+       "start": 68.18,
+       "end": 68.564,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 68.564,
+       "end": 68.949,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 68.949,
+       "end": 69.333,
+       "hl": false
+      },
+      {
+       "text": "re-renders.",
+       "start": 69.333,
+       "end": 69.718,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s11",
+   "beat": "cta",
+   "chapter": null,
+   "start": 70.168,
+   "end": 74.045,
+   "field": "blue",
+   "transition": "bar_wipe",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "end_card",
+     "props": {
+      "up_next": "How useState creates and updates state"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 70.168,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 73.21,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "time"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time.",
+     "speaker": "PEER_A",
+     "start": 70.518,
+     "end": 73.595,
+     "words": [
+      {
+       "text": "Follow",
+       "start": 70.518,
+       "end": 70.903,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 70.903,
+       "end": 71.287,
+       "hl": false
+      },
+      {
+       "text": "more,",
+       "start": 71.287,
+       "end": 71.672,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 71.672,
+       "end": 72.057,
+       "hl": false
+      },
+      {
+       "text": "idea",
+       "start": 72.057,
+       "end": 72.441,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 72.441,
+       "end": 72.826,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 72.826,
+       "end": 73.21,
+       "hl": false
+      },
+      {
+       "text": "time.",
+       "start": 73.21,
+       "end": 73.595,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  }
+ ]
+}

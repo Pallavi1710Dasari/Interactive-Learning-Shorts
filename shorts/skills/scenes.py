@@ -62,8 +62,9 @@ THE RULES
   titles. Never invent a fact, a number or a name.
 - Keep every string within its "max" length; kinetic_title text wraps to at most 3 lines
   of about 18 characters.
-- In a two-speaker reel the two avatars stand at the bottom of the frame; the objects
-  must fit above them (keep it to 2-3 short objects).
+- In a two-speaker reel the lower half of the frame is the chat (two speaker badges
+  and their speech bubbles); the objects must fit above it (keep it to 2-3 short
+  objects).
 
 LIBRARY (kind: props; actions it accepts):
 __LIBRARY__

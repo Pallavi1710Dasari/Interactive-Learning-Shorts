@@ -18,6 +18,7 @@ import {
   type ChipTone,
 } from "../objects/editorial";
 import type { PlanAction, PlanObject, PlanShot } from "./types";
+import { IdentityTitle, type IdentitySpec } from "../identity/Identity";
 import library from "../library.json";
 
 const KINETIC = (library as { kinetic: { size: number; line_height: number } }).kinetic;
@@ -101,8 +102,9 @@ function scrambled(text: string, age: number, seed: number): string {
 const highlightOn = (s: ObjState) => s.highlight > 0 && s.highlightAge < 0.9;
 
 /** One scene object at time t. */
-export function SceneObject({ obj, shot, t, field, series }: {
+export function SceneObject({ obj, shot, t, field, series, identity, themeLabel = "", tags = [] }: {
   obj: PlanObject; shot: PlanShot; t: number; field: FieldName; series: string;
+  identity?: IdentitySpec | null; themeLabel?: string; tags?: string[];
 }): ReactNode {
   const s = objectState(obj, shot, t);
   const p = obj.props;
@@ -110,6 +112,11 @@ export function SceneObject({ obj, shot, t, field, series }: {
   const cx = W / 2;
   const th = theme(field);
   switch (obj.kind) {
+    case "identity_title":
+      return identity ? (
+        <div style={{ transform: `scale(${1 + 0.05 * pulseOf(s.pulseAge, 0, 0.5)})`, transformOrigin: `${b.x + 85}px ${b.y + 85}px` }}>
+          <IdentityTitle spec={identity} label={themeLabel} field={field} x={b.x} y={b.y} t={s.local} />
+        </div>) : null;
     case "kinetic_title": {
       const accent = new Set((p.accent ?? []).map((a: string) => a.toUpperCase().replace(/[^\w]/g, "")));
       let n = 0;
@@ -214,7 +221,7 @@ export function SceneObject({ obj, shot, t, field, series }: {
     }
     case "end_card":
       return <>
-        <EndCard upNext={p.up_next || "Follow for more"} chips={[]} t={s.local} />
+        <EndCard upNext={p.up_next || "Follow for more"} chips={tags.map((label) => ({ label, done: false }))} t={s.local} />
         {s.pulseAge < 0.9 && <Overlay><rect x={cx - 230 - 30 * s.pulseAge} y={1050 - 20 * s.pulseAge} width={460 + 60 * s.pulseAge}
                                              height={96 + 40 * s.pulseAge} rx={60} fill="none" stroke={C.white} strokeWidth={6}
                                              opacity={1 - s.pulseAge / 0.9} /></Overlay>}

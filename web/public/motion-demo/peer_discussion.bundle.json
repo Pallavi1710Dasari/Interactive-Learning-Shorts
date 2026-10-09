@@ -1,0 +1,1020 @@
+{
+ "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+ "topic": "How does how a state update triggers a re-render work?",
+ "stub": true,
+ "theme": "peer_discussion",
+ "template": "fix_story",
+ "teaching_approach": "direct_explanation",
+ "tags": [
+  "#react",
+  "#discussion",
+  "#rerender",
+  "#state",
+  "#component"
+ ],
+ "language": "react",
+ "duration": 74.045,
+ "cost": 0,
+ "cost_estimated": false,
+ "stage": "timing",
+ "has_plan": true,
+ "approach": {
+  "primary": "direct_explanation",
+  "combined_with": [],
+  "alternatives": [],
+  "rationale": "Stub: explaining How does how a state update triggers a re-render work? plainly, with no device chosen."
+ },
+ "theme_choice": {
+  "theme": "peer_discussion",
+  "reason": "chosen by the reviewer (--theme)",
+  "tags": [
+   "#react",
+   "#discussion",
+   "#rerender",
+   "#state",
+   "#component"
+  ],
+  "fit_check": {
+   "passed": true,
+   "attempts": 0,
+   "rejected": [],
+   "fallback": false,
+   "fallback_reason": "",
+   "overrides": []
+  },
+  "source": "flag",
+  "template": "fix_story",
+  "language": "react",
+  "teaching_approach": "direct_explanation",
+  "eligible": [
+   "classic_explainer",
+   "narrative",
+   "interview_rapid_fire",
+   "peer_discussion",
+   "mentor_student",
+   "bug_hunt",
+   "myth_vs_fact",
+   "common_mistakes",
+   "predict_the_output",
+   "under_the_hood",
+   "step_by_step_walkthrough",
+   "real_world_scenario",
+   "before_vs_after"
+  ]
+ },
+ "script": {
+  "reel_style": "motion",
+  "template": "fix_story",
+  "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+  "source_section_id": "7.1",
+  "topic": "How does how a state update triggers a re-render work?",
+  "hook_question": "Why does my counter stay stuck at zero?",
+  "concept_name": "useState",
+  "promise": "Why plain variables forget",
+  "icon_vocabulary": [
+   {
+    "name": "refresh",
+    "label": "Render"
+   },
+   {
+    "name": "memory",
+    "label": "Memory"
+   },
+   {
+    "name": "bolt",
+    "label": "Trigger"
+   }
+  ],
+  "takeaways": [
+   {
+    "icon": "refresh",
+    "line": "Re-renders reset",
+    "sub": "plain variables start over"
+   },
+   {
+    "icon": "memory",
+    "line": "useState remembers",
+    "sub": "kept between renders"
+   },
+   {
+    "icon": "bolt",
+    "line": "Setters trigger",
+    "sub": "update, then re-render"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s01",
+    "beat": "hook",
+    "speech": "Wait, why does my counter stay stuck at zero?",
+    "captions": [
+     {
+      "text": "Wait, why does my counter stay stuck at <b>zero</b>?",
+      "speaker": "PEER_A"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Two desks: PEER_A's browser mock shows a counter button; each click fails and it stays 0.",
+    "code": [],
+    "scene": {
+     "field": "navy",
+     "transition": "cut",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "identity_title",
+       "props": {}
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Stay stuck at zero",
+        "tone": "bad",
+        "icon": "alert"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "Stay stuck at",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.46
+   },
+   {
+    "id": "s02",
+    "beat": "title",
+    "speech": "Because your count lives in a plain variable.",
+    "captions": [
+     {
+      "text": "Because your count lives in a <b>plain variable</b>.",
+      "speaker": "PEER_B"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Title card: series label, 'useState', the promise line, three icon tiles; PEER_B avatar beside it.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "iris",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "title_card",
+       "props": {
+        "title": "useState",
+        "promise": "Why plain variables forget",
+        "icons": [
+         {
+          "name": "refresh",
+          "label": "Render"
+         },
+         {
+          "name": "memory",
+          "label": "Memory"
+         },
+         {
+          "name": "bolt",
+          "label": "Trigger"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "plain",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.08
+   },
+   {
+    "id": "s03",
+    "beat": "setup",
+    "speech": "Here's my code. A plain count starts at zero, and each click adds one. Looks fine, right?",
+    "captions": [
+     {
+      "text": "Here's my code.",
+      "speaker": "PEER_A"
+     },
+     {
+      "text": "A plain <b>count</b> starts at zero, and each click adds one.",
+      "speaker": "PEER_A"
+     },
+     {
+      "text": "Looks fine, right?",
+      "speaker": "PEER_B"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Code window Counter.jsx, two lines highlighted in turn.",
+    "code": [
+     "let count = 0;",
+     "count = count + 1;"
+    ],
+    "scene": {
+     "field": "paper",
+     "transition": "bar_wipe",
+     "label": "THE CODE",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "code_window",
+       "props": {
+        "file": "App.jsx",
+        "lines": [
+         "let count = 0;",
+         "count = count + 1;"
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "start",
+       "do": "type",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "code",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "count",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "each",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      },
+      {
+       "at": "Looks",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.54
+   },
+   {
+    "id": "s04",
+    "beat": "break_1",
+    "speech": "But nothing tells React to run your component again. So the screen never changes. So the click does nothing?",
+    "captions": [
+     {
+      "text": "But nothing tells React to run your component again.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "So the screen <b>never changes</b>.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "So the click does nothing?",
+      "speaker": "PEER_A"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Entity card <Counter /> above a system panel 'React: Idle'; the click's pulse stops at a broken connector.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "cut",
+     "label": "WHY IT FAILS",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "token_row",
+       "props": {
+        "items": [
+         "never changes"
+        ],
+        "tones": [
+         "plain"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Nothing tells React",
+        "tone": "bad",
+        "icon": "x"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "Nothing tells React",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "React",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "component",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "never",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "click",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 7.31
+   },
+   {
+    "id": "s05",
+    "beat": "break_2",
+    "speech": "And if it did run again? Then your count starts fresh, back at zero. The old variable is thrown away.",
+    "captions": [
+     {
+      "text": "And if it did run again?",
+      "speaker": "PEER_A"
+     },
+     {
+      "text": "Then your count starts fresh, back at <b>zero</b>.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "The old variable is thrown away.",
+      "speaker": "PEER_B"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "A render sweep passes the entity card; the old count tile falls away and a new one reads 0.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "cut",
+     "label": "AND ALSO",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "token_row",
+       "props": {
+        "items": [
+         "zero"
+        ],
+        "tones": [
+         "plain"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Back at zero",
+        "tone": "bad",
+        "icon": "x"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "run",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "count",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "Back at zero",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "variable",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 7.69
+   },
+   {
+    "id": "s06",
+    "beat": "fix_idea",
+    "speech": "So how do I fix it? With use State. React keeps your count in its own memory, across every render.",
+    "captions": [
+     {
+      "text": "So how do I fix it?",
+      "speaker": "PEER_A"
+     },
+     {
+      "text": "With <b>useState</b>.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "React keeps your count in its own <b>memory</b>, across every render.",
+      "speaker": "PEER_B"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "System panel 'React' now holding a 'count' slot; a pulse travels up the connector to the entity card.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "double_bar_wipe",
+     "label": "THE FIX",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "kinetic_title",
+       "props": {
+        "text": "USESTATE",
+        "accent": [
+         "USESTATE"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "token_row",
+       "props": {
+        "items": [
+         "memory"
+        ],
+        "tones": [
+         "info"
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "fix",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "useState",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "count",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "memory",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 7.69
+   },
+   {
+    "id": "s07",
+    "beat": "fix_flow",
+    "speech": "Call set Count, and React updates that memory. Then it runs your component again with the new value. And the screen catches up.",
+    "captions": [
+     {
+      "text": "Call <b>setCount</b>, and React updates that memory.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "Then it runs your component again with the new value.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "And the screen catches up.",
+      "speaker": "PEER_A"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Trigger chip setCount(1) pulses to the system panel; the slot goes 0 to 1; the entity card re-renders showing 1.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "diagonal_stripes",
+     "label": "HOW IT WORKS",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "trigger_chip",
+       "props": {
+        "label": "setCount"
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "It updates",
+        "tone": "ok",
+        "icon": "check"
+       }
+      },
+      {
+       "id": "o3",
+       "kind": "connector",
+       "props": {
+        "from": "o1",
+        "to": "o2",
+        "tone": "info"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "setCount",
+       "do": "enter",
+       "target": "o3",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "setCount",
+       "do": "pulse",
+       "target": "o3",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "memory",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "runs",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "component",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "new",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "screen",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 8.85
+   },
+   {
+    "id": "s08",
+    "beat": "code_map",
+    "speech": "In code, use State of zero gives you the count and its setter.",
+    "captions": [
+     {
+      "text": "In code, <b>useState(0)</b> gives you the count and its <b>setter</b>.",
+      "speaker": "PEER_B"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Code map card: count -> memory icon 'the current value'; setCount -> bolt icon 'updates it and re-renders'.",
+    "code": [
+     "const [count, setCount] =",
+     "  useState(0);"
+    ],
+    "scene": {
+     "field": "paper",
+     "transition": "cut",
+     "label": "gives you the count",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "code_map",
+       "props": {
+        "lines": [
+         "const [count, setCount] =",
+         "  useState(0);"
+        ],
+        "parts": [
+         {
+          "code": "useState(0)",
+          "icon": "refresh",
+          "label": "gives you the count"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "useState(0)",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "count",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "setter",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 5.0
+   },
+   {
+    "id": "s09",
+    "beat": "payoff",
+    "speech": "Now every click counts, and the number keeps climbing.",
+    "captions": [
+     {
+      "text": "Now every click <b>counts</b>, and the number keeps climbing.",
+      "speaker": "PEER_A"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "The hook's browser mock again: each click succeeds and the counter climbs 1, 2, 3; status pill 'It works'.",
+    "code": [],
+    "scene": {
+     "field": "navy",
+     "transition": "stack_rise",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "kinetic_title",
+       "props": {
+        "text": "NOW EVERY CLICK COUNTS, AND THE NUMBER KEEPS",
+        "accent": [
+         "COUNTS"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Counts",
+        "tone": "ok",
+        "icon": "check"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "counts",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "keeps",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.46
+   },
+   {
+    "id": "s10",
+    "beat": "recap",
+    "speech": "Remember: re-renders reset plain variables. use State keeps the value. And the setter updates it and re-renders.",
+    "captions": [
+     {
+      "text": "Remember: re-renders reset plain variables.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "<b>useState</b> keeps the value.",
+      "speaker": "PEER_B"
+     },
+     {
+      "text": "And the setter updates it and re-renders.",
+      "speaker": "PEER_B"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Takeaway list: three rows with the refresh, memory and bolt icons.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "iris",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "takeaway_list",
+       "props": {
+        "heading": "Key takeaways",
+        "rows": [
+         {
+          "icon": "refresh",
+          "line": "Re-renders reset",
+          "sub": "plain variables start over"
+         },
+         {
+          "icon": "memory",
+          "line": "useState remembers",
+          "sub": "kept between renders"
+         },
+         {
+          "icon": "bolt",
+          "line": "Setters trigger",
+          "sub": "update, then re-render"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "value",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "updates",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.54
+   },
+   {
+    "id": "s11",
+    "beat": "cta",
+    "speech": "Follow for more, one idea at a time.",
+    "captions": [
+     {
+      "text": "Follow for more, one idea at a time.",
+      "speaker": "PEER_A"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "End card: Up next, Follow button, series chips.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "bar_wipe",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "end_card",
+       "props": {
+        "up_next": "How useState creates and updates state"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "time",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.08
+   }
+  ],
+  "chapters": [],
+  "running_example": null,
+  "series": "@learnthesimpleway",
+  "next_topic": "How useState creates and updates state",
+  "tts_provider": null,
+  "voice_ref": null,
+  "theme": "peer_discussion",
+  "language": "react",
+  "speakers": [
+   {
+    "role": "PEER_A",
+    "identity": "host",
+    "label": "Peer A",
+    "voice_slot": "motion_host"
+   },
+   {
+    "role": "PEER_B",
+    "identity": "react",
+    "label": "Peer B",
+    "voice_slot": "motion_char_1"
+   }
+  ],
+  "estimated_seconds": 62.7
+ },
+ "facts": [
+  {
+   "kind": "number",
+   "value": "0",
+   "section": "7.1",
+   "role": "main",
+   "shots": [
+    "s01",
+    "s03",
+    "s05",
+    "s08"
+   ]
+  }
+ ],
+ "cost_log": {
+  "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+  "runs": [
+   {
+    "started": "2026-10-09T11:41:38+00:00",
+    "ended": "2026-10-09T11:41:38+00:00",
+    "stub": true,
+    "calls": [],
+    "cost": 0
+   }
+  ],
+  "total": {
+   "calls": 0,
+   "cost": 0,
+   "estimated": false,
+   "by_label": {}
+  }
+ },
+ "plan_url": "/motion-demo/peer_discussion.json",
+ "audio_url": null,
+ "demo": "peer_discussion"
+}

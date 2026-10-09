@@ -420,20 +420,25 @@ export function EndCard({ upNext, chips, t }: { upNext: string; chips: { label: 
         <div style={{ fontSize: 42, fontWeight: 700, color: C.amber }}>Up next</div>
       </At>
       <At x={W / 2} y={890} center style={popStyle(seg(t, 0.12, 0.5))}>
-        <div style={{ fontSize: 120, fontWeight: 800, letterSpacing: -3, whiteSpace: "nowrap" }}>{upNext}</div>
+        {/* sized to fit the frame: about 0.55 em per character at weight 800 */}
+        <div style={{ fontSize: Math.min(120, Math.floor(940 / Math.max(1, upNext.length * 0.55))), fontWeight: 800,
+                      letterSpacing: -3, whiteSpace: "nowrap" }}>{upNext}</div>
       </At>
       <At x={W / 2} y={1098} center style={popStyle(seg(t, 0.26, 0.5))}>
         <div style={{ padding: "30px 108px", borderRadius: 999, background: C.white, color: C.indigo, fontWeight: 800, fontSize: 48 }}>Follow</div>
       </At>
-      {chips.map((c, i) => (
-        <At key={c.label} x={216 + i * 324} y={1320} center style={popStyle(seg(t, 1 + i * 0.12, 0.5))}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 30px", borderRadius: 999,
-                        background: c.done ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.14)",
-                        color: c.done ? C.indigo : C.white, fontFamily: FONT.mono, fontWeight: 700, fontSize: 33, whiteSpace: "nowrap" }}>
-            {c.done && <Icon name="check" size={36} color={C.indigo} stroke={2.6} />}{c.label}
+      {/* chips (the reel's tags) in one centred row that wraps */}
+      <div style={{ position: "absolute", left: 60, right: 60, top: 1290, display: "flex", flexWrap: "wrap",
+                    justifyContent: "center", gap: 16 }}>
+        {chips.map((c, i) => (
+          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 26px", borderRadius: 999,
+                                      background: c.done ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.14)",
+                                      color: c.done ? C.indigo : C.white, fontFamily: FONT.mono, fontWeight: 700, fontSize: 30,
+                                      whiteSpace: "nowrap", ...popStyle(seg(t, 1 + i * 0.12, 0.5)) }}>
+            {c.done && <Icon name="check" size={34} color={C.indigo} stroke={2.6} />}{c.label}
           </div>
-        </At>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

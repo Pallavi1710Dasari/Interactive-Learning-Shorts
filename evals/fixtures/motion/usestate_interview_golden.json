@@ -82,7 +82,7 @@
   "tts_provider": null,
   "voice_ref": null,
   "speakers": [
-    {"role": "INTERVIEWER", "avatar": "host", "name": "Juno", "voice_slot": "motion_host"},
-    {"role": "CANDIDATE", "avatar": "react", "name": "Rae", "voice_slot": "motion_react"}
+    {"role": "INTERVIEWER", "identity": "host", "label": "Interviewer", "voice_slot": "motion_host"},
+    {"role": "CANDIDATE", "identity": "react", "label": "Candidate", "voice_slot": "motion_char_1"}
   ]
 }

@@ -112,6 +112,7 @@ MOTION_GRADERS = {
     "recap_icons":           lambda s, src: checks.check_motion_recap_icons(s),
     "plain_words":           checks.check_motion_plain_words,
     "not_qa":                lambda s, src: checks.check_motion_not_qa(s),
+    "theme_speakers":        lambda s, src: checks.check_motion_theme_speakers(s),
     "walkthrough_chapters":  lambda s, src: checks.check_walkthrough_chapters(s),
     "running_example":       lambda s, src: checks.check_walkthrough_running_example(s),
     "main_source":           None,   # needs the case's main_sections — see run_motion_case
@@ -167,6 +168,36 @@ def _apply_patch(data, ops: list[dict]):
         else:
             target[last] = op["value"]
     return data
+
+
+def run_motion_theme_case(case: dict, sections) -> tuple[bool, str]:
+    """A motion THEME case (phase 2b): one of the theme step's graders on the
+    case's own inputs — no fixture script. theme_fit: `theme`, `approach`,
+    `input` + `section_id`, optional `template` (a human pin) and `language`.
+    theme_variety: `theme` and `history` (earlier reels' themes, oldest
+    first). tags: `tags`, and `input` + `section_id` when concept tags must
+    come from that section."""
+    doc = parse_markdown(ROOT / case["input"]) if case.get("input") else sections
+    section_text = (find_section(doc, case["section_id"]).text
+                    if case.get("section_id") else None)
+    grader = case["grader"]
+    if grader == "theme_fit":
+        result = checks.check_motion_theme_fit(
+            case["theme"], approach=case.get("approach"), section_text=section_text or "",
+            template=case.get("template"), language=case.get("language"))
+    elif grader == "theme_variety":
+        result = checks.check_motion_theme_variety(case["theme"], case.get("history", []))
+    elif grader == "tags":
+        result = checks.check_motion_tags(case["tags"], section_text)
+    else:
+        raise ValueError(f"unknown motion theme grader {grader!r}")
+    exp = case["expect"]
+    if result.passed != exp["passed"]:
+        return False, f"expected passed={exp['passed']}, got {result.passed} ({result.reason})"
+    needle = exp.get("reason_contains")
+    if needle and needle.lower() not in result.reason.lower():
+        return False, f"reason missing {needle!r}; got: {result.reason}"
+    return True, result.reason
 
 
 def run_motion_case(case: dict, sections) -> tuple[bool, str]:
@@ -687,6 +718,8 @@ def main():
                 ok, detail = run_revision_case(case, sections)
             elif kind == "motion_grader":
                 ok, detail = run_motion_case(case, sections)
+            elif kind == "motion_theme_grader":
+                ok, detail = run_motion_theme_case(case, sections)
             elif kind == "llm_judge":
                 ok, detail = run_judge_case(case, sections)
             elif kind == "vision_judge":

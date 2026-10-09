@@ -7735,7 +7735,10 @@ def check_motion_hook_curiosity(script) -> GraderResult:
     speech = first.speech.strip()
     lower = speech.lower().lstrip("\"'")
     problems: list[str] = []
-    if template == "walkthrough":
+    theme = _motion_theme(script)
+    if not theme.base:
+        problems = _themed_hook_problems(script, theme, speech, lower)
+    elif template == "walkthrough":
         if not lower.startswith(MOTION_WALKTHROUGH_HOOK_OPENERS):
             problems.append(f"hook {speech[:60]!r} does not open with a question about how "
                             f"something works ('How does...', 'What happens when...')")
@@ -7753,8 +7756,7 @@ def check_motion_hook_curiosity(script) -> GraderResult:
                             f"'What actually happens when...')")
         if "?" not in speech or not script.hook_question.strip().endswith("?"):
             problems.append("the hook is not phrased as a question")
-        words = {re.sub(r"[^a-z0-9']", "", w.lower()) for w in speech.split()}
-        if not (words & MOTION_SYMPTOM_WORDS or re.search(r"\d", speech)):
+        if not _names_symptom(speech):
             problems.append(f"hook {speech[:60]!r} names no concrete symptom (stuck at 0, "
                             f"page reloads, query is slow, ...)")
     concept_key = _motion_key(script.concept_name or "")
@@ -7767,6 +7769,39 @@ def check_motion_hook_curiosity(script) -> GraderResult:
         return GraderResult("motion_hook_curiosity", False, "; ".join(problems),
                             {"shots": [first.id]})
     return GraderResult("motion_hook_curiosity", True, f"hook {speech[:60]!r}")
+
+
+def _motion_theme(script):
+    """The theme a script is graded as (motion_themes.theme_for_script): its
+    own, or its template's base theme for a script written before themes."""
+    from .motion_themes import theme_for_script
+    return theme_for_script(script)
+
+
+def _names_symptom(text: str) -> bool:
+    """A concrete, visible symptom: a symptom word, or any number."""
+    words = {re.sub(r"[^a-z0-9']", "", w.lower()) for w in text.split()}
+    return bool(words & MOTION_SYMPTOM_WORDS or re.search(r"\d", text))
+
+
+def _themed_hook_problems(script, theme, speech: str, lower: str) -> list[str]:
+    """A non-base theme's hook (phase 2b), from its registry entry: the first
+    words start with one of the theme's openers; a `question` hook asks; a
+    hook with `symptom` names a concrete one. hook_question is always the
+    reel's question, ending in "?", whatever the hook's style."""
+    hook = theme.hook
+    problems: list[str] = []
+    if not lower.startswith(tuple(hook.openers)):
+        problems.append(f"hook {speech[:60]!r} does not open the way a {theme.id} hook does "
+                        f"({', '.join(repr(o) for o in hook.openers[:4])}, ...)")
+    if hook.style == "question" and "?" not in speech:
+        problems.append(f"the {theme.id} hook is not phrased as a question")
+    if not script.hook_question.strip().endswith("?"):
+        problems.append("hook_question is not a question")
+    if hook.symptom and not _names_symptom(speech):
+        problems.append(f"hook {speech[:60]!r} names no concrete symptom (stuck at 0, "
+                        f"page reloads, query is slow, ...)")
+    return problems
 
 
 def _beat_word_cap(seconds: float) -> int:
@@ -8070,6 +8105,9 @@ def check_motion_not_qa(script) -> GraderResult:
     the hook asks a question. A walkthrough chapter may also ask ONE short
     rhetorical question, answered by the very next sentence of the same shot."""
     template = _template(script)
+    theme = _motion_theme(script)
+    if not theme.base:
+        return _themed_not_qa(script, theme)
     problems: list[str] = []
     asked: dict[int, str] = {}
     for s in script.shots:
@@ -8104,6 +8142,153 @@ def check_motion_not_qa(script) -> GraderResult:
     if problems:
         return GraderResult("motion_not_qa", False, "; ".join(problems))
     return GraderResult("motion_not_qa", True, "one narrator, no Q&A")
+
+
+def _speech_label(speech: str) -> bool:
+    label = re.match(r"^\s*([A-Za-z_]+)\s*:\s", speech)
+    return bool(label and (label.group(1).lower() in _MOTION_SPEAKER_LABELS
+                           or label.group(1) in STORY_ACTORS
+                           or label.group(1).isupper()))
+
+
+def _themed_not_qa(script, theme) -> GraderResult:
+    """A non-base theme (phase 2b): speaker labels never go in the speech
+    (they belong on the captions, where TTS does not read them), and a
+    question may come only from the hook, a beat the theme lets ask, or a
+    speaker role that asks (the interviewer, the student)."""
+    problems: list[str] = []
+    beats = theme.beats if isinstance(theme.beats, dict) else {}
+    askers = [s.role for s in theme.speakers if s.asks]
+    for s in script.shots:
+        if _speech_label(s.speech):
+            problems.append(f"{s.id} speech opens with a speaker label — speakers go on the "
+                            f"captions, never in what TTS reads")
+        if s.beat == "hook":
+            continue
+        beat = beats.get(s.beat)
+        for c in s.captions:
+            plain = " ".join(_motion_words(c.text)).rstrip("\"'”’ ")
+            if not plain.endswith("?"):
+                continue
+            role = theme.speaker(c.speaker) if c.speaker else None
+            if (beat is not None and beat.asks) or (role is not None and role.asks):
+                continue
+            who = f" {c.speaker}" if c.speaker else ""
+            problems.append(f"{s.id} ({s.beat}){who} asks {plain!r} — in a {theme.id} reel "
+                            f"only the hook"
+                            + (f", {' and '.join(askers)}" if askers else "")
+                            + (", and the " + "/".join(b for b, v in beats.items() if v.asks)
+                               + " beat" if any(v.asks for v in beats.values()) else "")
+                            + " may ask")
+    if problems:
+        return GraderResult("motion_not_qa", False, "; ".join(problems))
+    kind = "a dialogue between " + " and ".join(theme.roles) if theme.two_speaker \
+        else "one narrator"
+    return GraderResult("motion_not_qa", True, f"{kind}; questions only where {theme.id} allows")
+
+
+def check_motion_theme_speakers(script) -> GraderResult:
+    """The script speaks the way its theme says (phase 2b). A one-narrator
+    theme: no caption carries a speaker and no avatar is cast. A two-speaker
+    theme: every caption is labelled with one of the theme's roles, each
+    beat uses only the speakers its beat template names and is opened by the
+    first of them, both roles speak, and both are cast. The script's template
+    is the theme's."""
+    from .motion_themes import registry
+    theme_id = getattr(script, "theme", None)
+    if theme_id and registry().get(theme_id) is None:
+        return GraderResult("motion_theme_speakers", False,
+                            f"theme {theme_id!r} is not in the theme registry")
+    theme = _motion_theme(script)
+    problems: list[str] = []
+    off: list[str] = []
+    if theme.template != _template(script):
+        problems.append(f"the {theme.id} theme is a {theme.template} theme, the script is "
+                        f"a {_template(script)}")
+    cast = [sp.role for sp in getattr(script, "speakers", [])]
+    if not theme.two_speaker:
+        labelled = [s.id for s in script.shots if any(c.speaker for c in s.captions)]
+        if labelled:
+            problems.append(f"shot(s) {labelled} label a speaker — {theme.id} has one narrator")
+            off += labelled
+        if cast:
+            problems.append(f"{theme.id} has one narrator, but avatars are cast for {cast}")
+    else:
+        beats = theme.beats if isinstance(theme.beats, dict) else {}
+        spoke: set[str] = set()
+        for s in script.shots:
+            allowed = beats[s.beat].speakers if s.beat in beats else theme.roles
+            who = [c.speaker for c in s.captions]
+            unknown = [w for w in who if w not in theme.roles]
+            if unknown:
+                problems.append(f"{s.id} caption speaker(s) {unknown} — every line of a "
+                                f"{theme.id} reel is labelled {' or '.join(theme.roles)}")
+                off.append(s.id)
+                continue
+            spoke |= set(who)
+            stray = sorted({w for w in who if w not in allowed})
+            if stray:
+                problems.append(f"{s.id} ({s.beat}) has {stray} speaking; the {theme.id} beat "
+                                f"template gives it to {allowed}")
+                off.append(s.id)
+            elif who and who[0] != allowed[0]:
+                problems.append(f"{s.id} ({s.beat}) is opened by {who[0]}; the {theme.id} "
+                                f"beat template opens it with {allowed[0]}")
+                off.append(s.id)
+        silent = [r for r in theme.roles if r not in spoke]
+        if silent:
+            problems.append(f"{silent} never speak — {theme.id} is a two-speaker reel")
+        if sorted(cast) != sorted(theme.roles):
+            problems.append(f"cast {cast or 'nobody'}, the {theme.id} theme needs "
+                            f"{theme.roles}")
+    if problems:
+        return GraderResult("motion_theme_speakers", False, "; ".join(problems),
+                            {"shots": sorted(set(off))})
+    if theme.two_speaker:
+        return GraderResult("motion_theme_speakers", True,
+                            f"{theme.id}: {' and '.join(theme.roles)}, every line labelled")
+    return GraderResult("motion_theme_speakers", True, f"{theme.id}: one narrator")
+
+
+def check_motion_theme_fit(theme_id: str, *, approach: str | None, section_text: str,
+                           template: str | None = None, language: str | None = None) -> GraderResult:
+    """The chosen theme fits the section (phase 2b): it is in the registry,
+    the section meets its requirements (code for predict_the_output and
+    bug_hunt), the approved teaching approach is not one the registry marks
+    incompatible, and it uses the template a human pinned, if any."""
+    from .motion_themes import section_has_code, theme_problems
+    problems = theme_problems(theme_id, approach=approach,
+                              has_code=section_has_code(section_text),
+                              template=template, history=None, language=language)
+    if problems:
+        return GraderResult("motion_theme_fit", False, "; ".join(problems))
+    return GraderResult("motion_theme_fit", True,
+                        f"{theme_id} fits: requirements met, compatible with "
+                        f"{approach or 'any approach'}")
+
+
+def check_motion_theme_variety(theme_id: str, history: list[str]) -> GraderResult:
+    """The fixed variety rule (phase 2b): never the previous reel's theme, and
+    at most max_same of one theme in the last `window` reels, the new one
+    included. `history` is the earlier reels' themes in the same language,
+    oldest first."""
+    from .motion_themes import variety_problems
+    problems = variety_problems(theme_id, history)
+    if problems:
+        return GraderResult("motion_theme_variety", False, "; ".join(problems))
+    return GraderResult("motion_theme_variety", True,
+                        f"{theme_id} after {history[-4:] or 'no earlier reels'}")
+
+
+def check_motion_tags(tags: list[str], section_text: str | None = None) -> GraderResult:
+    """The tag format (phase 2b): '#' plus lowercase letters and digits, one
+    language tag first from the fixed list, one theme tag second from the
+    registry, then 1-3 concept tags taken from the section."""
+    from .motion_themes import tag_problems
+    problems = tag_problems(tags, section_text)
+    if problems:
+        return GraderResult("motion_tags", False, "; ".join(problems))
+    return GraderResult("motion_tags", True, " ".join(tags))
 
 
 def check_walkthrough_chapters(script) -> GraderResult:
@@ -8370,6 +8555,7 @@ def motion_fact_sources(script, main_sections: list[tuple[str, str]],
 MOTION_HOOK_GRADERS = frozenset({
     "motion_hook_curiosity", "motion_word_budget", "motion_caption_sentences",
     "motion_captions_match_speech", "motion_speech_vs_caption", "motion_numbers_sourced",
+    "motion_theme_speakers",
 })
 
 
@@ -8392,6 +8578,7 @@ def run_motion_script_graders(script, source_text: str, icon_names=None,
         check_motion_recap_icons(script, icon_names),
         check_motion_plain_words(script, source_text),
         check_motion_not_qa(script),
+        check_motion_theme_speakers(script),
         check_walkthrough_chapters(script),
         check_walkthrough_running_example(script),
         check_walkthrough_main_source(script, main_text),

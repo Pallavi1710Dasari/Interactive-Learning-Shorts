@@ -1,6 +1,6 @@
 # Restyle: motion reels (`REEL_STYLE=motion`)
 
-Status: **Phases 1, 1b and 2 of 5 done (script contract, both templates, scene library).** Built and verified with `SHORTS_STUB=1` only; no real LLM call has been made in motion mode yet.
+Status: **Phases 1, 1b, 2 and 2b done (script contract, both templates, scene library, themes and tags); 2b is awaiting review.** Built and verified with `SHORTS_STUB=1` only; no real LLM call has been made in motion mode yet.
 
 **Read `REFERENCE_STYLE_ADDENDUM.md` with this file. Where they disagree, the addendum wins.** It adds the second reference reel (tokenization), the `walkthrough` template, the 120 s cap, karaoke sentence captions, and the motion system phase 2 builds.
 
@@ -142,8 +142,101 @@ Screenshots of every entry next to the reference are in `docs/reference/phase2/`
 
 Also in phase 2: every test suite now writes to a temp folder (`shorts/testing.py`, `SHORTS_OUTPUT_DIR` / `SHORTS_CAST_ASSETS_DIR`) instead of `output/` and `assets/cast/`.
 
+Display font: **Anton** (approved with phase 2, 2026-10-09; `docs/reference/phase2/fonts_anton_vs_archivo_black.png`).
+
+## Phase 2b: themes and tags
+
+The **teaching approach** (the existing step, unchanged) is HOW the idea is explained: conceptual, analogy, comparison and so on. The **theme** (new) is the FORMAT of the reel: who speaks and what it feels like, such as an interview, a discussion or a story. The two combine. Themes apply to `REEL_STYLE=motion` only. Explainer and story modes, and every existing reel, are unchanged.
+
+Pipeline: `setup (topic -> teaching_approach -> template) -> theme -> script -> scenes -> ...`. The runner's stages are now `setup -> theme -> script -> scenes -> voice -> timing -> render -> report`.
+
+### The theme registry
+
+The registry is `shorts/motion_themes.yaml`, loaded and validated by `shorts/motion_themes.py`. Adding a theme takes only a new entry, as long as it uses a template, hook style and avatar kind that already exist (`motion_themes.TEMPLATES`, `HOOK_STYLES`, `AVATAR_KINDS`). `motion_theme_test.test_a_new_theme_is_only_a_registry_entry` proves this.
+
+| Theme | Tag | Template | Speakers (avatar) | Needs code | Works with | Incompatible with | Hook |
+|---|---|---|---|---|---|---|---|
+| classic_explainer | explainer | fix_story (own beats) | narrator | no | all but process_demonstration | — | symptom question |
+| story | story | fix_story | narrator | no | real_world_example, analogy, conceptual_visual, direct_explanation, code | — | scene |
+| interview | interview | fix_story | INTERVIEWER (host, asks) / CANDIDATE (language) | no | code, direct_explanation, comparison, conceptual_visual | — | question |
+| interview_rapid_fire | rapidfire | fix_story | INTERVIEWER (host, asks) / CANDIDATE (language) | no | direct_explanation, code, comparison | process_demonstration, analogy | question |
+| peer_discussion | discussion | fix_story | PEER_A (host, asks) / PEER_B (language, asks) | no | analogy, comparison, conceptual_visual, direct_explanation, code | — | question |
+| mentor_student | mentor | fix_story | STUDENT (host, asks) / MENTOR (language, asks) | no | analogy, direct_explanation, conceptual_visual, code, real_world_example | — | question |
+| bug_hunt | bughunt | fix_story | narrator | **yes** | code, process_demonstration, direct_explanation | analogy | claim (the bug report) |
+| myth_vs_fact | mythvsfact | fix_story | narrator | no | comparison, direct_explanation, conceptual_visual, code | process_demonstration | claim (the myth) |
+| common_mistakes | mistakes | fix_story | narrator | no | code, direct_explanation, comparison | analogy | claim |
+| predict_the_output | predict | fix_story | narrator | **yes** | code, process_demonstration | analogy, real_world_example | question |
+| under_the_hood | underthehood | fix_story | narrator | no | conceptual_visual, process_demonstration, direct_explanation, code | real_world_example | question |
+| step_by_step_walkthrough | walkthrough | walkthrough (own beats) | narrator | no | process_demonstration, conceptual_visual, code, direct_explanation | — | how question |
+| real_world_scenario | realworld | fix_story | narrator | no | real_world_example, analogy, direct_explanation, code | process_demonstration | scene |
+| before_vs_after | beforeafter | fix_story | narrator | no | comparison, code, conceptual_visual | process_demonstration | question |
+
+Each entry also has a description, the kinds of concepts it suits, hook openers and a brief, and its beat template.
+
+- **Beat templates fit the existing contract.** Every fix_story theme maps all 11 fix_story beats: what each beat does in that format, who speaks (the first speaker named opens the beat), and whether it may ask. The beat order, shot count, word budgets, code beats and recap are unchanged.
+- **No duplicated template.** The walkthrough template *is* `step_by_step_walkthrough` (`beats: walkthrough`), and `classic_explainer` *is* the original fix_story (`beats: fix_story`). Both use their template's own prompt and graders, unchanged.
+- **Theme and template.** A theme names its template. The teaching approach still suggests one (walkthrough for process_demonstration). That suggestion now only pins the theme's template when a human chose it: `--template`, or the reviewer at the template gate (`setup.json` `template_source`). Otherwise the theme decides. A setup written before 2b counts as pinned.
+
+### How the theme is chosen (`shorts/skills/theme.py`)
+
+1. **Fixed rules first** (`motion_themes.theme_problems`), each logged with its rule name:
+   - **requirement:** the theme needs code and the section has none (a fenced block, or an inline span with code punctuation; a bare `` `[CLS]` `` is not code), or the theme needs an avatar for the language.
+   - **incompatible:** the approved teaching approach is in the theme's `incompatible_with`.
+   - **template:** a human pinned the other template.
+   - **variety:** the theme repeats the previous reel's theme, or would make more than 2 of the last 5 reels (the new one included). The history is the `tags.json` of earlier motion reels in the same language, ordered by `created_at`.
+2. **Fit, by the LLM** (`SYSTEM_MOTION_THEME`, one call). It sees only the themes that passed step 1, plus the section, its candidate concept tags, the approved approach and the history, and returns `{theme, reason, concept_tags}`. With exactly one eligible theme no call is made (`only_candidate`).
+3. **Validation.** The pick goes through step 1 again. A rejected pick gets **one retry**, with the reason. If both picks are rejected, or nothing was eligible, the template's fallback is used (**classic_explainer** for fix_story, step_by_step_walkthrough for a pinned walkthrough) and the reason is logged and saved.
+4. **The pause.** The theme, its reason, source, cast, eligible list, fit check and tags are shown, with a money gate before the call. On approval they are saved as `output/<id>/theme.json` (`MotionThemeChoice`) and `output/<id>/tags.json` (`MotionTags`). Override with **`--theme <id>`**. A flag may relax variety (logged as an override) but never a requirement or an incompatibility. A resumed reel keeps its theme unless you pass `--force-stage theme`.
+
+### Tags
+
+Every motion reel gets one language tag, one theme tag and 1–3 concept tags, e.g. `#react #interview #plainvariable #rerender`.
+
+- Tags are lowercase with no spaces: `#` plus letters and digits.
+- Language tags come from a fixed list: `python javascript typescript react html css sql java c cpp cs` (`cs` covers material with no programming language). Theme tags come from the registry.
+- Concept tags must be words, or adjacent word pairs, of the section. The LLM's tags are cleaned against the section, and if none survive the section's own candidates are used.
+- The language comes from the section's fenced code, then the document's, then a language named in the document title, then the one named most often, else `cs`. Override with `--language`.
+- Tags are saved in `tags.json` and printed in the report.
+
+### Script by theme
+
+- `write_motion_script(theme=, language=)`. A non-base theme replaces only the prompt's FORMAT and THE BEATS (`skills.script.motion_system_for`). LENGTH, WORDS, captions, CODE, VISUAL and ICONS are untouched, so the 2-minute cap (a cap, not a target), the source-scope rule and the topic-agnostic rules all still apply.
+- Two-speaker themes write **speaker-labelled lines**: each caption, which is one sentence, carries `speaker` (`INTERVIEWER`, `CANDIDATE`). Labels never appear in `speech`. The hook repair has a themed prompt of its own.
+- `MotionScript` gains `theme`, `language` and `speakers` (role → avatar → voice slot, set in Python). `CaptionChunk` gains `speaker`. All are optional, so phase 1 files load unchanged and are graded as their template's base theme.
+
+### Avatars: contract only
+
+`shorts/motion_avatars.yaml` holds one original character per course language, plus a shared **host**. Each has a name, a look note, a palette and a Chatterbox voice slot (`voices/motion/<slot>.wav`, recorded in phase 3).
+
+- Only two-speaker themes use avatars: the asking role is the host and the answering role is the language's character, so a reel always has two characters and two voices.
+- Palettes may not use coral, mint or lavender, which are reserved colour meanings. The loader rejects them.
+- The rules for the artwork are in the file's header: no official logos or mascots or look-alikes, the professional flat motion style, and no stick figures.
+
+### Graders and evals
+
+| Grader | Rule |
+|---|---|
+| `motion_theme_speakers` (script, 17th motion grader) | One-narrator theme: no speaker labels, no cast. Two-speaker: every caption labelled with a theme role, each beat spoken only by its template's speakers and opened by the first, both roles speak, both are cast. The script's template is the theme's. |
+| `motion_hook_curiosity` (themed) | A non-base theme's hook opens with one of its openers, asks when its style is `question`, and names a symptom when the theme requires one. Base themes are unchanged. |
+| `motion_not_qa` (themed) | No speaker label in speech. Questions only in the hook, a beat marked `asks`, or a line by a role that `asks`. |
+| `motion_theme_fit` | Registry entry, requirements met, approach not incompatible, pinned template respected. |
+| `motion_theme_variety` | Not the previous reel's theme; at most 2 in the last 5. |
+| `motion_tags` | Format, one language tag first, one theme tag second, 1–3 concept tags from the section. |
+
+- `evals/cases.yaml` **E175–E197** (23 cases) cover all of these. The new case type `motion_theme_grader` is in `run_evals.run_motion_theme_case`.
+- New golden fixtures, which are also the stubs for their themes: `usestate_interview_golden.json`, `usestate_peer_discussion_golden.json` and `usestate_bug_hunt_golden.json`. With the useState (classic_explainer) and tokenization (step_by_step_walkthrough) fixtures, five themes run end to end in stub mode.
+- `shorts/motion_theme_test.py`: 34 tests.
+
+```
+SHORTS_STUB=1 python -m shorts.motion_reel content/react_usestate_basics.md --yes --theme interview
+SHORTS_STUB=1 python -m shorts.motion_theme_test
+python -m evals.run_evals
+```
+
+In stub mode the theme call picks the first eligible theme that has a golden fixture for the material, so consecutive stub runs rotate themes under the variety rule.
+
 ## Phases still to come
 
-3. **Scenes and timing.** `MotionStage` (the player that lays a script's shots, transitions and captions on one timeline — moved here from phase 2 because SceneSpec defines what it plays), `SYSTEM_MOTION_SCENES`, SceneSpec validation and the `revision.py` loop, per-shot Chatterbox narration, and whisper-aligned timelines. Also adds the three scene graders.
+3. **Scenes and timing.** `MotionStage` (the player that lays a script's shots, transitions and captions on one timeline — moved here from phase 2 because SceneSpec defines what it plays), `SYSTEM_MOTION_SCENES`, SceneSpec validation and the `revision.py` loop, per-shot Chatterbox narration, and whisper-aligned timelines. Also adds the three scene graders. **Since phase 2b it also includes avatars, two-speaker scenes and two voices:** the avatar artwork (`shorts/motion_avatars.yaml`'s characters and host, as React components pure in `t`), scenes that place two speakers and show who is talking, and narration voiced per caption from each speaker's voice slot (two Chatterbox references per two-speaker reel).
 4. **Render and QA.** Motion capture, MP4, frame checks (word count from the page, safe zones), motion judge rubrics, and the report.
 5. **Polish.** A motion view in the web UI, `docs/RUNBOOK_MOTION.md`, and cleanup.

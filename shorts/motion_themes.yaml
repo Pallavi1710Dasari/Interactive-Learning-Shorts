@@ -1,0 +1,452 @@
+# The motion-reel THEME registry (RESTYLE_TO_MOTION_REELS.md, phase 2b).
+# REEL_STYLE=motion only.
+#
+# The teaching approach is HOW the idea is explained (analogy, comparison, ...).
+# The theme is the FORMAT of the reel: who speaks and what it feels like
+# (interview, story, ...). The two combine. Loaded and validated by
+# shorts/motion_themes.py. ADDING A THEME IS ONE NEW ENTRY HERE AND NO CODE
+# CHANGE, as long as it uses a template, hook style and avatar kind that already
+# exist (motion_themes.TEMPLATES / HOOK_STYLES / AVATAR_KINDS).
+#
+# Every entry has:
+#   tag             the reel's theme hashtag: lowercase letters and digits only
+#   template        the beat contract the script follows: fix_story (11 beats,
+#                   only break_2 optional) or walkthrough (chapters)
+#   description     what the reel is, in a sentence (shown to the LLM and the reviewer)
+#   speakers        1 or 2 roles. role is the label on every caption line of a
+#                   two-speaker reel. avatar is "language" (the course
+#                   language's own character) or "host" (the shared host
+#                   character); a one-speaker theme has no avatar. asks: the
+#                   role may ask questions outside the hook.
+#   needs_code      the selected section must show code (a fenced block, or an
+#                   inline span with code punctuation)
+#   suits           the kinds of concepts it suits (guidance for the LLM)
+#   works_with      teaching approaches it is a natural fit for
+#   incompatible_with  teaching approaches it is REJECTED with (a hard rule)
+#   hook            style (one of motion_themes.HOOK_STYLES), the openers the
+#                   hook's first words must start with (lowercase), whether it
+#                   must name a concrete symptom, and a one-line brief
+#   beats           the beat template: either the name of a template whose own
+#                   built-in beats are used unchanged (fix_story, walkthrough),
+#                   or one entry per fix_story beat. A beat entry says what the
+#                   shot does, which speakers may talk in it (the first one
+#                   opens it), and whether it may ask a question.
+#
+# Teaching approaches: analogy, real_world_example, code, conceptual_visual,
+# process_demonstration, comparison, direct_explanation.
+
+variety:
+  # A fixed rule, never the LLM's: among earlier motion reels in the same
+  # language, never the previous reel's theme, and at most max_same reels of
+  # one theme in the last `window` reels (the new one included).
+  window: 5
+  max_same: 2
+
+# Used when no theme survives the fit check after one retry. Per template, so a
+# reel the reviewer pinned to a walkthrough still falls back to a walkthrough.
+fallback:
+  fix_story: classic_explainer
+  walkthrough: step_by_step_walkthrough
+
+themes:
+
+  classic_explainer:
+    tag: explainer
+    template: fix_story
+    description: >-
+      One narrator talks to the viewer about a problem they have hit, why it
+      happens, and the fix working. The original motion reel.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["why does X fail / not work", "a fix the learner can apply", "any concept"]
+    works_with: [analogy, real_world_example, code, conceptual_visual, comparison, direct_explanation]
+    incompatible_with: []
+    hook:
+      style: symptom_question
+      symptom: true
+      brief: A curiosity question naming a concrete, visible symptom.
+    beats: fix_story
+
+  story:
+    tag: story
+    template: fix_story
+    description: >-
+      One narrator tells a short second-person story: you, at a real moment,
+      hit the problem, find out why, and fix it. Scene-led, not lecture-led.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["a problem with a clear moment it bites", "everyday bugs", "behaviour that surprises beginners"]
+    works_with: [real_world_example, analogy, conceptual_visual, direct_explanation, code]
+    incompatible_with: []
+    hook:
+      style: scene
+      openers: ["you're", "you've", "you just", "it's", "picture this", "imagine", "late one night", "your"]
+      symptom: true
+      brief: Drop the viewer into the moment it goes wrong, with the visible symptom.
+    beats:
+      hook:     {does: "The moment: you, doing something ordinary, and the visible symptom."}
+      title:    {does: "Name the concept as the turning point of the story, in one line."}
+      setup:    {does: "What you wrote or did just before it broke, exactly as a beginner would."}
+      break_1:  {does: "The first clue: what is really happening underneath."}
+      break_2:  {does: "OPTIONAL. A second clue, only if the material states a second reason."}
+      fix_idea: {does: "The realisation: the concept that fixes it, as a mental model."}
+      fix_flow: {does: "You apply the fix, step by step: the trigger, the change, the result."}
+      code_map: {does: "The real syntax you used, each part tied to what it controls."}
+      payoff:   {does: "The same moment as the hook, now working. Mirror the hook."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  interview:
+    tag: interview
+    template: fix_story
+    description: >-
+      A technical interview. The interviewer asks about a real symptom; the
+      candidate explains why it happens and how to fix it, and the
+      interviewer pushes with follow-up questions.
+    speakers:
+      - {role: INTERVIEWER, avatar: host, asks: true}
+      - {role: CANDIDATE, avatar: language}
+    needs_code: false
+    suits: ["classic interview questions", "why does X fail", "concepts with a crisp correct answer"]
+    works_with: [code, direct_explanation, comparison, conceptual_visual]
+    incompatible_with: []
+    hook:
+      style: question
+      openers: ["why does", "why do", "why is", "why would", "so why", "so, why", "tell me why", "walk me through why", "what happens when", "what actually happens when", "explain why"]
+      symptom: true
+      brief: The interviewer asks why a concrete, visible symptom happens.
+    beats:
+      hook:     {speakers: [INTERVIEWER], does: "The interview question: why does this visible symptom happen?"}
+      title:    {speakers: [CANDIDATE], does: "The candidate names the concept that answers it, in one line."}
+      setup:    {speakers: [INTERVIEWER, CANDIDATE], does: "The interviewer shows the code a beginner writes and asks what is wrong; the candidate may start to answer."}
+      break_1:  {speakers: [CANDIDATE], does: "The candidate gives the first reason it fails, as a mechanism."}
+      break_2:  {speakers: [INTERVIEWER, CANDIDATE], does: "OPTIONAL. The interviewer pushes (\"Anything else?\"); the candidate gives the second reason the material states."}
+      fix_idea: {speakers: [INTERVIEWER, CANDIDATE], does: "The interviewer asks for the fix; the candidate gives the concept as a mental model."}
+      fix_flow: {speakers: [CANDIDATE], does: "The candidate walks the fix step by step: the trigger, the change, the result."}
+      code_map: {speakers: [INTERVIEWER, CANDIDATE], does: "The interviewer asks to see it in code; the candidate maps the real syntax."}
+      payoff:   {speakers: [CANDIDATE], does: "The candidate shows the hook's symptom gone. Mirror the hook."}
+      recap:    {speakers: [INTERVIEWER], does: "The interviewer sums up the three takeaways."}
+      cta:      {speakers: [INTERVIEWER], does: "Follow for more plus the next topic."}
+
+  interview_rapid_fire:
+    tag: rapidfire
+    template: fix_story
+    description: >-
+      A fast interview round: short, sharp questions from the interviewer,
+      each answered in a sentence or two by the candidate.
+    speakers:
+      - {role: INTERVIEWER, avatar: host, asks: true}
+      - {role: CANDIDATE, avatar: language}
+    needs_code: false
+    suits: ["facts with crisp answers", "definitions and rules", "revision of a concept the learner half knows"]
+    works_with: [direct_explanation, code, comparison]
+    incompatible_with: [process_demonstration, analogy]
+    hook:
+      style: question
+      openers: ["quick fire", "rapid fire", "quick one", "first question", "question one", "why does", "why do", "what does", "what is", "what's"]
+      symptom: false
+      brief: The interviewer opens the round with a short, direct question.
+    beats:
+      hook:     {speakers: [INTERVIEWER], does: "Question one, short and direct."}
+      title:    {speakers: [CANDIDATE], does: "The candidate answers with the concept's name, in one line."}
+      setup:    {speakers: [INTERVIEWER, CANDIDATE], does: "Next question about the code a beginner writes; a one-sentence answer."}
+      break_1:  {speakers: [INTERVIEWER, CANDIDATE], does: "Next question: why does it fail? A crisp answer."}
+      break_2:  {speakers: [INTERVIEWER, CANDIDATE], does: "OPTIONAL. Next question on the second reason the material states."}
+      fix_idea: {speakers: [INTERVIEWER, CANDIDATE], does: "Next question: what fixes it? The concept as a mental model."}
+      fix_flow: {speakers: [INTERVIEWER, CANDIDATE], does: "Next question: what happens step by step? The trigger, the change, the result."}
+      code_map: {speakers: [INTERVIEWER, CANDIDATE], does: "Next question: show me the syntax. Each part tied to what it does."}
+      payoff:   {speakers: [CANDIDATE], does: "The candidate shows the hook's problem solved."}
+      recap:    {speakers: [INTERVIEWER], does: "The interviewer reads back the three answers that matter."}
+      cta:      {speakers: [INTERVIEWER], does: "Follow for more plus the next topic."}
+
+  peer_discussion:
+    tag: discussion
+    template: fix_story
+    description: >-
+      Two peers work it out together: one has hit the problem, the other has
+      figured it out, and they talk it through like friends at a desk.
+    speakers:
+      - {role: PEER_A, avatar: host, asks: true}
+      - {role: PEER_B, avatar: language, asks: true}
+    needs_code: false
+    suits: ["confusing behaviour", "concepts with a common wrong mental model", "anything better talked through"]
+    works_with: [analogy, comparison, conceptual_visual, direct_explanation, code]
+    incompatible_with: []
+    hook:
+      style: question
+      openers: ["wait, why", "wait why", "hey, why", "okay, why", "why does", "why do", "why is", "so why", "have you noticed", "ever noticed"]
+      symptom: true
+      brief: One peer asks the other why a concrete, visible symptom happens.
+    beats:
+      hook:     {speakers: [PEER_A], does: "Peer A, stuck: why does this visible symptom happen?"}
+      title:    {speakers: [PEER_B], does: "Peer B names the concept that explains it, in one line."}
+      setup:    {speakers: [PEER_A, PEER_B], does: "Peer A shows what they wrote, exactly as a beginner writes it."}
+      break_1:  {speakers: [PEER_B, PEER_A], does: "Peer B explains the first reason it fails; peer A may react."}
+      break_2:  {speakers: [PEER_A, PEER_B], does: "OPTIONAL. The second reason the material states."}
+      fix_idea: {speakers: [PEER_A, PEER_B], does: "Peer A asks what fixes it; peer B gives the concept as a mental model."}
+      fix_flow: {speakers: [PEER_B, PEER_A], does: "Peer B walks the fix step by step: the trigger, the change, the result."}
+      code_map: {speakers: [PEER_B], does: "Peer B maps the real syntax, each part tied to what it controls."}
+      payoff:   {speakers: [PEER_A], does: "Peer A tries it: the hook's symptom is gone. Mirror the hook."}
+      recap:    {speakers: [PEER_B], does: "Peer B sums up the three takeaways."}
+      cta:      {speakers: [PEER_A], does: "Follow for more plus the next topic."}
+
+  mentor_student:
+    tag: mentor
+    template: fix_story
+    description: >-
+      A student brings a problem to a mentor, who explains it patiently,
+      checking the student follows each step.
+    speakers:
+      - {role: STUDENT, avatar: host, asks: true}
+      - {role: MENTOR, avatar: language, asks: true}
+    needs_code: false
+    suits: ["foundational concepts", "ideas that need a mental model first", "beginner confusion"]
+    works_with: [analogy, direct_explanation, conceptual_visual, code, real_world_example]
+    incompatible_with: []
+    hook:
+      style: question
+      openers: ["why does", "why do", "why is", "why won't", "why doesn't", "can you explain why", "i don't get why", "what's wrong with"]
+      symptom: true
+      brief: The student asks why a concrete, visible symptom happens.
+    beats:
+      hook:     {speakers: [STUDENT], does: "The student's question about a visible symptom."}
+      title:    {speakers: [MENTOR], does: "The mentor names the concept, in one line."}
+      setup:    {speakers: [MENTOR, STUDENT], does: "The mentor asks to see the code; it is what a beginner writes."}
+      break_1:  {speakers: [MENTOR], does: "The mentor explains the first reason it fails."}
+      break_2:  {speakers: [STUDENT, MENTOR], does: "OPTIONAL. The student follows up; the mentor gives the second reason the material states."}
+      fix_idea: {speakers: [MENTOR], does: "The mentor gives the concept that fixes it, as a mental model."}
+      fix_flow: {speakers: [MENTOR, STUDENT], does: "The fix step by step: the trigger, the change, the result."}
+      code_map: {speakers: [MENTOR], does: "The real syntax, each part tied to what it controls."}
+      payoff:   {speakers: [STUDENT], does: "The student runs it: the hook's symptom is gone. Mirror the hook."}
+      recap:    {speakers: [MENTOR], does: "The mentor sums up the three takeaways."}
+      cta:      {speakers: [MENTOR], does: "Follow for more plus the next topic."}
+
+  bug_hunt:
+    tag: bughunt
+    template: fix_story
+    description: >-
+      One narrator hunts a bug like a detective: the bug report, the clues in
+      the code, the culprit named, the fix, and the case closed.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: true
+    suits: ["a bug a beginner really writes", "code that runs but does the wrong thing"]
+    works_with: [code, process_demonstration, direct_explanation]
+    incompatible_with: [analogy]
+    hook:
+      style: claim
+      openers: ["there's a bug", "this code has a bug", "something's wrong", "spot the bug", "can you spot the bug", "find the bug", "bug report"]
+      symptom: true
+      brief: The bug report, with its visible symptom.
+    beats:
+      hook:     {does: "The bug report: what the user sees go wrong."}
+      title:    {does: "Name the concept as the suspect, in one line."}
+      setup:    {does: "The code at the scene, exactly as a beginner writes it.", asks: true}
+      break_1:  {does: "Clue one: the first thing that really happens when it runs."}
+      break_2:  {does: "OPTIONAL. Clue two, only if the material states a second reason."}
+      fix_idea: {does: "The culprit named: the concept that fixes it, as a mental model."}
+      fix_flow: {does: "The fix applied step by step: the trigger, the change, the result."}
+      code_map: {does: "The fixed code, each part tied to what it controls."}
+      payoff:   {does: "Case closed: the hook's symptom is gone. Mirror the hook."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  myth_vs_fact:
+    tag: mythvsfact
+    template: fix_story
+    description: >-
+      One narrator states a belief beginners hold, shows why it seems true,
+      then replaces it with what really happens.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["a common wrong belief the material corrects", "rules people half-remember"]
+    works_with: [comparison, direct_explanation, conceptual_visual, code]
+    incompatible_with: [process_demonstration]
+    hook:
+      style: claim
+      openers: ["myth:", "you've heard", "everyone says", "people say", "they say", "you might think", "most beginners think", "true or false"]
+      symptom: false
+      brief: State the myth as beginners believe it.
+    beats:
+      hook:     {does: "The myth, stated plainly as beginners believe it.", asks: true}
+      title:    {does: "The fact, named with the concept, in one line."}
+      setup:    {does: "Why the myth seems true: the code or situation that suggests it."}
+      break_1:  {does: "Where the myth breaks: what really happens."}
+      break_2:  {does: "OPTIONAL. A second way it breaks, only if the material states one."}
+      fix_idea: {does: "The fact: the concept as the right mental model."}
+      fix_flow: {does: "The fact at work, step by step: the trigger, the change, the result."}
+      code_map: {does: "The real syntax, each part tied to what it controls."}
+      payoff:   {does: "The hook's situation again, now understood correctly."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  common_mistakes:
+    tag: mistakes
+    template: fix_story
+    description: >-
+      One narrator shows the mistakes beginners make with the concept, why
+      each one breaks, and the right way.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["concepts with typical misuse", "rules with a few classic traps"]
+    works_with: [code, direct_explanation, comparison]
+    incompatible_with: [analogy]
+    hook:
+      style: claim
+      openers: ["most beginners", "the most common mistake", "the number one mistake", "stop", "you're probably", "this mistake", "almost everyone"]
+      symptom: true
+      brief: Name the mistake with its visible symptom.
+    beats:
+      hook:     {does: "The mistake beginners make, with what it breaks."}
+      title:    {does: "Name the concept they are missing, in one line."}
+      setup:    {does: "Mistake one, exactly as a beginner writes it."}
+      break_1:  {does: "Why mistake one breaks, as a mechanism."}
+      break_2:  {does: "OPTIONAL. Mistake two, only if the material states a second one."}
+      fix_idea: {does: "The right way: the concept as a mental model."}
+      fix_flow: {does: "The right way working, step by step: the trigger, the change, the result."}
+      code_map: {does: "The right syntax, each part tied to what it controls."}
+      payoff:   {does: "The hook's situation again, done right and working."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  predict_the_output:
+    tag: predict
+    template: fix_story
+    description: >-
+      One narrator shows a short piece of code and asks the viewer to predict
+      what it does, then reveals the answer and why.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: true
+    suits: ["code whose result surprises beginners", "evaluation order", "state and scope"]
+    works_with: [code, process_demonstration]
+    incompatible_with: [analogy, real_world_example]
+    hook:
+      style: question
+      openers: ["what does this", "what will this", "what do you think", "can you predict", "what gets printed", "what shows up"]
+      symptom: false
+      brief: Ask the viewer to predict what a short piece of code does.
+    beats:
+      hook:     {does: "The challenge: what will this code do?"}
+      title:    {does: "Name the concept the answer depends on, in one line."}
+      setup:    {does: "The code, exactly as written, and the prompt to guess.", asks: true}
+      break_1:  {does: "The guess most people make, and why it is wrong."}
+      break_2:  {does: "OPTIONAL. A second trap, only if the material states one."}
+      fix_idea: {does: "The concept that decides the answer, as a mental model."}
+      fix_flow: {does: "The code running step by step to the real result."}
+      code_map: {does: "The syntax that makes it behave as expected, each part tied to what it controls."}
+      payoff:   {does: "The reveal: the real output, set against the guess."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  under_the_hood:
+    tag: underthehood
+    template: fix_story
+    description: >-
+      One narrator opens the machine: what really happens inside when a
+      familiar thing runs, and why that explains what you see.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["mechanisms behind familiar behaviour", "runtimes, memory, rendering, compilers"]
+    works_with: [conceptual_visual, process_demonstration, direct_explanation, code]
+    incompatible_with: [real_world_example]
+    hook:
+      style: question
+      openers: ["what actually happens", "what really happens", "what happens inside", "what happens when", "ever wondered what", "how does", "how do"]
+      symptom: false
+      brief: Ask what really happens inside when a familiar thing runs.
+    beats:
+      hook:     {does: "The question: what really happens inside when this runs?"}
+      title:    {does: "Name the concept that runs underneath, in one line."}
+      setup:    {does: "The familiar surface: the code or action the viewer knows."}
+      break_1:  {does: "Layer one: the first thing the machine really does."}
+      break_2:  {does: "OPTIONAL. Layer two, only if the material states it."}
+      fix_idea: {does: "The concept as the mental model of the machine."}
+      fix_flow: {does: "The whole path inside, step by step: the trigger, the change, the result."}
+      code_map: {does: "The syntax on the surface, each part tied to what it controls inside."}
+      payoff:   {does: "Back to the surface, now seen for what it is."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  step_by_step_walkthrough:
+    tag: walkthrough
+    template: walkthrough
+    description: >-
+      One narrator follows one running example through every step of a
+      process, in 2 to 4 numbered chapters. The walkthrough template.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["how does X work", "a process with ordered steps", "a pipeline or algorithm"]
+    works_with: [process_demonstration, conceptual_visual, code, direct_explanation]
+    incompatible_with: []
+    hook:
+      style: how_question
+      symptom: false
+      brief: A question about how something works, then a surprising one-line answer.
+    beats: walkthrough
+
+  real_world_scenario:
+    tag: realworld
+    template: fix_story
+    description: >-
+      One narrator sets the concept in a real job: a product, a team, a user
+      who hits the problem, and the fix that ships.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["concepts with a clear use in real products", "trade-offs that matter at work"]
+    works_with: [real_world_example, analogy, direct_explanation, code]
+    incompatible_with: [process_demonstration]
+    hook:
+      style: scene
+      openers: ["you're building", "you're shipping", "you're on", "you just shipped", "picture", "imagine", "your app", "your team", "your users"]
+      symptom: true
+      brief: A real product moment where a user sees the problem.
+    beats:
+      hook:     {does: "The real moment: a product, a user, and what they see go wrong."}
+      title:    {does: "Name the concept the team needs, in one line."}
+      setup:    {does: "The code or setup the team shipped, exactly as a beginner writes it."}
+      break_1:  {does: "Why it fails for the user, as a mechanism."}
+      break_2:  {does: "OPTIONAL. A second reason, only if the material states one."}
+      fix_idea: {does: "The concept that fixes it, as a mental model."}
+      fix_flow: {does: "The fix shipping, step by step: the trigger, the change, the result."}
+      code_map: {does: "The real syntax, each part tied to what it controls."}
+      payoff:   {does: "The same user moment, now working. Mirror the hook."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  before_vs_after:
+    tag: beforeafter
+    template: fix_story
+    description: >-
+      One narrator sets two versions side by side, the broken before and the
+      working after, and shows the one change that makes the difference.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["a small change with a big effect", "the right way set against the naive way"]
+    works_with: [comparison, code, conceptual_visual]
+    incompatible_with: [process_demonstration]
+    hook:
+      style: question
+      openers: ["same", "spot the difference", "why does this", "why does one", "why do these", "these look", "one of these"]
+      symptom: true
+      brief: Two versions side by side; why does one show the visible symptom?
+    beats:
+      hook:     {does: "Before and after side by side: why does one show the symptom?"}
+      title:    {does: "Name the concept that makes the difference, in one line."}
+      setup:    {does: "The before: exactly as a beginner writes it."}
+      break_1:  {does: "Why the before fails, as a mechanism."}
+      break_2:  {does: "OPTIONAL. A second reason the before fails, only if the material states one."}
+      fix_idea: {does: "The one change: the concept as a mental model."}
+      fix_flow: {does: "The after working, step by step: the trigger, the change, the result."}
+      code_map: {does: "The after's syntax, each part tied to what it controls."}
+      payoff:   {does: "Before and after again: now the difference is obvious."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}

@@ -1,0 +1,96 @@
+# The motion-reel AVATAR registry (RESTYLE_TO_MOTION_REELS.md, phase 2b).
+# REEL_STYLE=motion only. CONTRACT ONLY in phase 2b: names, palettes and voice
+# slots. The artwork, the scenes that place avatars and the recorded voices
+# arrive in phase 3.
+#
+# Only themes with two speakers use avatars (shorts/motion_themes.yaml: a
+# speaker's `avatar` is "language" or "host"). A one-narrator reel has none.
+#
+# RULES FOR THE ARTWORK (phase 3), checked by review, not code:
+#   - Original designs. Never an official language logo or mascot, and never a
+#     look-alike of one (no snake for Python, no coffee cup for Java, no atom
+#     for React, no shield for HTML or CSS).
+#   - The professional motion style of web/src/motion: flat geometric shapes,
+#     the same stroke weight and corner radius as the cards, drawn in design
+#     units and pure in `t` like every other component. No stick figures, no
+#     clip art, no gradients beyond what the cards already use.
+#   - Palettes never use coral (#F2555A), mint (#17B27B) or lavender
+#     (#B9A8FF): those colours mean failure, success and system-added in every
+#     motion reel (web/src/motion/tokens.ts). shorts/motion_themes.py rejects
+#     a palette that uses them.
+#
+# Voice slots are Chatterbox reference clips. `voice_slot` names the clip; the
+# file is voices/motion/<voice_slot>.wav, recorded in phase 3. Two speakers
+# always get two different slots: the host and the language character.
+
+# The course languages, in tag form (lowercase letters and digits only). Every
+# reel gets exactly one of these as its language tag. `cs` is the fallback for
+# material with no programming language (operating systems, data structures,
+# AI concepts).
+languages: [python, javascript, typescript, react, html, css, sql, java, c, cpp, cs]
+
+# The shared host: the asking role of two-speaker themes (interviewer, peer,
+# student), the same character whatever the language.
+host:
+  id: host
+  name: Juno
+  look: Rounded square head, short swept hair, headset mic, navy jacket.
+  palette: {primary: "#283EE6", secondary: "#091025", accent: "#FDD13E", ink: "#151936"}
+  voice_slot: motion_host
+
+characters:
+  python:
+    name: Ivy
+    look: Tall rectangle body, round glasses, rolled sleeves, a notebook.
+    palette: {primary: "#3A5FCD", secondary: "#FFB524", accent: "#ECF0F7", ink: "#151936"}
+    voice_slot: motion_python
+  javascript:
+    name: Jett
+    look: Square body, cap worn backwards, hoodie with a single stripe.
+    palette: {primary: "#FDD13E", secondary: "#151936", accent: "#283EE6", ink: "#151936"}
+    voice_slot: motion_javascript
+  typescript:
+    name: Tess
+    look: Square body with a neat collar, short bob, a clipboard.
+    palette: {primary: "#2F74C0", secondary: "#ECF0F7", accent: "#FDD13E", ink: "#151936"}
+    voice_slot: motion_typescript
+  react:
+    name: Rae
+    look: Circle head on a rounded body, side ponytail, a lanyard badge.
+    palette: {primary: "#5B4BF5", secondary: "#ECEAFE", accent: "#FFB524", ink: "#151936"}
+    voice_slot: motion_react
+  html:
+    name: Hart
+    look: Tall arch-shaped body, short beard, a messenger bag.
+    palette: {primary: "#E07A2E", secondary: "#FFF3D9", accent: "#283EE6", ink: "#151936"}
+    voice_slot: motion_html
+  css:
+    name: Sia
+    look: Pill-shaped body, long straight hair, a paint-chip scarf.
+    palette: {primary: "#2E6FE0", secondary: "#FDD13E", accent: "#ECF0F7", ink: "#151936"}
+    voice_slot: motion_css
+  sql:
+    name: Quinn
+    look: Stacked-rectangle body, rolled cuffs, a pencil behind one ear.
+    palette: {primary: "#3C5A99", secondary: "#E2E4EF", accent: "#FFB524", ink: "#151936"}
+    voice_slot: motion_sql
+  java:
+    name: Jorah
+    look: Broad square body, cardigan, a wristwatch.
+    palette: {primary: "#B5562F", secondary: "#FFF3D9", accent: "#283EE6", ink: "#151936"}
+    voice_slot: motion_java
+  c:
+    name: Cy
+    look: Compact square body, buzz cut, a toolbelt.
+    palette: {primary: "#5A6B8C", secondary: "#E2E4EF", accent: "#FDD13E", ink: "#151936"}
+    voice_slot: motion_c
+  cpp:
+    name: Cass
+    look: Tall rectangle body, high ponytail, a utility vest.
+    palette: {primary: "#3B4FA8", secondary: "#ECF0F7", accent: "#FFB524", ink: "#151936"}
+    voice_slot: motion_cpp
+  cs:
+    name: Nova
+    look: Rounded body, curly hair, a scarf, a chalk stick.
+    palette: {primary: "#1F31C4", secondary: "#FDD13E", accent: "#ECF0F7", ink: "#151936"}
+    voice_slot: motion_cs

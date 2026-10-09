@@ -3031,6 +3031,11 @@ class CaptionChunk(BaseModel):
     (checks.check_motion_caption_sentences), shown karaoke-style. May carry up
     to two <b>...</b> highlighted keywords."""
     text: str
+    #: Two-speaker themes only (phase 2b): who says this sentence, as the
+    #: theme's role label ("INTERVIEWER", "CANDIDATE"). None on every
+    #: one-narrator reel, so phase 1 files load unchanged. Phase 3 voices each
+    #: caption with its speaker's avatar voice.
+    speaker: Optional[str] = None
 
 
 class IconRef(BaseModel):
@@ -3164,6 +3169,14 @@ class MotionScript(BaseModel):
     #: Set by the voice stage (phase 3). None until audio exists.
     tts_provider: Optional[str] = None
     voice_ref: Optional[str] = None
+    #: Phase 2b: the approved theme (shorts/motion_themes.yaml) and the course
+    #: language. None on a script written before themes existed — graded as
+    #: its template's base theme (classic_explainer / step_by_step_walkthrough).
+    theme: Optional[str] = None
+    language: Optional[str] = None
+    #: Two-speaker themes only: each role and the avatar that plays it. Set in
+    #: Python from the theme and the language, never by the LLM.
+    speakers: list["MotionSpeaker"] = Field(default_factory=list)
 
     @field_validator("shots")
     @classmethod
@@ -3176,3 +3189,84 @@ class MotionScript(BaseModel):
     @property
     def estimated_seconds(self) -> float:
         return round(sum(s.estimated_seconds for s in self.shots), 2)
+
+
+# ================================================================ motion themes
+#
+# Phase 2b (RESTYLE_TO_MOTION_REELS.md): the THEME step, between the teaching
+# approach and the script. The teaching approach is HOW the idea is explained;
+# the theme is the FORMAT of the reel — who speaks, what it feels like. Theme
+# ids are plain strings checked against shorts/motion_themes.yaml, not a
+# Literal: adding a theme is a registry entry, never a schema change.
+
+class MotionSpeaker(BaseModel):
+    """One speaking role of a two-speaker reel and the avatar that plays it
+    (shorts/motion_avatars.yaml). Phase 3 draws the avatar and voices its
+    lines from voices/motion/<voice_slot>.wav."""
+    role: str                    #: "INTERVIEWER", as on the captions
+    avatar: str                  #: "host" or the language ("python")
+    name: str                    #: the character's name
+    voice_slot: str              #: the Chatterbox reference clip's name
+
+
+MotionScript.model_rebuild()
+
+
+class MotionThemeDraft(BaseModel):
+    """What the theme call returns: one theme picked from the eligible list,
+    why it fits, and 1-3 concept tags taken from the section. Everything else
+    on MotionThemeChoice is set in Python."""
+    theme: str
+    reason: str = ""
+    concept_tags: list[str] = Field(default_factory=list)
+
+
+class ThemeRejection(BaseModel):
+    """One theme the fit check turned down, and why."""
+    theme: str
+    attempt: int                 #: 1 = the first pick, 2 = the retry
+    problems: list[str]
+
+
+class ThemeFitCheck(BaseModel):
+    """The result of the fit check (motion_themes.theme_problems): the
+    requirements, compatibility, template and variety rules every chosen theme
+    must pass."""
+    passed: bool
+    attempts: int = 0            #: LLM picks made (0 when no call was needed)
+    rejected: list[ThemeRejection] = Field(default_factory=list)
+    #: True when nothing passed after one retry and the template's fallback
+    #: theme (classic_explainer for fix_story) was used instead.
+    fallback: bool = False
+    fallback_reason: str = ""
+    #: Rules a human relaxed on purpose, e.g. variety under --theme.
+    overrides: list[str] = Field(default_factory=list)
+
+
+class MotionThemeChoice(BaseModel):
+    """The theme step's result, saved as output/<short_id>/theme.json."""
+    theme: str
+    reason: str
+    tags: list[str]              #: language, theme, then 1-3 concept tags
+    fit_check: ThemeFitCheck
+    #: llm (the fit call picked it), flag (--theme), only_candidate (one
+    #: theme was eligible, no call made), fallback (nothing passed).
+    source: Literal["llm", "flag", "only_candidate", "fallback"]
+    template: MotionTemplate
+    language: str
+    teaching_approach: Optional[str] = None
+    #: Every theme that passed requirements, compatibility, template and
+    #: variety before the pick — what the LLM chose from.
+    eligible: list[str] = Field(default_factory=list)
+
+
+class MotionTags(BaseModel):
+    """A motion reel's tags, saved as output/<short_id>/tags.json — the
+    metadata the variety rule reads back for later reels."""
+    reel_style: Literal["motion"] = "motion"
+    short_id: str
+    language: str
+    theme: str
+    concepts: list[str]
+    tags: list[str]              #: "#python", "#interview", "#closures"
+    created_at: str              #: ISO 8601, UTC — orders the reel history

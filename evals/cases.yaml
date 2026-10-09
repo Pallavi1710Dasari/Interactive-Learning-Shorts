@@ -10,6 +10,9 @@
 #   golden       - a known-good output. Regression guard.
 #   motion_grader - deterministic, REEL_STYLE=motion scripts. A golden fixture
 #                  plus an optional `patch`; see run_evals._apply_patch.
+#   motion_theme_grader - deterministic, the motion THEME step (phase 2b): theme
+#                  fit, the variety rule and tag format, on the case's own inputs;
+#                  see run_evals.run_motion_theme_case.
 #
 # Grow this file every time something breaks in production. That is the whole
 # self-evolving loop: bug -> eval case -> prompt fix -> case passes forever.
@@ -2906,6 +2909,286 @@ cases:
     expect:
       passed: false
       reason_contains: "chapter 4 'Read the double hash': ['double', 'hash'] not in the main section"
+
+
+  # ----------------------------------------------- themes and tags (phase 2b)
+  # RESTYLE_TO_MOTION_REELS.md phase 2b: the theme step and its fixed rules.
+  # The three themed golden fixtures are also the stub answers for their
+  # themes; with the original useState (classic_explainer) and tokenization
+  # (step_by_step_walkthrough) fixtures that is five themes end to end.
+
+  - id: E175
+    name: The interview golden passes every motion grader
+    why: "The useState reel as a two-speaker interview: every caption labelled, each beat spoken by the roles its beat template names, only the interviewer asks. If a grader change rejects it, the grader is wrong or the golden must be re-derived."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_interview_golden.json
+    input: content/react_usestate_basics.md
+    expect:
+      passed: true
+
+  - id: E176
+    name: The peer discussion golden passes every motion grader
+    why: "Two peers, both allowed to ask, on the counter example from the source. Proves the speaker and question rules come from the registry, not from the interview."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_peer_discussion_golden.json
+    input: content/react_usestate_basics.md
+    expect:
+      passed: true
+
+  - id: E177
+    name: The bug hunt golden passes every motion grader
+    why: "One narrator, a claim hook (the bug report) instead of a question, and a question allowed only in the setup beat (\"Can you spot it?\")."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_bug_hunt_golden.json
+    input: content/react_usestate_basics.md
+    expect:
+      passed: true
+
+  - id: E178
+    name: A two-speaker line with no speaker label is rejected
+    why: "Phase 3 voices each caption with its speaker's avatar. An unlabelled line has no voice."
+    type: motion_grader
+    grader: theme_speakers
+    fixture: evals/fixtures/motion/usestate_interview_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.3.captions.0.speaker, remove: true}
+    expect:
+      passed: false
+      reason_contains: "caption speaker(s) [None]"
+
+  - id: E179
+    name: A beat spoken by the wrong role is rejected
+    why: "The interview's beat template gives the title to the CANDIDATE. The interviewer naming the answer to their own question is not an interview."
+    type: motion_grader
+    grader: theme_speakers
+    fixture: evals/fixtures/motion/usestate_interview_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.1.captions.0.speaker, value: INTERVIEWER}
+    expect:
+      passed: false
+      reason_contains: "s02 (title) has ['INTERVIEWER'] speaking"
+
+  - id: E180
+    name: A one-narrator theme with a speaker label is rejected
+    why: "bug_hunt has one narrator. A speaker label there means the script was written as a dialogue the theme does not have."
+    type: motion_grader
+    grader: theme_speakers
+    fixture: evals/fixtures/motion/usestate_bug_hunt_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.0.captions.0.speaker, value: NARRATOR}
+    expect:
+      passed: false
+      reason_contains: "has one narrator"
+
+  - id: E181
+    name: The candidate asking a question is rejected
+    why: "In an interview only the INTERVIEWER asks; a candidate who answers with questions is the Q&A drift the not_qa grader exists to stop."
+    type: motion_grader
+    grader: not_qa
+    fixture: evals/fixtures/motion/usestate_interview_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.3.captions.1.text, value: "The variable starts fresh, back to <b>zero</b>?"}
+      - {path: shots.3.speech, value: "On every re-render, React runs your component again from the top. The variable starts fresh, back to zero?"}
+    expect:
+      passed: false
+      reason_contains: "s04 (break_1) CANDIDATE asks"
+
+  - id: E182
+    name: A bug hunt hook that does not open as a bug report is rejected
+    why: "Each theme's hook style comes from its registry entry. The classic curiosity opener is not a bug report."
+    type: motion_grader
+    grader: hook_curiosity
+    fixture: evals/fixtures/motion/usestate_bug_hunt_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: shots.0.speech, value: "Ever wondered why this like button stays stuck at zero?"}
+      - {path: shots.0.captions, value: [{text: "Ever wondered why this like button stays stuck at <b>zero</b>?"}]}
+    expect:
+      passed: false
+      reason_contains: "does not open the way a bug_hunt hook does"
+
+  - id: E183
+    name: A two-speaker script with no avatars cast is rejected
+    why: "The cast (role -> avatar -> voice slot) is set in Python from the theme and language. Without it phase 3 has no one to draw or voice."
+    type: motion_grader
+    grader: theme_speakers
+    fixture: evals/fixtures/motion/usestate_peer_discussion_golden.json
+    input: content/react_usestate_basics.md
+    patch:
+      - {path: speakers, value: []}
+    expect:
+      passed: false
+      reason_contains: "cast nobody"
+
+  - id: E184
+    name: An interview fits the useState section with a code approach
+    why: "The baseline fit: registry entry, no unmet requirement, approach not marked incompatible."
+    type: motion_theme_grader
+    grader: theme_fit
+    theme: interview
+    approach: code
+    input: content/react_usestate_basics.md
+    section_id: "7.2"
+    language: react
+    expect:
+      passed: true
+
+  - id: E185
+    name: predict_the_output on a section with no code is rejected
+    why: "You cannot predict the output of code that is not there. The tokenization section names tokens like [CLS] but shows no code."
+    type: motion_theme_grader
+    grader: theme_fit
+    theme: predict_the_output
+    approach: process_demonstration
+    input: content/tokenization_basics.md
+    section_id: "1.1"
+    expect:
+      passed: false
+      reason_contains: "needs code in the section"
+
+  - id: E186
+    name: A bug hunt with an analogy approach is rejected as incompatible
+    why: "The registry marks analogy incompatible with bug_hunt: a bug hunt is about the real code, not a stand-in for it."
+    type: motion_theme_grader
+    grader: theme_fit
+    theme: bug_hunt
+    approach: analogy
+    input: content/react_usestate_basics.md
+    section_id: "7.2"
+    expect:
+      passed: false
+      reason_contains: "incompatible: bug_hunt does not work with the analogy teaching approach"
+
+  - id: E187
+    name: Rapid-fire with a process demonstration is rejected as incompatible
+    why: "A rapid-fire round of one-line answers cannot hold an ordered process together."
+    type: motion_theme_grader
+    grader: theme_fit
+    theme: interview_rapid_fire
+    approach: process_demonstration
+    input: content/tokenization_basics.md
+    section_id: "1.1"
+    expect:
+      passed: false
+      reason_contains: "incompatible"
+
+  - id: E188
+    name: A fix_story theme on a reel pinned to the walkthrough is rejected
+    why: "When a human pins the template (--template, or the reviewer), only that template's themes may be chosen."
+    type: motion_theme_grader
+    grader: theme_fit
+    theme: myth_vs_fact
+    approach: conceptual_visual
+    input: content/tokenization_basics.md
+    section_id: "1.1"
+    template: walkthrough
+    expect:
+      passed: false
+      reason_contains: "pinned to walkthrough"
+
+  - id: E189
+    name: under_the_hood fits a no-code section with a conceptual approach
+    why: "Not every theme needs code: under_the_hood carries an OS or AI mechanism as well as a React one."
+    type: motion_theme_grader
+    grader: theme_fit
+    theme: under_the_hood
+    approach: conceptual_visual
+    input: content/session_18_paging.md
+    section_id: "3.2"
+    expect:
+      passed: true
+
+  - id: E190
+    name: Repeating the previous reel's theme is rejected
+    why: "Variety is a fixed rule: the same format twice in a row makes a feed feel like one reel."
+    type: motion_theme_grader
+    grader: theme_variety
+    theme: interview
+    history: [story, bug_hunt, interview]
+    expect:
+      passed: false
+      reason_contains: "was the previous reel's theme"
+
+  - id: E191
+    name: A third interview in the last five reels is rejected
+    why: "At most 2 of one theme in the last 5 reels, the new one included."
+    type: motion_theme_grader
+    grader: theme_variety
+    theme: interview
+    history: [interview, story, interview, bug_hunt]
+    expect:
+      passed: false
+      reason_contains: "3 of the last 5 reels, max 2"
+
+  - id: E192
+    name: A theme that left the five-reel window is allowed again
+    why: "The rule counts the last 5 reels only; an older run of interviews does not block one now."
+    type: motion_theme_grader
+    grader: theme_variety
+    theme: interview
+    history: [interview, interview, story, bug_hunt, myth_vs_fact]
+    expect:
+      passed: true
+
+  - id: E193
+    name: Valid tags pass
+    why: "One language tag first, one theme tag second, then 1-3 concept tags from the section."
+    type: motion_theme_grader
+    grader: tags
+    tags: ["#react", "#interview", "#plainvariable", "#rerender"]
+    input: content/react_usestate_basics.md
+    section_id: "7.2"
+    expect:
+      passed: true
+
+  - id: E194
+    name: A tag with capitals or a space is rejected
+    why: "Tags are lowercase with no spaces, so the same concept is always the same tag."
+    type: motion_theme_grader
+    grader: tags
+    tags: ["#react", "#Interview", "#plain variable"]
+    expect:
+      passed: false
+      reason_contains: "lowercase letters and digits"
+
+  - id: E195
+    name: A tag list with no language tag first is rejected
+    why: "Every reel has exactly one language tag, from the fixed list, first."
+    type: motion_theme_grader
+    grader: tags
+    tags: ["#interview", "#react", "#rerender"]
+    expect:
+      passed: false
+      reason_contains: "language tag, first"
+
+  - id: E196
+    name: An unknown theme tag is rejected
+    why: "Theme tags come from the registry only, so tags can be counted and filtered."
+    type: motion_theme_grader
+    grader: tags
+    tags: ["#react", "#podcast", "#rerender"]
+    expect:
+      passed: false
+      reason_contains: "exactly one theme tag"
+
+  - id: E197
+    name: A concept tag the section never uses is rejected
+    why: "Concept tags are taken from the section, never invented: #closures on a useState section is a wrong tag."
+    type: motion_theme_grader
+    grader: tags
+    tags: ["#react", "#interview", "#closures"]
+    input: content/react_usestate_basics.md
+    section_id: "7.2"
+    expect:
+      passed: false
+      reason_contains: "not taken from the section"
 
 # ============================================================================
 # RUBRIC — what the LLM judge scores, 1 to 5. Keep the wording stable; changing

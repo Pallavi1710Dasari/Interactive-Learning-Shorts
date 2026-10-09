@@ -11,6 +11,8 @@ Phase 1 — used only when a caller explicitly asks for it (config.REEL_STYLE ==
 "story"). The two prompts are independent; nothing in SYSTEM_EXPLAINER changed to
 make room for SYSTEM_STORY.
 """
+import re
+
 from ..schema import (Script, Topic, Section, SectionUnderstanding, QuestionWorkflow,
                       QuestionFraming, TeachingApproach,
                       Character, ConceptMapping, ConceptMappingSet, Shot, StoryScript,
@@ -2507,14 +2509,111 @@ highlights. hook_question is the question itself, ending in "?".
 Return JSON: {"hook_question": "...", "speech": "...", "captions": [{"text": "..."}],
 "visual": "..."}"""
 
+#: Phase 2b: a non-base THEME's hook repair. The base themes keep their own
+#: prompts above unchanged.
+SYSTEM_MOTION_THEMED_HOOK_FIX = """You are rewriting ONLY the opening hook shot of a short teaching
+reel in the __THEME__ format. Every other shot is final and not yours to change.
+
+__HOOK__ Never name the concept. 8 to 10 words.
+
+speech is spelled for text-to-speech (code written as words), and never carries a speaker
+label. captions are the SAME words, one caption per sentence, each at most 14 words with
+at most 2 <b>...</b> highlights.__SPEAKER__ hook_question is the reel's question, ending
+in "?".
+
+Return JSON: {"hook_question": "...", "speech": "...", "captions": [{"text": "..."__SPEAKER_JSON__}],
+"visual": "..."}"""
+
+
+def _theme_hook_rule(theme) -> str:
+    hook = theme.hook
+    openers = ", ".join(f'"{o.capitalize()}..."' for o in hook.openers)
+    rule = f"The hook: {hook.brief} Open with one of: {openers}."
+    if hook.style == "question":
+        rule += " It asks a question."
+    if hook.symptom:
+        rule += (" It names a CONCRETE, VISIBLE SYMPTOM (stuck at 0, the page reloads, the "
+                 "query is slow).")
+    return rule
+
+
+def _theme_format_block(theme) -> str:
+    lines = [f"FORMAT — THEME: {theme.id}", theme.description.strip()]
+    askers = [s.role for s in theme.speakers if s.asks]
+    asking_beats = [b for b, v in theme.beats.items() if v.asks]
+    if theme.two_speaker:
+        a, b = theme.roles
+        lines.append(
+            f"Two speakers: {a} and {b}. Every caption carries \"speaker\": the role that says "
+            f"that sentence. A shot may hold lines from both, in the order they are spoken; the "
+            f"beat list below says who may speak in each beat, and the first one named opens "
+            f"it. Never write a speaker label into speech (\"{a}: ...\"): speech is only the "
+            f"words, and the label goes on the caption.")
+    else:
+        lines.append("One narrator, talking to the viewer in the second person (\"you\", "
+                     "\"your\"). Never a dialogue, no speaker labels.")
+    may_ask = ["the hook"] + askers + [f"the {b} beat" for b in asking_beats if b != "hook"]
+    lines.append(f"Questions: only {', '.join(may_ask)} may ask one. Every other line is a "
+                 f"statement.")
+    return "\n".join(lines)
+
+
+def _theme_beats_block(theme) -> str:
+    from ..schema import MOTION_BEAT_ORDER
+    lines = ["THE BEATS — every reel has these shots, in exactly this order:"]
+    for i, beat in enumerate(MOTION_BEAT_ORDER, 1):
+        spec = theme.beats[beat]
+        who = f"[{' then '.join(spec.speakers)}] " if spec.speakers else ""
+        lines.append(f"  {i:<2} {beat:<9} {who}{spec.does}")
+    lines += [
+        "The reel must ANSWER the hook: problem -> why -> fix -> proof it works.",
+        "fix_flow and payoff are never optional; break_2 is used only when the material "
+        "states a second reason.",
+        _theme_hook_rule(theme) + " Never name the concept in the hook.",
+    ]
+    return "\n".join(lines)
+
+
+def motion_system_for(template: str, theme=None) -> tuple[str, str]:
+    """The (script, hook-fix) system prompts for a template and theme. A base
+    theme (classic_explainer, step_by_step_walkthrough) or no theme gets its
+    template's own prompts, unchanged. Any other theme gets SYSTEM_MOTION with
+    its FORMAT and THE BEATS replaced by the theme's — every other rule
+    (length, words, captions, code, visuals, icons) stays exactly as it is."""
+    from ..motion_library import icon_names
+    if template == "walkthrough":
+        return SYSTEM_MOTION_WALKTHROUGH, SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX
+    system = SYSTEM_MOTION.replace("__ICONS__", ", ".join(sorted(icon_names())))
+    if theme is None or theme.base:
+        return system, SYSTEM_MOTION_HOOK_FIX
+    system = re.sub(r"FORMAT\n.*?\n\n(?=THE BEATS)",
+                    lambda m: _theme_format_block(theme) + "\n\n", system, count=1, flags=re.S)
+    system = re.sub(r"THE BEATS.*?\n\n(?=LENGTH)",
+                    lambda m: _theme_beats_block(theme) + "\n\n", system, count=1, flags=re.S)
+    if theme.two_speaker:
+        system = system.replace(
+            '"captions": [{"text": "..."}],',
+            f'"captions": [{{"text": "...", "speaker": "{theme.roles[0]}"}}],')
+    a = theme.roles[0]
+    hook_fix = (SYSTEM_MOTION_THEMED_HOOK_FIX
+                .replace("__THEME__", theme.id)
+                .replace("__HOOK__", _theme_hook_rule(theme))
+                .replace("__SPEAKER__", f' Every caption carries "speaker": "{a}".'
+                         if theme.two_speaker else "")
+                .replace("__SPEAKER_JSON__", f', "speaker": "{a}"' if theme.two_speaker else ""))
+    return system, hook_fix
+
+
 def _motion_material_block(topic: Topic, section: Section,
                            understanding: SectionUnderstanding | None, source_text: str,
                            approach: TeachingApproach | None, series: str,
                            next_topic: str, template: str = "fix_story",
-                           supporting_text: str = "") -> str:
-    parts = [
-        f"TEMPLATE: {template}",
-        f"QUESTION THIS REEL ANSWERS: {topic.topic}",
+                           supporting_text: str = "", theme=None) -> str:
+    parts = [f"TEMPLATE: {template}"]
+    if theme is not None:
+        parts.append(f"THEME: {theme.id}")
+    parts += [
+        "QUESTION THIS REEL ANSWERS: " + topic.topic,
         f"\nMATERIAL:\n{source_text}",
     ]
     if supporting_text:
@@ -2538,10 +2637,12 @@ def _motion_material_block(topic: Topic, section: Section,
 
 def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
                      short_id: str, series: str, next_topic: str,
-                     template: str = "fix_story") -> MotionScript:
+                     template: str = "fix_story", theme=None,
+                     language: str | None = None) -> MotionScript:
     """The draft plus everything set in Python, never asked of the model:
-    shot ids (s01, s02, ... in order), the template, the series label and the
-    next topic."""
+    shot ids (s01, s02, ... in order), the template, the theme, its cast of
+    avatars, the language, the series label and the next topic."""
+    from ..motion_themes import cast_speakers
     shots = [s.model_copy(update={"id": f"s{i + 1:02d}"}) for i, s in enumerate(draft.shots)]
     return MotionScript(
         template=template,
@@ -2558,6 +2659,10 @@ def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
         running_example=draft.running_example,
         series=series,
         next_topic=next_topic,
+        theme=theme.id if theme is not None else None,
+        language=language,
+        speakers=(cast_speakers(theme, language)
+                  if theme is not None and language else []),
     )
 
 
@@ -2567,9 +2672,9 @@ def regenerate_motion_hook(script: MotionScript, material: str, source_text: str
     """Rewrite only the hook shot, up to config.MAX_MOTION_HOOK_FIX_RETRIES
     times. Returns (the repaired script, its grader results) once every grader
     passes, else (None, the last results)."""
+    from ..motion_themes import registry
     hook = script.shots[0]
-    system = (SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX if script.template == "walkthrough"
-              else SYSTEM_MOTION_HOOK_FIX)
+    _, system = motion_system_for(script.template, registry().get(script.theme))
     feedback = "; ".join(r.reason for r in results if not r.passed)
     for _ in range(config.MAX_MOTION_HOOK_FIX_RETRIES):
         user = (material +
@@ -2597,7 +2702,9 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                         series: str | None = None,
                         next_topic: str = "",
                         template: str = "fix_story",
-                        supporting_text: str = "") -> tuple[MotionScript | None, list]:
+                        supporting_text: str = "",
+                        theme: str | None = None,
+                        language: str | None = None) -> tuple[MotionScript | None, list]:
     """
     Write and grade a motion script in `template` (fix_story or walkthrough).
     `source_text` is the selected section's own evidence — where the
@@ -2611,16 +2718,28 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
     A failure confined to the hook (checks.motion_failures_are_hook_only) is
     repaired by regenerate_motion_hook rather than a full rewrite — the rest
     of the script already passed, and a full retry risks breaking it.
+
+    `theme` (phase 2b) is an id from shorts/motion_themes.yaml; it must use
+    `template`. A non-base theme rewrites the prompt's FORMAT and THE BEATS
+    from its beat template; every other rule stays. `language` casts a
+    two-speaker theme's avatars. None for both writes the script exactly as
+    before themes existed.
     """
-    from ..motion_library import icon_names
+    from ..motion_themes import registry
     if template not in MOTION_TEMPLATES:
         raise ValueError(f"template {template!r} is not one of {MOTION_TEMPLATES}")
+    spec = None
+    if theme is not None:
+        spec = registry().get(theme)
+        if spec is None:
+            raise ValueError(f"theme {theme!r} is not in the theme registry")
+        if spec.template != template:
+            raise ValueError(f"theme {theme!r} is a {spec.template} theme, not {template}")
     series = config.MOTION_SERIES if series is None else series
-    system = (SYSTEM_MOTION_WALKTHROUGH if template == "walkthrough"
-              else SYSTEM_MOTION.replace("__ICONS__", ", ".join(sorted(icon_names()))))
+    system, _ = motion_system_for(template, spec)
     material = _motion_material_block(topic, section, understanding, source_text,
                                       approach, series, next_topic, template,
-                                      supporting_text)
+                                      supporting_text, spec)
     main_text = source_text if supporting_text else None
     if supporting_text:
         source_text = source_text + "\n\n" + supporting_text
@@ -2630,7 +2749,7 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
         draft = ask_json(system, user, MotionScriptDraft, max_tokens=6000,
                          label="motion_script")
         script = _assemble_motion(draft, topic, section, short_id, series, next_topic,
-                                  template)
+                                  template, spec, language)
         results = checks.run_motion_script_graders(script, source_text, main_text=main_text)
         if checks.all_passed(results):
             return script, results

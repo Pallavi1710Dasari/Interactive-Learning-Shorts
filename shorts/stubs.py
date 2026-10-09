@@ -86,6 +86,8 @@ def fake(model_cls, system: str, user: str):
         return model_cls(**_motion_script(user))
     if name == "MotionHookFix":
         return model_cls(**_motion_hook_fix(user))
+    if name == "MotionThemeDraft":
+        return model_cls(**_motion_theme(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 
@@ -955,27 +957,65 @@ _MOTION_DRAFT_FIELDS = ("hook_question", "concept_name", "promise",
                         "running_example")
 
 
+#: The theme a fixture written before themes existed is: its template's base.
+_MOTION_BASE_THEMES = {"fix_story": "classic_explainer", "walkthrough": "step_by_step_walkthrough"}
+
+
+def _fixture_kind(data: dict) -> tuple[str, str]:
+    template = data.get("template", "fix_story")
+    return template, data.get("theme") or _MOTION_BASE_THEMES[template]
+
+
+def _motion_fixtures_teaching(material: str) -> list[tuple[Path, dict]]:
+    flat = re.sub(r"[`*]", "", material).lower()
+    out = []
+    for path in sorted(_MOTION_FIXTURES.glob("*_golden.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data["concept_name"].lower() in flat:
+            out.append((path, data))
+    return out
+
+
 def _motion_fixture_for(user: str) -> dict:
     """The golden fixture whose concept_name the material teaches AND whose
-    template is the one asked for (the TEMPLATE: line of the material block).
+    template and theme are the ones asked for (the TEMPLATE: and THEME: lines
+    of the material block; no THEME: line means the template's base theme).
     A walkthrough asked of useState material has no fixture, and says so,
     rather than handing back a fix_story the walkthrough graders then fail."""
     material = (_find(r"MATERIAL:\n(.*?)(?:\n(?:CORE IDEA|THE APPROVED|SERIES)|\Z)",
                       user, re.S) or user)
     template = _find(r"^TEMPLATE:\s*(\w+)", user, re.M) or "fix_story"
-    flat = re.sub(r"[`*]", "", material).lower()
+    theme = _find(r"^THEME:\s*(\w+)", user, re.M) or _MOTION_BASE_THEMES[template]
     taught = []
-    for path in sorted(_MOTION_FIXTURES.glob("*_golden.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if data["concept_name"].lower() in flat:
-            if data.get("template", "fix_story") == template:
-                return data
-            taught.append(f"{path.name} ({data.get('template', 'fix_story')})")
+    for path, data in _motion_fixtures_teaching(material):
+        if _fixture_kind(data) == (template, theme):
+            return data
+        tpl, thm = _fixture_kind(data)
+        taught.append(f"{path.name} ({tpl}" + (f", {thm}" if thm != _MOTION_BASE_THEMES[tpl]
+                                               else "") + ")")
     raise NotImplementedError(
         f"no {template} motion stub fixture teaches this material"
+        + (f" as {theme}" if theme != _MOTION_BASE_THEMES[template] else "")
         + (f" (only {', '.join(taught)})" if taught else "")
         + f" — add an evals/fixtures/motion/<name>_golden.json with template "
-        f"{template!r} whose concept_name appears in it, or unset SHORTS_STUB.")
+        f"{template!r} and theme {theme!r} whose concept_name appears in it, "
+        f"or unset SHORTS_STUB.")
+
+
+def _motion_theme(user: str) -> dict:
+    """The theme call's stub: the first ELIGIBLE theme (registry order) that a
+    golden fixture can write a script for on this material — so a stub run
+    goes on to a script — else the first eligible theme. Concept tags are the
+    section's own candidates, which the prompt lists."""
+    material = _find(r"MATERIAL:\n(.*?)\n\nLANGUAGE:", user, re.S) or user
+    eligible = re.findall(r"^- (\w+) \[template (\w+);", user, re.M)
+    have = {_fixture_kind(d)[::-1] for _, d in _motion_fixtures_teaching(material)}
+    pick = next((t for t, tpl in eligible if (t, tpl) in have), eligible[0][0])
+    tags = _find(r"^CONCEPT TAGS \(from the section\): (.*)$", user, re.M) or ""
+    return {"theme": pick,
+            "reason": f"stub: the first eligible theme with a golden fixture ({pick})",
+            "concept_tags": [t.strip() for t in tags.split(",")
+                             if t.strip() and t.strip() != "none found"]}
 
 
 def _motion_script(user: str) -> dict:

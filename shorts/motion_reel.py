@@ -4,8 +4,9 @@ Run one MOTION reel end to end (REEL_STYLE=motion — RESTYLE_TO_MOTION_REELS.md
     python -m shorts.motion_reel content/react_usestate_basics.md
     python -m shorts.motion_reel <doc.md> --topic <short_id>          # resume
     python -m shorts.motion_reel <doc.md> --topic <id> --force-stage script
+    python -m shorts.motion_reel <doc.md> --theme interview           # pick the theme
 
-Stages: setup -> script -> scenes -> voice -> timing -> render -> report.
+Stages: setup -> theme -> script -> scenes -> voice -> timing -> render -> report.
 Mirrors shorts/story_reel.py's stage and resume behaviour on purpose, so one
 runbook habit covers both: a stage runs when its artifact is missing, --from
 trusts everything before it, --force-stage redoes that stage and every later
@@ -20,7 +21,10 @@ THREE HUMAN GATES, all before anything is voiced or drawn:
      walkthrough when the approved approach is process_demonstration, else
      fix_story (REFERENCE_STYLE_ADDENDUM.md section 3) — the reviewer can
      switch it there, or pass --template;
-  3. the shot list — beat, speech, captions and visual for every shot, shown
+  3. the theme (phase 2b) — the reel's FORMAT (interview, story, bug hunt, ...;
+     shorts/motion_themes.yaml), with the reason it was chosen and the reel's
+     tags. Override it with --theme;
+  4. the shot list — beat, speech, captions and visual for every shot, shown
      after the script passes the free motion graders.
 Each writes its artifact ONLY on approval, so declining means "show me this
 pause again on the next run", never "skip ahead".
@@ -41,16 +45,19 @@ import sys
 from pathlib import Path
 
 from . import checks, config, preflight, review, usage
+from . import motion_themes
 from . import workflow as question_workflow
 from .parse import find_section, parse_markdown, story_evidence_pool
-from .schema import (MOTION_TEMPLATES, MotionScript, QuestionWorkflow,
-                     SectionUnderstanding, TeachingApproach, Topic, motion_plain_text)
+from .schema import (MOTION_TEMPLATES, MotionScript, MotionTags, MotionThemeChoice,
+                     QuestionWorkflow, SectionUnderstanding, TeachingApproach, Topic,
+                     motion_plain_text)
 from .skills.script import write_motion_script
+from .skills.theme import MAX_THEME_ATTEMPTS, SYSTEM_MOTION_THEME, choose_theme
 from .skills.select import select_topics_with_selections
 from .skills.understanding import understanding_for
 
-STAGE_ORDER = ["setup", "script", "scenes", "voice", "timing", "render", "report"]
-MONEY_STAGES = {"script", "scenes"}
+STAGE_ORDER = ["setup", "theme", "script", "scenes", "voice", "timing", "render", "report"]
+MONEY_STAGES = {"theme", "script", "scenes"}
 
 #: Stages that exist in STAGE_ORDER (so --from / --force-stage accept them and
 #: resume math is already right) but are built in a later phase.
@@ -118,6 +125,14 @@ def _facts_path(short_id: str) -> Path:
 
 def _setup_path(short_id: str) -> Path:
     return config.OUTPUT_DIR / short_id / "setup.json"
+
+
+def theme_path(short_id: str) -> Path:
+    return config.OUTPUT_DIR / short_id / "theme.json"
+
+
+def tags_path(short_id: str) -> Path:
+    return config.OUTPUT_DIR / short_id / "tags.json"
 
 
 def _reel_exists(short_id: str) -> bool:
@@ -202,18 +217,23 @@ def walkthrough_session_ids(sections: list, section_id: str) -> list[str]:
             if "." in s.section_id and s.section_id.split(".")[0] == major]
 
 
-def _decide_template(default: str, yes: bool, override: str | None) -> str:
+def _decide_template(default: str, yes: bool, override: str | None) -> tuple[str, str]:
     """The template gate: --template wins, then --yes keeps the default, then
     an interactive reviewer may switch it. Choosing a template spends nothing,
-    so a non-interactive run keeps the default rather than stopping."""
+    so a non-interactive run keeps the default rather than stopping.
+
+    Returns (template, source). Since phase 2b the THEME decides the template
+    unless a human chose it here: source "flag" or "reviewer" pins it, and the
+    theme step then only considers themes of that template; "default" leaves
+    it to the theme."""
     if override:
         print(f"  template: {override}   (--template)")
-        return override
+        return override, "flag"
     if yes or not sys.stdin.isatty():
         print(f"  template: {default}   (from the teaching approach"
               + ("; --yes" if yes else "; non-interactive — pass --template to change it")
               + ")")
-        return default
+        return default, "default"
     try:
         answer = input(f"  template [{default}] — Enter to keep, or type "
                        f"{' / '.join(MOTION_TEMPLATES)}: ").strip().lower()
@@ -222,7 +242,7 @@ def _decide_template(default: str, yes: bool, override: str | None) -> str:
     if answer and answer not in MOTION_TEMPLATES:
         print(f"  {answer!r} is not a template — keeping {default}")
         answer = ""
-    return answer or default
+    return (answer, "reviewer") if answer else (default, "default")
 
 
 def _run_setup(sections: list, doc_text: str, yes: bool,
@@ -254,7 +274,8 @@ def _run_setup(sections: list, doc_text: str, yes: bool,
         print("\nTEACHING APPROACH GATE — not approved. Rerun from an interactive "
               "terminal, or pass --yes to approve the recommendation.")
         return None
-    template = _decide_template(default_template(approach), yes, template_override)
+    template, template_source = _decide_template(default_template(approach), yes,
+                                                 template_override)
 
     _pool, pool_ids = story_evidence_pool(
         sections, topic.source_section_id,
@@ -272,6 +293,7 @@ def _run_setup(sections: list, doc_text: str, yes: bool,
         "understanding": understanding.model_dump() if understanding else None,
         "workflow": wf.model_dump(),
         "template": template,
+        "template_source": template_source,
         "pool_ids": list(pool_ids),
         "support_ids": support_ids,
         "next_topic": next_topic_for(sections, section.section_id,
@@ -287,6 +309,119 @@ def _save_setup(short_id: str, state: dict) -> None:
 
 def _load_setup(short_id: str) -> dict:
     return json.loads(_setup_path(short_id).read_text(encoding="utf-8"))
+
+
+# ==================================================================== theme
+
+def template_pin(state: dict) -> str | None:
+    """The template a human chose at setup (--template, or the reviewer at the
+    template gate), which the theme must use. None when the template was only
+    the teaching approach's default — then the theme decides it. A setup
+    written before phase 2b has no template_source; its template was the
+    approved one then, so it stays pinned."""
+    if state.get("template_source", "pinned") == "default":
+        return None
+    return state.get("template", "fix_story")
+
+
+def _load_theme(short_id: str) -> MotionThemeChoice | None:
+    path = theme_path(short_id)
+    if not path.exists():
+        return None
+    return MotionThemeChoice.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def print_theme(choice: MotionThemeChoice, language_how: str = "",
+                history: list[str] | None = None) -> None:
+    """The theme gate's screen: the theme and why, what it was chosen from,
+    the fit check, the cast and the tags."""
+    spec = motion_themes.registry().themes[choice.theme]
+    print(f"\n=== Theme: {choice.theme} ({choice.source}) ===")
+    print(f"  reason:   {choice.reason}")
+    print(f"  format:   {spec.description}")
+    print(f"  template: {choice.template}   approach: {choice.teaching_approach or '(none)'}")
+    who = (" / ".join(f"{sp.role} = {sp.name} ({sp.avatar})"
+                      for sp in motion_themes.cast_speakers(spec, choice.language))
+           if spec.two_speaker else "one narrator, no avatar")
+    print(f"  speakers: {who}")
+    print(f"  language: {choice.language}" + (f"   ({language_how})" if language_how else ""))
+    if history is not None:
+        print(f"  earlier reels in {choice.language}: {', '.join(history) or 'none'}")
+    print(f"  eligible: {', '.join(choice.eligible) or '(none)'}")
+    fit = choice.fit_check
+    print(f"  fit check: {'passed' if fit.passed else 'FAILED'}"
+          f"{f' after {fit.attempts} pick(s)' if fit.attempts else ''}")
+    for r in fit.rejected:
+        print(f"      rejected {r.theme} (pick {r.attempt}): {'; '.join(r.problems)}")
+    if fit.fallback:
+        print(f"      FALLBACK: {fit.fallback_reason}")
+    for o in fit.overrides:
+        print(f"      override: {o}")
+    print(f"  tags:     {' '.join(choice.tags)}")
+
+
+def stage_theme(short_id: str, state: dict, sections: list, doc_text: str, yes: bool,
+                reel_cursor: int, override: str | None = None,
+                language_override: str | None = None) -> MotionThemeChoice | None:
+    """Choose the reel's theme (skills/theme.py), show it at the theme gate,
+    and on approval save theme.json and tags.json. The fit call is the only
+    spend, and only when two or more themes are eligible and --theme is not
+    given."""
+    section = find_section(sections, state["section_id"])
+    source_text = "\n\n".join(find_section(sections, sid).text for sid in state["pool_ids"])
+    if language_override:
+        language, how = language_override, "--language"
+    else:
+        language, how = motion_themes.detect_language(source_text, doc_text)
+    history = [t.theme for t in motion_themes.reel_history(config.OUTPUT_DIR, language,
+                                                           exclude_id=short_id)]
+    pin = template_pin(state)
+    wf = QuestionWorkflow(**state["workflow"])
+    approach = wf.approved_teaching_approach
+    kind = approach.primary if approach is not None else None
+    eligible = motion_themes.eligible_themes(
+        approach=kind, has_code=motion_themes.section_has_code(source_text),
+        template=pin, history=history, language=language)
+    if not override and len(eligible) > 1:
+        plan = [preflight.ModelPlan(
+            "motion_theme", config.MODEL_GENERATOR, MAX_THEME_ATTEMPTS,
+            preflight.text_cost_per_call(config.MODEL_GENERATOR,
+                                         (len(SYSTEM_MOTION_THEME) + len(source_text)) // 3
+                                         + 120 * len(eligible), 300))]
+        if not _money_gate("theme", short_id, plan, yes, reel_cursor):
+            return None
+    try:
+        choice = choose_theme(section, source_text=source_text, approach=approach,
+                              language=language, history=history, template_pin=pin,
+                              override=override)
+    except ValueError as e:
+        print(f"\n  {e}")
+        return None
+    print_theme(choice, how, history)
+    tag_check = checks.check_motion_tags(choice.tags, source_text)
+    print(f"  {tag_check}")
+    if not tag_check.passed:
+        print("  GIVING UP — the tags are not valid (see above).")
+        return None
+    if not _confirm("Approve theme?", yes):
+        print(f"Stopped at the theme — nothing saved. Rerun with --topic {short_id} to see "
+              f"this pause again, or --topic {short_id} --theme <id> to choose it yourself "
+              f"({', '.join(motion_themes.registry().ids())}).")
+        return None
+    path = theme_path(short_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(choice.model_dump_json(indent=2), encoding="utf-8")
+    concepts = [t.lstrip("#") for t in choice.tags[2:]]
+    tags = MotionTags(short_id=short_id, language=choice.language, theme=choice.theme,
+                      concepts=concepts, tags=choice.tags,
+                      created_at=_now_iso())
+    tags_path(short_id).write_text(tags.model_dump_json(indent=2), encoding="utf-8")
+    return choice
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
 
 
 # =================================================================== script
@@ -313,8 +448,12 @@ def print_fact_sources(rows: list[dict]) -> None:
 def print_shot_list(script: MotionScript, results: list | None = None) -> None:
     """The shot-list gate's screen: every shot's beat, speech, captions and
     visual. Also what `--from script` prints for an approved script."""
-    print(f"\n=== Shot list: {script.short_id} — {script.template} ({len(script.shots)} "
-          f"shots, ~{script.estimated_seconds:.1f}s) ===")
+    print(f"\n=== Shot list: {script.short_id} — {script.template}"
+          + (f", theme {script.theme}" if script.theme else "")
+          + f" ({len(script.shots)} shots, ~{script.estimated_seconds:.1f}s) ===")
+    if script.speakers:
+        print("speakers: " + ", ".join(f"{sp.role} = {sp.name} ({sp.avatar}, voice "
+                                        f"{sp.voice_slot})" for sp in script.speakers))
     print(f"concept: {script.concept_name}   promise: {script.promise!r}")
     print(f"hook question: {script.hook_question}")
     walkthrough = script.template == "walkthrough"
@@ -328,8 +467,12 @@ def print_shot_list(script: MotionScript, results: list | None = None) -> None:
     for s in script.shots:
         chapter = f" ch{s.chapter}" if s.chapter is not None else ""
         print(f"\n  {s.id}  {s.beat:<12}{chapter} ~{s.estimated_seconds:.1f}s")
-        print(f"      speech:   {s.speech}")
-        print(f"      captions: {' | '.join(motion_plain_text(c.text) for c in s.captions)}")
+        if any(c.speaker for c in s.captions):
+            for c in s.captions:
+                print(f"      {c.speaker or '?'}: {motion_plain_text(c.text)}")
+        else:
+            print(f"      speech:   {s.speech}")
+            print(f"      captions: {' | '.join(motion_plain_text(c.text) for c in s.captions)}")
         print(f"      visual:   {s.visual}")
         if s.example:
             print(f"      example:  {s.example}")
@@ -347,7 +490,7 @@ def print_shot_list(script: MotionScript, results: list | None = None) -> None:
 
 
 def stage_script(short_id: str, state: dict, sections: list, yes: bool,
-                 reel_cursor: int) -> MotionScript | None:
+                 reel_cursor: int, theme: MotionThemeChoice | None = None) -> MotionScript | None:
     plan = [preflight.ModelPlan(
         "motion_script", config.MODEL_GENERATOR,
         config.MAX_MOTION_SCRIPT_RETRIES * (1 + config.MAX_MOTION_HOOK_FIX_RETRIES),
@@ -368,8 +511,10 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
         topic, section, short_id=short_id, source_text=source_text,
         understanding=understanding, approach=wf.approved_teaching_approach,
         next_topic=state.get("next_topic", ""),
-        template=state.get("template", "fix_story"),
-        supporting_text=supporting_text)
+        template=theme.template if theme else state.get("template", "fix_story"),
+        supporting_text=supporting_text,
+        theme=theme.theme if theme else None,
+        language=theme.language if theme else None)
     if script is None:
         print("  GIVING UP — no script passed the motion graders:")
         for r in results:
@@ -392,7 +537,8 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
 # ======================================================================= run
 
 def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
-        force_stage: str | None, yes: bool, template: str | None = None) -> int:
+        force_stage: str | None, yes: bool, template: str | None = None,
+        theme: str | None = None, language: str | None = None) -> int:
     print(_MOTION_MODE_BANNER)
     if not config.STUB and not config.ANTHROPIC_API_KEY:
         print("Cannot proceed — ANTHROPIC_API_KEY is not set (every text call goes "
@@ -440,11 +586,28 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         _save_setup(short_id, state)
         print(f"\n=== setup complete: short_id={short_id} ===")
 
+    # ---------------------------------------------------------------- theme
+    choice = _load_theme(short_id)
+    if _needs("theme", choice is not None):
+        c = usage.mark()
+        choice = stage_theme(short_id, state, sections, doc_text, yes, reel_cursor,
+                             override=theme, language_override=language)
+        stage_usage["theme"] = usage.since(c)
+        if choice is None:
+            return 1
+    elif choice is not None:
+        if theme and theme != choice.theme:
+            print(f"--theme {theme} does not match this reel's approved theme "
+                  f"{choice.theme!r}. Rerun with --force-stage theme to choose again.")
+            return 1
+        print(f"\n=== theme: resumed {choice.theme} from {theme_path(short_id)} ===")
+        print(f"  {' '.join(choice.tags)}")
+
     # --------------------------------------------------------------- script
     script = None
     if _needs("script", motion_path(short_id).exists()):
         c = usage.mark()
-        script = stage_script(short_id, state, sections, yes, reel_cursor)
+        script = stage_script(short_id, state, sections, yes, reel_cursor, choice)
         stage_usage["script"] = usage.since(c)
         if script is None:
             return 1
@@ -465,6 +628,9 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
     print(f"\n=== report: {short_id} ===")
     print(f"  {motion_path(short_id)}")
     print(f"  template: {script.template}   ~{script.estimated_seconds:.1f}s estimated")
+    if choice is not None:
+        print(f"  theme: {choice.theme} ({choice.source}) — {choice.reason}")
+        print(f"  tags: {' '.join(choice.tags)}   ({tags_path(short_id)})")
     print_fact_sources(fact_sources(script, sections, state))
     for stage, u in stage_usage.items():
         print(f"  {stage}: {u['calls']} call(s), ${u['cost']:.4f}")
@@ -475,7 +641,7 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m shorts.motion_reel",
-        description="Run one motion reel: setup -> script -> scenes -> voice -> "
+        description="Run one motion reel: setup -> theme -> script -> scenes -> voice -> "
                     "timing -> render -> report.")
     p.add_argument("markdown_path")
     p.add_argument("--topic", dest="topic_short_id", default=None,
@@ -488,6 +654,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--template", choices=MOTION_TEMPLATES, default=None,
                    help="the script template (default: walkthrough when the approved "
                         "teaching approach is process_demonstration, else fix_story)")
+    p.add_argument("--theme", choices=motion_themes.registry().ids(), default=None,
+                   help="the reel's theme (default: the best fit among the themes that "
+                        "pass the fit and variety rules — shorts/motion_themes.yaml)")
+    p.add_argument("--language", choices=motion_themes.language_tags(), default=None,
+                   help="the course language for tags, variety and avatars (default: "
+                        "detected from the material)")
     p.add_argument("--yes", action="store_true",
                    help="answer every confirmation automatically (still prints "
                         "every pre-flight summary and every pause screen)")
@@ -497,7 +669,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     return run(args.markdown_path, args.topic_short_id, args.from_stage,
-               args.force_stage, args.yes, args.template)
+               args.force_stage, args.yes, args.template, args.theme, args.language)
 
 
 if __name__ == "__main__":

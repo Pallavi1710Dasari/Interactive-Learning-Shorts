@@ -47,9 +47,13 @@ export function Layer({ children, style }: { children?: ReactNode; style?: CSSPr
 export function At({ x, y, center = false, children, style }: {
   x: number; y: number; center?: boolean; children?: ReactNode; style?: CSSProperties;
 }) {
+  // A centred object keeps its centring when it animates its own transform
+  // (popStyle's rise and scale): the two compose instead of one replacing
+  // the other, which pushed every centred pill and chip off centre.
+  const own = style?.transform;
+  const transform = center ? `translate(-50%, -50%)${own ? ` ${own}` : ""}` : own;
   return (
-    <div style={{ position: "absolute", left: x, top: y,
-                  transform: center ? "translate(-50%, -50%)" : undefined, ...style }}>
+    <div style={{ position: "absolute", left: x, top: y, ...style, transform }}>
       {children}
     </div>
   );

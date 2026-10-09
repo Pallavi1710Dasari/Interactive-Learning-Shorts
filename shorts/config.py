@@ -707,6 +707,8 @@ MOTION_SERIES = os.getenv("MOTION_SERIES", "").strip() or BRAND_HANDLE
 #: story mode keeps between MAX_STORY_MAPPING_RETRIES and MAX_HOOK_FIX_RETRIES.
 MAX_MOTION_SCRIPT_RETRIES = _i("MAX_MOTION_SCRIPT_RETRIES", 3)
 MAX_MOTION_HOOK_FIX_RETRIES = _i("MAX_MOTION_HOOK_FIX_RETRIES", 2)
+#: Phase 3: repair calls for failing scenes after the first scenes call.
+MAX_MOTION_SCENE_RETRIES = _i("MAX_MOTION_SCENE_RETRIES", 2)
 
 
 # --------------------------------------------------------------- image generation

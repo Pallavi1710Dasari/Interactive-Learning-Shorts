@@ -88,6 +88,9 @@ def fake(model_cls, system: str, user: str):
         return model_cls(**_motion_hook_fix(user))
     if name == "MotionThemeDraft":
         return model_cls(**_motion_theme(user))
+    if name == "MotionScenesDraft":
+        from .skills.scenes import stub_scenes
+        return model_cls(**stub_scenes(user))
     raise NotImplementedError(
         f"no stub for {name}. Add one in shorts/stubs.py, or unset SHORTS_STUB.")
 

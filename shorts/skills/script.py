@@ -2291,7 +2291,7 @@ def write_story_shots(mapping: ConceptMappingSet, topic: Topic, section: Section
 # database index or React state; nothing below may be tuned to one topic. The
 # graders that enforce these rules live in checks.run_motion_script_graders.
 
-SYSTEM_MOTION = """You write the script for ONE short vertical teaching reel (40-75 seconds)
+SYSTEM_MOTION = """You write the script for ONE short vertical teaching reel (40-120 seconds)
 that answers ONE "why does this fail" question from the material below.
 
 FORMAT
@@ -2319,7 +2319,8 @@ The reel must ANSWER the hook's question: problem -> why -> fix -> proof it work
 fix_flow and payoff are never optional.
 
 LENGTH
-- 110 to 195 spoken words in total (at most 75 seconds spoken).
+- 110 to 312 spoken words in total (40 to 120 seconds spoken). 120 seconds is a hard CAP,
+  not a target: use the words the concept needs to be explained FULLY, then stop. Never pad.
 - Every shot: 8 to 30 words.
 - hook: at most 10 words. title: exactly 8 words. cta: exactly 8 words.
 - Short spoken sentences. Contractions are fine.
@@ -2404,7 +2405,7 @@ Return JSON: {"hook_question": "...", "speech": "...", "captions": [{"text": "..
 #: The second template (REFERENCE_STYLE_ADDENDUM.md section 3B): "how does X work".
 #: Its own prompt rather than a branch inside SYSTEM_MOTION, so neither template's
 #: rules can leak into the other's reels.
-SYSTEM_MOTION_WALKTHROUGH = """You write the script for ONE short vertical teaching reel (60-120 seconds)
+SYSTEM_MOTION_WALKTHROUGH = """You write the script for ONE short vertical teaching reel (40-120 seconds)
 that answers ONE "how does this work" question from the material below, by following
 ONE running example through every step of the process.
 
@@ -2442,7 +2443,8 @@ THE RUNNING EXAMPLE
 - Give every chapter_card and chapter shot its chapter number in `chapter` (1, 2, ...).
 
 LENGTH
-- 160 to 300 spoken words in total (at most 120 seconds spoken — a hard limit).
+- 110 to 312 spoken words in total (40 to 120 seconds spoken). 120 seconds is a hard CAP,
+  not a target: explain every step FULLY, then stop. Never pad.
 - Every chapter: at most 60 spoken words, card included.
 - Every shot: 8 to 30 words, except name_it and chapter_card (3 or more).
 - Short spoken sentences. Contractions are fine.
@@ -2590,17 +2592,6 @@ def motion_system_for(template: str, theme=None) -> tuple[str, str]:
                     lambda m: _theme_format_block(theme) + "\n\n", system, count=1, flags=re.S)
     system = re.sub(r"THE BEATS.*?\n\n(?=LENGTH)",
                     lambda m: _theme_beats_block(theme) + "\n\n", system, count=1, flags=re.S)
-    from ..checks import MOTION_THEMED_SECONDS, MOTION_THEMED_WORDS
-    lo_s, hi_s = MOTION_THEMED_SECONDS
-    system = system.replace(
-        "ONE short vertical teaching reel (40-75 seconds)",
-        f"ONE short vertical teaching reel ({lo_s:g}-{hi_s:g} seconds)", 1)
-    system = system.replace(
-        "- 110 to 195 spoken words in total (at most 75 seconds spoken).",
-        f"- {MOTION_THEMED_WORDS[0]} to {MOTION_THEMED_WORDS[1]} spoken words in total "
-        f"({lo_s:g} to {hi_s:g} seconds spoken). {hi_s:g} seconds is a hard CAP, not a "
-        f"target: use the words the concept needs to be explained FULLY, then stop. Never "
-        f"pad to reach it.", 1)
     if theme.two_speaker:
         system = system.replace(
             '"captions": [{"text": "..."}],',

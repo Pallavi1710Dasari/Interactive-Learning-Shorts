@@ -206,6 +206,42 @@ def run_motion_theme_case(case: dict, sections) -> tuple[bool, str]:
     return True, result.reason
 
 
+MOTION_SCENE_GRADERS = {
+    "scene_valid":         lambda s: checks.check_motion_scene_valid(s),
+    "payoff_mirrors_hook": lambda s: checks.check_motion_payoff_mirrors_hook(s),
+    "change_cadence":      lambda s: checks.check_motion_change_cadence(s),
+    "color_semantics":     lambda s: checks.check_motion_color_semantics(s),
+}
+
+
+def run_motion_scene_case(case: dict, sections) -> tuple[bool, str]:
+    """A motion SCENE case (phase 3): a golden script fixture, given its
+    default scenes (motion_scenes.with_default_scenes — the stub answer for
+    the scenes call), then optionally patched like a motion_grader case
+    (paths into the scened script: shots.3.scene.objects.0.props.tone)."""
+    from shorts.motion_scenes import with_default_scenes
+    from shorts.schema import MotionScript
+    data = json.loads((ROOT / case["fixture"]).read_text(encoding="utf-8"))
+    scened = with_default_scenes(MotionScript(**data))
+    patched = _apply_patch(json.loads(scened.model_dump_json()), case.get("patch", []))
+    script = MotionScript(**patched)
+    if case["grader"] == "all":
+        results = checks.run_motion_scene_graders(script)
+        passed = checks.all_passed(results)
+        reason = ("; ".join(str(r) for r in results if not r.passed)
+                  or f"all {len(results)} scene graders pass")
+    else:
+        result = MOTION_SCENE_GRADERS[case["grader"]](script)
+        passed, reason = result.passed, result.reason
+    exp = case["expect"]
+    if passed != exp["passed"]:
+        return False, f"expected passed={exp['passed']}, got {passed} ({reason})"
+    needle = exp.get("reason_contains")
+    if needle and needle.lower() not in reason.lower():
+        return False, f"reason missing {needle!r}; got: {reason}"
+    return True, reason
+
+
 def run_motion_case(case: dict, sections) -> tuple[bool, str]:
     """A motion-script case: a MotionScript fixture, optionally patched, graded
     against the whole `input` document (motion scripts draw on a pool of
@@ -726,6 +762,8 @@ def main():
                 ok, detail = run_motion_case(case, sections)
             elif kind == "motion_theme_grader":
                 ok, detail = run_motion_theme_case(case, sections)
+            elif kind == "motion_scene_grader":
+                ok, detail = run_motion_scene_case(case, sections)
             elif kind == "llm_judge":
                 ok, detail = run_judge_case(case, sections)
             elif kind == "vision_judge":

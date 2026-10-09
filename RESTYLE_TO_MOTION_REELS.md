@@ -1,6 +1,6 @@
 # Restyle: motion reels (`REEL_STYLE=motion`)
 
-Status: **Phases 1, 1b, 2 and 2b done (script contract, both templates, scene library, themes and tags); 2b is awaiting review.** Built and verified with `SHORTS_STUB=1` only; no real LLM call has been made in motion mode yet.
+Status: **Phases 1, 1b, 2, 2b and 3 done (script contract, both templates, scene library, themes and tags, scenes / timing / avatars / voices); 3 is awaiting review.** Built and verified with `SHORTS_STUB=1`, plus one short real Chatterbox sample to check caption timing. No real LLM call has been made in motion mode yet.
 
 **Read `REFERENCE_STYLE_ADDENDUM.md` with this file. Where they disagree, the addendum wins.** It adds the second reference reel (tokenization), the `walkthrough` template, the 120 s cap, karaoke sentence captions, and the motion system phase 2 builds.
 
@@ -240,8 +240,179 @@ python -m evals.run_evals
 
 In stub mode the theme call picks the first eligible theme that has a golden fixture for the material, so consecutive stub runs rotate themes under the variety rule.
 
+## Phase 3: scenes, timing, avatars, voices
+
+The runner now runs `setup -> theme -> script -> scenes -> voice -> timing -> render -> report`. Scenes, voice and timing are built; render is phase 4. Until then a reel plays in the browser at `#motion-reel/<short_id>` (from the API server), or at `#motion-reel?src=<plan url>`.
+
+### The scene format
+
+A scene says what one shot shows (`schema.MotionScene`):
+- its **field** (navy, blue, paper or yellow);
+- the **transition** into it (`cut`, or one of the five field transitions);
+- an optional tracked-caps **label**;
+- **objects**: kinds from the phase 2 library;
+- **actions**: a timeline in which each action is cued on 1–3 words copied from the shot's captions.
+
+The vocabulary is one file, `web/src/motion/library.json`, read by Python (validation and layout) and the player (drawing). It lists every object kind with its props, maximum lengths, height, layout class (full-frame, placed, overlay or link) and allowed actions; the actions (`enter`, `exit`, `state`, `pulse`, `highlight`, `type`, `count`, `scramble`, `stagger`, `stamp`); the transitions; and the avatar art vocabulary. A test fails if a kind has no renderer, or a renderer has no kind.
+
+Cues resolve in speaking order: a repeated word means its next occurrence, and the same cue twice in a row means "at the same moment". The build-up order is the addendum's: label, then object, then state change, then result, each on the word that names it.
+
+**Python lays out, the player only draws.** `motion_scenes.layout_scene` stacks placed objects in the region from the library's heights: the middle of the frame for a solo reel, above the avatars for a duo reel. Connectors run between neighbours, and stamps sit on the region's centre. The timing stage resolves every cue to seconds. So what the graders checked is exactly what the player draws.
+
+**Beat → scene.** `motion_scenes.default_scene` maps every beat of both templates to library objects, using only the script's own words: captions, `<b>` highlights, code, icons, takeaways, chapters and the running example. It is the scenes call's stub answer, and the fallback for any shot the LLM can't get right.
+
+| Beat | Default scene |
+|---|---|
+| hook | navy; kinetic title of the question + a coral status pill naming the symptom |
+| title | title card (concept, promise, icon tiles) |
+| setup (code) / chapter (code) | code window typing in, lines lit on their highlight words |
+| setup / break_1 / break_2 | chips of the highlighted terms, a coral pill on the symptom, the last chip turning coral |
+| fix_idea | blue; the concept in display caps + its highlighted terms |
+| fix_flow | trigger chip → connector pulse → mint result pill |
+| code_map | code map card, parts lit on their words (no code: an icon row) |
+| payoff | navy; the hook's objects again, now mint (mirrors the hook) |
+| recap | takeaway list (walkthrough: recap grid) |
+| cta | end card |
+| name_it / example / chapter_card / chapter / result / takeaway | kinetic title / token row / chapter card / token row of the example's state / count + final row / kinetic title |
+
+Field transitions rotate and never repeat. A walkthrough changes field per chapter (blue, paper, yellow, paper). Where the estimated timing would leave the frame still, a small highlight or pulse is added, cued on the content word spoken at that moment.
+
+### The scenes call (`shorts/skills/scenes.py`)
+
+`SYSTEM_MOTION_SCENES` gives the LLM the library, the rules and the script (readable, plus exact JSON for cues). The graders then check every scene. Each shot that fails gets a **repair call for that shot alone**, with the reasons; passing shots are kept. This is the motion counterpart of `revision.py`'s narrow repair; `revision.py` itself stays explainer-only. Retries are capped by `MAX_MOTION_SCENE_RETRIES` (default 2). A shot still failing after that uses its default scene, and the fallback is logged. The scene gate shows every object and every cue before anything is voiced.
+
+### Scene graders (free, deterministic)
+
+| Grader | Rule |
+|---|---|
+| `motion_scene_valid` | Kinds, props, lengths and types; targets and allowed actions; every cue is a spoken word, in order; at most 4 placed objects, which fit their region; a full-frame object stands alone. A field change needs a field transition, a same-field shot is a cut, the same transition never runs twice in a row, `type_scatter` only leaves the hook, and there is at most one stamp per reel. |
+| `motion_payoff_mirrors_hook` | fix_story: the payoff shows the hook's object kinds on the hook's field, with the hook's failure now a success. walkthrough: the result shows the running example's final state. |
+| `motion_change_cadence` | A visible change at least every 2.5 s: transitions, actions, and full-frame cards' own entrance steps (`builtin` in the library). Karaoke progress doesn't count. Run on the estimated clock at the scenes stage, and again on the real audio at the timing stage. |
+| `motion_color_semantics` | Coral only on failure beats (hook, setup, break_1/2; a walkthrough example or chapter), mint only where something works. A stamp counts as coral. |
+
+### Voices (`shorts/motion_voice.py`)
+
+- **One clip per caption**, since a caption is one sentence with one speaker, synthesized by local Chatterbox from the speaker's **voice slot**. The narrator uses `motion_narrator`; a two-speaker reel uses the host's slot and the language character's (`motion_host` + `motion_react`, for example), so two speakers get two voices.
+- A slot's reference clip is `voices/motion/<slot>.wav`. None are recorded yet, so slots fall back to the project's existing Chatterbox clips: the host and narrator to the interviewer clip, a character to the student clip. Each fallback is logged and recorded in `audio/manifest.json`.
+- Chatterbox writes 32-bit float WAV, which Python's `wave` module can't read; the real sample found this. Every clip is converted to 16-bit mono PCM at 24 kHz before it is cached.
+- The clips are laid on the reel's clock and mixed to `audio/reel.wav`, normalised to -14 LUFS.
+- In stub mode every clip is silence of the estimated length.
+
+### Real caption timing (`shorts/motion_align.py`)
+
+Word times come from the audio, best source first, all free and local:
+1. **Forced alignment.** wav2vec2 (`torchaudio` `WAV2VEC2_ASR_BASE_960H`, downloaded once, ~360 MB) with `torchaudio.functional.forced_align`, against the words we know were said. It runs in a resident worker, `shorts/motion_align_worker.py`, inside `venv-chatterbox`, which already has torch.
+2. **faster-whisper word boundaries**, paired with the known words when the counts match.
+3. **An even split** of the caption's measured length.
+
+Each caption records its source, and the plan records the weakest. A caption word standing for several spoken words (`useState(0)` ← "use State of zero") spans all of them.
+
+`motion_timeline.shot_timings` puts everything on one clock from either estimated or real caption lengths. Each shot has a 0.35 s lead and a 0.45 s tail; gaps are 0.15 s between captions and 0.3 s on a speaker change; title, chapter-card and cta shots have minimum lengths. `build_plan` then writes `output/<id>/plan.json`, the player's only input.
+
+**The real sample** was one interview exchange: Juno's question and Rae's answer, 17 words, two voices. Both captions were placed by forced alignment. Word starts were within 62–66 ms on average of faster-whisper's independent timings (worst word 161 ms), every word was in order and inside its clip, and the clips were 2.8 s and 3.2 s. Forced alignment is the tighter of the two: whisper starts both first words at 0.00 s.
+
+### Avatars (`web/src/motion/avatars/`)
+
+- `Avatar.tsx` draws each character from `motion_avatars.yaml`'s new `art` field: body shape, head, hair, skin and accessories, coloured by its palette.
+- The style is original flat shapes, the same as the cards: no logos, mascots or stick figures.
+- There are 16 characters: a host plus 15 languages. Three states, all pure in `t`:
+  - **idle:** breathing, a slow bob, and blinks at fixed times;
+  - **talking:** the mouth on a hashed syllable rhythm, nods, and a gesturing hand;
+  - **reacting:** brows up, eyes wide, a head tilt, and accent ticks.
+- A palette's body colour may never be a field colour, or the character would vanish on that field. The loader rejects it.
+- The player's copy of the registry is `avatars.generated.json`, written by `python -m shorts.motion_themes export-avatars`; a test checks it is in sync.
+
+### Two-speaker scenes
+
+- In a duo reel, objects stack above the stage and the two avatars stand at the bottom: the asking role (host) on the left, the answering character on the right, facing each other.
+- **Turn-taking comes from the captions.** The speaker of the caption being spoken is *talking*, scaled to full size with a lit name tag. The listener is idle, or *reacting* for 0.9 s after the other asks a question, or when a result lands (a state or stamp action with a tone).
+- Full-frame cards (title, code map, recap, end) hide the stage; there a small tag above the caption names the speaker.
+
+### The player (`web/src/motion/scene/`)
+
+- `MotionStage` / `MotionFrame` lay a plan's shots, field transitions, chrome (fix_story progress segments, walkthrough step chip, section labels, corner mark), karaoke captions and the duo stage on one timeline.
+- It is a pure function of `(plan, t)`. The TS checks render all three demo plans at every shot's start, middle and end, twice each.
+- `MotionPlayer` (`#motion-reel/...`) adds play and pause with the audio as the clock, a scrubber, shot buttons, the current captions with their timing source, and `window.__capture.seek(t)` for phase 4.
+- The server serves `GET /api/motion/<id>/plan` and `GET /api/motion/<id>/audio`.
+- `python -m shorts.motion_demo` writes three stub plans (interview, classic, walkthrough) to `web/public/motion-demo/`, so the player runs with only Vite.
+
+Phase 2 fixes found on the way:
+- `At` centring was overwritten by `popStyle`'s transform, so every centred pill and chip sat off centre.
+- `CodeMapCard` can now highlight a part on line 2.
+
+### Files
+
+| File | What |
+|---|---|
+| `web/src/motion/library.json` | The scene vocabulary both sides read |
+| `shorts/schema.py` | `MotionScene`, `MotionSceneObject`, `MotionSceneAction`, `MotionScenesDraft`, timing and plan models, `MotionShot.scene` typed, avatar spec |
+| `shorts/motion_scenes.py` | Validation, cues, layout, change events, the default mapping |
+| `shorts/motion_timeline.py` | The clock and the plan |
+| `shorts/skills/scenes.py` | The scenes call and its repair loop |
+| `shorts/motion_voice.py`, `motion_align.py`, `motion_align_worker.py` | Voices, mix, word timing |
+| `shorts/motion_reel.py` | The scenes, voice and timing stages |
+| `shorts/server.py` | Plan and audio endpoints |
+| `shorts/motion_demo.py` | Writes the demo plans |
+| `web/src/motion/avatars/`, `web/src/motion/scene/` | Avatars and the player |
+| `evals/cases.yaml` | E202–E217 (`motion_scene_grader`) |
+| `shorts/motion_scene_test.py` | 32 tests |
+| `web/src/motion/motion.test.tsx` | Avatars and the full-reel stage |
+
+Screenshots are in `docs/reference/phase3/`: every avatar in every state, two two-speaker frames, a single-narrator fix_story frame and a walkthrough frame, and the player.
+
+```
+SHORTS_STUB=1 python -m shorts.motion_reel content/react_usestate_basics.md --yes --theme interview
+SHORTS_STUB=1 python -m shorts.motion_scene_test
+SHORTS_STUB=1 python -m shorts.motion_demo     # then: cd web && npm run dev, open #motion-reel?src=/motion-demo/interview.json
+npm --prefix web run test:motion
+python -m evals.run_evals
+```
+
+## Phase 3 review (2026-10-09)
+
+**Length: 40–120 s for every reel.** This covers every theme (classic_explainer included) and both templates, at 110–312 words. 120 s is a cap, not a target: both script prompts say to explain the concept fully, then stop, and never pad. `checks.MOTION_SECONDS` and `MOTION_WORDS` are the one place it is set. It supersedes the earlier 40–75 s / 60–120 s windows mentioned above, and eval E145 now records it (a 76 s fix_story passes).
+
+**Voices.** The proposal is in `docs/reference/phase3/voices.md`: four voices (narrator, host, and two character voices shared across the languages), the clip requirements, and free sources with licences. Nothing has been recorded or downloaded. The registry now lets characters share a voice slot; it only forbids a character sharing the host's.
+
+**Models: one file, `shorts/motion_models.yaml`.**
+- Each LLM call a motion reel makes is listed by its label, mapped to a tier:
+  - `deliberate` = `anthropic/claude-opus-5.5`: select, understanding, teaching approach, theme, script, hook fix, scenes, scene repair, and the phase 4 judge;
+  - `mechanical` = `anthropic/claude-sonnet-5.5`: framing and question rewording.
+- Ids were checked against OpenRouter on 2026-10-09; prices are in `usage.PRICES`.
+- Parsing, tags, variety, layout, cue timing and every grader are plain code with no LLM call.
+- `motion_reel` switches the routing on for its own run only (`motion_models.use()` → `llm._LABEL_MODELS`). Explainer and story keep `config.MODEL_*`.
+
+**Cost.**
+- Before a real run starts, the runner prints the whole reel's estimate (per step: model, calls, $/call, typical and worst) and asks once. `--estimate` prints it and stops, for free.
+- During the run, every LLM call prints a line: step, model, tokens, cost.
+- After the run, `output/<id>/cost.json` keeps every run's calls, and the report prints this run's spend and the reel's total across runs.
+- For the useState lesson the estimate is about $0.56 typical and $1.38 worst case, under `MAX_REEL_USD` ($2.00).
+
+**One real reel (the user runs it, not Claude):**
+
+```
+python -m shorts.motion_reel content/react_usestate_basics.md --estimate   # free: the estimate only
+python -m shorts.motion_reel content/react_usestate_basics.md              # the real reel, up to the playable plan
+```
+
+The second command has no `SHORTS_STUB`. It shows the estimate and asks before anything is spent, then stops at every gate (topic, teaching approach, theme, shot list, scenes) for your approval. Voice (Chatterbox) and timing (forced alignment) run locally for free. It ends with `output/<id>/plan.json`, `audio/reel.wav` and `cost.json`, playable at `#motion/reel/<id>`.
+
+**Web UI: the Motion section** (`web/src/motion/MotionSection.tsx`). It is separate from the explainer screens, which are unchanged.
+- `#motion` lists every motion reel: reels in `output/`, stub or real, from `GET /api/motion` (needs the API server), plus the stub demos in `web/public/motion-demo/` (Vite only).
+- `#motion/reel/<id>` and `#motion/demo/<name>` show one reel:
+  - the player;
+  - the theme with its reason and fit check;
+  - the teaching approach;
+  - tags;
+  - the script shot by shot, with speaker labels, highlights, code and visual brief;
+  - fact sources;
+  - cost (per step and per call).
+- There are links to the scene library (`#motion-gallery`) and the avatars (`#motion-gallery/avatars`).
+- `shorts/motion_bundle.py` builds the reel data (`GET /api/motion/<id>/bundle`), and `motion_demo` writes the same shape for the demos.
+
+**Standing rules** are in `CLAUDE.md`: the user reviews everything, everything is viewable, no commit before approval, no push unless asked, and no paid calls unless the user runs them.
+
 ## Phases still to come
 
-3. **Scenes and timing.** `MotionStage` (the player that lays a script's shots, transitions and captions on one timeline — moved here from phase 2 because SceneSpec defines what it plays), `SYSTEM_MOTION_SCENES`, SceneSpec validation and the `revision.py` loop, per-shot Chatterbox narration, and whisper-aligned timelines. Also adds the three scene graders. **Since phase 2b it also includes avatars, two-speaker scenes and two voices:** the avatar artwork (`shorts/motion_avatars.yaml`'s characters and host, as React components pure in `t`), scenes that place two speakers and show who is talking, and narration voiced per caption from each speaker's voice slot (two Chatterbox references per two-speaker reel).
-4. **Render and QA.** Motion capture, MP4, frame checks (word count from the page, safe zones), motion judge rubrics, and the report.
+4. **Render and QA.** Motion capture of `#motion-reel` through `window.__capture.seek`, the MP4 with `audio/reel.wav`, frame checks (word count from the page, safe zones), motion judge rubrics, and the report. Record the real voice slot clips (`voices/motion/<slot>.wav`).
 5. **Polish.** A motion view in the web UI, `docs/RUNBOOK_MOTION.md`, and cleanup.

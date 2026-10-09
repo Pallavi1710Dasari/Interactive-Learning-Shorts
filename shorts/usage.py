@@ -22,6 +22,9 @@ from . import config
 PRICES = {
     "claude-opus-5":     (5.0e-6, 25.0e-6),
     "claude-sonnet-5":   (2.0e-6, 10.0e-6),
+    # OpenRouter list prices, checked 2026-10-09 (openrouter.ai/api/v1/models).
+    "claude-opus-5.5":   (4.0e-6, 20.0e-6),
+    "claude-sonnet-5.5": (2.0e-6, 10.0e-6),
     "claude-haiku-4.5":  (1.0e-6,  5.0e-6),
     "claude-haiku-4-5":  (1.0e-6,  5.0e-6),
     "claude-opus-4.8":   (5.0e-6, 25.0e-6),
@@ -104,6 +107,28 @@ def _price(model: str, tin: int, tout: int) -> float:
     return tin * pin + tout * pout
 
 
+#: Functions called with every recorded Call — the motion runner prints each
+#: call's cost as it happens. A listener that raises is ignored.
+_listeners: list = []
+
+
+def add_listener(fn) -> None:
+    _listeners.append(fn)
+
+
+def remove_listener(fn) -> None:
+    if fn in _listeners:
+        _listeners.remove(fn)
+
+
+def _notify(call: "Call") -> None:
+    for fn in list(_listeners):
+        try:
+            fn(call)
+        except Exception:
+            pass
+
+
 def record(label: str, model: str, resp, duration_seconds: float = 0.0) -> Call | None:
     """Log one model call. Never raises — accounting must not break generation.
 
@@ -137,6 +162,7 @@ def record(label: str, model: str, resp, duration_seconds: float = 0.0) -> Call 
             _load_locked()
             _calls.append(call)
             _save_locked()
+        _notify(call)
         return call
     except Exception:
         return None

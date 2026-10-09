@@ -1,0 +1,1905 @@
+{
+ "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+ "template": "fix_story",
+ "theme": "classic_explainer",
+ "series": "@learnthesimpleway",
+ "concept_name": "useState",
+ "duration": 68.46,
+ "audio": null,
+ "timing_source": "even",
+ "cast": [],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "chapter": null,
+   "start": 0.0,
+   "end": 4.646,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "EVER WONDERED WHY YOUR LIKE BUTTON STAYS STUCK AT",
+      "accent": [
+       "ZERO"
+      ],
+      "lines": [
+       "EVER WONDERED WHY",
+       "YOUR LIKE BUTTON",
+       "STAYS STUCK AT"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 576.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Stays stuck at zero",
+      "tone": "bad",
+      "icon": "alert"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 943.6,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 0.0,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 1.119,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "why"
+    },
+    {
+     "t": 2.658,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Stays stuck at"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Ever wondered why your like button stays stuck at <b>zero</b>?",
+     "speaker": null,
+     "start": 0.35,
+     "end": 4.196,
+     "words": [
+      {
+       "text": "Ever",
+       "start": 0.35,
+       "end": 0.735,
+       "hl": false
+      },
+      {
+       "text": "wondered",
+       "start": 0.735,
+       "end": 1.119,
+       "hl": false
+      },
+      {
+       "text": "why",
+       "start": 1.119,
+       "end": 1.504,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 1.504,
+       "end": 1.888,
+       "hl": false
+      },
+      {
+       "text": "like",
+       "start": 1.888,
+       "end": 2.273,
+       "hl": false
+      },
+      {
+       "text": "button",
+       "start": 2.273,
+       "end": 2.658,
+       "hl": false
+      },
+      {
+       "text": "stays",
+       "start": 2.658,
+       "end": 3.042,
+       "hl": false
+      },
+      {
+       "text": "stuck",
+       "start": 3.042,
+       "end": 3.427,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 3.427,
+       "end": 3.811,
+       "hl": false
+      },
+      {
+       "text": "zero?",
+       "start": 3.811,
+       "end": 4.196,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "beat": "title",
+   "chapter": null,
+   "start": 4.646,
+   "end": 8.523,
+   "field": "blue",
+   "transition": "iris",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "title_card",
+     "props": {
+      "title": "useState",
+      "promise": "Why plain variables forget",
+      "icons": [
+       {
+        "name": "refresh",
+        "label": "Render"
+       },
+       {
+        "name": "memory",
+        "label": "Memory"
+       },
+       {
+        "name": "bolt",
+        "label": "Trigger"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 4.646,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 7.304,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "fixes"
+    }
+   ],
+   "captions": [
+    {
+     "text": "React has one <b>big idea</b> that fixes this.",
+     "speaker": null,
+     "start": 4.996,
+     "end": 8.073,
+     "words": [
+      {
+       "text": "React",
+       "start": 4.996,
+       "end": 5.381,
+       "hl": false
+      },
+      {
+       "text": "has",
+       "start": 5.381,
+       "end": 5.765,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 5.765,
+       "end": 6.15,
+       "hl": false
+      },
+      {
+       "text": "big",
+       "start": 6.15,
+       "end": 6.534,
+       "hl": true
+      },
+      {
+       "text": "idea",
+       "start": 6.534,
+       "end": 6.919,
+       "hl": true
+      },
+      {
+       "text": "that",
+       "start": 6.919,
+       "end": 7.304,
+       "hl": false
+      },
+      {
+       "text": "fixes",
+       "start": 7.304,
+       "end": 7.688,
+       "hl": false
+      },
+      {
+       "text": "this.",
+       "start": 7.688,
+       "end": 8.073,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "chapter": null,
+   "start": 8.523,
+   "end": 15.242,
+   "field": "paper",
+   "transition": "bar_wipe",
+   "label": "THE CODE",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_window",
+     "props": {
+      "file": "App.jsx",
+      "lines": [
+       "let likes = 0;",
+       "const onTap = () => likes++;"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 593.0,
+      "w": 960.0,
+      "h": 414.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 8.523,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 8.523,
+     "do": "type",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 10.562,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "likes"
+    },
+    {
+     "t": 12.1,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "plain variable"
+    },
+    {
+     "t": 13.638,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "tap"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Here's the code.",
+     "speaker": null,
+     "start": 8.873,
+     "end": 10.027,
+     "words": [
+      {
+       "text": "Here's",
+       "start": 8.873,
+       "end": 9.258,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 9.258,
+       "end": 9.642,
+       "hl": false
+      },
+      {
+       "text": "code.",
+       "start": 9.642,
+       "end": 10.027,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Your likes sit in a <b>plain variable</b>, and each tap adds one.",
+     "speaker": null,
+     "start": 10.177,
+     "end": 14.792,
+     "words": [
+      {
+       "text": "Your",
+       "start": 10.177,
+       "end": 10.562,
+       "hl": false
+      },
+      {
+       "text": "likes",
+       "start": 10.562,
+       "end": 10.946,
+       "hl": false
+      },
+      {
+       "text": "sit",
+       "start": 10.946,
+       "end": 11.331,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 11.331,
+       "end": 11.715,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 11.715,
+       "end": 12.1,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 12.1,
+       "end": 12.485,
+       "hl": true
+      },
+      {
+       "text": "variable,",
+       "start": 12.485,
+       "end": 12.869,
+       "hl": true
+      },
+      {
+       "text": "and",
+       "start": 12.869,
+       "end": 13.254,
+       "hl": false
+      },
+      {
+       "text": "each",
+       "start": 13.254,
+       "end": 13.638,
+       "hl": false
+      },
+      {
+       "text": "tap",
+       "start": 13.638,
+       "end": 14.023,
+       "hl": false
+      },
+      {
+       "text": "adds",
+       "start": 14.023,
+       "end": 14.407,
+       "hl": false
+      },
+      {
+       "text": "one.",
+       "start": 14.407,
+       "end": 14.792,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "break_1",
+   "chapter": null,
+   "start": 15.242,
+   "end": 23.499,
+   "field": "paper",
+   "transition": "cut",
+   "label": "WHY IT FAILS",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "re-render",
+       "zero"
+      ],
+      "tones": [
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 698.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Back to zero",
+      "tone": "bad",
+      "icon": "x"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 822.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 15.242,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 17.13,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "React"
+    },
+    {
+     "t": 19.053,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "from"
+    },
+    {
+     "t": 20.742,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "variable"
+    },
+    {
+     "t": 21.895,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Back to zero"
+    },
+    {
+     "t": 22.664,
+     "do": "state",
+     "target": "o1",
+     "value": "plain,bad",
+     "tone": null,
+     "cue": "zero"
+    }
+   ],
+   "captions": [
+    {
+     "text": "But on every <b>re-render</b>, React runs your component again from the top.",
+     "speaker": null,
+     "start": 15.592,
+     "end": 20.207,
+     "words": [
+      {
+       "text": "But",
+       "start": 15.592,
+       "end": 15.977,
+       "hl": false
+      },
+      {
+       "text": "on",
+       "start": 15.977,
+       "end": 16.361,
+       "hl": false
+      },
+      {
+       "text": "every",
+       "start": 16.361,
+       "end": 16.746,
+       "hl": false
+      },
+      {
+       "text": "re-render,",
+       "start": 16.746,
+       "end": 17.13,
+       "hl": true
+      },
+      {
+       "text": "React",
+       "start": 17.13,
+       "end": 17.515,
+       "hl": false
+      },
+      {
+       "text": "runs",
+       "start": 17.515,
+       "end": 17.899,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 17.899,
+       "end": 18.284,
+       "hl": false
+      },
+      {
+       "text": "component",
+       "start": 18.284,
+       "end": 18.669,
+       "hl": false
+      },
+      {
+       "text": "again",
+       "start": 18.669,
+       "end": 19.053,
+       "hl": false
+      },
+      {
+       "text": "from",
+       "start": 19.053,
+       "end": 19.438,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 19.438,
+       "end": 19.822,
+       "hl": false
+      },
+      {
+       "text": "top.",
+       "start": 19.822,
+       "end": 20.207,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The variable starts fresh, back to <b>zero</b>.",
+     "speaker": null,
+     "start": 20.357,
+     "end": 23.049,
+     "words": [
+      {
+       "text": "The",
+       "start": 20.357,
+       "end": 20.742,
+       "hl": false
+      },
+      {
+       "text": "variable",
+       "start": 20.742,
+       "end": 21.126,
+       "hl": false
+      },
+      {
+       "text": "starts",
+       "start": 21.126,
+       "end": 21.511,
+       "hl": false
+      },
+      {
+       "text": "fresh,",
+       "start": 21.511,
+       "end": 21.895,
+       "hl": false
+      },
+      {
+       "text": "back",
+       "start": 21.895,
+       "end": 22.28,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 22.28,
+       "end": 22.664,
+       "hl": false
+      },
+      {
+       "text": "zero.",
+       "start": 22.664,
+       "end": 23.049,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "beat": "break_2",
+   "chapter": null,
+   "start": 23.499,
+   "end": 30.218,
+   "field": "paper",
+   "transition": "cut",
+   "label": "AND ALSO",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "never updates"
+      ],
+      "tones": [
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 698.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Never tells React",
+      "tone": "bad",
+      "icon": "x"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 822.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 23.499,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 25.003,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "plain"
+    },
+    {
+     "t": 25.772,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Never tells React"
+    },
+    {
+     "t": 27.31,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "changed"
+    },
+    {
+     "t": 28.614,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "screen"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Worse, changing a plain variable never tells React anything changed.",
+     "speaker": null,
+     "start": 23.849,
+     "end": 27.695,
+     "words": [
+      {
+       "text": "Worse,",
+       "start": 23.849,
+       "end": 24.234,
+       "hl": false
+      },
+      {
+       "text": "changing",
+       "start": 24.234,
+       "end": 24.618,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 24.618,
+       "end": 25.003,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 25.003,
+       "end": 25.387,
+       "hl": false
+      },
+      {
+       "text": "variable",
+       "start": 25.387,
+       "end": 25.772,
+       "hl": false
+      },
+      {
+       "text": "never",
+       "start": 25.772,
+       "end": 26.157,
+       "hl": false
+      },
+      {
+       "text": "tells",
+       "start": 26.157,
+       "end": 26.541,
+       "hl": false
+      },
+      {
+       "text": "React",
+       "start": 26.541,
+       "end": 26.926,
+       "hl": false
+      },
+      {
+       "text": "anything",
+       "start": 26.926,
+       "end": 27.31,
+       "hl": false
+      },
+      {
+       "text": "changed.",
+       "start": 27.31,
+       "end": 27.695,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "So the screen <b>never updates</b>.",
+     "speaker": null,
+     "start": 27.845,
+     "end": 29.768,
+     "words": [
+      {
+       "text": "So",
+       "start": 27.845,
+       "end": 28.23,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 28.23,
+       "end": 28.614,
+       "hl": false
+      },
+      {
+       "text": "screen",
+       "start": 28.614,
+       "end": 28.999,
+       "hl": false
+      },
+      {
+       "text": "never",
+       "start": 28.999,
+       "end": 29.383,
+       "hl": true
+      },
+      {
+       "text": "updates.",
+       "start": 29.383,
+       "end": 29.768,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "beat": "fix_idea",
+   "chapter": null,
+   "start": 30.218,
+   "end": 38.625,
+   "field": "blue",
+   "transition": "double_bar_wipe",
+   "label": "THE FIX",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "USESTATE",
+      "accent": [
+       "USESTATE"
+      ],
+      "lines": [
+       "USESTATE"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 746.8,
+      "w": 960.0,
+      "h": 106.4
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 30.568,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "useState"
+    },
+    {
+     "t": 32.641,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "keeps"
+    },
+    {
+     "t": 34.564,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "own"
+    },
+    {
+     "t": 35.868,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "hands"
+    },
+    {
+     "t": 36.637,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "back"
+    }
+   ],
+   "captions": [
+    {
+     "text": "<b>useState</b> fixes both.",
+     "speaker": null,
+     "start": 30.568,
+     "end": 32.106,
+     "words": [
+      {
+       "text": "useState",
+       "start": 30.568,
+       "end": 31.081,
+       "hl": true
+      },
+      {
+       "text": "fixes",
+       "start": 31.081,
+       "end": 31.593,
+       "hl": false
+      },
+      {
+       "text": "both.",
+       "start": 31.593,
+       "end": 32.106,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "React keeps the value in its own memory.",
+     "speaker": null,
+     "start": 32.256,
+     "end": 35.333,
+     "words": [
+      {
+       "text": "React",
+       "start": 32.256,
+       "end": 32.641,
+       "hl": false
+      },
+      {
+       "text": "keeps",
+       "start": 32.641,
+       "end": 33.025,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 33.025,
+       "end": 33.41,
+       "hl": false
+      },
+      {
+       "text": "value",
+       "start": 33.41,
+       "end": 33.794,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 33.794,
+       "end": 34.179,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 34.179,
+       "end": 34.564,
+       "hl": false
+      },
+      {
+       "text": "own",
+       "start": 34.564,
+       "end": 34.948,
+       "hl": false
+      },
+      {
+       "text": "memory.",
+       "start": 34.948,
+       "end": 35.333,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "It hands it back on every render.",
+     "speaker": null,
+     "start": 35.483,
+     "end": 38.175,
+     "words": [
+      {
+       "text": "It",
+       "start": 35.483,
+       "end": 35.868,
+       "hl": false
+      },
+      {
+       "text": "hands",
+       "start": 35.868,
+       "end": 36.252,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 36.252,
+       "end": 36.637,
+       "hl": false
+      },
+      {
+       "text": "back",
+       "start": 36.637,
+       "end": 37.021,
+       "hl": false
+      },
+      {
+       "text": "on",
+       "start": 37.021,
+       "end": 37.406,
+       "hl": false
+      },
+      {
+       "text": "every",
+       "start": 37.406,
+       "end": 37.79,
+       "hl": false
+      },
+      {
+       "text": "render.",
+       "start": 37.79,
+       "end": 38.175,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s07",
+   "beat": "fix_flow",
+   "chapter": null,
+   "start": 38.625,
+   "end": 46.883,
+   "field": "paper",
+   "transition": "diagonal_stripes",
+   "label": "HOW IT WORKS",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "trigger_chip",
+     "props": {
+      "label": "setLikes"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 658.0,
+      "w": 960.0,
+      "h": 84.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Re-renders",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 862.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "connector",
+     "props": {
+      "from": "o1",
+      "to": "o2",
+      "tone": "info",
+      "points": [
+       [
+        540.0,
+        752.0
+       ],
+       [
+        540.0,
+        852.0
+       ]
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 38.625,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 39.437,
+     "do": "enter",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "setLikes"
+    },
+    {
+     "t": 39.437,
+     "do": "pulse",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "setLikes"
+    },
+    {
+     "t": 41.433,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "Call"
+    },
+    {
+     "t": 42.971,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "updates"
+    },
+    {
+     "t": 44.51,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "re-renders"
+    },
+    {
+     "t": 45.664,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "new"
+    }
+   ],
+   "captions": [
+    {
+     "text": "And <b>setLikes</b> is the trigger.",
+     "speaker": null,
+     "start": 38.975,
+     "end": 41.283,
+     "words": [
+      {
+       "text": "And",
+       "start": 38.975,
+       "end": 39.437,
+       "hl": false
+      },
+      {
+       "text": "setLikes",
+       "start": 39.437,
+       "end": 39.898,
+       "hl": true
+      },
+      {
+       "text": "is",
+       "start": 39.898,
+       "end": 40.36,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 40.36,
+       "end": 40.821,
+       "hl": false
+      },
+      {
+       "text": "trigger.",
+       "start": 40.821,
+       "end": 41.283,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Call it, and React updates its memory, then <b>re-renders</b> using the new value.",
+     "speaker": null,
+     "start": 41.433,
+     "end": 46.433,
+     "words": [
+      {
+       "text": "Call",
+       "start": 41.433,
+       "end": 41.818,
+       "hl": false
+      },
+      {
+       "text": "it,",
+       "start": 41.818,
+       "end": 42.202,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 42.202,
+       "end": 42.587,
+       "hl": false
+      },
+      {
+       "text": "React",
+       "start": 42.587,
+       "end": 42.971,
+       "hl": false
+      },
+      {
+       "text": "updates",
+       "start": 42.971,
+       "end": 43.356,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 43.356,
+       "end": 43.741,
+       "hl": false
+      },
+      {
+       "text": "memory,",
+       "start": 43.741,
+       "end": 44.125,
+       "hl": false
+      },
+      {
+       "text": "then",
+       "start": 44.125,
+       "end": 44.51,
+       "hl": false
+      },
+      {
+       "text": "re-renders",
+       "start": 44.51,
+       "end": 44.895,
+       "hl": true
+      },
+      {
+       "text": "using",
+       "start": 44.895,
+       "end": 45.279,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 45.279,
+       "end": 45.664,
+       "hl": false
+      },
+      {
+       "text": "new",
+       "start": 45.664,
+       "end": 46.048,
+       "hl": false
+      },
+      {
+       "text": "value.",
+       "start": 46.048,
+       "end": 46.433,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "code_map",
+   "chapter": null,
+   "start": 46.883,
+   "end": 52.683,
+   "field": "paper",
+   "transition": "cut",
+   "label": "gives you the value",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_map",
+     "props": {
+      "lines": [
+       "const [likes, setLikes] =",
+       "  useState(0);"
+      ],
+      "parts": [
+       {
+        "code": "useState(0)",
+        "icon": "refresh",
+        "label": "gives you the value"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 46.883,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 48.233,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "useState(0)"
+    },
+    {
+     "t": 50.233,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "value"
+    },
+    {
+     "t": 51.733,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "setter"
+    }
+   ],
+   "captions": [
+    {
+     "text": "In code, <b>useState(0)</b> gives you the value and its <b>setter</b>.",
+     "speaker": null,
+     "start": 47.233,
+     "end": 52.233,
+     "words": [
+      {
+       "text": "In",
+       "start": 47.233,
+       "end": 47.733,
+       "hl": false
+      },
+      {
+       "text": "code,",
+       "start": 47.733,
+       "end": 48.233,
+       "hl": false
+      },
+      {
+       "text": "useState(0)",
+       "start": 48.233,
+       "end": 48.733,
+       "hl": true
+      },
+      {
+       "text": "gives",
+       "start": 48.733,
+       "end": 49.233,
+       "hl": false
+      },
+      {
+       "text": "you",
+       "start": 49.233,
+       "end": 49.733,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 49.733,
+       "end": 50.233,
+       "hl": false
+      },
+      {
+       "text": "value",
+       "start": 50.233,
+       "end": 50.733,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 50.733,
+       "end": 51.233,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 51.233,
+       "end": 51.733,
+       "hl": false
+      },
+      {
+       "text": "setter.",
+       "start": 51.733,
+       "end": 52.233,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s09",
+   "beat": "payoff",
+   "chapter": null,
+   "start": 52.683,
+   "end": 56.945,
+   "field": "navy",
+   "transition": "stack_rise",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "NOW EVERY TAP STICKS, AND YOUR LIKES KEEP",
+      "accent": [
+       "STICKS"
+      ],
+      "lines": [
+       "NOW EVERY TAP",
+       "STICKS, AND YOUR",
+       "LIKES KEEP"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 576.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Sticks",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 943.6,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 52.683,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 54.187,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "sticks"
+    },
+    {
+     "t": 55.726,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "keep"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Now every tap <b>sticks</b>, and your likes keep climbing.",
+     "speaker": null,
+     "start": 53.033,
+     "end": 56.495,
+     "words": [
+      {
+       "text": "Now",
+       "start": 53.033,
+       "end": 53.418,
+       "hl": false
+      },
+      {
+       "text": "every",
+       "start": 53.418,
+       "end": 53.802,
+       "hl": false
+      },
+      {
+       "text": "tap",
+       "start": 53.802,
+       "end": 54.187,
+       "hl": false
+      },
+      {
+       "text": "sticks,",
+       "start": 54.187,
+       "end": 54.572,
+       "hl": true
+      },
+      {
+       "text": "and",
+       "start": 54.572,
+       "end": 54.956,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 54.956,
+       "end": 55.341,
+       "hl": false
+      },
+      {
+       "text": "likes",
+       "start": 55.341,
+       "end": 55.726,
+       "hl": false
+      },
+      {
+       "text": "keep",
+       "start": 55.726,
+       "end": 56.11,
+       "hl": false
+      },
+      {
+       "text": "climbing.",
+       "start": 56.11,
+       "end": 56.495,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "beat": "recap",
+   "chapter": null,
+   "start": 56.945,
+   "end": 64.583,
+   "field": "paper",
+   "transition": "iris",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "takeaway_list",
+     "props": {
+      "heading": "Key takeaways",
+      "rows": [
+       {
+        "icon": "refresh",
+        "line": "Re-renders reset",
+        "sub": "plain variables start over"
+       },
+       {
+        "icon": "memory",
+        "line": "useState remembers",
+        "sub": "kept between renders"
+       },
+       {
+        "icon": "bolt",
+        "line": "Setters trigger",
+        "sub": "update, then re-render"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 56.945,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 60.81,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "value"
+    },
+    {
+     "t": 62.595,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "updates"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Remember: re-renders reset plain variables.",
+     "speaker": null,
+     "start": 57.295,
+     "end": 59.218,
+     "words": [
+      {
+       "text": "Remember:",
+       "start": 57.295,
+       "end": 57.68,
+       "hl": false
+      },
+      {
+       "text": "re-renders",
+       "start": 57.68,
+       "end": 58.064,
+       "hl": false
+      },
+      {
+       "text": "reset",
+       "start": 58.064,
+       "end": 58.449,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 58.449,
+       "end": 58.833,
+       "hl": false
+      },
+      {
+       "text": "variables.",
+       "start": 58.833,
+       "end": 59.218,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "<b>useState</b> keeps the value.",
+     "speaker": null,
+     "start": 59.368,
+     "end": 61.291,
+     "words": [
+      {
+       "text": "useState",
+       "start": 59.368,
+       "end": 59.849,
+       "hl": true
+      },
+      {
+       "text": "keeps",
+       "start": 59.849,
+       "end": 60.33,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 60.33,
+       "end": 60.81,
+       "hl": false
+      },
+      {
+       "text": "value.",
+       "start": 60.81,
+       "end": 61.291,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "And the setter updates it and re-renders.",
+     "speaker": null,
+     "start": 61.441,
+     "end": 64.133,
+     "words": [
+      {
+       "text": "And",
+       "start": 61.441,
+       "end": 61.826,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 61.826,
+       "end": 62.21,
+       "hl": false
+      },
+      {
+       "text": "setter",
+       "start": 62.21,
+       "end": 62.595,
+       "hl": false
+      },
+      {
+       "text": "updates",
+       "start": 62.595,
+       "end": 62.979,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 62.979,
+       "end": 63.364,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 63.364,
+       "end": 63.748,
+       "hl": false
+      },
+      {
+       "text": "re-renders.",
+       "start": 63.748,
+       "end": 64.133,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s11",
+   "beat": "cta",
+   "chapter": null,
+   "start": 64.583,
+   "end": 68.46,
+   "field": "blue",
+   "transition": "bar_wipe",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "end_card",
+     "props": {
+      "up_next": "How useState creates"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 64.583,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 67.625,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "time"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time.",
+     "speaker": null,
+     "start": 64.933,
+     "end": 68.01,
+     "words": [
+      {
+       "text": "Follow",
+       "start": 64.933,
+       "end": 65.318,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 65.318,
+       "end": 65.702,
+       "hl": false
+      },
+      {
+       "text": "more,",
+       "start": 65.702,
+       "end": 66.087,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 66.087,
+       "end": 66.472,
+       "hl": false
+      },
+      {
+       "text": "idea",
+       "start": 66.472,
+       "end": 66.856,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 66.856,
+       "end": 67.241,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 67.241,
+       "end": 67.625,
+       "hl": false
+      },
+      {
+       "text": "time.",
+       "start": 67.625,
+       "end": 68.01,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  }
+ ]
+}

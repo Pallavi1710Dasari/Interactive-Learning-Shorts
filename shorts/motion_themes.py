@@ -45,6 +45,8 @@ AVATAR_KINDS = ("language", "host")
 #: Colours with a fixed meaning in every motion reel (web/src/motion/tokens.ts):
 #: coral failure, mint success, lavender system-added. No avatar may wear them.
 RESERVED_COLOURS = frozenset({"#f2555a", "#17b27b", "#b9a8ff"})
+#: The four field colours (web/src/motion/tokens.ts FIELDS).
+FIELD_COLOURS = ("#091025", "#283EE6", "#ECF0F7", "#FDD13E")
 
 TAG_RE = re.compile(r"^#[a-z0-9]+$")
 MAX_CONCEPT_TAGS = 3
@@ -291,6 +293,34 @@ class AvatarPalette(BaseModel):
             if colour.lower() in RESERVED_COLOURS:
                 raise ValueError(f"palette {name} {colour} is reserved (coral = failure, "
                                  f"mint = success, lavender = system-added)")
+        fields = {c.lower() for c in FIELD_COLOURS}
+        if self.primary.lower() in fields:
+            raise ValueError(f"palette primary {self.primary} is a field colour — the body "
+                             f"would vanish on that field")
+        return self
+
+
+class AvatarArt(BaseModel):
+    """What the player draws (web/src/motion/avatars/Avatar.tsx), from the
+    art vocabulary in web/src/motion/library.json."""
+    body: str
+    head: str
+    hair: str
+    skin: str
+    accessories: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def known(self):
+        from .motion_library import library
+        vocab = library()["avatar"]
+        problems = [f"{name} {value!r} is not one of {vocab[key] if key != 'skins' else list(vocab[key])}"
+                    for name, value, key in (("body", self.body, "bodies"), ("head", self.head, "heads"),
+                                             ("hair", self.hair, "hair"), ("skin", self.skin, "skins"))
+                    if value not in vocab[key]]
+        problems += [f"accessory {a!r} is not one of {vocab['accessories']}"
+                     for a in self.accessories if a not in vocab["accessories"]]
+        if problems:
+            raise ValueError("; ".join(problems))
         return self
 
 
@@ -298,6 +328,7 @@ class Avatar(BaseModel):
     id: str
     name: str
     look: str
+    art: AvatarArt
     palette: AvatarPalette
     voice_slot: str
 
@@ -305,11 +336,20 @@ class Avatar(BaseModel):
     def voice_path(self) -> str:
         return f"voices/motion/{self.voice_slot}.wav"
 
+    def spec(self):
+        """The player's view of this avatar (schema.MotionAvatarSpec)."""
+        from .schema import MotionAvatarSpec
+        return MotionAvatarSpec(id=self.id, name=self.name, body=self.art.body,
+                                head=self.art.head, hair=self.art.hair, skin=self.art.skin,
+                                accessories=list(self.art.accessories),
+                                palette=self.palette.model_dump())
+
 
 class AvatarRegistry(BaseModel):
     languages: list[str]
     host: Avatar
     characters: dict[str, Avatar]
+    narrator_slot: str = "motion_narrator"
 
     @model_validator(mode="after")
     def one_per_language(self):
@@ -322,12 +362,22 @@ class AvatarRegistry(BaseModel):
         if missing or extra:
             problems.append(f"one character per course language (missing {missing}, "
                             f"not a language {extra})")
-        slots = [self.host.voice_slot] + [a.voice_slot for a in self.characters.values()]
-        if len(set(slots)) != len(slots):
-            problems.append("voice slots repeat — every character has its own voice")
+        # Voices may be SHARED between characters (a few character voices for
+        # fifteen languages — see docs/reference/phase3/voices.md). The one
+        # rule: the host never shares a voice with a character, so the two
+        # speakers of any two-speaker reel always sound different.
+        clash = sorted({a.id for a in self.characters.values()
+                        if a.voice_slot == self.host.voice_slot})
+        if clash:
+            problems.append(f"the host's voice slot {self.host.voice_slot!r} is also used by "
+                            f"{clash} — a two-speaker reel would have one voice")
         names = [self.host.name] + [a.name for a in self.characters.values()]
         if len(set(names)) != len(names):
             problems.append("character names repeat")
+        looks = [(a.art.body, a.art.head, a.art.hair, tuple(a.art.accessories))
+                 for a in [self.host, *self.characters.values()]]
+        if len(set(looks)) != len(looks):
+            problems.append("two characters share the same body, head, hair and accessories")
         if problems:
             raise ValueError("motion avatar registry: " + "; ".join(problems))
         return self
@@ -338,11 +388,36 @@ def avatars() -> AvatarRegistry:
     data = yaml.safe_load(AVATARS_PATH.read_text(encoding="utf-8")) or {}
     host = Avatar(id="host", **{k: v for k, v in data["host"].items() if k != "id"})
     chars = {lang: Avatar(id=lang, **spec) for lang, spec in (data.get("characters") or {}).items()}
-    return AvatarRegistry(languages=data.get("languages") or [], host=host, characters=chars)
+    return AvatarRegistry(languages=data.get("languages") or [], host=host, characters=chars,
+                          narrator_slot=(data.get("narrator") or {}).get("voice_slot",
+                                                                         "motion_narrator"))
 
 
 def language_tags() -> list[str]:
     return list(avatars().languages)
+
+
+#: The player's copy of the avatar registry, for pages that draw avatars with
+#: no plan loaded (the gallery). Written by `python -m shorts.motion_themes
+#: export-avatars`; motion_scene_test checks it matches the YAML.
+AVATARS_JSON = ROOT.parent / "web" / "src" / "motion" / "avatars" / "avatars.generated.json"
+
+
+def avatars_json() -> str:
+    import json
+    reg = avatars()
+    data = {"_comment": "GENERATED from shorts/motion_avatars.yaml by `python -m shorts.motion_themes "
+                        "export-avatars` — do not edit by hand.",
+            "host": reg.host.spec().model_dump(),
+            "characters": {k: a.spec().model_dump() for k, a in reg.characters.items()}}
+    return json.dumps(data, indent=2) + "\n"
+
+
+def export_avatars() -> Path:
+    AVATARS_JSON.parent.mkdir(parents=True, exist_ok=True)
+    AVATARS_JSON.write_text(avatars_json(), encoding="utf-8")
+    return AVATARS_JSON
+
 
 
 def cast_speakers(theme: ThemeSpec, language: str) -> list[MotionSpeaker]:
@@ -750,3 +825,11 @@ def eligible_themes(*, approach: str | None, has_code: bool, template: str | Non
     return [t for t in registry().ids()
             if not theme_problems(t, approach=approach, has_code=has_code,
                                   template=template, history=history, language=language)]
+
+
+if __name__ == "__main__":
+    import sys
+    if sys.argv[1:] == ["export-avatars"]:
+        print(f"wrote {export_avatars()}")
+    else:
+        raise SystemExit("usage: python -m shorts.motion_themes export-avatars")

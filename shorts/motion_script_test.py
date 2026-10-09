@@ -302,7 +302,7 @@ def test_runner_setup_and_script_then_resume():
         assert (out / short_id / "setup.json").exists()
         script = MotionScript.model_validate_json(motion_file.read_text(encoding="utf-8"))
         assert script.reel_style == "motion" and len(script.shots) == 11
-        assert "Approve shot list?" in text and "scenes: not built yet" in text
+        assert "Approve shot list?" in text and "render: not built yet" in text
         assert script.template == "fix_story" and "template: fix_story" in text
 
         code, text = _run_runner("--topic", short_id)

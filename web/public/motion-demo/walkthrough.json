@@ -1,0 +1,2818 @@
+{
+ "short_id": "stub_how_ai_reads_your_text__motion",
+ "template": "walkthrough",
+ "theme": "step_by_step_walkthrough",
+ "series": "@learnthesimpleway",
+ "concept_name": "tokenization",
+ "duration": 99.958,
+ "audio": null,
+ "timing_source": "even",
+ "cast": [],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "chapter": null,
+   "start": 0.0,
+   "end": 5.715,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "HOW DOES AI READ YOUR TEXT?",
+      "accent": [
+       "AI",
+       "CAN'T"
+      ],
+      "lines": [
+       "HOW DOES AI READ",
+       "YOUR TEXT?"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 616.4,
+      "w": 960.0,
+      "h": 212.8
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "IT CAN'T.",
+      "lines": [
+       "IT CAN'T."
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 877.2,
+      "w": 960.0,
+      "h": 106.4
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 0.0,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 1.504,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "read"
+    },
+    {
+     "t": 2.808,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "It"
+    },
+    {
+     "t": 4.111,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "only"
+    }
+   ],
+   "captions": [
+    {
+     "text": "How does <b>AI</b> read your text?",
+     "speaker": null,
+     "start": 0.35,
+     "end": 2.658,
+     "words": [
+      {
+       "text": "How",
+       "start": 0.35,
+       "end": 0.735,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 0.735,
+       "end": 1.119,
+       "hl": false
+      },
+      {
+       "text": "AI",
+       "start": 1.119,
+       "end": 1.504,
+       "hl": true
+      },
+      {
+       "text": "read",
+       "start": 1.504,
+       "end": 1.889,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 1.889,
+       "end": 2.273,
+       "hl": false
+      },
+      {
+       "text": "text?",
+       "start": 2.273,
+       "end": 2.658,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "It <b>can't</b>.",
+     "speaker": null,
+     "start": 2.808,
+     "end": 3.577,
+     "words": [
+      {
+       "text": "It",
+       "start": 2.808,
+       "end": 3.192,
+       "hl": false
+      },
+      {
+       "text": "can't.",
+       "start": 3.192,
+       "end": 3.577,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "It only reads <b>numbers</b>.",
+     "speaker": null,
+     "start": 3.727,
+     "end": 5.265,
+     "words": [
+      {
+       "text": "It",
+       "start": 3.727,
+       "end": 4.111,
+       "hl": false
+      },
+      {
+       "text": "only",
+       "start": 4.111,
+       "end": 4.496,
+       "hl": false
+      },
+      {
+       "text": "reads",
+       "start": 4.496,
+       "end": 4.88,
+       "hl": false
+      },
+      {
+       "text": "numbers.",
+       "start": 4.88,
+       "end": 5.265,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "beat": "name_it",
+   "chapter": null,
+   "start": 5.715,
+   "end": 9.207,
+   "field": "blue",
+   "transition": "iris",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "TOKENIZATION",
+      "accent": [
+       "TOKENIZATION"
+      ],
+      "lines": [
+       "TOKENIZATION"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 746.8,
+      "w": 960.0,
+      "h": 106.4
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 5.715,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 7.219,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "numbers"
+    },
+    {
+     "t": 8.372,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "tokenization"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Turning words into numbers is called <b>tokenization</b>.",
+     "speaker": null,
+     "start": 6.065,
+     "end": 8.757,
+     "words": [
+      {
+       "text": "Turning",
+       "start": 6.065,
+       "end": 6.45,
+       "hl": false
+      },
+      {
+       "text": "words",
+       "start": 6.45,
+       "end": 6.834,
+       "hl": false
+      },
+      {
+       "text": "into",
+       "start": 6.834,
+       "end": 7.219,
+       "hl": false
+      },
+      {
+       "text": "numbers",
+       "start": 7.219,
+       "end": 7.603,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 7.603,
+       "end": 7.988,
+       "hl": false
+      },
+      {
+       "text": "called",
+       "start": 7.988,
+       "end": 8.372,
+       "hl": false
+      },
+      {
+       "text": "tokenization.",
+       "start": 8.372,
+       "end": 8.757,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "beat": "example",
+   "chapter": null,
+   "start": 9.207,
+   "end": 13.619,
+   "field": "paper",
+   "transition": "bar_wipe",
+   "label": "FOLLOW ONE EXAMPLE",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "Tokenization"
+      ],
+      "tones": [
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 11.096,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "Tokenization"
+    },
+    {
+     "t": 12.4,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "two"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Let's follow <b>one</b> sentence: \u201cTokenization matters.\u201d",
+     "speaker": null,
+     "start": 9.557,
+     "end": 11.865,
+     "words": [
+      {
+       "text": "Let's",
+       "start": 9.557,
+       "end": 9.942,
+       "hl": false
+      },
+      {
+       "text": "follow",
+       "start": 9.942,
+       "end": 10.326,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 10.326,
+       "end": 10.711,
+       "hl": true
+      },
+      {
+       "text": "sentence:",
+       "start": 10.711,
+       "end": 11.096,
+       "hl": false
+      },
+      {
+       "text": "\u201cTokenization",
+       "start": 11.096,
+       "end": 11.48,
+       "hl": false
+      },
+      {
+       "text": "matters.\u201d",
+       "start": 11.48,
+       "end": 11.865,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Just two words.",
+     "speaker": null,
+     "start": 12.015,
+     "end": 13.169,
+     "words": [
+      {
+       "text": "Just",
+       "start": 12.015,
+       "end": 12.4,
+       "hl": false
+      },
+      {
+       "text": "two",
+       "start": 12.4,
+       "end": 12.784,
+       "hl": false
+      },
+      {
+       "text": "words.",
+       "start": 12.784,
+       "end": 13.169,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "chapter_card",
+   "chapter": 1,
+   "start": 13.619,
+   "end": 16.819,
+   "field": "blue",
+   "transition": "double_bar_wipe",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "chapter_card",
+     "props": {
+      "n": 1,
+      "of": 4,
+      "title": "Cut the sentence"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 13.619,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Step <b>one</b>.",
+     "speaker": null,
+     "start": 13.969,
+     "end": 14.738,
+     "words": [
+      {
+       "text": "Step",
+       "start": 13.969,
+       "end": 14.353,
+       "hl": false
+      },
+      {
+       "text": "one.",
+       "start": 14.353,
+       "end": 14.738,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Cut the sentence.",
+     "speaker": null,
+     "start": 14.888,
+     "end": 16.042,
+     "words": [
+      {
+       "text": "Cut",
+       "start": 14.888,
+       "end": 15.273,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 15.273,
+       "end": 15.657,
+       "hl": false
+      },
+      {
+       "text": "sentence.",
+       "start": 15.657,
+       "end": 16.042,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "beat": "chapter",
+   "chapter": 1,
+   "start": 16.819,
+   "end": 23.153,
+   "field": "blue",
+   "transition": "cut",
+   "label": "CUT THE SENTENCE",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "Tokenization",
+       "matters",
+       "."
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 16.819,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 18.707,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "spaces"
+    },
+    {
+     "t": 20.78,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "stop"
+    },
+    {
+     "t": 21.934,
+     "do": "highlight",
+     "target": "o1",
+     "value": "3",
+     "tone": null,
+     "cue": "own"
+    }
+   ],
+   "captions": [
+    {
+     "text": "The tokenizer cuts at <b>spaces</b> and <b>punctuation</b>.",
+     "speaker": null,
+     "start": 17.169,
+     "end": 19.861,
+     "words": [
+      {
+       "text": "The",
+       "start": 17.169,
+       "end": 17.554,
+       "hl": false
+      },
+      {
+       "text": "tokenizer",
+       "start": 17.554,
+       "end": 17.938,
+       "hl": false
+      },
+      {
+       "text": "cuts",
+       "start": 17.938,
+       "end": 18.323,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 18.323,
+       "end": 18.707,
+       "hl": false
+      },
+      {
+       "text": "spaces",
+       "start": 18.707,
+       "end": 19.092,
+       "hl": true
+      },
+      {
+       "text": "and",
+       "start": 19.092,
+       "end": 19.476,
+       "hl": false
+      },
+      {
+       "text": "punctuation.",
+       "start": 19.476,
+       "end": 19.861,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The full stop becomes its <b>own</b> piece.",
+     "speaker": null,
+     "start": 20.011,
+     "end": 22.703,
+     "words": [
+      {
+       "text": "The",
+       "start": 20.011,
+       "end": 20.396,
+       "hl": false
+      },
+      {
+       "text": "full",
+       "start": 20.396,
+       "end": 20.78,
+       "hl": false
+      },
+      {
+       "text": "stop",
+       "start": 20.78,
+       "end": 21.165,
+       "hl": false
+      },
+      {
+       "text": "becomes",
+       "start": 21.165,
+       "end": 21.549,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 21.549,
+       "end": 21.934,
+       "hl": false
+      },
+      {
+       "text": "own",
+       "start": 21.934,
+       "end": 22.318,
+       "hl": true
+      },
+      {
+       "text": "piece.",
+       "start": 22.318,
+       "end": 22.703,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "beat": "chapter_card",
+   "chapter": 2,
+   "start": 23.153,
+   "end": 26.353,
+   "field": "paper",
+   "transition": "diagonal_stripes",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "chapter_card",
+     "props": {
+      "n": 2,
+      "of": 4,
+      "title": "Check the word shelf"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 23.153,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Step <b>two</b>.",
+     "speaker": null,
+     "start": 23.503,
+     "end": 24.272,
+     "words": [
+      {
+       "text": "Step",
+       "start": 23.503,
+       "end": 23.887,
+       "hl": false
+      },
+      {
+       "text": "two.",
+       "start": 23.887,
+       "end": 24.272,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Check the shelf.",
+     "speaker": null,
+     "start": 24.422,
+     "end": 25.576,
+     "words": [
+      {
+       "text": "Check",
+       "start": 24.422,
+       "end": 24.807,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 24.807,
+       "end": 25.191,
+       "hl": false
+      },
+      {
+       "text": "shelf.",
+       "start": 25.191,
+       "end": 25.576,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s07",
+   "beat": "chapter",
+   "chapter": 2,
+   "start": 26.353,
+   "end": 34.996,
+   "field": "paper",
+   "transition": "cut",
+   "label": "CHECK THE WORD SHELF",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "Tokenization",
+       "matters",
+       "."
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 26.353,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 28.242,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "fixed"
+    },
+    {
+     "t": 29.395,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "word"
+    },
+    {
+     "t": 30.549,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "knows"
+    },
+    {
+     "t": 32.623,
+     "do": "highlight",
+     "target": "o1",
+     "value": "3",
+     "tone": null,
+     "cue": "knows about"
+    },
+    {
+     "t": 33.777,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "lakh"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Every model has a fixed list of word pieces it knows, called its <b>vocabulary</b>.",
+     "speaker": null,
+     "start": 26.703,
+     "end": 32.088,
+     "words": [
+      {
+       "text": "Every",
+       "start": 26.703,
+       "end": 27.088,
+       "hl": false
+      },
+      {
+       "text": "model",
+       "start": 27.088,
+       "end": 27.472,
+       "hl": false
+      },
+      {
+       "text": "has",
+       "start": 27.472,
+       "end": 27.857,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 27.857,
+       "end": 28.242,
+       "hl": false
+      },
+      {
+       "text": "fixed",
+       "start": 28.242,
+       "end": 28.626,
+       "hl": false
+      },
+      {
+       "text": "list",
+       "start": 28.626,
+       "end": 29.011,
+       "hl": false
+      },
+      {
+       "text": "of",
+       "start": 29.011,
+       "end": 29.395,
+       "hl": false
+      },
+      {
+       "text": "word",
+       "start": 29.395,
+       "end": 29.78,
+       "hl": false
+      },
+      {
+       "text": "pieces",
+       "start": 29.78,
+       "end": 30.165,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 30.165,
+       "end": 30.549,
+       "hl": false
+      },
+      {
+       "text": "knows,",
+       "start": 30.549,
+       "end": 30.934,
+       "hl": false
+      },
+      {
+       "text": "called",
+       "start": 30.934,
+       "end": 31.319,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 31.319,
+       "end": 31.703,
+       "hl": false
+      },
+      {
+       "text": "vocabulary.",
+       "start": 31.703,
+       "end": 32.088,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Ours knows about <b>1.2 lakh</b> pieces.",
+     "speaker": null,
+     "start": 32.238,
+     "end": 34.546,
+     "words": [
+      {
+       "text": "Ours",
+       "start": 32.238,
+       "end": 32.623,
+       "hl": false
+      },
+      {
+       "text": "knows",
+       "start": 32.623,
+       "end": 33.007,
+       "hl": false
+      },
+      {
+       "text": "about",
+       "start": 33.007,
+       "end": 33.392,
+       "hl": false
+      },
+      {
+       "text": "1.2",
+       "start": 33.392,
+       "end": 33.777,
+       "hl": true
+      },
+      {
+       "text": "lakh",
+       "start": 33.777,
+       "end": 34.161,
+       "hl": true
+      },
+      {
+       "text": "pieces.",
+       "start": 34.161,
+       "end": 34.546,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "chapter",
+   "chapter": 2,
+   "start": 34.996,
+   "end": 42.1,
+   "field": "paper",
+   "transition": "cut",
+   "label": "CHECK THE WORD SHELF",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "Tokenization",
+       "matters",
+       "."
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 34.996,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 36.885,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "shelf"
+    },
+    {
+     "t": 38.423,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "not"
+    },
+    {
+     "t": 40.112,
+     "do": "highlight",
+     "target": "o1",
+     "value": "3",
+     "tone": null,
+     "cue": "built"
+    }
+   ],
+   "captions": [
+    {
+     "text": "\u201cMatters\u201d is on the shelf, but \u201ctokenization\u201d is not.",
+     "speaker": null,
+     "start": 35.346,
+     "end": 38.808,
+     "words": [
+      {
+       "text": "\u201cMatters\u201d",
+       "start": 35.346,
+       "end": 35.731,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 35.731,
+       "end": 36.115,
+       "hl": false
+      },
+      {
+       "text": "on",
+       "start": 36.115,
+       "end": 36.5,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 36.5,
+       "end": 36.885,
+       "hl": false
+      },
+      {
+       "text": "shelf,",
+       "start": 36.885,
+       "end": 37.269,
+       "hl": false
+      },
+      {
+       "text": "but",
+       "start": 37.269,
+       "end": 37.654,
+       "hl": false
+      },
+      {
+       "text": "\u201ctokenization\u201d",
+       "start": 37.654,
+       "end": 38.039,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 38.039,
+       "end": 38.423,
+       "hl": false
+      },
+      {
+       "text": "not.",
+       "start": 38.423,
+       "end": 38.808,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "So it is built from <b>smaller pieces</b>.",
+     "speaker": null,
+     "start": 38.958,
+     "end": 41.65,
+     "words": [
+      {
+       "text": "So",
+       "start": 38.958,
+       "end": 39.343,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 39.343,
+       "end": 39.727,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 39.727,
+       "end": 40.112,
+       "hl": false
+      },
+      {
+       "text": "built",
+       "start": 40.112,
+       "end": 40.496,
+       "hl": false
+      },
+      {
+       "text": "from",
+       "start": 40.496,
+       "end": 40.881,
+       "hl": false
+      },
+      {
+       "text": "smaller",
+       "start": 40.881,
+       "end": 41.265,
+       "hl": true
+      },
+      {
+       "text": "pieces.",
+       "start": 41.265,
+       "end": 41.65,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s09",
+   "beat": "chapter",
+   "chapter": 2,
+   "start": 42.1,
+   "end": 49.953,
+   "field": "paper",
+   "transition": "cut",
+   "label": "CHECK THE WORD SHELF",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "To",
+       "##ken",
+       "##ization",
+       "matters",
+       "."
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 42.1,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 44.354,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "shelf"
+    },
+    {
+     "t": 46.042,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "longest"
+    },
+    {
+     "t": 47.58,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "To"
+    },
+    {
+     "t": 48.349,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "##ken"
+    }
+   ],
+   "captions": [
+    {
+     "text": "\u201cToken\u201d?",
+     "speaker": null,
+     "start": 42.45,
+     "end": 43.05,
+     "words": [
+      {
+       "text": "\u201cToken\u201d?",
+       "start": 42.45,
+       "end": 43.05,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Not on the shelf.",
+     "speaker": null,
+     "start": 43.2,
+     "end": 44.738,
+     "words": [
+      {
+       "text": "Not",
+       "start": 43.2,
+       "end": 43.585,
+       "hl": false
+      },
+      {
+       "text": "on",
+       "start": 43.585,
+       "end": 43.969,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 43.969,
+       "end": 44.354,
+       "hl": false
+      },
+      {
+       "text": "shelf.",
+       "start": 44.354,
+       "end": 44.738,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "It takes the longest piece that fits: <b>To</b>, then <b>##ken</b>, then ##ization.",
+     "speaker": null,
+     "start": 44.888,
+     "end": 49.503,
+     "words": [
+      {
+       "text": "It",
+       "start": 44.888,
+       "end": 45.273,
+       "hl": false
+      },
+      {
+       "text": "takes",
+       "start": 45.273,
+       "end": 45.657,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 45.657,
+       "end": 46.042,
+       "hl": false
+      },
+      {
+       "text": "longest",
+       "start": 46.042,
+       "end": 46.426,
+       "hl": false
+      },
+      {
+       "text": "piece",
+       "start": 46.426,
+       "end": 46.811,
+       "hl": false
+      },
+      {
+       "text": "that",
+       "start": 46.811,
+       "end": 47.196,
+       "hl": false
+      },
+      {
+       "text": "fits:",
+       "start": 47.196,
+       "end": 47.58,
+       "hl": false
+      },
+      {
+       "text": "To,",
+       "start": 47.58,
+       "end": 47.965,
+       "hl": true
+      },
+      {
+       "text": "then",
+       "start": 47.965,
+       "end": 48.349,
+       "hl": false
+      },
+      {
+       "text": "##ken,",
+       "start": 48.349,
+       "end": 48.734,
+       "hl": true
+      },
+      {
+       "text": "then",
+       "start": 48.734,
+       "end": 49.118,
+       "hl": false
+      },
+      {
+       "text": "##ization.",
+       "start": 49.118,
+       "end": 49.503,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "beat": "chapter_card",
+   "chapter": 3,
+   "start": 49.953,
+   "end": 53.153,
+   "field": "yellow",
+   "transition": "stack_rise",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "chapter_card",
+     "props": {
+      "n": 3,
+      "of": 4,
+      "title": "Add special tokens"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 49.953,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Step <b>three</b>.",
+     "speaker": null,
+     "start": 50.303,
+     "end": 51.072,
+     "words": [
+      {
+       "text": "Step",
+       "start": 50.303,
+       "end": 50.688,
+       "hl": false
+      },
+      {
+       "text": "three.",
+       "start": 50.688,
+       "end": 51.072,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Add special tokens.",
+     "speaker": null,
+     "start": 51.222,
+     "end": 52.376,
+     "words": [
+      {
+       "text": "Add",
+       "start": 51.222,
+       "end": 51.607,
+       "hl": false
+      },
+      {
+       "text": "special",
+       "start": 51.607,
+       "end": 51.991,
+       "hl": false
+      },
+      {
+       "text": "tokens.",
+       "start": 51.991,
+       "end": 52.376,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s11",
+   "beat": "chapter",
+   "chapter": 3,
+   "start": 53.153,
+   "end": 60.642,
+   "field": "yellow",
+   "transition": "cut",
+   "label": "ADD SPECIAL TOKENS",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "[CLS]",
+       "To",
+       "##ken",
+       "##ization",
+       "matters",
+       ".",
+       "[SEP]"
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 53.153,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 53.503,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "[CLS]"
+    },
+    {
+     "t": 55.042,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "front"
+    },
+    {
+     "t": 55.811,
+     "do": "highlight",
+     "target": "o1",
+     "value": "7",
+     "tone": null,
+     "cue": "[SEP]"
+    },
+    {
+     "t": 57.884,
+     "do": "highlight",
+     "target": "o1",
+     "value": "3",
+     "tone": null,
+     "cue": "Two"
+    },
+    {
+     "t": 59.423,
+     "do": "highlight",
+     "target": "o1",
+     "value": "4",
+     "tone": null,
+     "cue": "seven"
+    }
+   ],
+   "captions": [
+    {
+     "text": "<b>[CLS]</b> goes at the front, and <b>[SEP]</b> goes at the end.",
+     "speaker": null,
+     "start": 53.503,
+     "end": 57.734,
+     "words": [
+      {
+       "text": "[CLS]",
+       "start": 53.503,
+       "end": 53.888,
+       "hl": true
+      },
+      {
+       "text": "goes",
+       "start": 53.888,
+       "end": 54.272,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 54.272,
+       "end": 54.657,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 54.657,
+       "end": 55.042,
+       "hl": false
+      },
+      {
+       "text": "front,",
+       "start": 55.042,
+       "end": 55.426,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 55.426,
+       "end": 55.811,
+       "hl": false
+      },
+      {
+       "text": "[SEP]",
+       "start": 55.811,
+       "end": 56.195,
+       "hl": true
+      },
+      {
+       "text": "goes",
+       "start": 56.195,
+       "end": 56.58,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 56.58,
+       "end": 56.965,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 56.965,
+       "end": 57.349,
+       "hl": false
+      },
+      {
+       "text": "end.",
+       "start": 57.349,
+       "end": 57.734,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Two words are now <b>seven</b> tokens.",
+     "speaker": null,
+     "start": 57.884,
+     "end": 60.192,
+     "words": [
+      {
+       "text": "Two",
+       "start": 57.884,
+       "end": 58.269,
+       "hl": false
+      },
+      {
+       "text": "words",
+       "start": 58.269,
+       "end": 58.653,
+       "hl": false
+      },
+      {
+       "text": "are",
+       "start": 58.653,
+       "end": 59.038,
+       "hl": false
+      },
+      {
+       "text": "now",
+       "start": 59.038,
+       "end": 59.423,
+       "hl": false
+      },
+      {
+       "text": "seven",
+       "start": 59.423,
+       "end": 59.807,
+       "hl": true
+      },
+      {
+       "text": "tokens.",
+       "start": 59.807,
+       "end": 60.192,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s12",
+   "beat": "chapter",
+   "chapter": 3,
+   "start": 60.642,
+   "end": 66.423,
+   "field": "yellow",
+   "transition": "cut",
+   "label": "ADD SPECIAL TOKENS",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "[CLS]",
+       "To",
+       "##ken",
+       "##ization",
+       "matters",
+       ".",
+       "[SEP]"
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 60.642,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 62.511,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "gathers"
+    },
+    {
+     "t": 64.434,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "whole"
+    },
+    {
+     "t": 65.588,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "[CLS]"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Why?",
+     "speaker": null,
+     "start": 60.992,
+     "end": 61.592,
+     "words": [
+      {
+       "text": "Why?",
+       "start": 60.992,
+       "end": 61.592,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The model gathers a <b>summary</b> of the whole sentence into <b>[CLS]</b>.",
+     "speaker": null,
+     "start": 61.742,
+     "end": 65.973,
+     "words": [
+      {
+       "text": "The",
+       "start": 61.742,
+       "end": 62.127,
+       "hl": false
+      },
+      {
+       "text": "model",
+       "start": 62.127,
+       "end": 62.511,
+       "hl": false
+      },
+      {
+       "text": "gathers",
+       "start": 62.511,
+       "end": 62.896,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 62.896,
+       "end": 63.281,
+       "hl": false
+      },
+      {
+       "text": "summary",
+       "start": 63.281,
+       "end": 63.665,
+       "hl": true
+      },
+      {
+       "text": "of",
+       "start": 63.665,
+       "end": 64.05,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 64.05,
+       "end": 64.434,
+       "hl": false
+      },
+      {
+       "text": "whole",
+       "start": 64.434,
+       "end": 64.819,
+       "hl": false
+      },
+      {
+       "text": "sentence",
+       "start": 64.819,
+       "end": 65.204,
+       "hl": false
+      },
+      {
+       "text": "into",
+       "start": 65.204,
+       "end": 65.588,
+       "hl": false
+      },
+      {
+       "text": "[CLS].",
+       "start": 65.588,
+       "end": 65.973,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s13",
+   "beat": "chapter_card",
+   "chapter": 4,
+   "start": 66.423,
+   "end": 69.623,
+   "field": "paper",
+   "transition": "iris",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "chapter_card",
+     "props": {
+      "n": 4,
+      "of": 4,
+      "title": "Swap each token for a number"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 66.423,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Step <b>four</b>.",
+     "speaker": null,
+     "start": 66.773,
+     "end": 67.542,
+     "words": [
+      {
+       "text": "Step",
+       "start": 66.773,
+       "end": 67.158,
+       "hl": false
+      },
+      {
+       "text": "four.",
+       "start": 67.158,
+       "end": 67.542,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Swap in numbers.",
+     "speaker": null,
+     "start": 67.692,
+     "end": 68.846,
+     "words": [
+      {
+       "text": "Swap",
+       "start": 67.692,
+       "end": 68.077,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 68.077,
+       "end": 68.461,
+       "hl": false
+      },
+      {
+       "text": "numbers.",
+       "start": 68.461,
+       "end": 68.846,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s14",
+   "beat": "chapter",
+   "chapter": 4,
+   "start": 69.623,
+   "end": 75.423,
+   "field": "paper",
+   "transition": "cut",
+   "label": "SWAP EACH TOKEN FOR A NUMBER",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "[CLS]",
+       "To",
+       "##ken",
+       "##ization",
+       "matters",
+       ".",
+       "[SEP]"
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 69.623,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 70.742,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "piece"
+    },
+    {
+     "t": 71.896,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "fixed"
+    },
+    {
+     "t": 73.819,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "number"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Every shelf piece has a fixed <b>ID</b>, like a roll number in class.",
+     "speaker": null,
+     "start": 69.973,
+     "end": 74.973,
+     "words": [
+      {
+       "text": "Every",
+       "start": 69.973,
+       "end": 70.358,
+       "hl": false
+      },
+      {
+       "text": "shelf",
+       "start": 70.358,
+       "end": 70.742,
+       "hl": false
+      },
+      {
+       "text": "piece",
+       "start": 70.742,
+       "end": 71.127,
+       "hl": false
+      },
+      {
+       "text": "has",
+       "start": 71.127,
+       "end": 71.511,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 71.511,
+       "end": 71.896,
+       "hl": false
+      },
+      {
+       "text": "fixed",
+       "start": 71.896,
+       "end": 72.281,
+       "hl": false
+      },
+      {
+       "text": "ID,",
+       "start": 72.281,
+       "end": 72.665,
+       "hl": true
+      },
+      {
+       "text": "like",
+       "start": 72.665,
+       "end": 73.05,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 73.05,
+       "end": 73.435,
+       "hl": false
+      },
+      {
+       "text": "roll",
+       "start": 73.435,
+       "end": 73.819,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 73.819,
+       "end": 74.204,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 74.204,
+       "end": 74.588,
+       "hl": false
+      },
+      {
+       "text": "class.",
+       "start": 74.588,
+       "end": 74.973,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s15",
+   "beat": "chapter",
+   "chapter": 4,
+   "start": 75.423,
+   "end": 80.988,
+   "field": "paper",
+   "transition": "cut",
+   "label": "SWAP EACH TOKEN FOR A NUMBER",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "101",
+       "11469",
+       "11862",
+       "19988",
+       "50807",
+       "119",
+       "102"
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain",
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 762.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 75.423,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 77.311,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "101"
+    },
+    {
+     "t": 79.384,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "meaning"
+    }
+   ],
+   "captions": [
+    {
+     "text": "For example, <b>[CLS]</b> is <b>101</b>.",
+     "speaker": null,
+     "start": 75.773,
+     "end": 77.696,
+     "words": [
+      {
+       "text": "For",
+       "start": 75.773,
+       "end": 76.158,
+       "hl": false
+      },
+      {
+       "text": "example,",
+       "start": 76.158,
+       "end": 76.542,
+       "hl": false
+      },
+      {
+       "text": "[CLS]",
+       "start": 76.542,
+       "end": 76.927,
+       "hl": true
+      },
+      {
+       "text": "is",
+       "start": 76.927,
+       "end": 77.311,
+       "hl": false
+      },
+      {
+       "text": "101.",
+       "start": 77.311,
+       "end": 77.696,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The number has no meaning by itself.",
+     "speaker": null,
+     "start": 77.846,
+     "end": 80.538,
+     "words": [
+      {
+       "text": "The",
+       "start": 77.846,
+       "end": 78.231,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 78.231,
+       "end": 78.615,
+       "hl": false
+      },
+      {
+       "text": "has",
+       "start": 78.615,
+       "end": 79.0,
+       "hl": false
+      },
+      {
+       "text": "no",
+       "start": 79.0,
+       "end": 79.384,
+       "hl": false
+      },
+      {
+       "text": "meaning",
+       "start": 79.384,
+       "end": 79.769,
+       "hl": false
+      },
+      {
+       "text": "by",
+       "start": 79.769,
+       "end": 80.153,
+       "hl": false
+      },
+      {
+       "text": "itself.",
+       "start": 80.153,
+       "end": 80.538,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s16",
+   "beat": "result",
+   "chapter": null,
+   "start": 80.988,
+   "end": 85.634,
+   "field": "paper",
+   "transition": "cut",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "big_counter",
+     "props": {
+      "value": "1 \u2192 7",
+      "label": "items"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 588.0,
+      "w": 960.0,
+      "h": 300.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "101",
+       "11469",
+       "11862",
+       "19988",
+       "50807",
+       "119",
+       "102"
+      ],
+      "tones": [
+       "ok",
+       "ok",
+       "ok",
+       "ok",
+       "ok",
+       "ok",
+       "ok"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 936.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 80.988,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 80.988,
+     "do": "count",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 82.876,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "seven"
+    },
+    {
+     "t": 84.415,
+     "do": "highlight",
+     "target": "o2",
+     "value": "1",
+     "tone": null,
+     "cue": "seven numbers"
+    }
+   ],
+   "captions": [
+    {
+     "text": "So two words became <b>seven</b> tokens, and then seven <b>numbers</b>.",
+     "speaker": null,
+     "start": 81.338,
+     "end": 85.184,
+     "words": [
+      {
+       "text": "So",
+       "start": 81.338,
+       "end": 81.723,
+       "hl": false
+      },
+      {
+       "text": "two",
+       "start": 81.723,
+       "end": 82.107,
+       "hl": false
+      },
+      {
+       "text": "words",
+       "start": 82.107,
+       "end": 82.492,
+       "hl": false
+      },
+      {
+       "text": "became",
+       "start": 82.492,
+       "end": 82.876,
+       "hl": false
+      },
+      {
+       "text": "seven",
+       "start": 82.876,
+       "end": 83.261,
+       "hl": true
+      },
+      {
+       "text": "tokens,",
+       "start": 83.261,
+       "end": 83.646,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 83.646,
+       "end": 84.03,
+       "hl": false
+      },
+      {
+       "text": "then",
+       "start": 84.03,
+       "end": 84.415,
+       "hl": false
+      },
+      {
+       "text": "seven",
+       "start": 84.415,
+       "end": 84.799,
+       "hl": false
+      },
+      {
+       "text": "numbers.",
+       "start": 84.799,
+       "end": 85.184,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s17",
+   "beat": "takeaway",
+   "chapter": null,
+   "start": 85.634,
+   "end": 89.896,
+   "field": "navy",
+   "transition": "bar_wipe",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "SO ALWAYS COUNT TOKENS WITH YOUR MODEL'S OWN",
+      "accent": [
+       "OWN"
+      ],
+      "lines": [
+       "SO ALWAYS COUNT",
+       "TOKENS WITH YOUR",
+       "MODEL'S OWN"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 640.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 85.634,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 87.138,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "tokens"
+    },
+    {
+     "t": 88.677,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "own"
+    }
+   ],
+   "captions": [
+    {
+     "text": "So always count tokens with your model's <b>own</b> tokenizer.",
+     "speaker": null,
+     "start": 85.984,
+     "end": 89.446,
+     "words": [
+      {
+       "text": "So",
+       "start": 85.984,
+       "end": 86.369,
+       "hl": false
+      },
+      {
+       "text": "always",
+       "start": 86.369,
+       "end": 86.753,
+       "hl": false
+      },
+      {
+       "text": "count",
+       "start": 86.753,
+       "end": 87.138,
+       "hl": false
+      },
+      {
+       "text": "tokens",
+       "start": 87.138,
+       "end": 87.523,
+       "hl": false
+      },
+      {
+       "text": "with",
+       "start": 87.523,
+       "end": 87.907,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 87.907,
+       "end": 88.292,
+       "hl": false
+      },
+      {
+       "text": "model's",
+       "start": 88.292,
+       "end": 88.677,
+       "hl": false
+      },
+      {
+       "text": "own",
+       "start": 88.677,
+       "end": 89.061,
+       "hl": true
+      },
+      {
+       "text": "tokenizer.",
+       "start": 89.061,
+       "end": 89.446,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s18",
+   "beat": "recap",
+   "chapter": null,
+   "start": 89.896,
+   "end": 96.081,
+   "field": "paper",
+   "transition": "double_bar_wipe",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "recap_grid",
+     "props": {
+      "concept": "tokenization",
+      "steps": [
+       "Cut the sentence",
+       "Check the word shelf",
+       "Add special tokens",
+       "Swap each token for a number"
+      ],
+      "final": [
+       "101",
+       "11469",
+       "11862",
+       "19988",
+       "50807",
+       "119",
+       "102"
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 89.896,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 91.785,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "cut"
+    },
+    {
+     "t": 92.939,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "shelf"
+    },
+    {
+     "t": 94.477,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "swap"
+    }
+   ],
+   "captions": [
+    {
+     "text": "<b>Tokenization</b> in four steps: cut, check the shelf, add special tokens, swap in numbers.",
+     "speaker": null,
+     "start": 90.246,
+     "end": 95.631,
+     "words": [
+      {
+       "text": "Tokenization",
+       "start": 90.246,
+       "end": 90.631,
+       "hl": true
+      },
+      {
+       "text": "in",
+       "start": 90.631,
+       "end": 91.015,
+       "hl": false
+      },
+      {
+       "text": "four",
+       "start": 91.015,
+       "end": 91.4,
+       "hl": false
+      },
+      {
+       "text": "steps:",
+       "start": 91.4,
+       "end": 91.785,
+       "hl": false
+      },
+      {
+       "text": "cut,",
+       "start": 91.785,
+       "end": 92.169,
+       "hl": false
+      },
+      {
+       "text": "check",
+       "start": 92.169,
+       "end": 92.554,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 92.554,
+       "end": 92.939,
+       "hl": false
+      },
+      {
+       "text": "shelf,",
+       "start": 92.939,
+       "end": 93.323,
+       "hl": false
+      },
+      {
+       "text": "add",
+       "start": 93.323,
+       "end": 93.708,
+       "hl": false
+      },
+      {
+       "text": "special",
+       "start": 93.708,
+       "end": 94.092,
+       "hl": false
+      },
+      {
+       "text": "tokens,",
+       "start": 94.092,
+       "end": 94.477,
+       "hl": false
+      },
+      {
+       "text": "swap",
+       "start": 94.477,
+       "end": 94.862,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 94.862,
+       "end": 95.246,
+       "hl": false
+      },
+      {
+       "text": "numbers.",
+       "start": 95.246,
+       "end": 95.631,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s19",
+   "beat": "cta",
+   "chapter": null,
+   "start": 96.081,
+   "end": 99.958,
+   "field": "blue",
+   "transition": "diagonal_stripes",
+   "label": "",
+   "layout": "solo",
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "end_card",
+     "props": {},
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 96.081,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 99.123,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "time"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time.",
+     "speaker": null,
+     "start": 96.431,
+     "end": 99.508,
+     "words": [
+      {
+       "text": "Follow",
+       "start": 96.431,
+       "end": 96.816,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 96.816,
+       "end": 97.2,
+       "hl": false
+      },
+      {
+       "text": "more,",
+       "start": 97.2,
+       "end": 97.585,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 97.585,
+       "end": 97.97,
+       "hl": false
+      },
+      {
+       "text": "idea",
+       "start": 97.97,
+       "end": 98.354,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 98.354,
+       "end": 98.739,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 98.739,
+       "end": 99.123,
+       "hl": false
+      },
+      {
+       "text": "time.",
+       "start": 99.123,
+       "end": 99.508,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  }
+ ]
+}

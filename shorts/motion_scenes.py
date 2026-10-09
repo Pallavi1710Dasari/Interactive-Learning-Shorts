@@ -1,0 +1,835 @@
+"""
+Motion SCENES (RESTYLE_TO_MOTION_REELS.md phase 3). REEL_STYLE=motion only.
+
+A scene says what one shot SHOWS: its field colour, the transition into it,
+its objects (kinds from web/src/motion/library.json, the phase 2 library)
+and its timeline actions, each CUED ON A SPOKEN WORD of the shot's captions
+(addendum 4.6 D: label, then object, then state change, then result, each
+tied to the word that names it).
+
+This module is everything about a scene that is a fixed rule:
+  - scene_problems: is a scene drawable (kinds, props, lengths, targets,
+    actions, cues, transitions, does it fit its region);
+  - resolve_cues / resolve_actions: a cue -> a word -> seconds;
+  - layout_scene: where every object goes (the player never decides);
+  - change_events: every visible change, for the 2.5 s cadence rule;
+  - default_scenes: a deterministic beat -> scene mapping for ANY script,
+    built only from the script's own words (captions, highlights, code,
+    icons, chapters). It is the stub answer for SYSTEM_MOTION_SCENES and the
+    baseline any LLM scene is compared with. Nothing in it names a topic.
+"""
+import math
+import re
+
+from . import motion_library as lib
+from .schema import (MotionBox, MotionPlacedObject, MotionScene, MotionSceneAction,
+                     MotionSceneObject, MotionScript, MotionShot, motion_plain_text)
+
+#: The 2.5 s rule (addendum 4.6 D): a visible change at least this often.
+#: Karaoke caption progress does not count.
+MAX_STILL_SECONDS = 2.5
+#: Placed objects per shot — more than this is a slide, not a scene.
+MAX_PLACED = 4
+#: Field transitions rotate and never repeat back to back (addendum 4.6 A);
+#: this is the order, mirroring transitions.tsx's ROTATION.
+ROTATION = ("iris", "bar_wipe", "double_bar_wipe", "diagonal_stripes", "stack_rise")
+
+#: Colour meanings (tokens.ts): coral = failure, mint = success. Which beats
+#: are which. A beat in neither set may use neither colour.
+FAILURE_BEATS = frozenset({"hook", "setup", "break_1", "break_2", "chapter", "example"})
+SUCCESS_BEATS = frozenset({"fix_idea", "fix_flow", "code_map", "payoff", "recap",
+                           "chapter", "result", "takeaway"})
+
+
+# ===================================================================== words
+
+def _key(word: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (word or "").lower())
+
+
+def shot_words(shot: MotionShot) -> list[str]:
+    """The shot's caption words, in order, as cue keys — one per shown word,
+    so an index here is an index into the timing's words too. A word with no
+    letters or digits ("—") has the empty key, which no cue matches."""
+    from .motion_timeline import caption_words
+    return [_key(w) for c in shot.captions for w, _ in caption_words(c.text)]
+
+
+def resolve_cues(shot: MotionShot, scene: MotionScene | None = None) -> list[int | None]:
+    """Each action's cue as an index into shot_words (-1 for "start"), or
+    None when the cue is not found. Cues resolve IN ORDER: each search starts
+    after the previous action's cue, so a repeated word means its next
+    occurrence and the build-up order is the speaking order. An action with
+    exactly the previous action's cue happens WITH it (same word)."""
+    scene = scene or shot.scene
+    words = shot_words(shot)
+    out: list[int | None] = []
+    pos = 0
+    prev_cue: str | None = None
+    for a in scene.actions:
+        if a.at.strip().lower() == "start":
+            out.append(-1)
+            continue
+        cue = [_key(w) for w in a.at.split() if _key(w)]
+        if prev_cue is not None and cue and cue == prev_cue and out and out[-1] is not None:
+            out.append(out[-1])
+            continue
+        prev_cue = cue
+        found = None
+        if cue:
+            for i in range(pos, len(words) - len(cue) + 1):
+                if words[i:i + len(cue)] == cue:
+                    found = i
+                    break
+        out.append(found)
+        if found is not None:
+            pos = found + 1
+    return out
+
+
+def resolve_actions(shot: MotionShot, clock) -> list[tuple[MotionSceneAction, float]]:
+    """Every action with its time on the reel's clock: "start" is the shot's
+    start, a word cue is that word's start. An unresolved cue (which a valid
+    scene never has) falls back to the shot's start rather than vanishing."""
+    words = clock.words()
+    out = []
+    for a, idx in zip(shot.scene.actions, resolve_cues(shot)):
+        if idx is None or idx < 0 or idx >= len(words):
+            out.append((a, clock.start))
+        else:
+            out.append((a, words[idx].start))
+    return out
+
+
+# ==================================================================== layout
+
+def kinetic_lines(text: str) -> list[str]:
+    """kinetic_title's lines: greedy word wrap at the library's
+    chars_per_line. The player draws exactly these lines."""
+    k = lib.library()["kinetic"]
+    lines: list[str] = []
+    for w in text.split():
+        if lines and len(lines[-1]) + 1 + len(w) <= k["chars_per_line"]:
+            lines[-1] += " " + w
+        else:
+            lines.append(w)
+    return lines
+
+
+def object_height(obj: MotionSceneObject) -> float:
+    """An object's height in design units — from the library, or computed
+    from its content for the kinds whose size depends on it."""
+    spec = lib.object_kinds()[obj.kind]
+    if "height" in spec:
+        return float(spec["height"])
+    if obj.kind == "kinetic_title":
+        k = lib.library()["kinetic"]
+        return len(kinetic_lines(str(obj.props.get("text", "")))) * k["size"] * k["line_height"]
+    if obj.kind == "code_window":
+        return 174.0 + 120.0 * len(obj.props.get("lines") or [])
+    if obj.kind == "lookup_table":
+        return 78.0 * (len(obj.props.get("rows") or []) + 1) + 24
+    return 0.0
+
+
+def _region(duo: bool) -> tuple[float, float]:
+    f = lib.library()["frame"]
+    r = f["duo" if duo else "solo"]
+    return float(r["top"]), float(r["bottom"])
+
+
+def stack_height(scene: MotionScene) -> float:
+    """The placed objects' stacked height, gaps included (a connector between
+    two neighbours needs the wider gap it is drawn in)."""
+    f = lib.library()["frame"]
+    placed = [o for o in scene.objects if lib.object_kinds()[o.kind]["layout"] == "placed"]
+    links = {(str(o.props.get("from")), str(o.props.get("to"))) for o in scene.objects
+             if o.kind == "connector"}
+    total = sum(object_height(o) for o in placed)
+    for a, b in zip(placed, placed[1:]):
+        linked = (a.id, b.id) in links or (b.id, a.id) in links
+        total += f["connector_gap"] if linked else f["gap"]
+    return total
+
+
+def layout_scene(scene: MotionScene, duo: bool) -> list[MotionPlacedObject]:
+    """Where everything goes. Placed objects stack top to bottom in the
+    region (solo: the middle of the frame; duo: above the two avatars),
+    centred vertically, each content_w wide. A connector's points run from
+    one object's bottom edge to the next one's top edge. A stamp sits on the
+    region's centre. Full-frame objects draw themselves."""
+    f = lib.library()["frame"]
+    top, bottom = _region(duo)
+    x = (f["w"] - f["content_w"]) / 2
+    kinds = lib.object_kinds()
+    placed = [o for o in scene.objects if kinds[o.kind]["layout"] == "placed"]
+    links = {(str(o.props.get("from")), str(o.props.get("to"))) for o in scene.objects
+             if o.kind == "connector"}
+    y = top + max(0.0, (bottom - top - stack_height(scene)) / 2)
+    boxes: dict[str, MotionBox] = {}
+    for i, o in enumerate(placed):
+        if i:
+            prev = placed[i - 1]
+            linked = (prev.id, o.id) in links or (o.id, prev.id) in links
+            y += f["connector_gap"] if linked else f["gap"]
+        h = object_height(o)
+        boxes[o.id] = MotionBox(x=x, y=round(y, 1), w=f["content_w"], h=round(h, 1))
+        y += h
+    out: list[MotionPlacedObject] = []
+    for o in scene.objects:
+        props = dict(o.props)
+        layout = kinds[o.kind]["layout"]
+        box = boxes.get(o.id)
+        if o.kind == "kinetic_title":
+            props["lines"] = kinetic_lines(str(o.props.get("text", "")))
+        if layout == "overlay":
+            box = MotionBox(x=f["w"] / 2, y=round((top + bottom) / 2, 1), w=0, h=0)
+        if layout == "link":
+            a, b = boxes.get(str(o.props.get("from"))), boxes.get(str(o.props.get("to")))
+            if a and b:
+                upper, lower = (a, b) if a.y <= b.y else (b, a)
+                cx = f["w"] / 2
+                props["points"] = [[cx, round(upper.y + upper.h + 10, 1)],
+                                   [cx, round(lower.y - 10, 1)]]
+        out.append(MotionPlacedObject(id=o.id, kind=o.kind, props=props, box=box))
+    return out
+
+
+# ================================================================ validation
+
+def _type_ok(value, kind: str) -> bool:
+    if kind == "str":
+        return isinstance(value, str) and bool(value.strip())
+    if kind == "int":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == "bool":
+        return isinstance(value, bool)
+    if kind == "tone":
+        return value in lib.tones()
+    if kind == "icon":
+        return value in lib.icon_names()
+    if kind == "str[]":
+        return isinstance(value, list) and bool(value) and all(isinstance(v, str) for v in value)
+    if kind == "tone[]":
+        return isinstance(value, list) and all(v in lib.tones() for v in value)
+    if kind == "rows":        # takeaway rows
+        return isinstance(value, list) and bool(value) and all(
+            isinstance(r, dict) and r.get("icon") in lib.icon_names() and r.get("line") for r in value)
+    if kind == "icons":
+        return isinstance(value, list) and bool(value) and all(
+            isinstance(r, dict) and r.get("name") in lib.icon_names() for r in value)
+    if kind == "parts":       # code_map parts
+        return isinstance(value, list) and bool(value) and all(
+            isinstance(r, dict) and r.get("code") and r.get("icon") in lib.icon_names()
+            and r.get("label") for r in value)
+    if kind == "table":
+        return isinstance(value, list) and bool(value) and all(
+            isinstance(r, list) and len(r) == 2 for r in value)
+    return False
+
+
+def object_problems(obj: MotionSceneObject) -> list[str]:
+    kinds = lib.object_kinds()
+    spec = kinds.get(obj.kind)
+    if spec is None:
+        return [f"{obj.id}: kind {obj.kind!r} is not in the scene library ({', '.join(kinds)})"]
+    problems: list[str] = []
+    for name, kind in spec["props"].items():
+        optional = kind.endswith("?")
+        kind = kind.rstrip("?")
+        if name not in obj.props or obj.props[name] in (None, "", []):
+            if not optional:
+                problems.append(f"{obj.id} ({obj.kind}) needs {name!r}")
+            continue
+        if not _type_ok(obj.props[name], kind):
+            problems.append(f"{obj.id} ({obj.kind}) {name}={obj.props[name]!r} is not a valid {kind}")
+            continue
+        cap = spec.get("max", {}).get(name)
+        val = obj.props[name]
+        length = (len(" ".join(str(v) for v in val)) if isinstance(val, list) else len(str(val)))
+        if cap and length > cap:
+            problems.append(f"{obj.id} ({obj.kind}) {name} is {length} characters, max {cap} "
+                            f"(it would not fit its box)")
+    stray = sorted(set(obj.props) - set(spec["props"]))
+    if stray:
+        problems.append(f"{obj.id} ({obj.kind}) has unknown prop(s) {stray}")
+    if obj.kind == "kinetic_title" and "text" in obj.props:
+        lines = kinetic_lines(str(obj.props["text"]))
+        k = lib.library()["kinetic"]
+        if len(lines) > k["max_lines"] or any(len(l) > k["chars_per_line"] + 3 for l in lines):
+            problems.append(f"{obj.id} (kinetic_title) wraps to {len(lines)} line(s), max "
+                            f"{k['max_lines']} of about {k['chars_per_line']} characters")
+    if obj.kind == "code_window" and obj.props.get("lines"):
+        if len(obj.props["lines"]) > 3 or any(len(l) > 30 for l in obj.props["lines"]):
+            problems.append(f"{obj.id} (code_window) shows more than 3 lines of 30 characters")
+    return problems
+
+
+def scene_problems(shot: MotionShot, scene: MotionScene | None = None, duo: bool = False) -> list[str]:
+    """Why a shot's scene cannot be drawn as given. Empty when it can."""
+    scene = scene if scene is not None else shot.scene
+    if scene is None:
+        return [f"{shot.id} has no scene"]
+    p: list[str] = []
+    kinds = lib.object_kinds()
+    if scene.transition not in lib.transitions():
+        p.append(f"transition {scene.transition!r} is not one of {lib.transitions()}")
+    ids = [o.id for o in scene.objects]
+    if not scene.objects:
+        p.append("no objects — every shot shows something")
+    if len(set(ids)) != len(ids):
+        p.append(f"object ids repeat: {ids}")
+    for o in scene.objects:
+        p += object_problems(o)
+    known = [o for o in scene.objects if o.kind in kinds]
+    full = [o for o in known if kinds[o.kind]["layout"] == "full"]
+    placed = [o for o in known if kinds[o.kind]["layout"] == "placed"]
+    if len(full) > 1 or (full and placed):
+        p.append("a full-frame object (title_card, end_card, takeaway_list, recap_grid, "
+                 "chapter_card, code_map) is the whole shot — nothing else is placed beside it")
+    if len(placed) > MAX_PLACED:
+        p.append(f"{len(placed)} placed objects, max {MAX_PLACED}")
+    for o in known:
+        if o.kind == "connector":
+            ends = [str(o.props.get("from")), str(o.props.get("to"))]
+            bad = [e for e in ends if e not in [q.id for q in placed]]
+            if bad:
+                p.append(f"{o.id} (connector) joins {bad}, which are not placed objects in this shot")
+            elif abs([q.id for q in placed].index(ends[0]) - [q.id for q in placed].index(ends[1])) != 1:
+                p.append(f"{o.id} (connector) joins {ends}, which are not next to each other")
+    top, bottom = _region(duo)
+    if placed and stack_height(scene) > bottom - top:
+        p.append(f"the placed objects stack to {stack_height(scene):.0f} units, the "
+                 f"{'duo' if duo else 'solo'} region is {bottom - top:.0f} — they do not fit")
+    by_id = {o.id: o for o in known}
+    for i, a in enumerate(scene.actions):
+        if a.do not in lib.action_kinds():
+            p.append(f"action {i + 1} {a.do!r} is not one of {sorted(lib.action_kinds())}")
+            continue
+        o = by_id.get(a.target)
+        if o is None:
+            p.append(f"action {i + 1} ({a.do}) targets {a.target!r}, which is not an object here")
+            continue
+        if a.do not in kinds[o.kind]["actions"]:
+            p.append(f"action {i + 1}: {o.kind} cannot {a.do!r} (it can {kinds[o.kind]['actions']})")
+        if a.tone is not None and a.tone not in lib.tones():
+            p.append(f"action {i + 1} tone {a.tone!r} is not one of {lib.tones()}")
+    for a, idx in zip(scene.actions, resolve_cues(shot, scene)):
+        if idx is None:
+            p.append(f"cue {a.at!r} ({a.do} {a.target}) is not a word of this shot's captions, "
+                     f"in order after the previous cue")
+    return p
+
+
+# =================================================================== timing
+
+def change_events(shot: MotionShot, clock) -> list[float]:
+    """Every moment the frame visibly changes in this shot: its start (the
+    transition or cut), each action, and each full-frame card's own built-in
+    entrance steps. Karaoke caption progress is NOT a change (decision
+    2026-10-01)."""
+    kinds = lib.object_kinds()
+    times = [clock.start]
+    entered: dict[str, float] = {}
+    for a, t in resolve_actions(shot, clock):
+        times.append(t)
+        if a.do in ("enter", "stamp"):
+            entered.setdefault(a.target, t)
+    for o in shot.scene.objects:
+        spec = kinds.get(o.kind, {})
+        t0 = entered.get(o.id, clock.start)
+        times += [t0 + b for b in spec.get("builtin", [])]
+    return sorted(t for t in times if clock.start <= t <= clock.end)
+
+
+def longest_still(shot: MotionShot, clock) -> tuple[float, float]:
+    """The longest stretch with no visible change, and when it starts."""
+    ev = change_events(shot, clock) + [clock.end]
+    gaps = [(b - a, a) for a, b in zip(ev, ev[1:])]
+    return max(gaps) if gaps else (clock.end - clock.start, clock.start)
+
+
+# ================================================================= defaults
+
+def _highlights(shot: MotionShot) -> list[str]:
+    """The shot's <b> highlights in order — the words the script itself
+    marked as the ones that matter."""
+    out: list[str] = []
+    for c in shot.captions:
+        out += [re.sub(r"\s+", " ", h).strip(" .,!?") for h in re.findall(r"<b>(.*?)</b>", c.text)]
+    return [h for h in out if h]
+
+
+def _fit(text: str, cap: int) -> str:
+    """`text` cut at a word boundary to at most `cap` characters."""
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= cap:
+        return text
+    cut = text[:cap + 1].rsplit(" ", 1)[0]
+    return cut.rstrip(" ,;:-") or text[:cap]
+
+
+def _kinetic(text: str, cap: int = 54) -> str:
+    """`text` cut (at a word) until it wraps to kinetic_title's line limit."""
+    text = _fit(text, cap)
+    k = lib.library()["kinetic"]
+    while len(kinetic_lines(text)) > k["max_lines"] and " " in text:
+        text = text.rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return text
+
+
+def _first_sentence(shot: MotionShot) -> str:
+    return motion_plain_text(shot.captions[0].text) if shot.captions else shot.speech
+
+
+def _cue_for(phrase: str) -> str:
+    """A cue for a highlight: its first word (a cue is 1-3 words)."""
+    words = [w for w in phrase.split() if _key(w)]
+    return " ".join(words[:3]) if words else "start"
+
+
+class _Builder:
+    def __init__(self, shot: MotionShot):
+        self.shot = shot
+        self.objects: list[MotionSceneObject] = []
+        self.actions: list[MotionSceneAction] = []
+        self._cue_pos = 0
+        self._words = shot_words(shot)
+
+    def add(self, kind: str, **props) -> str:
+        oid = f"o{len(self.objects) + 1}"
+        self.objects.append(MotionSceneObject(id=oid, kind=kind,
+                                              props={k: v for k, v in props.items() if v not in (None, "", [])}))
+        return oid
+
+    def cue(self, phrase: str | None) -> str:
+        """`phrase` as a cue if it is still ahead of the last cue (or is the
+        last cue itself: then it happens with it), else start."""
+        if not phrase or phrase == "start":
+            return "start"
+        key = [_key(w) for w in phrase.split() if _key(w)][:3]
+        last = next((a for a in reversed(self.actions) if a.at != "start"), None)
+        if last is not None and [_key(w) for w in last.at.split() if _key(w)] == key:
+            return last.at
+        for i in range(self._cue_pos, len(self._words) - len(key) + 1):
+            if self._words[i:i + len(key)] == key:
+                self._cue_pos = i + 1
+                return " ".join(phrase.split()[:3])
+        return "start" if not self.actions else ""
+
+    def act(self, do: str, target: str, at: str | None = "start", **kw):
+        cue = self.cue(at) if at != "start" else "start"
+        if cue == "":
+            return
+        self.actions.append(MotionSceneAction(at=cue, do=do, target=target, **kw))
+
+
+def _symptom(shot: MotionShot) -> str:
+    """A short phrase naming what goes wrong: a highlight, else the words
+    around the first symptom word, else the first four words."""
+    from .checks import MOTION_SYMPTOM_WORDS
+    hl = _highlights(shot)
+    words = motion_plain_text(" ".join(c.text for c in shot.captions)).split()
+    small = {"at", "to", "in", "on", "of", "the", "a", "an", "and", "back"}
+    for i, w in enumerate(words):
+        if _key(w) in MOTION_SYMPTOM_WORDS or re.search(r"\d", w):
+            j = min(len(words), i + 3)
+            # never end on a little word: "stuck at" -> "stuck at zero"
+            while j < len(words) and j - i < 5 and _key(words[j - 1]) in small:
+                j += 1
+            phrase = " ".join(words[i:j]).strip(" .,!?")
+            return _fit(phrase[:1].upper() + phrase[1:], 26)
+    if hl:
+        return _fit(hl[-1][:1].upper() + hl[-1][1:], 26)
+    return _fit(" ".join(words[:4]), 26)
+
+
+def _rotation_after(prev: str | None, used: list[str]) -> str:
+    start = (ROTATION.index(prev) + 1) if prev in ROTATION else len(used) % len(ROTATION)
+    return ROTATION[start % len(ROTATION)]
+
+
+#: Words too small to hang an action on — a cue should be a word someone hears.
+_WEAK_CUES = frozenset("a an the and or but so to of in on at it its is are was be by for with "
+                       "as that this then than your you".split())
+
+
+def _fill_cadence(b: _Builder, shot: MotionShot, primary: str, nudge: str, script) -> None:
+    """Add small actions wherever the estimated timing would leave the frame
+    still for more than about 2 s — each cued on a content word spoken at
+    that moment, so it still moves WITH the narration. The action goes to an
+    object that is already on screen by then: chips and rows light up, a
+    chip or connector pulses, and only failing those does a title re-scramble."""
+    from .motion_timeline import shot_timings
+    if not b.objects:
+        return
+    kinds = lib.object_kinds()
+
+    def nudge_of(o: MotionSceneObject) -> str | None:
+        acts = kinds[o.kind]["actions"]
+        if "highlight" in acts and _highlight_count(b, o.id):
+            return "highlight"
+        if "pulse" in acts and o.kind != "connector":
+            return "pulse"
+        return "scramble" if "scramble" in acts else None
+
+    ranked = sorted(b.objects, key=lambda o: (nudge_of(o) in (None, "scramble"), o.id != primary))
+
+    def clock_for(actions):
+        probe = shot.model_copy(update={"scene": MotionScene(objects=b.objects, actions=actions)})
+        return probe, shot_timings(script.model_copy(update={"shots": [probe]}))[0]
+
+    # Nothing on screen for the first ~2 s: the first object enters at the
+    # start instead, and the word that named it becomes its reveal.
+    probe, clock = clock_for(b.actions)
+    timed = resolve_actions(probe, clock)
+    enters = [(t, j) for j, (a, t) in enumerate(timed) if a.do in ("enter", "stamp")]
+    if enters:
+        t0, j = min(enters)
+        if t0 - clock.start > MAX_STILL_SECONDS - 0.4:
+            first = b.actions[j]
+            obj = next(o for o in b.objects if o.id == first.target)
+            b.actions[j] = first.model_copy(update={"at": "start"})
+            reveal = nudge_of(obj)
+            if reveal:
+                value = "1" if reveal == "highlight" else None
+                b.actions.insert(j + 1, MotionSceneAction(at=first.at, do=reveal, target=obj.id,
+                                                          value=value))
+                if None in resolve_cues(shot, MotionScene(objects=b.objects, actions=b.actions)):
+                    del b.actions[j + 1]
+
+    last_gap = None
+    for _ in range(16):
+        probe, clock = clock_for(b.actions)
+        scene = probe.scene
+        gap, at = longest_still(probe, clock)
+        if gap <= MAX_STILL_SECONDS - 0.4:
+            return
+        if last_gap is not None and gap >= last_gap[0] and at == last_gap[1]:
+            del b.actions[last_gap[2]]
+            return                       # the last insertion did not help
+        last_gap = None
+        words = clock.words()
+        keys = shot_words(shot)
+        order = resolve_cues(probe, scene)
+        target_t = at + min(2.0, gap / 2)
+        entered = {}
+        for act, k in zip(b.actions, order):
+            if act.do in ("enter", "stamp") and k is not None:
+                entered.setdefault(act.target, k)
+        placed = False
+        content = [i for i, w in enumerate(words) if w.start > at + 0.6 and w.start < at + gap - 0.4
+                   and len(keys[i]) >= 3 and keys[i] not in _WEAK_CUES]
+        for idx in sorted(content, key=lambda i: abs(words[i].start - target_t))[:5]:
+            target = next((o for o in ranked if nudge_of(o)
+                           and entered.get(o.id, -1 if not any(x.target == o.id and x.do == "enter"
+                                                               for x in b.actions) else 10 ** 6) < idx),
+                          None)
+            if target is None:
+                continue
+            do = nudge_of(target)
+            pos = next((j for j, k in enumerate(order) if k is not None and k > idx), len(order))
+            value = None
+            if do == "highlight":
+                n = sum(1 for x in b.actions[:pos] if x.do == "highlight" and x.target == target.id)
+                value = str(n % _highlight_count(b, target.id) + 1)
+            for n in (1, 2, 3):
+                cue = " ".join(re.sub(r"[^\w'-]", "", words[j].text)
+                               for j in range(idx, min(idx + n, len(words)))).strip()
+                trial = b.actions[:pos] + [MotionSceneAction(at=cue, do=do, target=target.id,
+                                                             value=value)] + b.actions[pos:]
+                got = resolve_cues(shot, MotionScene(objects=b.objects, actions=trial))
+                if got[pos] == idx and None not in got:
+                    b.actions = trial
+                    last_gap = (gap, at, pos)
+                    placed = True
+                    break
+            if placed:
+                break
+        if not placed:
+            return
+
+
+def _highlight_count(b: _Builder, oid: str) -> int:
+    o = next(o for o in b.objects if o.id == oid)
+    p = o.props
+    if o.kind == "code_window":
+        return len(p.get("lines") or [])
+    if o.kind == "token_row":
+        return len(p.get("items") or [])
+    if o.kind == "title_card":
+        return len(p.get("icons") or [])
+    if o.kind == "kinetic_title":
+        return len(str(p.get("text", "")).split())
+    if o.kind in ("takeaway_list",):
+        return len(p.get("rows") or [])
+    if o.kind == "recap_grid":
+        return len(p.get("steps") or [])
+    if o.kind == "code_map":
+        return len(p.get("parts") or [])
+    if o.kind == "icon_row":
+        return len(p.get("icons") or [])
+    if o.kind == "lookup_table":
+        return len(p.get("rows") or [])
+    return 0
+
+
+def _nudge_for(kind: str) -> str:
+    acts = lib.object_kinds()[kind]["actions"]
+    for a in ("highlight", "pulse", "scramble", "state"):
+        if a in acts:
+            return a
+    return "enter"
+
+
+def _chips(items: list[str], cap: int = 44) -> list[str]:
+    """As many items as fit one chip row."""
+    out: list[str] = []
+    for it in items:
+        it = _fit(it, 14)
+        if len(" ".join(out + [it])) > cap:
+            break
+        out.append(it)
+    return out
+
+
+#: A walkthrough's chapter fields, in order (addendum 4.1: navy, then blue,
+#: then paper, then yellow, then paper — navy is the hook's).
+CHAPTER_FIELDS = ("blue", "paper", "yellow", "paper")
+
+#: The code window's file name by course language — a plausible file, never
+#: the concept's name.
+_CODE_FILES = {"python": "main.py", "django": "views.py", "javascript": "app.js", "node": "server.js",
+               "typescript": "app.ts", "react": "App.jsx", "html": "index.html", "css": "styles.css",
+               "sql": "query.sql", "java": "Main.java", "c": "main.c", "cpp": "main.cpp",
+               "docker": "Dockerfile"}
+
+
+def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionScene:
+    """One shot's scene from the script's own words. See the module docstring."""
+    b = _Builder(shot)
+    hl = _highlights(shot)
+    beat = shot.beat
+    concept = script.concept_name
+    walk = script.template == "walkthrough"
+    field = "paper"
+    label = ""
+    primary_nudge: tuple[str, str] | None = None
+
+    if beat == "hook":
+        field = "navy"
+        o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()),
+                   accent=[h.upper() for h in hl[:2]])
+        b.act("enter", o1)
+        if walk:
+            rest = [motion_plain_text(c.text) for c in shot.captions[1:]]
+            if rest:
+                o2 = b.add("kinetic_title", text=_kinetic(rest[0].upper(), 30))
+                b.act("enter", o2, rest[0].split()[0])
+        else:
+            o2 = b.add("status_pill", text=_symptom(shot), tone="bad", icon="alert")
+            b.act("enter", o2, _cue_for(_symptom(shot)) if _symptom(shot) else "start")
+        primary_nudge = (o1, "highlight")
+    elif beat == "title":
+        field = "blue"
+        icons = [{"name": i.name, "label": _fit(i.label, 12)} for i in script.icon_vocabulary[:3]]
+        o1 = b.add("title_card", title=_fit(concept, 22), promise=_fit(script.promise, 40),
+                   icons=icons)
+        b.act("enter", o1)
+        if icons:
+            primary_nudge = (o1, "highlight")
+    elif beat in ("setup", "chapter") and shot.code:
+        o1 = b.add("code_window", file=_CODE_FILES.get(script.language or "", ""), lines=shot.code)
+        b.act("enter", o1)
+        b.act("type", o1)
+        for i, h in enumerate(hl[:2]):
+            b.act("highlight", o1, _cue_for(h), value=str(min(i + 1, len(shot.code))))
+        label = "THE CODE"
+        primary_nudge = (o1, "highlight")
+    elif beat in ("setup", "break_1", "break_2", "fix_idea", "fix_flow", "takeaway") and not walk:
+        fail = beat in ("setup", "break_1", "break_2")
+        label = {"setup": "THE SETUP", "break_1": "WHY IT FAILS", "break_2": "AND ALSO",
+                 "fix_idea": "THE FIX", "fix_flow": "HOW IT WORKS", "takeaway": "REMEMBER"}[beat]
+        if beat == "fix_idea":
+            field = "blue"
+            o1 = b.add("kinetic_title", text=_fit(concept.upper(), 30), accent=[concept.upper()])
+            b.act("enter", o1, concept if concept.lower() in shot.speech.lower().replace(" ", "")
+                  else "start")
+            rest = [h for h in hl if _key(h) != _key(concept)]
+            if rest:
+                o2 = b.add("token_row", items=_chips(rest), tones=["info"] * len(_chips(rest)))
+                b.act("enter", o2, _cue_for(rest[0]))
+            primary_nudge = (o1, "highlight")
+        elif beat == "fix_flow":
+            trig = hl[0] if hl else _fit(_first_sentence(shot), 22)
+            o1 = b.add("trigger_chip", label=_fit(trig, 22))
+            o3_text = _fit(hl[-1] if len(hl) > 1 else "It updates", 26)
+            o3 = b.add("status_pill", text=o3_text[:1].upper() + o3_text[1:], tone="ok", icon="check")
+            o2 = b.add("connector", **{"from": o1, "to": o3, "tone": "info"})
+            b.act("enter", o1)
+            b.act("enter", o2, _cue_for(trig) if hl else "start")
+            b.act("pulse", o2, _cue_for(trig) if hl else "start")
+            last_caption = motion_plain_text(shot.captions[-1].text).split() if len(shot.captions) > 1 else []
+            if len(hl) > 1:
+                b.act("enter", o3, _cue_for(hl[-1]))
+            elif last_caption:
+                b.act("enter", o3, next((w for w in last_caption
+                                         if len(_key(w)) >= 3 and _key(w) not in _WEAK_CUES),
+                                        last_caption[0]))
+            else:
+                b.act("enter", o3)
+            primary_nudge = (o1, "pulse")
+        else:
+            items = _chips(hl or [_fit(_first_sentence(shot), 14)])
+            o1 = b.add("token_row", items=items, tones=["plain"] * len(items))
+            b.act("enter", o1)
+            if fail:
+                o2 = b.add("status_pill", text=_symptom(shot), tone="bad", icon="x")
+                b.act("enter", o2, _cue_for(_symptom(shot)))
+                if len(items) > 1:
+                    tones = ["plain"] * (len(items) - 1) + ["bad"]
+                    b.act("state", o1, _cue_for(items[-1]), value=",".join(tones))
+            primary_nudge = (o1, "highlight")
+    elif beat == "code_map":
+        if shot.code:
+            parts = []
+            vocab = script.icon_vocabulary or []
+            plain = motion_plain_text(" ".join(c.text for c in shot.captions))
+            for i, h in enumerate([h for h in hl if any(h in l for l in shot.code)][:3]):
+                icon = vocab[i % len(vocab)].name if vocab else "code"
+                # what the caption says the part does: the words right after it
+                after = plain.split(h, 1)[1].split(".")[0].split(",")[0].split() if h in plain else []
+                label = _fit(" ".join(after[:5]), 20) or (vocab[i % len(vocab)].label if vocab else h)
+                parts.append({"code": h, "icon": icon, "label": label})
+            if not parts:
+                parts = [{"code": concept, "icon": vocab[0].name if vocab else "code",
+                          "label": _fit(vocab[0].label if vocab else concept, 20)}]
+            o1 = b.add("code_map", lines=shot.code, parts=parts)
+            b.act("enter", o1)
+            for i, part in enumerate(parts):
+                b.act("highlight", o1, _cue_for(part["code"]), value=str(i + 1))
+            primary_nudge = (o1, "highlight")
+        else:
+            icons = [{"name": i.name, "label": _fit(i.label, 12), "tone": "info"}
+                     for i in script.icon_vocabulary[:3]] or [{"name": "list", "label": "", "tone": "info"}]
+            o1 = b.add("icon_row", icons=icons)
+            b.act("enter", o1)
+            for i, h in enumerate(hl[:len(icons)]):
+                b.act("highlight", o1, _cue_for(h), value=str(i + 1))
+            label = "HOW IT MAPS"
+            primary_nudge = (o1, "highlight")
+    elif beat == "payoff":
+        field = "navy"
+        o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()),
+                   accent=[h.upper() for h in hl[:2]])
+        b.act("enter", o1)
+        ok_text = _fit((hl[-1] if hl else "It works"), 26)
+        o2 = b.add("status_pill", text=ok_text[:1].upper() + ok_text[1:], tone="ok", icon="check")
+        b.act("enter", o2, _cue_for(hl[-1]) if hl else None)
+        primary_nudge = (o1, "highlight")
+    elif beat == "recap" and not walk:
+        rows = [{"icon": t.icon, "line": t.line, "sub": t.sub} for t in script.takeaways] or \
+               [{"icon": "check", "line": _fit(h, 20), "sub": ""} for h in hl[:3]]
+        o1 = b.add("takeaway_list", heading="Key takeaways", rows=rows)
+        b.act("enter", o1)
+        primary_nudge = (o1, "highlight")
+    elif beat == "recap":
+        final = script.chapters[-1].example_out if script.chapters else []
+        o1 = b.add("recap_grid", concept=_fit(concept, 16), steps=[c.title for c in script.chapters],
+                   final=_chips(final, 60))
+        b.act("enter", o1)
+        primary_nudge = (o1, "highlight")
+    elif beat == "cta":
+        field = "blue"
+        o1 = b.add("end_card", up_next=_fit(script.next_topic, 22))
+        b.act("enter", o1)
+        primary_nudge = (o1, "pulse")
+    elif beat == "name_it":
+        field = "blue"
+        o1 = b.add("kinetic_title", text=_fit(concept.upper(), 30), accent=[concept.upper()])
+        b.act("enter", o1, concept if _key(concept) in "".join(shot_words(shot)) else "start")
+        primary_nudge = (o1, "highlight")
+    elif beat == "example":
+        items = _chips(script.running_example.items if script.running_example else hl, 44)
+        o1 = b.add("token_row", items=items, tones=["plain"] * len(items))
+        b.act("enter", o1, items[0] if items and _key(items[0]) in shot_words(shot) else "start")
+        label = "FOLLOW ONE EXAMPLE"
+        primary_nudge = (o1, "highlight")
+    elif beat == "chapter_card":
+        ch = next((c for c in script.chapters if c.n == shot.chapter), None)
+        o1 = b.add("chapter_card", n=shot.chapter or 1, of=len(script.chapters) or 1,
+                   title=_fit(ch.title if ch else _first_sentence(shot), 32))
+        b.act("enter", o1)
+    elif beat == "chapter":
+        ch = next((c for c in script.chapters if c.n == shot.chapter), None)
+        state = shot.example or (ch.example_out if ch else hl)
+        items = _chips(state, 44)
+        o1 = b.add("token_row", items=items, tones=["plain"] * len(items))
+        b.act("enter", o1)
+        for h in hl[:2]:
+            if any(_key(h) == _key(it) for it in items):
+                b.act("highlight", o1, _cue_for(h),
+                      value=str([_key(i) for i in items].index(_key(h)) + 1))
+        label = _fit((ch.title if ch else "").upper(), 30)
+        primary_nudge = (o1, "highlight")
+    elif beat == "result":
+        first = script.running_example.items if script.running_example else []
+        final = script.chapters[-1].example_out if script.chapters else []
+        o1 = b.add("big_counter", value=f"{len(first)} → {len(final)}", label="items")
+        b.act("enter", o1)
+        b.act("count", o1)
+        items = _chips(final, 44)
+        if items:
+            o2 = b.add("token_row", items=items, tones=["ok"] * len(items))
+            b.act("enter", o2, hl[0] if hl else None)
+            primary_nudge = (o2, "highlight")
+    elif beat == "takeaway":
+        field = "navy"
+        o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()),
+                   accent=[h.upper() for h in hl[:2]])
+        b.act("enter", o1)
+        primary_nudge = (o1, "highlight")
+    else:
+        o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()))
+        b.act("enter", o1)
+        primary_nudge = (o1, "highlight")
+
+    if walk and shot.chapter and beat in ("chapter_card", "chapter"):
+        # A walkthrough changes field per chapter (addendum 4.1): its card and
+        # its shots share one; yellow at most once.
+        field = CHAPTER_FIELDS[(shot.chapter - 1) % len(CHAPTER_FIELDS)]
+    if primary_nudge:
+        target, nudge = primary_nudge
+        kind = next(o.kind for o in b.objects if o.id == target)
+        if nudge not in lib.object_kinds()[kind]["actions"]:
+            nudge = _nudge_for(kind)
+        if nudge == "state":
+            nudge = _nudge_for(kind) if _nudge_for(kind) != "state" else "enter"
+        if nudge != "enter":
+            _fill_cadence(b, shot, target, nudge, script)
+    return MotionScene(field=field, label=label, objects=b.objects, actions=b.actions)
+
+
+def default_scenes(script: MotionScript) -> list[MotionScene]:
+    """Every shot's default scene, with transitions: a hard cut when the
+    field stays, otherwise the next field transition in the rotation (never
+    the same one twice in a row)."""
+    scenes = [default_scene(s, script, i) for i, s in enumerate(script.shots)]
+    prev_field = None
+    last: str | None = None
+    used: list[str] = []
+    for sc in scenes:
+        if prev_field is None or sc.field == prev_field:
+            sc.transition = "cut"
+        else:
+            last = _rotation_after(last, used)
+            used.append(last)
+            sc.transition = last
+        prev_field = sc.field
+    return scenes
+
+
+def with_default_scenes(script: MotionScript) -> MotionScript:
+    scenes = default_scenes(script)
+    return script.model_copy(update={"shots": [s.model_copy(update={"scene": sc})
+                                               for s, sc in zip(script.shots, scenes)]})

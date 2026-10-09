@@ -194,8 +194,8 @@ def test_one_avatar_per_course_language():
     reg = mt.avatars()
     assert reg.languages == mt.language_tags()
     assert sorted(reg.characters) == sorted(reg.languages)
-    slots = [reg.host.voice_slot] + [a.voice_slot for a in reg.characters.values()]
-    assert len(set(slots)) == len(slots)
+    # Voices may be shared between characters, never with the host.
+    assert all(a.voice_slot != reg.host.voice_slot for a in reg.characters.values())
     for a in [reg.host, *reg.characters.values()]:
         assert a.voice_path == f"voices/motion/{a.voice_slot}.wav"
         assert not {c.lower() for c in a.palette.model_dump().values()} & mt.RESERVED_COLOURS
@@ -454,12 +454,11 @@ def test_a_themed_prompt_swaps_only_format_and_beats():
     for rule in ("LENGTH", "WORDS", "SPEECH AND CAPTIONS ARE SEPARATE FIELDS", "CODE",
                  "VISUAL", "ICONS"):
         assert rule in system, rule
-    # Themed reels get 40-120 s, the cap stated as a cap; every other rule is
-    # the base prompt's, word for word.
-    assert "110 to 312 spoken words in total (40 to 120 seconds spoken)" in system
-    assert "hard CAP, not a target" in system and "(40-120 seconds)" in system
-    assert "110 to 195" not in system
-    tail = lambda text: text[text.index("- Every shot:"):].split("Return JSON")[0]
+    # Every reel gets 40-120 s, the cap stated as a cap; every rule but FORMAT
+    # and THE BEATS is the base prompt's, word for word.
+    assert "110 to 312 spoken words in total (40 to 120 seconds spoken)" in base
+    assert "hard CAP" in base and "(40-120 seconds)" in base
+    tail = lambda text: text[text.index("LENGTH"):].split("Return JSON")[0]
     assert tail(base) == tail(system)
 
 
@@ -474,10 +473,10 @@ def test_themed_fixtures_pass_every_grader():
     assert all(c.speaker in ("INTERVIEWER", "CANDIDATE") for s in two.shots for c in s.captions)
 
 
-def test_themed_reels_get_forty_to_one_twenty_seconds():
-    """Phase 2b review: themed reels may run 40-120 s; classic_explainer keeps
-    fix_story's 40-75 s. Over 120 s still fails. (Shot-level word caps are a
-    separate rule — this checks only the whole-reel window, details.length_ok.)"""
+def test_every_reel_gets_forty_to_one_twenty_seconds():
+    """Phase 3 review: every theme — classic_explainer included — and both
+    templates get 40-120 s. Over 120 s still fails. (Shot-level word caps are
+    a separate rule — this checks only the whole-reel window, length_ok.)"""
     def padded(theme: str, sentences: int) -> MotionScript:
         data = _fixture(THEMED["bug_hunt"])
         data["theme"] = theme
@@ -488,15 +487,14 @@ def test_themed_reels_get_forty_to_one_twenty_seconds():
             shot["captions"].append({"text": extra})
         return MotionScript(**data)
 
-    mid = padded("bug_hunt", 6)                         # ~58 s + 6 x 10 words
-    assert 75 < mid.estimated_seconds < 120, mid.estimated_seconds
-    assert checks.check_motion_word_budget(mid).details["length_ok"]
-    classic = padded("classic_explainer", 6)
-    r = checks.check_motion_word_budget(classic)
-    assert not r.details["length_ok"] and "a fix_story needs 110-200" in r.reason, r.reason
-    long = padded("bug_hunt", 18)                       # past 312 words
-    r = checks.check_motion_word_budget(long)
+    for theme in ("bug_hunt", "classic_explainer"):
+        mid = padded(theme, 6)                          # ~58 s + 6 x 10 words
+        assert 75 < mid.estimated_seconds < 120, mid.estimated_seconds
+        assert checks.check_motion_word_budget(mid).details["length_ok"], theme
+    r = checks.check_motion_word_budget(padded("bug_hunt", 18))      # past 312 words
     assert not r.details["length_ok"] and "a bug_hunt reel needs 110-312" in r.reason, r.reason
+    r = checks.check_motion_word_budget(padded("classic_explainer", 18))
+    assert not r.details["length_ok"] and "a fix_story needs 110-312" in r.reason, r.reason
 
 
 def test_theme_speaker_grader():

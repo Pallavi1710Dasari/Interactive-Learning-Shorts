@@ -340,7 +340,7 @@ export function TitleCard({ series, title, promise, icons, t }: {
  * controls. `active` moves the amber highlight from part to part. */
 export function CodeMapCard({ line1, line2, parts, active, t, field }: {
   line1: CodeLine; line2: CodeLine;
-  parts: { at: [number, number]; icon: string; tone: Tone; name: string; desc: string }[];
+  parts: { at: [number, number]; icon: string; tone: Tone; name: string; desc: string; row?: number }[];
   active: number; t: number; field: FieldName;
 }) {
   const th = theme(field);
@@ -350,7 +350,7 @@ export function CodeMapCard({ line1, line2, parts, active, t, field }: {
       <At x={60} y={528} style={popStyle(seg(t, 0, 0.5))}>
         <div style={{ width: 960, height: 348, borderRadius: 54, background: C.code, boxShadow: shadow(th), position: "relative" }}>
           {active >= 0 && parts[active] && (
-            <div style={{ position: "absolute", top: 66, height: 90, borderRadius: 21, background: C.amber,
+            <div style={{ position: "absolute", top: 66 + (parts[active].row ?? 0) * 114, height: 90, borderRadius: 21, background: C.amber,
                           left: 60 + parts[active].at[0] * cw - 12, width: parts[active].at[1] * cw + 24 }} />
           )}
           {[line1, line2].map((line, i) => (

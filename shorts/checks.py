@@ -7407,17 +7407,15 @@ def all_passed(results: list[GraderResult]) -> bool:
 
 #: The hard cap on every motion reel, either template (addendum section 2).
 MOTION_MAX_SECONDS = 120.0
-#: Per-template length: spoken words AND estimated seconds must both fit
-#: (user decision 2026-10-01 — for fix_story the seconds bound is the tighter
-#: one, ~195 words at MOTION_WORDS_PER_SECOND).
-MOTION_TEMPLATE_WORDS = {"fix_story": (110, 200), "walkthrough": (160, 300)}
-MOTION_TEMPLATE_SECONDS = {"fix_story": (40.0, 75.0), "walkthrough": (60.0, 120.0)}
-#: Phase 2b review (user decision 2026-10-09): a fix_story reel in any theme
-#: other than classic_explainer — interview, narrative, bug_hunt, ... — gets
-#: 40-120 s. 120 s is a cap, not a target: explain the concept fully, then stop.
-#: classic_explainer keeps fix_story's own 40-75 s.
-MOTION_THEMED_SECONDS = (40.0, 120.0)
-MOTION_THEMED_WORDS = (110, 312)             #: 120 s at MOTION_WORDS_PER_SECOND
+#: The length window, the same for EVERY reel — both templates, every theme
+#: (phase 3 review, user decision 2026-10-09; it was 40-75 s for fix_story,
+#: 60-120 s for walkthrough, then 40-120 s for themes only). Spoken words AND
+#: estimated seconds must both fit. 120 s is a cap, not a target: a concept
+#: explained fully in 70 s is a good reel, and nothing pads it to 120.
+MOTION_SECONDS = (40.0, 120.0)
+MOTION_WORDS = (110, 312)                    #: 120 s at MOTION_WORDS_PER_SECOND
+MOTION_TEMPLATE_WORDS = {"fix_story": MOTION_WORDS, "walkthrough": MOTION_WORDS}
+MOTION_TEMPLATE_SECONDS = {"fix_story": MOTION_SECONDS, "walkthrough": MOTION_SECONDS}
 
 MOTION_SHOT_COUNT = (10, 11)                 #: fix_story: 11 beats, break_2 optional
 MOTION_OPTIONAL_BEATS = frozenset({"break_2"})
@@ -7826,11 +7824,8 @@ def check_motion_word_budget(script) -> GraderResult:
     seconds = script.estimated_seconds
     lo, hi = MOTION_TEMPLATE_WORDS[template]
     slo_s, shi_s = MOTION_TEMPLATE_SECONDS[template]
-    kind = f"a {template}"
     theme = _motion_theme(script)
-    if not theme.base:
-        (lo, hi), (slo_s, shi_s) = MOTION_THEMED_WORDS, MOTION_THEMED_SECONDS
-        kind = f"a {theme.id} reel"
+    kind = f"a {template}" if theme.base else f"a {theme.id} reel"
     if not lo <= total <= hi:
         problems.append(f"{total} spoken words, {kind} needs {lo}-{hi} "
                         f"({'too long' if total > hi else 'too short'})")
@@ -8630,3 +8625,193 @@ def motion_failures_are_hook_only(results: list[GraderResult], hook_id: str = "s
         if r.name != "motion_hook_curiosity" and shots != [hook_id]:
             return False
     return True
+
+
+# ============================================================ motion scenes
+#
+# RESTYLE_TO_MOTION_REELS.md phase 3: the scene graders. Free and
+# deterministic, like the script graders. The scenes stage runs them on the
+# ESTIMATED clock (motion_timeline.shot_timings with no audio); the timing
+# stage runs them again on the REAL one, so a scene approved against the
+# estimate is re-checked against the voice it plays with.
+
+def _scene_tones(shot) -> list[tuple[str, str]]:
+    """Every (tone, where) a shot's scene shows: object tones, chip tones,
+    icon tones, state actions' tones — and a stamp, which is always coral."""
+    out: list[tuple[str, str]] = []
+    if shot.scene is None:
+        return out
+    for o in shot.scene.objects:
+        p = o.props
+        if isinstance(p.get("tone"), str):
+            out.append((p["tone"], f"{o.id} {o.kind}"))
+        for t in p.get("tones") or []:
+            out.append((t, f"{o.id} {o.kind} chip"))
+        for ic in p.get("icons") or []:
+            if isinstance(ic, dict) and ic.get("tone"):
+                out.append((ic["tone"], f"{o.id} {o.kind} icon"))
+        if o.kind == "stamp":
+            out.append(("bad", f"{o.id} stamp"))
+    for a in shot.scene.actions:
+        if a.tone:
+            out.append((a.tone, f"{a.do} {a.target}"))
+        if a.do == "state" and a.value and set(a.value.split(",")) <= set(("plain", "info", "warn", "ok", "bad", "special")):
+            out += [(t, f"{a.do} {a.target}") for t in a.value.split(",")]
+    return out
+
+
+def check_motion_scene_valid(script) -> GraderResult:
+    """Every shot has a drawable scene (motion_scenes.scene_problems: kinds,
+    props, lengths, targets, actions, word cues, it fits its region), and the
+    transitions follow the rules: a field change needs a field transition, a
+    same-field shot is a hard cut, type_scatter only leaves the hook, the same
+    transition never runs twice in a row, and at most one stamp per reel."""
+    from .motion_scenes import scene_problems
+    problems: list[str] = []
+    off: list[str] = []
+    duo = bool(getattr(script, "speakers", []))
+    prev = None
+    last_kind = None
+    stamps = 0
+    for i, s in enumerate(script.shots):
+        found = scene_problems(s, duo=duo)
+        if found:
+            problems.append(f"{s.id} ({s.beat}): " + "; ".join(found))
+            off.append(s.id)
+            prev = s
+            continue
+        sc = s.scene
+        stamps += sum(1 for o in sc.objects if o.kind == "stamp")
+        if prev is not None and prev.scene is not None:
+            same = prev.scene.field == sc.field
+            if same and sc.transition != "cut":
+                problems.append(f"{s.id}: {sc.transition} into the same {sc.field} field — inside a "
+                                f"field, cut (field transitions are for field changes)")
+                off.append(s.id)
+            if not same and sc.transition == "cut":
+                problems.append(f"{s.id}: the field changes {prev.scene.field} -> {sc.field} on a hard "
+                                f"cut — use a field transition")
+                off.append(s.id)
+            if sc.transition == "type_scatter" and prev.beat != "hook":
+                problems.append(f"{s.id}: type_scatter only leaves the hook")
+                off.append(s.id)
+        if sc.transition != "cut":
+            if sc.transition == last_kind:
+                problems.append(f"{s.id}: {sc.transition} twice in a row — rotate transitions")
+                off.append(s.id)
+            last_kind = sc.transition
+        prev = s
+    if stamps > 1:
+        problems.append(f"{stamps} stamps — at most one verdict stamp per reel")
+    if problems:
+        return GraderResult("motion_scene_valid", False, "; ".join(problems),
+                            {"shots": sorted(set(off))})
+    return GraderResult("motion_scene_valid", True,
+                        f"{len(script.shots)} drawable scenes, transitions in rotation")
+
+
+def check_motion_payoff_mirrors_hook(script) -> GraderResult:
+    """The payoff is the hook's picture, now working (spec: "mirror the
+    hook"). fix_story: the payoff shows every kind of object the hook showed,
+    on the same field; the hook shows a failure (coral) and the payoff a
+    success (mint) and no failure. walkthrough: the result shot shows the
+    running example's final state."""
+    by_beat = {s.beat: s for s in script.shots}
+    if _template(script) == "walkthrough":
+        res = by_beat.get("result")
+        final = script.chapters[-1].example_out if script.chapters else []
+        if res is None or res.scene is None:
+            return GraderResult("motion_payoff_mirrors_hook", False, "no result scene")
+        rows = [o for o in res.scene.objects if o.kind == "token_row"]
+        shown = [_motion_key(i) for o in rows for i in o.props.get("items", [])]
+        if final and not (shown and all(k in [_motion_key(f) for f in final] for k in shown)):
+            return GraderResult("motion_payoff_mirrors_hook", False,
+                                f"the result shot does not show the example's final state {final}")
+        return GraderResult("motion_payoff_mirrors_hook", True,
+                            "the result shows the running example's final state")
+    hook, pay = by_beat.get("hook"), by_beat.get("payoff")
+    if not hook or not pay or hook.scene is None or pay.scene is None:
+        return GraderResult("motion_payoff_mirrors_hook", False, "hook or payoff has no scene")
+    problems: list[str] = []
+    hk = {o.kind for o in hook.scene.objects}
+    pk = {o.kind for o in pay.scene.objects}
+    if not hk <= pk:
+        problems.append(f"the payoff shows {sorted(pk)} but the hook showed {sorted(hk)} — "
+                        f"mirror the hook's picture")
+    if hook.scene.field != pay.scene.field:
+        problems.append(f"the payoff is on {pay.scene.field}, the hook on {hook.scene.field}")
+    ht = {t for t, _ in _scene_tones(hook)}
+    pt = {t for t, _ in _scene_tones(pay)}
+    if "bad" not in ht:
+        problems.append("the hook shows no failure (coral) for the payoff to resolve")
+    if "ok" not in pt or "bad" in pt:
+        problems.append("the payoff must show success (mint) and no failure")
+    if problems:
+        return GraderResult("motion_payoff_mirrors_hook", False, "; ".join(problems),
+                            {"shots": [pay.id]})
+    return GraderResult("motion_payoff_mirrors_hook", True,
+                        f"payoff mirrors the hook ({', '.join(sorted(hk))}), failure -> success")
+
+
+def check_motion_change_cadence(script, clocks=None) -> GraderResult:
+    """A visible change at least every 2.5 s (addendum 4.6 D) — a transition,
+    an action, or a full-frame card's own entrance step. Karaoke caption
+    progress does not count. `clocks` are the real timings (the timing
+    stage); omitted, the word-count estimate."""
+    from .motion_scenes import MAX_STILL_SECONDS, longest_still
+    from .motion_timeline import shot_timings
+    clocks = clocks if clocks is not None else shot_timings(script)
+    problems: list[str] = []
+    off: list[str] = []
+    worst = 0.0
+    for s, c in zip(script.shots, clocks):
+        if s.scene is None:
+            continue
+        gap, at = longest_still(s, c)
+        worst = max(worst, gap)
+        if gap > MAX_STILL_SECONDS + 1e-6:
+            problems.append(f"{s.id} ({s.beat}) holds still for {gap:.1f}s from "
+                            f"{at - c.start:.1f}s in — add an action cued on a word there")
+            off.append(s.id)
+    if problems:
+        return GraderResult("motion_change_cadence", False, "; ".join(problems),
+                            {"shots": off, "worst": round(worst, 2)})
+    return GraderResult("motion_change_cadence", True,
+                        f"longest still stretch {worst:.1f}s (max {MAX_STILL_SECONDS}s)",
+                        {"worst": round(worst, 2)})
+
+
+def check_motion_color_semantics(script) -> GraderResult:
+    """Colour meanings are fixed (tokens.ts): coral only where something
+    FAILS, mint only where something WORKS. fix_story fails in hook, setup,
+    break_1 and break_2, and works from fix_idea on; a walkthrough chapter
+    may show both (YES/NO tags)."""
+    from .motion_scenes import FAILURE_BEATS, SUCCESS_BEATS
+    problems: list[str] = []
+    off: list[str] = []
+    for s in script.shots:
+        for tone, where in _scene_tones(s):
+            if tone == "bad" and s.beat not in FAILURE_BEATS:
+                problems.append(f"{s.id} ({s.beat}) {where} is coral, but nothing fails in a "
+                                f"{s.beat} shot")
+                off.append(s.id)
+            if tone == "ok" and s.beat not in SUCCESS_BEATS:
+                problems.append(f"{s.id} ({s.beat}) {where} is mint, but nothing has worked yet "
+                                f"in a {s.beat} shot")
+                off.append(s.id)
+    if problems:
+        return GraderResult("motion_color_semantics", False, "; ".join(problems),
+                            {"shots": sorted(set(off))})
+    return GraderResult("motion_color_semantics", True,
+                        "coral only on failure, mint only on success")
+
+
+def run_motion_scene_graders(script, clocks=None) -> list[GraderResult]:
+    """The phase 3 scene graders. `clocks`: the real timings, when audio
+    exists."""
+    return [
+        check_motion_scene_valid(script),
+        check_motion_payoff_mirrors_hook(script),
+        check_motion_change_cadence(script, clocks),
+        check_motion_color_semantics(script),
+    ]

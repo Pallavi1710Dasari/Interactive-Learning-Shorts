@@ -10,6 +10,9 @@
 #   golden       - a known-good output. Regression guard.
 #   motion_grader - deterministic, REEL_STYLE=motion scripts. A golden fixture
 #                  plus an optional `patch`; see run_evals._apply_patch.
+#   motion_scene_grader - deterministic, motion SCENES (phase 3): a golden script
+#                  fixture given its default scenes, optionally patched; see
+#                  run_evals.run_motion_scene_case.
 #   motion_theme_grader - deterministic, the motion THEME step (phase 2b): theme
 #                  fit, the variety rule and tag format, on the case's own inputs;
 #                  see run_evals.run_motion_theme_case.
@@ -2509,8 +2512,8 @@ cases:
       reason_contains: "the order needs"
 
   - id: E145
-    name: A fix_story script over 75 seconds is rejected, even under 200 words
-    why: "A fix_story reel is 40-75 s AND 110-200 words (REFERENCE_STYLE_ADDENDUM.md section 2); both apply (decision 2026-10-01). 198 words is under the word cap but ~76 s at 2.6 words/s, so the seconds bound is the one that bites."
+    name: A 76-second fix_story script is accepted (every reel gets 40-120 s)
+    why: "Was: a fix_story over 75 s is rejected. Phase 3 review (2026-10-09): every reel, every theme and template, gets 40-120 s; 120 s is a cap, not a target, so a concept explained fully in 76 s passes."
     type: motion_grader
     grader: word_budget
     fixture: evals/fixtures/motion/usestate_golden.json
@@ -2523,8 +2526,7 @@ cases:
       - {path: shots.6.speech, value: "And set Likes is the trigger you call. Call it, and React updates its memory first, then re-renders the whole component using the new value."}
       - {path: shots.9.speech, value: "Remember: re-renders reset plain variables every time. use State keeps the value safe in memory. And the setter updates it, then React re-renders."}
     expect:
-      passed: false
-      reason_contains: "needs 40-75s (too long)"
+      passed: true
 
   - id: E146
     name: A motion shot under 8 words is rejected
@@ -3233,6 +3235,185 @@ cases:
     section_id: "3.2"
     expect:
       passed: true
+
+
+  # ------------------------------------------------------- scenes (phase 3)
+  # RESTYLE_TO_MOTION_REELS.md phase 3: the scene graders, on each golden script
+  # given its default scenes (motion_scenes.default_scenes, the scenes stub).
+
+  - id: E202
+    name: Default scenes for classic_explainer (useState) pass every scene grader
+    why: "The deterministic beat -> scene mapping is the stub and the fallback for any script. Five themes and both templates must come out drawable, mirrored, moving every 2.5 s and colour-correct."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_golden.json
+    expect:
+      passed: true
+
+  - id: E203
+    name: Default scenes for interview (two speakers) pass every scene grader
+    why: "The deterministic beat -> scene mapping is the stub and the fallback for any script. Five themes and both templates must come out drawable, mirrored, moving every 2.5 s and colour-correct."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_interview_golden.json
+    expect:
+      passed: true
+
+  - id: E204
+    name: Default scenes for peer_discussion (two speakers) pass every scene grader
+    why: "The deterministic beat -> scene mapping is the stub and the fallback for any script. Five themes and both templates must come out drawable, mirrored, moving every 2.5 s and colour-correct."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_peer_discussion_golden.json
+    expect:
+      passed: true
+
+  - id: E205
+    name: Default scenes for bug_hunt pass every scene grader
+    why: "The deterministic beat -> scene mapping is the stub and the fallback for any script. Five themes and both templates must come out drawable, mirrored, moving every 2.5 s and colour-correct."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/usestate_bug_hunt_golden.json
+    expect:
+      passed: true
+
+  - id: E206
+    name: Default scenes for classic_explainer with no code (the TLB) pass every scene grader
+    why: "The deterministic beat -> scene mapping is the stub and the fallback for any script. Five themes and both templates must come out drawable, mirrored, moving every 2.5 s and colour-correct."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/tlb_golden.json
+    expect:
+      passed: true
+
+  - id: E207
+    name: Default scenes for step_by_step_walkthrough (tokenization) pass every scene grader
+    why: "The deterministic beat -> scene mapping is the stub and the fallback for any script. Five themes and both templates must come out drawable, mirrored, moving every 2.5 s and colour-correct."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    expect:
+      passed: true
+
+  - id: E208
+    name: Default scenes for step_by_step_walkthrough (hash table) pass every scene grader
+    why: "The deterministic beat -> scene mapping is the stub and the fallback for any script. Five themes and both templates must come out drawable, mirrored, moving every 2.5 s and colour-correct."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/hash_table_golden.json
+    expect:
+      passed: true
+
+  - id: E209
+    name: A payoff that shows no success is rejected
+    why: "The payoff mirrors the hook with the failure now a success. A grey pill where the mint one belongs means the reel never shows the fix working."
+    type: motion_scene_grader
+    grader: payoff_mirrors_hook
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.8.scene.objects.1.props.tone, value: plain}
+    expect:
+      passed: false
+      reason_contains: "must show success"
+
+  - id: E210
+    name: Mint on a failure beat is rejected
+    why: "Colour meanings are fixed: mint only where something works. A green pill while the narration explains why it breaks teaches the opposite."
+    type: motion_scene_grader
+    grader: color_semantics
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.3.scene.objects.1.props.tone, value: ok}
+    expect:
+      passed: false
+      reason_contains: "s04 (break_1)"
+
+  - id: E211
+    name: A field change on a hard cut is rejected
+    why: "Field transitions are for field changes (addendum 4.6 A); a colour jump on a cut looks like a glitch."
+    type: motion_scene_grader
+    grader: scene_valid
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.5.scene.transition, value: cut}
+    expect:
+      passed: false
+      reason_contains: "on a hard cut"
+
+  - id: E212
+    name: The same transition twice in a row is rejected
+    why: "Rotate transitions and never repeat one back to back (addendum 4.6 A)."
+    type: motion_scene_grader
+    grader: scene_valid
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.5.scene.transition, value: bar_wipe}
+    expect:
+      passed: false
+      reason_contains: "twice in a row"
+
+  - id: E213
+    name: A shot that holds still too long is rejected
+    why: "A visible change at least every 2.5 s; karaoke progress does not count (addendum 4.6 D). The reference's 8-10 s still diagrams are the thing not to copy."
+    type: motion_scene_grader
+    grader: change_cadence
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.3.scene.actions, value: [{at: start, do: enter, target: o1}, {at: start, do: enter, target: o2}]}
+    expect:
+      passed: false
+      reason_contains: "s04 (break_1) holds still"
+
+  - id: E214
+    name: A cue that is not a spoken word is rejected
+    why: "Every build-up step is tied to the word that names it; a cue the narration never says cannot be timed."
+    type: motion_scene_grader
+    grader: scene_valid
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.3.scene.actions.0.at, value: "photosynthesis"}
+    expect:
+      passed: false
+      reason_contains: "cue 'photosynthesis'"
+
+  - id: E215
+    name: An object kind the player cannot draw is rejected
+    why: "The LLM picks from the library; it never draws. An unknown kind would render as nothing."
+    type: motion_scene_grader
+    grader: scene_valid
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.5.scene.objects.0.kind, value: hologram}
+    expect:
+      passed: false
+      reason_contains: "not in the scene library"
+
+  - id: E216
+    name: More than one stamp in a reel is rejected
+    why: "One strong verdict stamp per reel at most (addendum 4.5); two stamps cancel each other out."
+    type: motion_scene_grader
+    grader: scene_valid
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.0.scene.objects, append: {id: o9, kind: stamp, props: {text: STUCK}}}
+      - {path: shots.0.scene.actions, append: {at: start, do: stamp, target: o9}}
+      - {path: shots.3.scene.objects, append: {id: o9, kind: stamp, props: {text: RESET}}}
+      - {path: shots.3.scene.actions, append: {at: start, do: stamp, target: o9}}
+    expect:
+      passed: false
+      reason_contains: "at most one verdict stamp"
+
+  - id: E217
+    name: A walkthrough result that does not show the final state is rejected
+    why: "The walkthrough's payoff is the running example's end state (two words became seven tokens); a result without it never closes the loop."
+    type: motion_scene_grader
+    grader: payoff_mirrors_hook
+    fixture: evals/fixtures/motion/tokenization_golden.json
+    patch:
+      - {path: shots.15.scene.objects.1.props.items, value: ["banana"]}
+    expect:
+      passed: false
+      reason_contains: "final state"
 
 # ============================================================================
 # RUBRIC — what the LLM judge scores, 1 to 5. Keep the wording stable; changing

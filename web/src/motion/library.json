@@ -1,0 +1,471 @@
+{
+  "_comment": "The motion SCENE vocabulary (RESTYLE_TO_MOTION_REELS.md phase 3): every scene object, action and transition a scene may name, read by BOTH sides. Python (shorts/motion_library.py) validates scenes against it and lays them out with the heights below; the player (web/src/motion/scene/) draws each kind with the phase 2 components. Adding a kind is an entry here plus one renderer in web/src/motion/scene/objects.tsx. Props: name -> type (str, int, str[], icon, tone, icons, rows, parts, cells, table); a trailing ? marks it optional. max: the longest a string prop may be (characters), so text fits its box. Heights are design units on the 1080 x 1920 frame. builtin: seconds after an object enters at which its own entrance animation visibly changes the frame (the full-frame cards animate themselves); the change-cadence grader counts them as changes.",
+  "frame": {
+    "w": 1080,
+    "h": 1920,
+    "content_w": 960,
+    "gap": 48,
+    "connector_gap": 120,
+    "solo": {
+      "top": 300,
+      "bottom": 1300
+    },
+    "duo": {
+      "top": 260,
+      "bottom": 820
+    },
+    "avatars": {
+      "top": 850,
+      "bottom": 1240,
+      "left_x": 250,
+      "right_x": 830
+    }
+  },
+  "fields": [
+    "navy",
+    "blue",
+    "paper",
+    "yellow"
+  ],
+  "tones": [
+    "plain",
+    "info",
+    "warn",
+    "ok",
+    "bad",
+    "special"
+  ],
+  "transitions": [
+    "cut",
+    "iris",
+    "bar_wipe",
+    "double_bar_wipe",
+    "diagonal_stripes",
+    "stack_rise",
+    "type_scatter"
+  ],
+  "kinetic": {
+    "size": 112,
+    "line_height": 0.95,
+    "chars_per_line": 18,
+    "max_lines": 3
+  },
+  "objects": {
+    "title_card": {
+      "layout": "full",
+      "props": {
+        "title": "str",
+        "promise": "str",
+        "icons": "icons?"
+      },
+      "max": {
+        "title": 22,
+        "promise": 40
+      },
+      "actions": [
+        "enter",
+        "highlight"
+      ],
+      "builtin": [
+        0,
+        0.12,
+        0.26,
+        0.7,
+        1.05,
+        1.4
+      ]
+    },
+    "end_card": {
+      "layout": "full",
+      "props": {
+        "up_next": "str?"
+      },
+      "max": {
+        "up_next": 22
+      },
+      "actions": [
+        "enter",
+        "pulse"
+      ],
+      "builtin": [
+        0,
+        0.12,
+        0.26,
+        1.0,
+        1.12,
+        1.24
+      ]
+    },
+    "takeaway_list": {
+      "layout": "full",
+      "props": {
+        "heading": "str?",
+        "rows": "rows"
+      },
+      "max": {
+        "heading": 24
+      },
+      "actions": [
+        "enter",
+        "stagger",
+        "highlight"
+      ],
+      "builtin": [
+        0,
+        0.5,
+        1.4,
+        2.3
+      ]
+    },
+    "recap_grid": {
+      "layout": "full",
+      "props": {
+        "concept": "str",
+        "steps": "str[]",
+        "final": "str[]?"
+      },
+      "max": {
+        "concept": 16
+      },
+      "actions": [
+        "enter",
+        "highlight"
+      ],
+      "builtin": [
+        0,
+        0.4,
+        0.52,
+        0.64,
+        0.76,
+        0.9
+      ]
+    },
+    "chapter_card": {
+      "layout": "full",
+      "props": {
+        "n": "int",
+        "of": "int",
+        "title": "str"
+      },
+      "max": {
+        "title": 32
+      },
+      "actions": [
+        "enter"
+      ],
+      "builtin": [
+        0,
+        0.5,
+        0.9,
+        2.6,
+        3.05
+      ]
+    },
+    "code_map": {
+      "layout": "full",
+      "props": {
+        "lines": "str[]",
+        "parts": "parts"
+      },
+      "actions": [
+        "enter",
+        "highlight"
+      ],
+      "builtin": [
+        0
+      ]
+    },
+    "kinetic_title": {
+      "layout": "placed",
+      "props": {
+        "text": "str",
+        "accent": "str[]?"
+      },
+      "max": {
+        "text": 54
+      },
+      "actions": [
+        "enter",
+        "highlight",
+        "scramble",
+        "exit"
+      ]
+    },
+    "code_window": {
+      "layout": "placed",
+      "props": {
+        "file": "str?",
+        "lines": "str[]"
+      },
+      "max": {
+        "file": 24
+      },
+      "actions": [
+        "enter",
+        "type",
+        "highlight",
+        "exit"
+      ]
+    },
+    "entity_card": {
+      "layout": "placed",
+      "height": 330,
+      "props": {
+        "label": "str",
+        "value": "str",
+        "unit": "str?",
+        "tone": "tone?"
+      },
+      "max": {
+        "label": 22,
+        "value": 10,
+        "unit": 12
+      },
+      "actions": [
+        "enter",
+        "state",
+        "pulse",
+        "exit"
+      ]
+    },
+    "system_panel": {
+      "layout": "placed",
+      "height": 300,
+      "props": {
+        "title": "str",
+        "status": "str",
+        "tone": "tone?",
+        "slot_name": "str?",
+        "slot_value": "str?"
+      },
+      "max": {
+        "title": 16,
+        "status": 14,
+        "slot_name": 14,
+        "slot_value": 6
+      },
+      "actions": [
+        "enter",
+        "state",
+        "pulse",
+        "exit"
+      ]
+    },
+    "status_pill": {
+      "layout": "placed",
+      "height": 80,
+      "props": {
+        "text": "str",
+        "tone": "tone",
+        "icon": "icon?"
+      },
+      "max": {
+        "text": 26
+      },
+      "actions": [
+        "enter",
+        "state",
+        "exit"
+      ]
+    },
+    "trigger_chip": {
+      "layout": "placed",
+      "height": 84,
+      "props": {
+        "label": "str"
+      },
+      "max": {
+        "label": 22
+      },
+      "actions": [
+        "enter",
+        "pulse",
+        "exit"
+      ]
+    },
+    "token_row": {
+      "layout": "placed",
+      "height": 76,
+      "props": {
+        "items": "str[]",
+        "tones": "tone[]?"
+      },
+      "max": {
+        "items": 44
+      },
+      "actions": [
+        "enter",
+        "state",
+        "highlight",
+        "exit"
+      ]
+    },
+    "big_counter": {
+      "layout": "placed",
+      "height": 300,
+      "props": {
+        "value": "str",
+        "label": "str?"
+      },
+      "max": {
+        "value": 8,
+        "label": 22
+      },
+      "actions": [
+        "enter",
+        "count",
+        "state",
+        "exit"
+      ]
+    },
+    "callout": {
+      "layout": "placed",
+      "height": 150,
+      "props": {
+        "label": "str",
+        "text": "str"
+      },
+      "max": {
+        "label": 20,
+        "text": 40
+      },
+      "actions": [
+        "enter",
+        "exit"
+      ]
+    },
+    "icon_row": {
+      "layout": "placed",
+      "height": 230,
+      "props": {
+        "icons": "icons"
+      },
+      "actions": [
+        "enter",
+        "highlight",
+        "exit"
+      ]
+    },
+    "lookup_table": {
+      "layout": "placed",
+      "props": {
+        "header": "str[]",
+        "rows": "table"
+      },
+      "actions": [
+        "enter",
+        "highlight",
+        "exit"
+      ]
+    },
+    "stamp": {
+      "layout": "overlay",
+      "props": {
+        "text": "str"
+      },
+      "max": {
+        "text": 18
+      },
+      "actions": [
+        "stamp"
+      ]
+    },
+    "connector": {
+      "layout": "link",
+      "props": {
+        "from": "str",
+        "to": "str",
+        "tone": "tone?",
+        "broken": "bool?"
+      },
+      "actions": [
+        "enter",
+        "pulse",
+        "state"
+      ]
+    }
+  },
+  "actions": {
+    "enter": "the object appears (its kind's own entrance)",
+    "exit": "the object fades out",
+    "state": "tone and/or value change: entity_card value+tone, system_panel status+tone(+slot_value), status_pill text+tone, token_row item tones (value = comma-separated tones), big_counter value, connector tone/broken",
+    "pulse": "a pulse travels / the object glows (connector, trigger_chip, system_panel, entity_card)",
+    "highlight": "one part lights up: value = 1-based word (kinetic_title), line (code_window), chip (token_row), row (lookup_table), part (code_map), icon (icon_row)",
+    "type": "code_window types its lines in, one by one",
+    "count": "big_counter counts up from 0 to its value",
+    "scramble": "kinetic_title's words settle from random characters",
+    "stagger": "takeaway_list rows appear one by one",
+    "stamp": "the stamp slams in (at most one per reel; coral, so failure beats only)"
+  },
+  "avatar": {
+    "_comment": "The avatar art vocabulary (shorts/motion_avatars.yaml `art`). Avatar.tsx draws each value; motion_themes validates the YAML against these lists.",
+    "bodies": [
+      "rounded",
+      "square",
+      "tall",
+      "pill",
+      "arch",
+      "wide",
+      "compact",
+      "hex",
+      "stacked",
+      "broad"
+    ],
+    "heads": [
+      "round",
+      "oval",
+      "rounded_square"
+    ],
+    "hair": [
+      "swept",
+      "bob",
+      "ponytail",
+      "ponytail_high",
+      "bun",
+      "curly",
+      "twists",
+      "buzz",
+      "side_part",
+      "long",
+      "short",
+      "beanie",
+      "cap"
+    ],
+    "accessories": [
+      "headset",
+      "glasses",
+      "lanyard",
+      "scarf",
+      "notebook",
+      "clipboard",
+      "pencil",
+      "watch",
+      "toolbelt",
+      "vest",
+      "blazer",
+      "bag",
+      "beard",
+      "hivis",
+      "hoodie",
+      "cardigan",
+      "track_jacket"
+    ],
+    "skins": {
+      "s1": "#F6D7C3",
+      "s2": "#E8B894",
+      "s3": "#C98E64",
+      "s4": "#A86B45",
+      "s5": "#7E4E33",
+      "s6": "#5A3825"
+    },
+    "states": [
+      "idle",
+      "talking",
+      "reacting"
+    ],
+    "box": {
+      "w": 360,
+      "h": 420
+    }
+  }
+}

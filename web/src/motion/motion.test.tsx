@@ -19,6 +19,17 @@ import { FIELD_NAMES, FIELDS, C } from "./tokens";
 import { leadColor, planTransitions, ROTATION } from "./transitions";
 import { formatNumber, scanSchedule } from "./animations";
 import { evenWords, sentenceAt } from "./KaraokeCaption";
+import { Avatar, mouthOpen } from "./avatars/Avatar";
+import { allAvatars } from "./avatars/AvatarSheet";
+import { MotionFrame, avatarState, shotIndexAt, speakerAt } from "./scene/MotionStage";
+import type { MotionPlan } from "./scene/types";
+import demoInterviewJson from "../../public/motion-demo/interview.json";
+import demoClassicJson from "../../public/motion-demo/classic.json";
+import demoWalkJson from "../../public/motion-demo/walkthrough.json";
+
+const demoInterview = demoInterviewJson as unknown as MotionPlan;
+const demoClassic = demoClassicJson as unknown as MotionPlan;
+const demoWalk = demoWalkJson as unknown as MotionPlan;
 
 let failures = 0;
 function check(ok: boolean, msg: string) {
@@ -68,6 +79,55 @@ check(sched.every((s, i) => i === 0 || s.start > sched[i - 1].end), "scan pieces
 const sentence = evenWords("Every model has a <b>vocabulary</b>.", 1, 3);
 check(sentence.words.length === 5 && sentence.words[4].hl && !sentence.words[0].hl, "evenWords highlights");
 check(sentenceAt([sentence], 0.5) === null && sentenceAt([sentence], 1.2) === sentence, "sentenceAt");
+
+// ------------------------------------------------- 4 (phase 3): avatars
+// Every avatar in every state: pure in t, no CSS animation, and talking
+// actually moves (the mouth and the head) while idle stays nearly still.
+for (const { key, spec } of allAvatars()) {
+  for (const state of ["idle", "talking", "reacting"] as const) {
+    const frames = [0.2, 0.55, 0.9, 1.3].map((t) => renderToStaticMarkup(<Avatar spec={spec} state={state} t={t} since={t} />));
+    frames.forEach((m, i) => {
+      const again = renderToStaticMarkup(<Avatar spec={spec} state={state} t={[0.2, 0.55, 0.9, 1.3][i]} since={[0.2, 0.55, 0.9, 1.3][i]} />);
+      check(again === m, `avatar ${key} ${state}: not pure in t`);
+      check(!/animation\s*:|transition\s*:|@keyframes/.test(m), `avatar ${key} ${state}: uses a CSS animation`);
+    });
+    if (state === "talking") check(new Set(frames).size >= 3, `avatar ${key} talking: does not move`);
+  }
+  const idle = renderToStaticMarkup(<Avatar spec={spec} state="idle" t={1} />);
+  const react = renderToStaticMarkup(<Avatar spec={spec} state="reacting" t={1} since={0.5} />);
+  check(idle !== react, `avatar ${key}: reacting looks like idle`);
+}
+check(mouthOpen(0.5, 3) >= 0 && mouthOpen(0.5, 3) <= 1, "mouthOpen out of range");
+console.log(`  ${allAvatars().length} avatars x 3 states rendered`);
+
+// ----------------------------------------- 5 (phase 3): the full-reel stage
+// The demo plans (web/public/motion-demo, from shorts/motion_demo.py): every
+// shot at its start, middle and end — pure in t, no CSS animation, frames
+// change through the reel, and the two-speaker logic says who talks.
+for (const [name, plan] of Object.entries({ interview: demoInterview, classic: demoClassic, walkthrough: demoWalk }) as [string, MotionPlan][]) {
+  const seen = new Set<string>();
+  for (const shot of plan.shots) {
+    for (const t of [shot.start + 0.01, (shot.start + shot.end) / 2, shot.end - 0.02]) {
+      let m: string;
+      try { m = renderToStaticMarkup(<MotionFrame plan={plan} t={t} />); }
+      catch (err) { check(false, `${name} ${shot.id} at ${t.toFixed(2)}: throws: ${err}`); continue; }
+      check(m === renderToStaticMarkup(<MotionFrame plan={plan} t={t} />), `${name} ${shot.id}: not pure in t`);
+      check(!/animation\s*:|transition\s*:|@keyframes/.test(m), `${name} ${shot.id}: uses a CSS animation`);
+      seen.add(m);
+    }
+    check(shotIndexAt(plan, shot.start + 0.01) === plan.shots.indexOf(shot), `${name}: shotIndexAt ${shot.id}`);
+  }
+  check(seen.size >= plan.shots.length * 2, `${name}: the reel barely changes (${seen.size} distinct frames)`);
+}
+const ivShot = demoInterview.shots.find((s) => s.captions.some((c) => c.speaker === "CANDIDATE"))!;
+const cand = ivShot.captions.find((c) => c.speaker === "CANDIDATE")!;
+check(speakerAt(ivShot, (cand.start + cand.end) / 2) === "CANDIDATE", "speakerAt");
+check(avatarState(ivShot, "CANDIDATE", (cand.start + cand.end) / 2).state === "talking", "the speaker talks");
+check(avatarState(ivShot, "INTERVIEWER", (cand.start + cand.end) / 2).state !== "talking", "the listener is not talking");
+const q = demoInterview.shots.flatMap((s) => s.captions.map((c) => ({ s, c })))
+  .find(({ c }) => c.speaker === "INTERVIEWER" && /\?\s*$/.test(c.text.replace(/<\/?b>/g, "")))!;
+check(avatarState(q.s, "CANDIDATE", q.c.end + 0.2).state === "reacting", "the listener reacts to a question");
+console.log("  3 demo plans rendered at every shot's start, middle and end");
 
 if (failures) {
   console.log(`\n${failures} MOTION CHECK(S) FAILED.`);

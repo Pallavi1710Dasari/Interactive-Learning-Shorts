@@ -26,3 +26,40 @@ def icon_names() -> frozenset[str]:
     """Every icon name the motion player can draw."""
     data = json.loads(ICONS_PATH.read_text(encoding="utf-8"))
     return frozenset(data["icons"])
+
+
+# ================================================================== scenes
+#
+# Phase 3: the scene vocabulary — web/src/motion/library.json, the ONE file
+# both sides read (see its _comment). Python validates scenes against it and
+# lays them out with its heights; the player draws them.
+
+LIBRARY_PATH = ICONS_PATH.parent / "library.json"
+
+
+@lru_cache(maxsize=1)
+def library() -> dict:
+    """The whole scene vocabulary: frame regions, fields, tones, transitions,
+    object kinds (props, layout, height, max lengths, allowed actions),
+    action kinds and the avatar art vocabulary."""
+    return json.loads(LIBRARY_PATH.read_text(encoding="utf-8"))
+
+
+def object_kinds() -> dict[str, dict]:
+    return library()["objects"]
+
+
+def action_kinds() -> frozenset[str]:
+    return frozenset(library()["actions"])
+
+
+def transitions() -> tuple[str, ...]:
+    return tuple(library()["transitions"])
+
+
+def fields() -> tuple[str, ...]:
+    return tuple(library()["fields"])
+
+
+def tones() -> tuple[str, ...]:
+    return tuple(library()["tones"])

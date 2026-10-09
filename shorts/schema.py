@@ -3078,15 +3078,48 @@ class MotionShot(BaseModel):
     #: The code a CodeWindow shows, one string per line. Only setup and
     #: code_map may carry code (checks.check_motion_code_shots).
     code: list[str] = Field(default_factory=list)
-    #: The SceneSpec (objects + timeline) — filled by the scenes stage in
-    #: phase 3. None until then.
-    scene: Optional[dict] = None
+    #: The SceneSpec (objects + timeline actions) — filled by the scenes
+    #: stage (phase 3). None until then. A dict is accepted and validated
+    #: into a MotionScene, so phase 1/2 files (scene: null) load unchanged.
+    scene: Optional["MotionScene"] = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def estimated_seconds(self) -> float:
         """Planning estimate from word count — never the real duration."""
         return round(len(self.speech.split()) / MOTION_WORDS_PER_SECOND, 2)
+
+
+class MotionSceneObject(BaseModel):
+    """One object on a shot's screen: a kind from web/src/motion/library.json
+    and its props. Where it goes is never the LLM's: motion_layout places
+    every object from the library's heights."""
+    id: str                      #: "o1", "o2", ... unique in the shot
+    kind: str
+    props: dict = Field(default_factory=dict)
+
+
+class MotionSceneAction(BaseModel):
+    """One timeline action, CUED ON A SPOKEN WORD (addendum 4.6 D: each
+    build-up step is tied to the word that names it). `at` is "start" or 1-3
+    words copied from the shot's captions; cues resolve in order through the
+    captions, so a repeated word means its next occurrence. The timing stage
+    turns every cue into seconds from the real audio."""
+    at: str = "start"
+    do: str                      #: an action kind from library.json
+    target: str                  #: an object id
+    value: Optional[str] = None  #: the new value / text / 1-based index
+    tone: Optional[str] = None   #: the new tone (state actions)
+
+
+class MotionScene(BaseModel):
+    """What one shot shows: its field colour, the transition INTO it, an
+    optional tracked-caps section label, its objects and its actions."""
+    field: Literal["navy", "blue", "paper", "yellow"] = "paper"
+    transition: str = "cut"
+    label: str = ""
+    objects: list[MotionSceneObject] = Field(default_factory=list)
+    actions: list[MotionSceneAction] = Field(default_factory=list)
 
 
 class MotionChapter(BaseModel):
@@ -3210,6 +3243,7 @@ class MotionSpeaker(BaseModel):
 
 
 MotionScript.model_rebuild()
+MotionShot.model_rebuild()
 
 
 class MotionThemeDraft(BaseModel):
@@ -3270,3 +3304,110 @@ class MotionTags(BaseModel):
     concepts: list[str]
     tags: list[str]              #: "#python", "#interview", "#closures"
     created_at: str              #: ISO 8601, UTC — orders the reel history
+
+
+# ================================================================ motion scenes
+#
+# Phase 3 (RESTYLE_TO_MOTION_REELS.md): the scenes call's answer, the voice
+# stage's manifest and the timeline the player plays.
+
+class MotionShotScene(BaseModel):
+    id: str
+    scene: MotionScene
+
+
+class MotionScenesDraft(BaseModel):
+    """What SYSTEM_MOTION_SCENES returns: one scene per shot, by shot id."""
+    shots: list[MotionShotScene]
+
+
+class MotionWord(BaseModel):
+    text: str                    #: as captioned (code kept as code)
+    start: float
+    end: float
+    hl: bool = False             #: a <b> highlight
+
+
+class MotionCaptionTiming(BaseModel):
+    """One caption (one spoken sentence) on the reel's clock."""
+    text: str
+    speaker: Optional[str] = None
+    start: float
+    end: float
+    words: list[MotionWord]
+    #: forced_alignment (wav2vec2 on the real audio), whisper (faster-whisper
+    #: word boundaries paired to the known words) or even (an even split —
+    #: stub mode, or both aligners unavailable).
+    source: Literal["forced_alignment", "whisper", "even"] = "even"
+
+
+class MotionActionTiming(BaseModel):
+    t: float                     #: seconds on the reel's clock
+    do: str
+    target: str
+    value: Optional[str] = None
+    tone: Optional[str] = None
+    cue: str = "start"
+
+
+class MotionBox(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+class MotionPlacedObject(BaseModel):
+    id: str
+    kind: str
+    props: dict = Field(default_factory=dict)
+    box: Optional[MotionBox] = None  #: None for full-frame, overlay and link kinds
+
+
+class MotionShotPlan(BaseModel):
+    id: str
+    beat: str
+    chapter: Optional[int] = None
+    start: float
+    end: float
+    field: str
+    transition: str
+    label: str = ""
+    layout: Literal["solo", "duo"] = "solo"
+    objects: list[MotionPlacedObject]
+    actions: list[MotionActionTiming]
+    captions: list[MotionCaptionTiming]
+
+
+class MotionAvatarSpec(BaseModel):
+    """What the player needs to draw one avatar (shorts/motion_avatars.yaml)."""
+    id: str
+    name: str
+    body: str
+    head: str
+    hair: str
+    skin: str
+    accessories: list[str] = Field(default_factory=list)
+    palette: dict
+
+
+class MotionCastMember(BaseModel):
+    role: str
+    side: Literal["left", "right"]
+    voice_slot: str
+    avatar: MotionAvatarSpec
+
+
+class MotionPlan(BaseModel):
+    """Everything the player needs, on one clock: output/<short_id>/plan.json.
+    The player is a pure function of (plan, t)."""
+    short_id: str
+    template: str
+    theme: Optional[str] = None
+    series: str = ""
+    concept_name: str = ""
+    duration: float
+    audio: Optional[str] = None      #: the mixed narration, relative to the plan
+    timing_source: str = "even"      #: the weakest source any caption used
+    cast: list[MotionCastMember] = Field(default_factory=list)
+    shots: list[MotionShotPlan]

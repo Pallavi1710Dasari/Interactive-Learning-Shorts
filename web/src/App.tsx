@@ -12,6 +12,8 @@ import { VoiceLab } from "./VoiceLab";
 import { CaptureStage } from "./CaptureStage";
 import { StoryCaptureStage } from "./StoryStage";
 import { MotionGallery } from "./motion/gallery/Gallery";
+import { MotionPlayer } from "./motion/scene/MotionPlayer";
+import { MotionSection } from "./motion/MotionSection";
 import { pickVoices, useVoices } from "./useNarration";
 import type { Feedback, QuestionWorkflow, StoryReel, Unit } from "./types";
 
@@ -37,6 +39,13 @@ export default function App() {
   // #motion-gallery — the motion library, checked frame by frame. A dev page:
   // no API calls, so it works with only the Vite server running.
   if (location.hash.startsWith("#motion-gallery")) return <MotionGallery />;
+  // #motion-reel/<short_id> — a motion reel in the full-reel player (phase 3):
+  // its plan and narration from the API, or any plan with ?src=<url>.
+  if (location.hash.startsWith("#motion-reel")) return <MotionPlayer />;
+  // #motion — the Motion section: every motion reel with its player, theme,
+  // approach, tags, script, fact sources and cost. The explainer screens below
+  // are untouched by it.
+  if (/^#motion(\/|$|\?)/.test(location.hash)) return <MotionSection />;
 
   return <Workspace />;
 }

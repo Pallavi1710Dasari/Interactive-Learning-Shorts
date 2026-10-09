@@ -1,0 +1,36 @@
+# Which model each LLM call of a MOTION reel uses — the one place to change it.
+# REEL_STYLE=motion only: shorts/motion_reel.py switches this routing on for its
+# own run (motion_models.use()). Explainer and story runs never read this file
+# and keep config.py's MODEL_* settings.
+#
+# Model ids are OpenRouter's (checked 2026-10-09 against
+# https://openrouter.ai/api/v1/models — the latest of each family):
+#   anthropic/claude-opus-5.5     $4 / $20 per million input / output tokens
+#   anthropic/claude-sonnet-5.5   $2 / $10
+# Prices for estimates live in shorts/usage.py PRICES; OpenRouter's reported
+# per-call cost wins whenever it sends one.
+models:
+  deliberate: anthropic/claude-opus-5.5    # judgement: what to teach, how, in what format
+  mechanical: anthropic/claude-sonnet-5.5  # wording and repair of something already decided
+
+# Every LLM call a motion reel can make, by its llm.ask_json label -> a tier
+# above (or a full model id). Everything else in the pipeline — parsing the
+# document, tags, variety, layout, cue timing, every grader — is plain code and
+# makes no LLM call at all.
+#
+# For each: the most calls one reel can make (retries and repairs included) and
+# rough tokens per call, for the estimate printed before a reel starts. `typical`
+# is the usual number of calls when nothing needs a retry.
+steps:
+  select:                       {tier: deliberate, worst: 1, typical: 1, input: doc+3500, output: 2500}
+  understanding:                {tier: deliberate, worst: 2, typical: 1, input: 6000, output: 2000}
+  framing:                      {tier: mechanical, worst: 2, typical: 1, input: 3000, output: 500}
+  regenerate_question:          {tier: mechanical, worst: 0, typical: 0, input: 3000, output: 300}
+  teaching_approach:            {tier: deliberate, worst: 2, typical: 1, input: 5000, output: 600}
+  teaching_approach_regenerate: {tier: deliberate, worst: 0, typical: 0, input: 5000, output: 600}
+  motion_theme:                 {tier: deliberate, worst: 2, typical: 1, input: 5500, output: 300}
+  motion_script:                {tier: deliberate, worst: 3, typical: 1, input: 7000, output: 4500}
+  motion_hook_fix:              {tier: deliberate, worst: 6, typical: 0, input: 7000, output: 400}
+  motion_scenes:                {tier: deliberate, worst: 1, typical: 1, input: 14000, output: 9000}
+  motion_scenes_repair:         {tier: deliberate, worst: 2, typical: 0, input: 9000, output: 4000}
+  motion_judge:                 {tier: deliberate, worst: 0, typical: 0, input: 8000, output: 1500}   # phase 4

@@ -1803,6 +1803,57 @@ def story_data(short_id: str):
            "audio_url": f"/api/story/{short_id}/audio" if has_audio else None}
 
 
+@app.get("/api/motion")
+def motion_list():
+    """Every motion reel in output/ (stub and real), newest first — the web
+    UI's Motion section (#motion). Read-only."""
+    from . import motion_bundle
+    return {"reels": [motion_bundle.summary(config.OUTPUT_DIR, sid)
+                      for sid in motion_bundle.list_reels(config.OUTPUT_DIR)]}
+
+
+@app.get("/api/motion/{short_id}/bundle")
+def motion_reel_bundle(short_id: str):
+    """One motion reel's script (with speakers), theme, teaching approach,
+    tags, fact sources and cost log, plus where its plan and audio are."""
+    from . import motion_bundle
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", short_id):
+        raise HTTPException(400, "bad short id")
+    if not motion_bundle.is_motion_reel(config.OUTPUT_DIR, short_id):
+        raise HTTPException(404, "no such motion reel")
+    has_plan = (config.OUTPUT_DIR / short_id / "plan.json").exists()
+    has_audio = (config.OUTPUT_DIR / short_id / "audio" / "reel.wav").exists()
+    return motion_bundle.bundle(config.OUTPUT_DIR, short_id,
+                                plan_url=f"/api/motion/{short_id}/plan" if has_plan else None,
+                                audio_url=f"/api/motion/{short_id}/audio" if has_audio else None)
+
+
+@app.get("/api/motion/{short_id}/plan")
+def motion_plan(short_id: str):
+    """A motion reel's player plan (RESTYLE_TO_MOTION_REELS.md phase 3):
+    output/<short_id>/plan.json, written by the motion runner's timing stage.
+    The player at #motion-reel/<short_id> is a pure function of it."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", short_id):
+        raise HTTPException(400, "bad short id")
+    path = config.OUTPUT_DIR / short_id / "plan.json"
+    if not path.exists():
+        raise HTTPException(404, "no plan for this motion reel — run its timing stage")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("audio"):
+        data["audio_url"] = f"/api/motion/{short_id}/audio"
+    return data
+
+
+@app.get("/api/motion/{short_id}/audio")
+def motion_audio(short_id: str):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", short_id):
+        raise HTTPException(400, "bad short id")
+    path = config.OUTPUT_DIR / short_id / "audio" / "reel.wav"
+    if not path.exists():
+        raise HTTPException(404, "no audio for this motion reel")
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/story/{short_id}/frame/{filename}")
 def story_frame(short_id: str, filename: str):
     short_id = _story_short_id(short_id)

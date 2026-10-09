@@ -6,6 +6,11 @@
 # Only themes with two speakers use avatars (shorts/motion_themes.yaml: a
 # speaker's `avatar` is "language" or "host"). A one-narrator reel has none.
 #
+# `art` is what the player draws (web/src/motion/avatars/Avatar.tsx): one
+# parametric, original character built from flat shapes — a body shape, a head
+# shape, hair, a skin tone and accessories, coloured by the palette. `look` is
+# the same character in words, for reviewers.
+#
 # RULES FOR THE ARTWORK (phase 3), checked by review, not code:
 #   - Original designs. Never an official language logo or mascot, and never a
 #     look-alike of one (no snake for Python, no coffee cup for Java, no atom
@@ -16,8 +21,9 @@
 #     clip art, no gradients beyond what the cards already use.
 #   - Palettes never use coral (#F2555A), mint (#17B27B) or lavender
 #     (#B9A8FF): those colours mean failure, success and system-added in every
-#     motion reel (web/src/motion/tokens.ts). shorts/motion_themes.py rejects
-#     a palette that uses them.
+#     motion reel (web/src/motion/tokens.ts). Nor is a body (primary) colour
+#     one of the four field colours, or the character vanishes into that
+#     field. shorts/motion_themes.py rejects both.
 #
 # Voice slots are Chatterbox reference clips. `voice_slot` names the clip; the
 # file is voices/motion/<voice_slot>.wav, recorded in phase 3. Two speakers
@@ -31,88 +37,109 @@
 # structures, AI concepts).
 languages: [python, javascript, typescript, react, node, django, html, css, sql, java, c, cpp, docker, os, cs]
 
+# The one-narrator voice: every theme with a single speaker (classic_explainer,
+# narrative, bug_hunt, ...) is read in this voice. No avatar is drawn for it.
+narrator:
+  voice_slot: motion_narrator
+
 # The shared host: the asking role of two-speaker themes (interviewer, peer,
 # student), the same character whatever the language.
 host:
   id: host
   name: Juno
   look: Rounded square head, short swept hair, headset mic, navy jacket.
-  palette: {primary: "#283EE6", secondary: "#091025", accent: "#FDD13E", ink: "#151936"}
+  art: {body: rounded, head: rounded_square, hair: swept, skin: s3, accessories: [headset]}
+  palette: {primary: "#2F6F8F", secondary: "#091025", accent: "#FDD13E", ink: "#151936"}
   voice_slot: motion_host
 
 characters:
   python:
     name: Ivy
     look: Tall rectangle body, round glasses, rolled sleeves, a notebook.
+    art: {body: tall, head: round, hair: long, skin: s2, accessories: [glasses, notebook]}
     palette: {primary: "#3A5FCD", secondary: "#FFB524", accent: "#ECF0F7", ink: "#151936"}
     voice_slot: motion_python
   javascript:
     name: Jett
     look: Square body, cap worn backwards, hoodie with a single stripe.
-    palette: {primary: "#FDD13E", secondary: "#151936", accent: "#283EE6", ink: "#151936"}
+    art: {body: square, head: round, hair: cap, skin: s4, accessories: [hoodie]}
+    palette: {primary: "#F2A93B", secondary: "#151936", accent: "#283EE6", ink: "#151936"}
     voice_slot: motion_javascript
   typescript:
     name: Tess
     look: Square body with a neat collar, short bob, a clipboard.
+    art: {body: square, head: oval, hair: bob, skin: s1, accessories: [clipboard]}
     palette: {primary: "#2F74C0", secondary: "#ECF0F7", accent: "#FDD13E", ink: "#151936"}
     voice_slot: motion_typescript
   react:
     name: Rae
     look: Circle head on a rounded body, side ponytail, a lanyard badge.
+    art: {body: rounded, head: round, hair: ponytail, skin: s5, accessories: [lanyard]}
     palette: {primary: "#5B4BF5", secondary: "#ECEAFE", accent: "#FFB524", ink: "#151936"}
     voice_slot: motion_react
   node:
     name: Odell
     look: Hexagon-cornered square body, short twists, a zip-up track jacket.
+    art: {body: hex, head: rounded_square, hair: twists, skin: s6, accessories: [track_jacket]}
     palette: {primary: "#2F6B4F", secondary: "#E2E4EF", accent: "#FDD13E", ink: "#151936"}
     voice_slot: motion_node
   django:
     name: Dara
     look: Tall rounded body, low bun, a fitted blazer with a pocket square.
+    art: {body: tall, head: oval, hair: bun, skin: s3, accessories: [blazer]}
     palette: {primary: "#1E4D44", secondary: "#FFF3D9", accent: "#FFB524", ink: "#151936"}
     voice_slot: motion_django
   html:
     name: Hart
     look: Tall arch-shaped body, short beard, a messenger bag.
+    art: {body: arch, head: round, hair: short, skin: s2, accessories: [beard, bag]}
     palette: {primary: "#E07A2E", secondary: "#FFF3D9", accent: "#283EE6", ink: "#151936"}
     voice_slot: motion_html
   css:
     name: Sia
     look: Pill-shaped body, long straight hair, a paint-chip scarf.
+    art: {body: pill, head: oval, hair: long, skin: s4, accessories: [scarf]}
     palette: {primary: "#2E6FE0", secondary: "#FDD13E", accent: "#ECF0F7", ink: "#151936"}
     voice_slot: motion_css
   sql:
     name: Quinn
     look: Stacked-rectangle body, rolled cuffs, a pencil behind one ear.
+    art: {body: stacked, head: rounded_square, hair: short, skin: s5, accessories: [pencil]}
     palette: {primary: "#3C5A99", secondary: "#E2E4EF", accent: "#FFB524", ink: "#151936"}
     voice_slot: motion_sql
   java:
     name: Jorah
     look: Broad square body, cardigan, a wristwatch.
+    art: {body: broad, head: rounded_square, hair: side_part, skin: s1, accessories: [cardigan, watch]}
     palette: {primary: "#B5562F", secondary: "#FFF3D9", accent: "#283EE6", ink: "#151936"}
     voice_slot: motion_java
   c:
     name: Cy
     look: Compact square body, buzz cut, a toolbelt.
+    art: {body: compact, head: round, hair: buzz, skin: s6, accessories: [toolbelt]}
     palette: {primary: "#5A6B8C", secondary: "#E2E4EF", accent: "#FDD13E", ink: "#151936"}
     voice_slot: motion_c
   cpp:
     name: Cass
     look: Tall rectangle body, high ponytail, a utility vest.
+    art: {body: tall, head: oval, hair: ponytail_high, skin: s2, accessories: [vest]}
     palette: {primary: "#3B4FA8", secondary: "#ECF0F7", accent: "#FFB524", ink: "#151936"}
     voice_slot: motion_cpp
   docker:
     name: Kit
     look: Wide stacked-box body, beanie, a hi-vis strap across the chest.
+    art: {body: wide, head: round, hair: beanie, skin: s3, accessories: [hivis]}
     palette: {primary: "#2496C8", secondary: "#091025", accent: "#FDD13E", ink: "#151936"}
     voice_slot: motion_docker
   os:
     name: Orin
-    look: Square body with rounded shoulders, side-parted hair, a cardigan with elbow patches.
+    look: Square body with rounded shoulders, short hair, round glasses, a cardigan with elbow patches.
+    art: {body: rounded, head: rounded_square, hair: short, skin: s5, accessories: [cardigan, glasses]}
     palette: {primary: "#4A4F7A", secondary: "#ECF0F7", accent: "#FFB524", ink: "#151936"}
     voice_slot: motion_os
   cs:
     name: Nova
     look: Rounded body, curly hair, a scarf, a chalk stick.
+    art: {body: rounded, head: round, hair: curly, skin: s4, accessories: [scarf]}
     palette: {primary: "#1F31C4", secondary: "#FDD13E", accent: "#ECF0F7", ink: "#151936"}
     voice_slot: motion_cs

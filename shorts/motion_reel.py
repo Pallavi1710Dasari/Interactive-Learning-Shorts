@@ -32,8 +32,10 @@ pause again on the next run", never "skip ahead".
 NO IMAGE GENERATION, EVER. Motion reels are drawn by web/src/motion; this
 module does not import shorts.imagegen, and motion_script_test asserts it.
 
-PHASE 1 (this commit) builds setup and script. scenes/voice/timing/render
-report "not built yet" and stop cleanly; they arrive in phases 3 and 4.
+PHASES 1-3 build setup, theme, script, scenes, voice and timing. render
+reports "not built yet" and stops cleanly; it arrives in phase 4. Until then
+the reel plays in the browser: #motion-reel/<short_id> (shorts/server.py
+serves output/<short_id>/plan.json and its audio).
 
 Motion reels get their OWN id namespace, <topic>__motion, never landing on an
 explainer reel's or a story reel's files — the same rule story_reel.py keeps
@@ -61,7 +63,7 @@ MONEY_STAGES = {"theme", "script", "scenes"}
 
 #: Stages that exist in STAGE_ORDER (so --from / --force-stage accept them and
 #: resume math is already right) but are built in a later phase.
-_NOT_BUILT_YET = {"scenes": 3, "voice": 3, "timing": 3, "render": 4}
+_NOT_BUILT_YET = {"render": 4}
 
 _MOTION_MODE_BANNER = (
     "\n"
@@ -111,6 +113,12 @@ def _money_gate(stage: str, short_id: str, plan: list, yes: bool, reel_cursor: i
               f"for {stage} = ${projected:.4f}. Stopping before any call.")
         return False
     return _confirm(f"Proceed with the {stage} stage (est. ${built['total_cost']:.4f})?", yes)
+
+
+def _model(label: str) -> str:
+    """The model a motion call uses (shorts/motion_models.yaml)."""
+    from . import motion_models
+    return motion_models.model_for(label) or config.MODEL_GENERATOR
 
 
 # ======================================================================= ids
@@ -384,8 +392,8 @@ def stage_theme(short_id: str, state: dict, sections: list, doc_text: str, yes: 
         template=pin, history=history, language=language)
     if not override and len(eligible) > 1:
         plan = [preflight.ModelPlan(
-            "motion_theme", config.MODEL_GENERATOR, MAX_THEME_ATTEMPTS,
-            preflight.text_cost_per_call(config.MODEL_GENERATOR,
+            "motion_theme", _model("motion_theme"), MAX_THEME_ATTEMPTS,
+            preflight.text_cost_per_call(_model("motion_theme"),
                                          (len(SYSTEM_MOTION_THEME) + len(source_text)) // 3
                                          + 120 * len(eligible), 300))]
         if not _money_gate("theme", short_id, plan, yes, reel_cursor):
@@ -498,9 +506,9 @@ def print_shot_list(script: MotionScript, results: list | None = None) -> None:
 def stage_script(short_id: str, state: dict, sections: list, yes: bool,
                  reel_cursor: int, theme: MotionThemeChoice | None = None) -> MotionScript | None:
     plan = [preflight.ModelPlan(
-        "motion_script", config.MODEL_GENERATOR,
+        "motion_script", _model("motion_script"),
         config.MAX_MOTION_SCRIPT_RETRIES * (1 + config.MAX_MOTION_HOOK_FIX_RETRIES),
-        preflight.text_cost_per_call(config.MODEL_GENERATOR, 4000, 3500))]
+        preflight.text_cost_per_call(_model("motion_script"), 7000, 4500))]
     if not _money_gate("script", short_id, plan, yes, reel_cursor):
         return None
 
@@ -540,16 +548,251 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
     return script
 
 
+# =================================================================== scenes
+
+def _scenes_done(script: MotionScript) -> bool:
+    return all(s.scene is not None for s in script.shots)
+
+
+def print_scenes(script: MotionScript, results: list | None = None) -> None:
+    """The scene gate's screen: per shot, the field, the transition in, every
+    object and every action with the word it is cued on."""
+    print(f"\n=== Scenes: {script.short_id} ===")
+    for s in script.shots:
+        sc = s.scene
+        if sc is None:
+            print(f"  {s.id} {s.beat}: (no scene)")
+            continue
+        label = f"  [{sc.label}]" if sc.label else ""
+        print(f"\n  {s.id}  {s.beat:<12} {sc.field:<6} <- {sc.transition}{label}")
+        for o in sc.objects:
+            brief = {k: v for k, v in o.props.items() if k in ("text", "title", "label", "items",
+                                                             "value", "lines", "status")}
+            print(f"      {o.id} {o.kind:<14} {json.dumps(brief, ensure_ascii=False)[:90]}")
+        for a in sc.actions:
+            extra = "".join(f" {k}={v}" for k, v in (("value", a.value), ("tone", a.tone)) if v)
+            print(f"      @ {a.at!r:<18} {a.do} {a.target}{extra}")
+    if results is not None:
+        print("\nscene check results:")
+        for r in results:
+            print(f"  {r}")
+
+
+def stage_scenes(short_id: str, script: MotionScript, yes: bool,
+                 reel_cursor: int) -> MotionScript | None:
+    from .skills.scenes import SYSTEM_MOTION_SCENES, write_motion_scenes
+    plan = [preflight.ModelPlan(
+        "motion_scenes", _model("motion_scenes"), 1 + config.MAX_MOTION_SCENE_RETRIES,
+        preflight.text_cost_per_call(_model("motion_scenes"),
+                                     len(SYSTEM_MOTION_SCENES) // 3 + 3500, 6000))]
+    if not _money_gate("scenes", short_id, plan, yes, reel_cursor):
+        return None
+    scripted, results = write_motion_scenes(script)
+    print_scenes(scripted, results)
+    if not checks.all_passed(results):
+        print("  GIVING UP — the scenes do not pass the scene graders (see above).")
+        return None
+    if not _confirm("Approve scenes?", yes):
+        print(f"Stopped after scenes — nothing saved. Rerun with --topic {short_id} to see "
+              f"this pause again.")
+        return None
+    motion_path(short_id).write_text(scripted.model_dump_json(indent=2), encoding="utf-8")
+    return scripted
+
+
+# ============================================================ voice, timing
+
+def plan_path(short_id: str) -> Path:
+    return config.OUTPUT_DIR / short_id / "plan.json"
+
+
+def _speech_stamp(script: MotionScript) -> str:
+    """What the voice depends on: every caption's text and speaker."""
+    import hashlib
+    blob = json.dumps([[s.id, s.speech, [[c.text, c.speaker] for c in s.captions]]
+                       for s in script.shots])
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def _voice_current(script: MotionScript) -> bool:
+    from . import motion_voice
+    path = motion_voice.manifest_path(script.short_id)
+    if not path.exists():
+        return False
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("stamp") == _speech_stamp(script)
+    except ValueError:
+        return False
+
+
+def stage_voice(short_id: str, script: MotionScript) -> dict | None:
+    """Every caption in its speaker's voice (shorts/motion_voice.py). Local
+    and free — no money gate — but it prints which voice each slot uses."""
+    from . import motion_voice
+    slots = motion_voice.speaker_slots(script)
+    print(f"\n=== voice: {sum(len(s.captions) for s in script.shots)} caption clip(s), "
+          f"{'stub silence' if config.STUB else 'Chatterbox (local, free)'} ===")
+    for role, slot in slots.items():
+        if role is None and script.speakers:
+            continue
+        ref, how = motion_voice.slot_reference(slot)
+        print(f"  {role or 'NARRATOR':<12} slot {slot:<18} {how}"
+              + (f" — {Path(ref).name}" if ref else ""))
+    try:
+        manifest = motion_voice.voice_script(script, log=lambda *_: None)
+    except RuntimeError as e:
+        print(f"  GIVING UP — {e}")
+        return None
+    manifest["stamp"] = _speech_stamp(script)
+    motion_voice.manifest_path(short_id).write_text(json.dumps(manifest, indent=2),
+                                                    encoding="utf-8")
+    return manifest
+
+
+def _cast(script: MotionScript) -> list:
+    from .schema import MotionCastMember
+    reg = motion_themes.avatars()
+    out = []
+    for i, sp in enumerate(script.speakers):
+        avatar = reg.host if sp.avatar == "host" else reg.characters[sp.avatar]
+        out.append(MotionCastMember(role=sp.role, side="left" if i == 0 else "right",
+                                    voice_slot=sp.voice_slot, avatar=avatar.spec()))
+    return out
+
+
+def stage_timing(short_id: str, script: MotionScript, manifest: dict) -> tuple[Path, list] | None:
+    """Word times from the real audio (motion_align: forced alignment, then
+    whisper, then an even split), every shot on one clock, the scene graders
+    again on that clock, the narration mixed, and the player's plan written."""
+    from . import motion_align, motion_timeline, motion_voice
+    print(f"\n=== timing: {short_id} ===")
+    seconds: dict[str, list[float]] = {}
+    times: dict[str, list] = {}
+    sources: dict[str, list[str]] = {}
+    adir = motion_voice.audio_dir(short_id)
+    for shot in script.shots:
+        rows = manifest["shots"].get(shot.id, [])
+        ranges = motion_voice.shown_to_spoken(shot)
+        seconds[shot.id] = [r["seconds"] for r in rows]
+        times[shot.id], sources[shot.id] = [], []
+        for row, rng in zip(rows, ranges):
+            spoken, src = motion_align.align_clip(adir / row["file"], row["text"], row["seconds"])
+            times[shot.id].append(motion_align.shown_times(spoken, rng))
+            sources[shot.id].append(src)
+    motion_align.close()
+    clocks = motion_timeline.shot_timings(script, seconds, times, sources)
+    counts: dict[str, int] = {}
+    for c in clocks:
+        for cap in c.captions:
+            counts[cap.source] = counts.get(cap.source, 0) + 1
+    print("  caption timing: " + ", ".join(f"{n} {k}" for k, n in sorted(counts.items())))
+    results = checks.run_motion_scene_graders(script, clocks) + [
+        checks.check_motion_duration_cap(script, measured_seconds=motion_timeline.total_seconds(clocks))]
+    for r in results:
+        print(f"  {r}")
+    audio = motion_voice.mix(script, manifest, clocks)
+    plan = motion_timeline.build_plan(script, clocks, audio=f"audio/{audio.name}", cast=_cast(script))
+    path = plan_path(short_id)
+    path.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+    print(f"  {motion_timeline.total_seconds(clocks):.1f}s — {path}")
+    print(f"  play it: run the app and open #motion-reel/{short_id}")
+    return path, results
+
+
 # ======================================================================= run
+
+def cost_path(short_id: str) -> Path:
+    return config.OUTPUT_DIR / short_id / "cost.json"
+
+
+def _print_call(call) -> None:
+    """One line per LLM call, as it happens."""
+    est = " (estimated)" if call.estimated else ""
+    print(f"    $ {call.label:<28} {call.model:<30} {call.input_tokens:>6} in {call.output_tokens:>6} out"
+          f"   ${call.cost:.4f}{est}")
+
+
+def record_cost(short_id: str, calls: list[dict], started: str) -> dict:
+    """Append this run's calls to output/<short_id>/cost.json and return the
+    reel's whole history: every run, every call, and the total."""
+    from datetime import datetime, timezone
+    path = cost_path(short_id)
+    data = {"short_id": short_id, "runs": []}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+    if calls or not data["runs"]:
+        data["runs"].append({"started": started,
+                             "ended": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                             "stub": bool(config.STUB), "calls": calls,
+                             "cost": round(sum(c["cost"] for c in calls), 6)})
+    every = [c for r in data["runs"] for c in r["calls"]]
+    by_label: dict[str, dict] = {}
+    for c in every:
+        row = by_label.setdefault(c["label"], {"calls": 0, "cost": 0.0, "model": c["model"]})
+        row["calls"] += 1
+        row["cost"] = round(row["cost"] + c["cost"], 6)
+    data["total"] = {"calls": len(every), "cost": round(sum(c["cost"] for c in every), 6),
+                     "estimated": any(c.get("estimated") for c in every), "by_label": by_label}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return data
+
 
 def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         force_stage: str | None, yes: bool, template: str | None = None,
-        theme: str | None = None, language: str | None = None) -> int:
+        theme: str | None = None, language: str | None = None,
+        estimate_only: bool = False) -> int:
+    """The motion run, with the model routing of shorts/motion_models.yaml
+    switched on, a whole-reel cost estimate (and one confirmation) before a
+    real run starts, every LLM call's cost printed as it happens, and the
+    reel's cost log written to output/<short_id>/cost.json."""
+    from datetime import datetime, timezone
+    from . import motion_models
     print(_MOTION_MODE_BANNER)
+    if estimate_only or (not config.STUB and topic_short_id is None):
+        doc_text = Path(doc_path).read_text(encoding="utf-8")
+        typical, worst = motion_models.print_estimate(motion_models.estimate(doc_text))
+        if estimate_only:
+            return 0
+        if worst > config.MAX_REEL_USD:
+            print(f"  The worst case is over MAX_REEL_USD (${config.MAX_REEL_USD:.2f}); each stage "
+                  f"still stops before it would cross it.")
+        if not _confirm(f"Start this motion reel (about ${typical:.2f}, at most ${worst:.2f})?", yes):
+            print("Nothing was run. Nothing was spent.")
+            return 1
     if not config.STUB and not config.ANTHROPIC_API_KEY:
         print("Cannot proceed — ANTHROPIC_API_KEY is not set (every text call goes "
               "through it). Copy .env.example to .env, or run with SHORTS_STUB=1.")
         return 1
+    started = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    cursor = usage.mark()
+    ctx: dict = {"short_id": topic_short_id}
+    usage.add_listener(_print_call)
+    try:
+        with motion_models.use():
+            code = _run(doc_path, topic_short_id, from_stage, force_stage, yes, template,
+                        theme, language, ctx)
+    finally:
+        usage.remove_listener(_print_call)
+    if ctx.get("short_id"):
+        data = record_cost(ctx["short_id"], usage.calls_since(cursor), started)
+        this = usage.since(cursor)
+        print(f"\n=== cost: {ctx['short_id']} ===")
+        print(f"  this run: {this['calls']} call(s), ${this['cost']:.4f}"
+              + (" (some estimated)" if this.get("estimated") else ""))
+        for label, row in data["total"]["by_label"].items():
+            print(f"    {label:<28} {row['model']:<30} {row['calls']:>3} call(s)  ${row['cost']:.4f}")
+        print(f"  reel total, every run: {data['total']['calls']} call(s), "
+              f"${data['total']['cost']:.4f}   ({cost_path(ctx['short_id'])})")
+    return code
+
+
+def _run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
+         force_stage: str | None, yes: bool, template: str | None,
+         theme: str | None, language: str | None, ctx: dict) -> int:
 
     sections = parse_markdown(doc_path)
     doc_text = Path(doc_path).read_text(encoding="utf-8")
@@ -589,6 +832,7 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
             return 1
         if short_id is None:
             short_id = _next_free_motion_id(state["topic"]["id"])
+        ctx["short_id"] = short_id
         _save_setup(short_id, state)
         print(f"\n=== setup complete: short_id={short_id} ===")
 
@@ -623,6 +867,39 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         print(f"\n=== script: resumed from {motion_path(short_id)} ===")
         print_shot_list(script)
 
+    # --------------------------------------------------------------- scenes
+    redone = False
+    if _needs("scenes", _scenes_done(script)):
+        c = usage.mark()
+        script = stage_scenes(short_id, script, yes, reel_cursor)
+        stage_usage["scenes"] = usage.since(c)
+        if script is None:
+            return 1
+        redone = True
+    else:
+        print(f"\n=== scenes: resumed ({sum(1 for s in script.shots if s.scene)} scenes) ===")
+
+    # ---------------------------------------------------------------- voice
+    from . import motion_voice
+    if _needs("voice", _voice_current(script)):
+        manifest = stage_voice(short_id, script)
+        if manifest is None:
+            return 1
+        redone = True
+    else:
+        manifest = motion_voice.load_manifest(short_id)
+        print(f"\n=== voice: resumed from {motion_voice.manifest_path(short_id)} ===")
+
+    # --------------------------------------------------------------- timing
+    timing_results: list = []
+    if _needs("timing", plan_path(short_id).exists() and not redone):
+        done = stage_timing(short_id, script, manifest)
+        if done is None:
+            return 1
+        _, timing_results = done
+    else:
+        print(f"\n=== timing: resumed from {plan_path(short_id)} ===")
+
     # ------------------------------------------------------ later phases
     for stage, phase in _NOT_BUILT_YET.items():
         if STAGE_ORDER.index(stage) >= start_idx:
@@ -638,6 +915,11 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         print(f"  theme: {choice.theme} ({choice.source}) — {choice.reason}")
         print(f"  tags: {' '.join(choice.tags)}   ({tags_path(short_id)})")
     print_fact_sources(fact_sources(script, sections, state))
+    if plan_path(short_id).exists():
+        print(f"  plan: {plan_path(short_id)}   (#motion-reel/{short_id} in the app)")
+    if timing_results and not checks.all_passed(timing_results):
+        print("  WARNING — on the real audio some scene checks fail (above); rerun with "
+              "--force-stage scenes")
     for stage, u in stage_usage.items():
         print(f"  {stage}: {u['calls']} call(s), ${u['cost']:.4f}")
     print(f"  total: {spend['calls']} call(s), ${spend['cost']:.4f}")
@@ -666,6 +948,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--language", choices=motion_themes.language_tags(), default=None,
                    help="the course language for tags, variety and avatars (default: "
                         "detected from the material)")
+    p.add_argument("--estimate", action="store_true",
+                   help="print the whole reel's estimated cost per step and model, and stop "
+                        "(free — no call is made)")
     p.add_argument("--yes", action="store_true",
                    help="answer every confirmation automatically (still prints "
                         "every pre-flight summary and every pause screen)")
@@ -675,7 +960,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     return run(args.markdown_path, args.topic_short_id, args.from_stage,
-               args.force_stage, args.yes, args.template, args.theme, args.language)
+               args.force_stage, args.yes, args.template, args.theme, args.language,
+               estimate_only=args.estimate)
 
 
 if __name__ == "__main__":

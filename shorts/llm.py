@@ -219,6 +219,17 @@ def text_of(resp) -> str:
     return "".join(b.text for b in resp.content if b.type == "text")
 
 
+#: label -> model, set by motion_models.use() for a motion run only. A routed
+#: label's model wins over the caller's default; anything not in the map keeps
+#: its normal model, and the map is empty outside a motion run.
+_LABEL_MODELS: dict[str, str] = {}
+
+
+def set_label_models(mapping: dict[str, str]) -> None:
+    _LABEL_MODELS.clear()
+    _LABEL_MODELS.update({k: v for k, v in mapping.items() if v})
+
+
 def ask_json(
     system: str,
     user: str,
@@ -252,7 +263,7 @@ def ask_json(
         from .stubs import fake
         return fake(model_cls, system, user)
 
-    model = model or config.MODEL_GENERATOR
+    model = _LABEL_MODELS.get(label) or model or config.MODEL_GENERATOR
     system = system + "\n\nReturn ONLY raw JSON. No prose, no markdown fences."
     content = _content(user, images)
     messages = [{"role": "user", "content": content}]

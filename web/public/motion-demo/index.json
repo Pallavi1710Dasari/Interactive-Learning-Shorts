@@ -1,0 +1,70 @@
+{
+ "reels": [
+  {
+   "short_id": "stub_how_a_state_update_triggers_a_re_render__motion",
+   "topic": "How does how a state update triggers a re-render work?",
+   "stub": true,
+   "theme": "interview",
+   "template": "fix_story",
+   "teaching_approach": "direct_explanation",
+   "tags": [
+    "#react",
+    "#interview",
+    "#rerender",
+    "#state",
+    "#component"
+   ],
+   "language": "react",
+   "duration": 72.204,
+   "cost": 0,
+   "stage": "timing",
+   "has_plan": true,
+   "demo": "interview",
+   "bundle_url": "/motion-demo/interview.bundle.json"
+  },
+  {
+   "short_id": "stub_how_a_state_update_triggers_a_re_render__motion_2",
+   "topic": "How does how a state update triggers a re-render work?",
+   "stub": true,
+   "theme": "classic_explainer",
+   "template": "fix_story",
+   "teaching_approach": "direct_explanation",
+   "tags": [
+    "#react",
+    "#explainer",
+    "#rerender",
+    "#state",
+    "#component"
+   ],
+   "language": "react",
+   "duration": 68.46,
+   "cost": 0,
+   "stage": "timing",
+   "has_plan": true,
+   "demo": "classic",
+   "bundle_url": "/motion-demo/classic.bundle.json"
+  },
+  {
+   "short_id": "stub_how_ai_reads_your_text__motion",
+   "topic": "How does how AI reads your text work?",
+   "stub": true,
+   "theme": "step_by_step_walkthrough",
+   "template": "walkthrough",
+   "teaching_approach": "direct_explanation",
+   "tags": [
+    "#cs",
+    "#walkthrough",
+    "#tokenization",
+    "#tokens",
+    "#text"
+   ],
+   "language": "cs",
+   "duration": 99.958,
+   "cost": 0,
+   "stage": "timing",
+   "has_plan": true,
+   "demo": "walkthrough",
+   "bundle_url": "/motion-demo/walkthrough.bundle.json"
+  }
+ ]
+}

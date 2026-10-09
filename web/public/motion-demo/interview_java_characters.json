@@ -1,0 +1,2272 @@
+{
+ "short_id": "stub_why_fails_on_two_equal_strings__motion",
+ "template": "fix_story",
+ "theme": "interview",
+ "series": "@learnthesimpleway",
+ "concept_name": "equals",
+ "duration": 61.336,
+ "audio": null,
+ "timing_source": "even",
+ "identity": {
+  "id": "java",
+  "name": "Java",
+  "colour": "#A53C27",
+  "on_dark": "#E39787",
+  "on_light": "#A53C27",
+  "text_on_dark": "#EFC5BD",
+  "text_on_light": "#A13B26",
+  "file": "Main.java",
+  "symbol": [
+   {
+    "rect": [
+     16.0,
+     12.0,
+     68.0,
+     76.0
+    ],
+    "r": 10.0,
+    "stroke": 8.0,
+    "tone": "main"
+   },
+   {
+    "rect": [
+     16.0,
+     12.0,
+     68.0,
+     24.0
+    ],
+    "r": 8.0,
+    "tone": "main"
+   },
+   {
+    "path": "M16 62 L84 62",
+    "r": 0,
+    "stroke": 7.0,
+    "tone": "main"
+   }
+  ]
+ },
+ "theme_label": "Interview",
+ "tags": [
+  "#java",
+  "#interview",
+  "#equalstrings",
+  "#fails"
+ ],
+ "intro": 0.0,
+ "cast": [
+  {
+   "role": "INTERVIEWER",
+   "side": "left",
+   "label": "Interviewer",
+   "voice_slot": "motion_host",
+   "identity": {
+    "id": "host",
+    "name": "Host",
+    "colour": "#6C6F7A",
+    "on_dark": "#A6A8B0",
+    "on_light": "#6C6F7A",
+    "text_on_dark": "#CCCDD2",
+    "text_on_light": "#595B64",
+    "file": "",
+    "symbol": [
+     {
+      "rect": [
+       36.0,
+       12.0,
+       28.0,
+       46.0
+      ],
+      "r": 14.0,
+      "tone": "main"
+     },
+     {
+      "path": "M24 44 C24 66 76 66 76 44",
+      "r": 0,
+      "stroke": 8.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       46.0,
+       64.0,
+       8.0,
+       18.0
+      ],
+      "r": 3.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       32.0,
+       80.0,
+       36.0,
+       8.0
+      ],
+      "r": 4.0,
+      "tone": "main"
+     }
+    ]
+   }
+  },
+  {
+   "role": "CANDIDATE",
+   "side": "right",
+   "label": "Candidate",
+   "voice_slot": "motion_char_2",
+   "identity": {
+    "id": "java",
+    "name": "Java",
+    "colour": "#A53C27",
+    "on_dark": "#E39787",
+    "on_light": "#A53C27",
+    "text_on_dark": "#EFC5BD",
+    "text_on_light": "#A13B26",
+    "file": "Main.java",
+    "symbol": [
+     {
+      "rect": [
+       16.0,
+       12.0,
+       68.0,
+       76.0
+      ],
+      "r": 10.0,
+      "stroke": 8.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       16.0,
+       12.0,
+       68.0,
+       24.0
+      ],
+      "r": 8.0,
+      "tone": "main"
+     },
+     {
+      "path": "M16 62 L84 62",
+      "r": 0,
+      "stroke": 7.0,
+      "tone": "main"
+     }
+    ]
+   }
+  }
+ ],
+ "characters": [
+  {
+   "role": "INTERVIEWER",
+   "preset": "host",
+   "config": {
+    "name": "Arjun",
+    "gender": "male",
+    "art": "soft",
+    "shading": "flat",
+    "skinTone": "#F8C9A8",
+    "hair": {
+     "style": "quiff",
+     "color": "#151515"
+    },
+    "face": {
+     "jaw": "square",
+     "brows": "medium",
+     "eyes": "oval",
+     "mouth": "full"
+    },
+    "outfit": {
+     "top": "shirtTie",
+     "topColor": "#FFFFFF",
+     "bottom": "trousers",
+     "bottomColor": "#1B2238",
+     "shoeColor": "#2A2F45",
+     "accentColor": "#6C6F7A"
+    },
+    "accessories": {
+     "belt": true
+    },
+    "build": {
+     "height": 1.0,
+     "shoulders": 1.0
+    }
+   },
+   "side": "left",
+   "seed": 303,
+   "cues": [
+    {
+     "t": 0.0,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": ""
+    },
+    {
+     "t": 0.15,
+     "kind": "gesture",
+     "name": "shrug",
+     "side": null,
+     "cue": "Why"
+    },
+    {
+     "t": 0.25,
+     "kind": "expression",
+     "name": "confused",
+     "side": null,
+     "cue": "Why"
+    },
+    {
+     "t": 4.996,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Because"
+    },
+    {
+     "t": 7.638,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "text."
+    },
+    {
+     "t": 8.773,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Here"
+    },
+    {
+     "t": 13.304,
+     "kind": "expression",
+     "name": "confused",
+     "side": null,
+     "cue": "So"
+    },
+    {
+     "t": 13.589,
+     "kind": "gesture",
+     "name": "shrug",
+     "side": null,
+     "cue": "why"
+    },
+    {
+     "t": 16.896,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "A"
+    },
+    {
+     "t": 20.307,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "memory."
+    },
+    {
+     "t": 24.669,
+     "kind": "expression",
+     "name": "confused",
+     "side": null,
+     "cue": "So"
+    },
+    {
+     "t": 24.954,
+     "kind": "gesture",
+     "name": "handsSpread",
+     "side": null,
+     "cue": "how"
+    },
+    {
+     "t": 27.761,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Use"
+    },
+    {
+     "t": 31.706,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "addresses."
+    },
+    {
+     "t": 38.04,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "true."
+    },
+    {
+     "t": 39.175,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Show"
+    },
+    {
+     "t": 41.113,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 42.601,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "references."
+    },
+    {
+     "t": 49.32,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "letters."
+    },
+    {
+     "t": 50.455,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Remember:"
+    },
+    {
+     "t": 60.301,
+     "kind": "gesture",
+     "name": "thumbsUp",
+     "side": null,
+     "cue": "time."
+    },
+    {
+     "t": 60.501,
+     "kind": "expression",
+     "name": "grin",
+     "side": null,
+     "cue": "time."
+    }
+   ]
+  },
+  {
+   "role": "CANDIDATE",
+   "preset": "java",
+   "config": {
+    "name": "Java",
+    "gender": "male",
+    "art": "soft",
+    "skinTone": "medium",
+    "hair": {
+     "style": "sidePart",
+     "color": "black"
+    },
+    "face": {
+     "jaw": "square",
+     "brows": "thick",
+     "eyes": "oval",
+     "mouth": "full"
+    },
+    "outfit": {
+     "top": "shirt",
+     "topColor": "#A53C27",
+     "bottom": "trousers",
+     "bottomColor": "#1B2238",
+     "shoeColor": "#2A2F45"
+    },
+    "accessories": {
+     "beard": "stubble",
+     "watch": true,
+     "belt": true
+    },
+    "build": {
+     "height": 1.0,
+     "shoulders": 1.0
+    }
+   },
+   "side": "right",
+   "seed": 700,
+   "cues": [
+    {
+     "t": 0.0,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": ""
+    },
+    {
+     "t": 0.35,
+     "kind": "expression",
+     "name": "thinking",
+     "side": null,
+     "cue": "Why"
+    },
+    {
+     "t": 4.896,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "Because"
+    },
+    {
+     "t": 6.334,
+     "kind": "gesture",
+     "name": "handsSpread",
+     "side": null,
+     "cue": "references,"
+    },
+    {
+     "t": 8.873,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Here"
+    },
+    {
+     "t": 12.819,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "hello."
+    },
+    {
+     "t": 13.404,
+     "kind": "expression",
+     "name": "thinking",
+     "side": null,
+     "cue": "So"
+    },
+    {
+     "t": 16.796,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "A"
+    },
+    {
+     "t": 17.081,
+     "kind": "gesture",
+     "name": "point",
+     "side": "R",
+     "cue": "string"
+    },
+    {
+     "t": 22.231,
+     "kind": "gesture",
+     "name": "pointUp",
+     "side": "R",
+     "cue": "objects"
+    },
+    {
+     "t": 24.769,
+     "kind": "expression",
+     "name": "thinking",
+     "side": null,
+     "cue": "So"
+    },
+    {
+     "t": 27.661,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "Use"
+    },
+    {
+     "t": 28.33,
+     "kind": "gesture",
+     "name": "okSign",
+     "side": "R",
+     "cue": "equals"
+    },
+    {
+     "t": 33.126,
+     "kind": "gesture",
+     "name": "presentLeft",
+     "side": null,
+     "cue": "walks"
+    },
+    {
+     "t": 37.89,
+     "kind": "gesture",
+     "name": "handsSpread",
+     "side": null,
+     "cue": "true."
+    },
+    {
+     "t": 39.275,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Show"
+    },
+    {
+     "t": 41.013,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 41.298,
+     "kind": "gesture",
+     "name": "countOne",
+     "side": "R",
+     "cue": "first"
+    },
+    {
+     "t": 44.524,
+     "kind": "gesture",
+     "name": "point",
+     "side": "R",
+     "cue": "characters."
+    },
+    {
+     "t": 47.632,
+     "kind": "gesture",
+     "name": "pointUp",
+     "side": "R",
+     "cue": "true"
+    },
+    {
+     "t": 50.555,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Remember:"
+    },
+    {
+     "t": 54.116,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "objects."
+    }
+   ]
+  }
+ ],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "chapter": null,
+   "start": 0.0,
+   "end": 4.646,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "identity_title",
+     "props": {},
+     "box": {
+      "x": 60.0,
+      "y": 341.0,
+      "w": 960.0,
+      "h": 270.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Same letters",
+      "tone": "bad",
+      "icon": "alert"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 659.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 0.0,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 1.888,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "check"
+    },
+    {
+     "t": 3.427,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "Same letters"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Why does my string check say <b>false</b> for same letters?",
+     "speaker": "INTERVIEWER",
+     "start": 0.35,
+     "end": 4.196,
+     "words": [
+      {
+       "text": "Why",
+       "start": 0.35,
+       "end": 0.735,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 0.735,
+       "end": 1.119,
+       "hl": false
+      },
+      {
+       "text": "my",
+       "start": 1.119,
+       "end": 1.504,
+       "hl": false
+      },
+      {
+       "text": "string",
+       "start": 1.504,
+       "end": 1.888,
+       "hl": false
+      },
+      {
+       "text": "check",
+       "start": 1.888,
+       "end": 2.273,
+       "hl": false
+      },
+      {
+       "text": "say",
+       "start": 2.273,
+       "end": 2.658,
+       "hl": false
+      },
+      {
+       "text": "false",
+       "start": 2.658,
+       "end": 3.042,
+       "hl": true
+      },
+      {
+       "text": "for",
+       "start": 3.042,
+       "end": 3.427,
+       "hl": false
+      },
+      {
+       "text": "same",
+       "start": 3.427,
+       "end": 3.811,
+       "hl": false
+      },
+      {
+       "text": "letters?",
+       "start": 3.811,
+       "end": 4.196,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "beat": "title",
+   "chapter": null,
+   "start": 4.646,
+   "end": 8.523,
+   "field": "blue",
+   "transition": "iris",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "title_card",
+     "props": {
+      "title": "equals",
+      "promise": "Why == lies about strings",
+      "icons": [
+       {
+        "name": "link",
+        "label": "Reference"
+       },
+       {
+        "name": "layers",
+        "label": "Objects"
+       },
+       {
+        "name": "check",
+        "label": "Equal"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 4.646,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 6.919,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "not"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Because double equals compares <b>references</b>, not the text.",
+     "speaker": "CANDIDATE",
+     "start": 4.996,
+     "end": 8.073,
+     "words": [
+      {
+       "text": "Because",
+       "start": 4.996,
+       "end": 5.381,
+       "hl": false
+      },
+      {
+       "text": "double",
+       "start": 5.381,
+       "end": 5.765,
+       "hl": false
+      },
+      {
+       "text": "equals",
+       "start": 5.765,
+       "end": 6.15,
+       "hl": false
+      },
+      {
+       "text": "compares",
+       "start": 6.15,
+       "end": 6.534,
+       "hl": false
+      },
+      {
+       "text": "references,",
+       "start": 6.534,
+       "end": 6.919,
+       "hl": true
+      },
+      {
+       "text": "not",
+       "start": 6.919,
+       "end": 7.304,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 7.304,
+       "end": 7.688,
+       "hl": false
+      },
+      {
+       "text": "text.",
+       "start": 7.688,
+       "end": 8.073,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "chapter": null,
+   "start": 8.523,
+   "end": 16.546,
+   "field": "paper",
+   "transition": "bar_wipe",
+   "label": "THE CODE",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_window",
+     "props": {
+      "file": "Main.java",
+      "lines": [
+       "a = new String(\"hello\");",
+       "b = new String(\"hello\");"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 333.0,
+      "w": 960.0,
+      "h": 414.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 8.523,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 8.523,
+     "do": "type",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 10.027,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "strings"
+    },
+    {
+     "t": 12.1,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "Both"
+    },
+    {
+     "t": 14.173,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "does"
+    },
+    {
+     "t": 15.327,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "print"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Here are two strings with the same letters.",
+     "speaker": "INTERVIEWER",
+     "start": 8.873,
+     "end": 11.95,
+     "words": [
+      {
+       "text": "Here",
+       "start": 8.873,
+       "end": 9.258,
+       "hl": false
+      },
+      {
+       "text": "are",
+       "start": 9.258,
+       "end": 9.642,
+       "hl": false
+      },
+      {
+       "text": "two",
+       "start": 9.642,
+       "end": 10.027,
+       "hl": false
+      },
+      {
+       "text": "strings",
+       "start": 10.027,
+       "end": 10.412,
+       "hl": false
+      },
+      {
+       "text": "with",
+       "start": 10.412,
+       "end": 10.796,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 10.796,
+       "end": 11.181,
+       "hl": false
+      },
+      {
+       "text": "same",
+       "start": 11.181,
+       "end": 11.565,
+       "hl": false
+      },
+      {
+       "text": "letters.",
+       "start": 11.565,
+       "end": 11.95,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Both say hello.",
+     "speaker": "INTERVIEWER",
+     "start": 12.1,
+     "end": 13.254,
+     "words": [
+      {
+       "text": "Both",
+       "start": 12.1,
+       "end": 12.485,
+       "hl": false
+      },
+      {
+       "text": "say",
+       "start": 12.485,
+       "end": 12.869,
+       "hl": false
+      },
+      {
+       "text": "hello.",
+       "start": 12.869,
+       "end": 13.254,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "So why does the check print false?",
+     "speaker": "INTERVIEWER",
+     "start": 13.404,
+     "end": 16.096,
+     "words": [
+      {
+       "text": "So",
+       "start": 13.404,
+       "end": 13.789,
+       "hl": false
+      },
+      {
+       "text": "why",
+       "start": 13.789,
+       "end": 14.173,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 14.173,
+       "end": 14.558,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 14.558,
+       "end": 14.942,
+       "hl": false
+      },
+      {
+       "text": "check",
+       "start": 14.942,
+       "end": 15.327,
+       "hl": false
+      },
+      {
+       "text": "print",
+       "start": 15.327,
+       "end": 15.711,
+       "hl": false
+      },
+      {
+       "text": "false?",
+       "start": 15.711,
+       "end": 16.096,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "break_1",
+   "chapter": null,
+   "start": 16.546,
+   "end": 24.419,
+   "field": "paper",
+   "transition": "cut",
+   "label": "WHY IT FAILS",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "objects"
+      ],
+      "tones": [
+       "plain"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 502.0,
+      "w": 960.0,
+      "h": 76.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 16.546,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 17.665,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "variable"
+    },
+    {
+     "t": 18.819,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "reference"
+    },
+    {
+     "t": 20.892,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "These"
+    },
+    {
+     "t": 22.431,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "objects"
+    }
+   ],
+   "captions": [
+    {
+     "text": "A string variable holds a reference, an address in memory.",
+     "speaker": "CANDIDATE",
+     "start": 16.896,
+     "end": 20.742,
+     "words": [
+      {
+       "text": "A",
+       "start": 16.896,
+       "end": 17.281,
+       "hl": false
+      },
+      {
+       "text": "string",
+       "start": 17.281,
+       "end": 17.665,
+       "hl": false
+      },
+      {
+       "text": "variable",
+       "start": 17.665,
+       "end": 18.05,
+       "hl": false
+      },
+      {
+       "text": "holds",
+       "start": 18.05,
+       "end": 18.434,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 18.434,
+       "end": 18.819,
+       "hl": false
+      },
+      {
+       "text": "reference,",
+       "start": 18.819,
+       "end": 19.204,
+       "hl": false
+      },
+      {
+       "text": "an",
+       "start": 19.204,
+       "end": 19.588,
+       "hl": false
+      },
+      {
+       "text": "address",
+       "start": 19.588,
+       "end": 19.973,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 19.973,
+       "end": 20.357,
+       "hl": false
+      },
+      {
+       "text": "memory.",
+       "start": 20.357,
+       "end": 20.742,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "These are two separate <b>objects</b> at two addresses.",
+     "speaker": "CANDIDATE",
+     "start": 20.892,
+     "end": 23.969,
+     "words": [
+      {
+       "text": "These",
+       "start": 20.892,
+       "end": 21.277,
+       "hl": false
+      },
+      {
+       "text": "are",
+       "start": 21.277,
+       "end": 21.661,
+       "hl": false
+      },
+      {
+       "text": "two",
+       "start": 21.661,
+       "end": 22.046,
+       "hl": false
+      },
+      {
+       "text": "separate",
+       "start": 22.046,
+       "end": 22.431,
+       "hl": false
+      },
+      {
+       "text": "objects",
+       "start": 22.431,
+       "end": 22.815,
+       "hl": true
+      },
+      {
+       "text": "at",
+       "start": 22.815,
+       "end": 23.2,
+       "hl": false
+      },
+      {
+       "text": "two",
+       "start": 23.2,
+       "end": 23.584,
+       "hl": false
+      },
+      {
+       "text": "addresses.",
+       "start": 23.584,
+       "end": 23.969,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "beat": "fix_idea",
+   "chapter": null,
+   "start": 24.419,
+   "end": 32.591,
+   "field": "blue",
+   "transition": "double_bar_wipe",
+   "label": "THE FIX",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "EQUALS",
+      "accent": [
+       "EQUALS"
+      ],
+      "lines": [
+       "EQUALS"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 486.8,
+      "w": 960.0,
+      "h": 106.4
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 24.419,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 26.307,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "compare"
+    },
+    {
+     "t": 27.076,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "text"
+    },
+    {
+     "t": 28.53,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "equals"
+    },
+    {
+     "t": 30.603,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "characters"
+    }
+   ],
+   "captions": [
+    {
+     "text": "So how do I compare the text?",
+     "speaker": "INTERVIEWER",
+     "start": 24.769,
+     "end": 27.461,
+     "words": [
+      {
+       "text": "So",
+       "start": 24.769,
+       "end": 25.154,
+       "hl": false
+      },
+      {
+       "text": "how",
+       "start": 25.154,
+       "end": 25.538,
+       "hl": false
+      },
+      {
+       "text": "do",
+       "start": 25.538,
+       "end": 25.923,
+       "hl": false
+      },
+      {
+       "text": "I",
+       "start": 25.923,
+       "end": 26.307,
+       "hl": false
+      },
+      {
+       "text": "compare",
+       "start": 26.307,
+       "end": 26.692,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 26.692,
+       "end": 27.076,
+       "hl": false
+      },
+      {
+       "text": "text?",
+       "start": 27.076,
+       "end": 27.461,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Use the <b>equals</b> method.",
+     "speaker": "CANDIDATE",
+     "start": 27.761,
+     "end": 29.299,
+     "words": [
+      {
+       "text": "Use",
+       "start": 27.761,
+       "end": 28.146,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 28.146,
+       "end": 28.53,
+       "hl": false
+      },
+      {
+       "text": "equals",
+       "start": 28.53,
+       "end": 28.915,
+       "hl": true
+      },
+      {
+       "text": "method.",
+       "start": 28.915,
+       "end": 29.299,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "It compares the characters, not the addresses.",
+     "speaker": "CANDIDATE",
+     "start": 29.449,
+     "end": 32.141,
+     "words": [
+      {
+       "text": "It",
+       "start": 29.449,
+       "end": 29.834,
+       "hl": false
+      },
+      {
+       "text": "compares",
+       "start": 29.834,
+       "end": 30.218,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 30.218,
+       "end": 30.603,
+       "hl": false
+      },
+      {
+       "text": "characters,",
+       "start": 30.603,
+       "end": 30.987,
+       "hl": false
+      },
+      {
+       "text": "not",
+       "start": 30.987,
+       "end": 31.372,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 31.372,
+       "end": 31.756,
+       "hl": false
+      },
+      {
+       "text": "addresses.",
+       "start": 31.756,
+       "end": 32.141,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "beat": "fix_flow",
+   "chapter": null,
+   "start": 32.591,
+   "end": 38.925,
+   "field": "paper",
+   "transition": "diagonal_stripes",
+   "label": "HOW IT WORKS",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "trigger_chip",
+     "props": {
+      "label": "true"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 398.0,
+      "w": 960.0,
+      "h": 84.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "It updates",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 602.0,
+      "w": 960.0,
+      "h": 80.0
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "connector",
+     "props": {
+      "from": "o1",
+      "to": "o2",
+      "tone": "info",
+      "points": [
+       [
+        540.0,
+        492.0
+       ],
+       [
+        540.0,
+        592.0
+       ]
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 32.591,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 34.479,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "character"
+    },
+    {
+     "t": 36.168,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "character matches"
+    },
+    {
+     "t": 38.09,
+     "do": "enter",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "true"
+    },
+    {
+     "t": 38.09,
+     "do": "pulse",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "true"
+    }
+   ],
+   "captions": [
+    {
+     "text": "It walks both strings character by character.",
+     "speaker": "CANDIDATE",
+     "start": 32.941,
+     "end": 35.633,
+     "words": [
+      {
+       "text": "It",
+       "start": 32.941,
+       "end": 33.326,
+       "hl": false
+      },
+      {
+       "text": "walks",
+       "start": 33.326,
+       "end": 33.71,
+       "hl": false
+      },
+      {
+       "text": "both",
+       "start": 33.71,
+       "end": 34.095,
+       "hl": false
+      },
+      {
+       "text": "strings",
+       "start": 34.095,
+       "end": 34.479,
+       "hl": false
+      },
+      {
+       "text": "character",
+       "start": 34.479,
+       "end": 34.864,
+       "hl": false
+      },
+      {
+       "text": "by",
+       "start": 34.864,
+       "end": 35.248,
+       "hl": false
+      },
+      {
+       "text": "character.",
+       "start": 35.248,
+       "end": 35.633,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Every character matches, so it returns <b>true</b>.",
+     "speaker": "CANDIDATE",
+     "start": 35.783,
+     "end": 38.475,
+     "words": [
+      {
+       "text": "Every",
+       "start": 35.783,
+       "end": 36.168,
+       "hl": false
+      },
+      {
+       "text": "character",
+       "start": 36.168,
+       "end": 36.552,
+       "hl": false
+      },
+      {
+       "text": "matches,",
+       "start": 36.552,
+       "end": 36.937,
+       "hl": false
+      },
+      {
+       "text": "so",
+       "start": 36.937,
+       "end": 37.321,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 37.321,
+       "end": 37.706,
+       "hl": false
+      },
+      {
+       "text": "returns",
+       "start": 37.706,
+       "end": 38.09,
+       "hl": false
+      },
+      {
+       "text": "true.",
+       "start": 38.09,
+       "end": 38.475,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s07",
+   "beat": "code_map",
+   "chapter": null,
+   "start": 38.925,
+   "end": 45.559,
+   "field": "paper",
+   "transition": "cut",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_map",
+     "props": {
+      "lines": [
+       "a == b       // false",
+       "a.equals(b)  // true"
+      ],
+      "parts": [
+       {
+        "code": "equals",
+        "icon": "link",
+        "label": "Reference"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 38.925,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 40.429,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "checks"
+    },
+    {
+     "t": 41.498,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "first"
+    },
+    {
+     "t": 42.651,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "references"
+    },
+    {
+     "t": 43.955,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "compares"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Show me both checks.",
+     "speaker": "INTERVIEWER",
+     "start": 39.275,
+     "end": 40.813,
+     "words": [
+      {
+       "text": "Show",
+       "start": 39.275,
+       "end": 39.66,
+       "hl": false
+      },
+      {
+       "text": "me",
+       "start": 39.66,
+       "end": 40.044,
+       "hl": false
+      },
+      {
+       "text": "both",
+       "start": 40.044,
+       "end": 40.429,
+       "hl": false
+      },
+      {
+       "text": "checks.",
+       "start": 40.429,
+       "end": 40.813,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The first compares the <b>references</b>.",
+     "speaker": "CANDIDATE",
+     "start": 41.113,
+     "end": 43.036,
+     "words": [
+      {
+       "text": "The",
+       "start": 41.113,
+       "end": 41.498,
+       "hl": false
+      },
+      {
+       "text": "first",
+       "start": 41.498,
+       "end": 41.882,
+       "hl": false
+      },
+      {
+       "text": "compares",
+       "start": 41.882,
+       "end": 42.267,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 42.267,
+       "end": 42.651,
+       "hl": false
+      },
+      {
+       "text": "references.",
+       "start": 42.651,
+       "end": 43.036,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The second compares the <b>characters</b>.",
+     "speaker": "CANDIDATE",
+     "start": 43.186,
+     "end": 45.109,
+     "words": [
+      {
+       "text": "The",
+       "start": 43.186,
+       "end": 43.571,
+       "hl": false
+      },
+      {
+       "text": "second",
+       "start": 43.571,
+       "end": 43.955,
+       "hl": false
+      },
+      {
+       "text": "compares",
+       "start": 43.955,
+       "end": 44.34,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 44.34,
+       "end": 44.724,
+       "hl": false
+      },
+      {
+       "text": "characters.",
+       "start": 44.724,
+       "end": 45.109,
+       "hl": true
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "payoff",
+   "chapter": null,
+   "start": 45.559,
+   "end": 50.205,
+   "field": "navy",
+   "transition": "stack_rise",
+   "label": "",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "NOW YOUR STRING CHECK SAYS TRUE FOR THE SAME",
+      "accent": [
+       "TRUE"
+      ],
+      "lines": [
+       "NOW YOUR STRING",
+       "CHECK SAYS TRUE",
+       "FOR THE SAME"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 316.4,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "True",
+      "tone": "ok",
+      "icon": "check"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 683.6,
+      "w": 960.0,
+      "h": 80.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 45.559,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 46.678,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "string"
+    },
+    {
+     "t": 47.832,
+     "do": "enter",
+     "target": "o2",
+     "value": null,
+     "tone": null,
+     "cue": "true"
+    },
+    {
+     "t": 48.986,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "same"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Now your string check says <b>true</b> for the same letters.",
+     "speaker": "CANDIDATE",
+     "start": 45.909,
+     "end": 49.755,
+     "words": [
+      {
+       "text": "Now",
+       "start": 45.909,
+       "end": 46.294,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 46.294,
+       "end": 46.678,
+       "hl": false
+      },
+      {
+       "text": "string",
+       "start": 46.678,
+       "end": 47.063,
+       "hl": false
+      },
+      {
+       "text": "check",
+       "start": 47.063,
+       "end": 47.447,
+       "hl": false
+      },
+      {
+       "text": "says",
+       "start": 47.447,
+       "end": 47.832,
+       "hl": false
+      },
+      {
+       "text": "true",
+       "start": 47.832,
+       "end": 48.217,
+       "hl": true
+      },
+      {
+       "text": "for",
+       "start": 48.217,
+       "end": 48.601,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 48.601,
+       "end": 48.986,
+       "hl": false
+      },
+      {
+       "text": "same",
+       "start": 48.986,
+       "end": 49.37,
+       "hl": false
+      },
+      {
+       "text": "letters.",
+       "start": 49.37,
+       "end": 49.755,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s09",
+   "beat": "recap",
+   "chapter": null,
+   "start": 50.205,
+   "end": 57.459,
+   "field": "paper",
+   "transition": "iris",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "takeaway_list",
+     "props": {
+      "heading": "Key takeaways",
+      "rows": [
+       {
+        "icon": "link",
+        "line": "== compares references",
+        "sub": "the addresses"
+       },
+       {
+        "icon": "layers",
+        "line": "New strings, new objects",
+        "sub": "built at run time"
+       },
+       {
+        "icon": "check",
+        "line": "equals compares text",
+        "sub": "every character"
+       }
+      ]
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 50.205,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 54.166,
+     "do": "highlight",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "objects"
+    },
+    {
+     "t": 55.855,
+     "do": "highlight",
+     "target": "o1",
+     "value": "2",
+     "tone": null,
+     "cue": "compares"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Remember: double equals compares references.",
+     "speaker": "INTERVIEWER",
+     "start": 50.555,
+     "end": 52.478,
+     "words": [
+      {
+       "text": "Remember:",
+       "start": 50.555,
+       "end": 50.94,
+       "hl": false
+      },
+      {
+       "text": "double",
+       "start": 50.94,
+       "end": 51.324,
+       "hl": false
+      },
+      {
+       "text": "equals",
+       "start": 51.324,
+       "end": 51.709,
+       "hl": false
+      },
+      {
+       "text": "compares",
+       "start": 51.709,
+       "end": 52.093,
+       "hl": false
+      },
+      {
+       "text": "references.",
+       "start": 52.093,
+       "end": 52.478,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "New strings are new objects.",
+     "speaker": "INTERVIEWER",
+     "start": 52.628,
+     "end": 54.551,
+     "words": [
+      {
+       "text": "New",
+       "start": 52.628,
+       "end": 53.013,
+       "hl": false
+      },
+      {
+       "text": "strings",
+       "start": 53.013,
+       "end": 53.397,
+       "hl": false
+      },
+      {
+       "text": "are",
+       "start": 53.397,
+       "end": 53.782,
+       "hl": false
+      },
+      {
+       "text": "new",
+       "start": 53.782,
+       "end": 54.166,
+       "hl": false
+      },
+      {
+       "text": "objects.",
+       "start": 54.166,
+       "end": 54.551,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The equals method compares the text.",
+     "speaker": "INTERVIEWER",
+     "start": 54.701,
+     "end": 57.009,
+     "words": [
+      {
+       "text": "The",
+       "start": 54.701,
+       "end": 55.086,
+       "hl": false
+      },
+      {
+       "text": "equals",
+       "start": 55.086,
+       "end": 55.47,
+       "hl": false
+      },
+      {
+       "text": "method",
+       "start": 55.47,
+       "end": 55.855,
+       "hl": false
+      },
+      {
+       "text": "compares",
+       "start": 55.855,
+       "end": 56.24,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 56.24,
+       "end": 56.624,
+       "hl": false
+      },
+      {
+       "text": "text.",
+       "start": 56.624,
+       "end": 57.009,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "beat": "cta",
+   "chapter": null,
+   "start": 57.459,
+   "end": 61.336,
+   "field": "blue",
+   "transition": "bar_wipe",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "end_card",
+     "props": {
+      "up_next": "Comparing safely"
+     },
+     "box": null
+    }
+   ],
+   "actions": [
+    {
+     "t": 57.459,
+     "do": "enter",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 60.501,
+     "do": "pulse",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "time"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time.",
+     "speaker": "INTERVIEWER",
+     "start": 57.809,
+     "end": 60.886,
+     "words": [
+      {
+       "text": "Follow",
+       "start": 57.809,
+       "end": 58.194,
+       "hl": false
+      },
+      {
+       "text": "for",
+       "start": 58.194,
+       "end": 58.578,
+       "hl": false
+      },
+      {
+       "text": "more,",
+       "start": 58.578,
+       "end": 58.963,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 58.963,
+       "end": 59.348,
+       "hl": false
+      },
+      {
+       "text": "idea",
+       "start": 59.348,
+       "end": 59.732,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 59.732,
+       "end": 60.117,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 60.117,
+       "end": 60.501,
+       "hl": false
+      },
+      {
+       "text": "time.",
+       "start": 60.501,
+       "end": 60.886,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  }
+ ]
+}

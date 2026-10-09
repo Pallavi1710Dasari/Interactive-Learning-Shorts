@@ -11,14 +11,32 @@
       "bottom": 1300
     },
     "duo": {
-      "top": 260,
-      "bottom": 820
+      "top": 240,
+      "bottom": 840
     },
-    "avatars": {
-      "top": 850,
-      "bottom": 1240,
-      "left_x": 250,
-      "right_x": 830
+    "chat": {
+      "top": 880,
+      "bottom": 1560,
+      "badge": 112,
+      "side": 54
+    },
+    "badge": {
+      "x": 1026,
+      "y": 96
+    },
+    "characters": {
+      "top": 852,
+      "bottom": 1250,
+      "chat_top": 1262,
+      "view": {
+        "top": 6,
+        "bottom": 432
+      },
+      "cx": [
+        270,
+        810
+      ],
+      "center_x": 540
     }
   },
   "fields": [
@@ -51,6 +69,20 @@
     "max_lines": 3
   },
   "objects": {
+    "identity_title": {
+      "layout": "placed",
+      "height": 270,
+      "props": {},
+      "actions": [
+        "enter",
+        "pulse"
+      ],
+      "builtin": [
+        0,
+        0.35,
+        0.6
+      ]
+    },
     "title_card": {
       "layout": "full",
       "props": {
@@ -81,7 +113,7 @@
         "up_next": "str?"
       },
       "max": {
-        "up_next": 22
+        "up_next": 40
       },
       "actions": [
         "enter",
@@ -397,75 +429,73 @@
     "stagger": "takeaway_list rows appear one by one",
     "stamp": "the stamp slams in (at most one per reel; coral, so failure beats only)"
   },
-  "avatar": {
-    "_comment": "The avatar art vocabulary (shorts/motion_avatars.yaml `art`). Avatar.tsx draws each value; motion_themes validates the YAML against these lists.",
-    "bodies": [
-      "rounded",
-      "square",
-      "tall",
-      "pill",
-      "arch",
-      "wide",
-      "compact",
-      "hex",
-      "stacked",
-      "broad"
+  "identity": {
+    "_comment": "Identity symbols are drawn on a 100 x 100 grid from these shapes (shorts/motion_identities.yaml); the player draws them in the identity's field tone.",
+    "shapes": [
+      "rect",
+      "circle",
+      "path"
     ],
-    "heads": [
-      "round",
-      "oval",
-      "rounded_square"
-    ],
-    "hair": [
-      "swept",
-      "bob",
-      "ponytail",
-      "ponytail_high",
-      "bun",
-      "curly",
-      "twists",
-      "buzz",
-      "side_part",
-      "long",
-      "short",
-      "beanie",
-      "cap"
-    ],
-    "accessories": [
-      "headset",
-      "glasses",
-      "lanyard",
-      "scarf",
-      "notebook",
-      "clipboard",
-      "pencil",
-      "watch",
-      "toolbelt",
-      "vest",
-      "blazer",
-      "bag",
-      "beard",
-      "hivis",
-      "hoodie",
-      "cardigan",
-      "track_jacket"
-    ],
-    "skins": {
-      "s1": "#F6D7C3",
-      "s2": "#E8B894",
-      "s3": "#C98E64",
-      "s4": "#A86B45",
-      "s5": "#7E4E33",
-      "s6": "#5A3825"
+    "tones": [
+      "main",
+      "soft"
+    ]
+  },
+  "characters": {
+    "_comment": "The optional animated-character layer (config.MOTION_CHARACTERS): one character per speaker (two on a two-speaker reel, one narrator otherwise), and the gestures and expressions the director (shorts/motion_characters.py) may cue. Who the characters are is in shorts/motion_character_presets.yaml. motion.test.tsx checks every name exists in the rig.",
+    "expressions": {
+      "speaking": "happy",
+      "asking": "neutral",
+      "question": "confused",
+      "listening": "listening",
+      "thinking": "thinking",
+      "end": "grin"
     },
-    "states": [
-      "idle",
-      "talking",
-      "reacting"
+    "gestures": {
+      "explain": [
+        "handsSpread",
+        "point",
+        "pointUp",
+        "okSign",
+        "presentToward"
+      ],
+      "why": "shrug",
+      "how": "handsSpread",
+      "count": {
+        "first": "countOne",
+        "second": "countTwo",
+        "third": "countThree"
+      },
+      "yes": "nod",
+      "no": "shake",
+      "agree": "nod",
+      "end": "thumbsUp"
+    },
+    "present": {
+      "left": "presentRight",
+      "right": "presentLeft"
+    },
+    "lead": {
+      "hands": 0.2,
+      "head": 0.05
+    },
+    "min_gap": 2.4,
+    "mirror_on_right": [
+      "point",
+      "pointUp",
+      "okSign",
+      "thumbsUp",
+      "countOne",
+      "countTwo",
+      "countThree"
     ],
-    "box": {
-      "w": 360,
-      "h": 420
-    }
+    "narrator_explain": [
+      "handsSpread",
+      "pointUp",
+      "presentRight",
+      "okSign",
+      "point",
+      "presentLeft"
+    ]
   }
 }

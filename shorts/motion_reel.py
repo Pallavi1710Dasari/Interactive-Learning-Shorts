@@ -254,11 +254,19 @@ def _decide_template(default: str, yes: bool, override: str | None) -> tuple[str
 
 
 def _run_setup(sections: list, doc_text: str, yes: bool,
-               template_override: str | None = None) -> dict | None:
+               template_override: str | None = None,
+               section_pin: str | None = None) -> dict | None:
     """Select a topic, gate it, frame it, pick a teaching approach, gate that.
     Returns the setup state, or None when a human declined (or no human was
     available to decide)."""
-    _topics, _notes, selections = select_topics_with_selections(sections, target=1)
+    # --section: choose the topic from that one section (the rest of the
+    # document still supplies evidence, the next topic and so on).
+    pool = [s for s in sections if s.section_id == section_pin] if section_pin else sections
+    if section_pin and not pool:
+        print(f"\n--section {section_pin}: no such section. The document has: "
+              f"{', '.join(s.section_id for s in sections)}")
+        return None
+    _topics, _notes, selections = select_topics_with_selections(pool, target=1)
     workflows = [QuestionWorkflow(selection=s) for s in selections]
     for w in workflows:
         print(f"  candidate [{w.selection.topic.source_section_id}] {w.effective_question}")
@@ -348,9 +356,9 @@ def print_theme(choice: MotionThemeChoice, language_how: str = "",
     print(f"  reason:   {choice.reason}")
     print(f"  format:   {spec.description}")
     print(f"  template: {choice.template}   approach: {choice.teaching_approach or '(none)'}")
-    who = (" / ".join(f"{sp.role} = {sp.name} ({sp.avatar})"
+    who = (" / ".join(f"{sp.label} ({sp.identity} badge, voice {sp.voice_slot})"
                       for sp in motion_themes.cast_speakers(spec, choice.language))
-           if spec.two_speaker else "one narrator, no avatar")
+           if spec.two_speaker else "one narrator")
     print(f"  speakers: {who}")
     print(f"  language: {choice.language}" + (f"   ({language_how})" if language_how else ""))
     if history is not None:
@@ -466,7 +474,7 @@ def print_shot_list(script: MotionScript, results: list | None = None) -> None:
           + (f", theme {script.theme}" if script.theme else "")
           + f" ({len(script.shots)} shots, ~{script.estimated_seconds:.1f}s) ===")
     if script.speakers:
-        print("speakers: " + ", ".join(f"{sp.role} = {sp.name} ({sp.avatar}, voice "
+        print("speakers: " + ", ".join(f"{sp.role} = {sp.label} ({sp.identity} badge, voice "
                                         f"{sp.voice_slot})" for sp in script.speakers))
     print(f"concept: {script.concept_name}   promise: {script.promise!r}")
     print(f"hook question: {script.hook_question}")
@@ -650,13 +658,16 @@ def stage_voice(short_id: str, script: MotionScript) -> dict | None:
 
 
 def _cast(script: MotionScript) -> list:
-    from .schema import MotionCastMember
-    reg = motion_themes.avatars()
+    """The two speakers' badges: the host on the left (the asking role), the
+    language speaker on the right."""
+    from .motion_identities import identity, registry
+    from .schema import MotionCastMember, MotionIdentitySpec
     out = []
-    for i, sp in enumerate(script.speakers):
-        avatar = reg.host if sp.avatar == "host" else reg.characters[sp.avatar]
-        out.append(MotionCastMember(role=sp.role, side="left" if i == 0 else "right",
-                                    voice_slot=sp.voice_slot, avatar=avatar.spec()))
+    for sp in script.speakers:
+        ident = registry().host if sp.identity == "host" else identity(sp.identity)
+        out.append(MotionCastMember(role=sp.role, side="left" if sp.identity == "host" else "right",
+                                    label=sp.label, voice_slot=sp.voice_slot,
+                                    identity=MotionIdentitySpec(**ident.spec())))
     return out
 
 
@@ -680,7 +691,8 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict) -> tuple[P
             times[shot.id].append(motion_align.shown_times(spoken, rng))
             sources[shot.id].append(src)
     motion_align.close()
-    clocks = motion_timeline.shot_timings(script, seconds, times, sources)
+    intro = config.MOTION_INTRO_SECONDS if config.MOTION_INTRO_STING else 0.0
+    clocks = motion_timeline.shot_timings(script, seconds, times, sources, offset=intro)
     counts: dict[str, int] = {}
     for c in clocks:
         for cap in c.captions:
@@ -691,7 +703,18 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict) -> tuple[P
     for r in results:
         print(f"  {r}")
     audio = motion_voice.mix(script, manifest, clocks)
-    plan = motion_timeline.build_plan(script, clocks, audio=f"audio/{audio.name}", cast=_cast(script))
+    tags = []
+    if tags_path(short_id).exists():
+        tags = json.loads(tags_path(short_id).read_text(encoding="utf-8")).get("tags", [])
+    plan = motion_timeline.build_plan(script, clocks, audio=f"audio/{audio.name}", cast=_cast(script),
+                                      tags=tags, intro=intro, characters=config.MOTION_CHARACTERS,
+                                      character=config.MOTION_CHARACTER_PRESET)
+    if plan.characters:
+        shown = sum(s.characters for s in plan.shots)
+        print("  characters: " + ", ".join(
+            f"{t.config.get('name', t.preset)} ({t.preset}) as {t.role or 'narrator'} "
+            f"({sum(c.kind == 'gesture' for c in t.cues)} gestures)" for t in plan.characters)
+            + f" — on {shown} of {len(plan.shots)} shots")
     path = plan_path(short_id)
     path.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
     print(f"  {motion_timeline.total_seconds(clocks):.1f}s — {path}")
@@ -744,7 +767,7 @@ def record_cost(short_id: str, calls: list[dict], started: str) -> dict:
 def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         force_stage: str | None, yes: bool, template: str | None = None,
         theme: str | None = None, language: str | None = None,
-        estimate_only: bool = False) -> int:
+        estimate_only: bool = False, section: str | None = None) -> int:
     """The motion run, with the model routing of shorts/motion_models.yaml
     switched on, a whole-reel cost estimate (and one confirmation) before a
     real run starts, every LLM call's cost printed as it happens, and the
@@ -774,7 +797,7 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
     try:
         with motion_models.use():
             code = _run(doc_path, topic_short_id, from_stage, force_stage, yes, template,
-                        theme, language, ctx)
+                        theme, language, ctx, section)
     finally:
         usage.remove_listener(_print_call)
     if ctx.get("short_id"):
@@ -792,7 +815,7 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
 
 def _run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
          force_stage: str | None, yes: bool, template: str | None,
-         theme: str | None, language: str | None, ctx: dict) -> int:
+         theme: str | None, language: str | None, ctx: dict, section: str | None = None) -> int:
 
     sections = parse_markdown(doc_path)
     doc_text = Path(doc_path).read_text(encoding="utf-8")
@@ -826,7 +849,7 @@ def _run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
             return 1
     else:
         c = usage.mark()
-        state = _run_setup(sections, doc_text, yes, template)
+        state = _run_setup(sections, doc_text, yes, template, section)
         stage_usage["setup"] = usage.since(c)
         if state is None:
             return 1
@@ -946,8 +969,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="the reel's theme (default: the best fit among the themes that "
                         "pass the fit and variety rules — shorts/motion_themes.yaml)")
     p.add_argument("--language", choices=motion_themes.language_tags(), default=None,
-                   help="the course language for tags, variety and avatars (default: "
+                   help="the course language: tags, variety, badge and voices (default: "
                         "detected from the material)")
+    p.add_argument("--section", default=None,
+                   help="choose the topic from this section of the document (e.g. 3.4) "
+                        "instead of the whole document")
+    p.add_argument("--characters", action="store_true",
+                   help="draw the speakers as animated characters, one per speaker: the host and "
+                        "the language character on a two-speaker reel, the language character as "
+                        "narrator on a one-narrator reel (same as MOTION_CHARACTERS=1; off by default)")
+    p.add_argument("--character", default=None, metavar="PRESET",
+                   help="the character preset that plays the reel's language, for this reel only "
+                        "(a language id, or an extra such as riya — shorts/motion_character_"
+                        "presets.yaml); implies --characters")
     p.add_argument("--estimate", action="store_true",
                    help="print the whole reel's estimated cost per step and model, and stop "
                         "(free — no call is made)")
@@ -959,9 +993,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return run(args.markdown_path, args.topic_short_id, args.from_stage,
-               args.force_stage, args.yes, args.template, args.theme, args.language,
-               estimate_only=args.estimate)
+    if args.character:
+        from . import motion_character_presets
+        if args.character not in motion_character_presets.ids():
+            print(f"no character preset {args.character!r} — choose from: "
+                  f"{', '.join(motion_character_presets.ids())}")
+            return 2
+    default, default_preset = config.MOTION_CHARACTERS, config.MOTION_CHARACTER_PRESET
+    config.MOTION_CHARACTERS = default or args.characters or bool(args.character)
+    config.MOTION_CHARACTER_PRESET = args.character or default_preset
+    try:
+        return run(args.markdown_path, args.topic_short_id, args.from_stage,
+                   args.force_stage, args.yes, args.template, args.theme, args.language,
+                   estimate_only=args.estimate, section=args.section)
+    finally:
+        config.MOTION_CHARACTERS, config.MOTION_CHARACTER_PRESET = default, default_preset
 
 
 if __name__ == "__main__":

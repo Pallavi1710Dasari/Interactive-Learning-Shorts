@@ -1,0 +1,900 @@
+{
+ "short_id": "stub_why_fails_on_two_equal_strings__motion",
+ "topic": "How does why == fails on two equal strings work?",
+ "stub": true,
+ "theme": "interview",
+ "template": "fix_story",
+ "teaching_approach": "direct_explanation",
+ "tags": [
+  "#java",
+  "#interview",
+  "#equalstrings",
+  "#fails"
+ ],
+ "language": "java",
+ "duration": 61.336,
+ "cost": 0,
+ "cost_estimated": false,
+ "stage": "timing",
+ "has_plan": true,
+ "approach": {
+  "primary": "direct_explanation",
+  "combined_with": [],
+  "alternatives": [],
+  "rationale": "Stub: explaining How does why == fails on two equal strings work? plainly, with no device chosen."
+ },
+ "theme_choice": {
+  "theme": "interview",
+  "reason": "chosen by the reviewer (--theme)",
+  "tags": [
+   "#java",
+   "#interview",
+   "#equalstrings",
+   "#fails"
+  ],
+  "fit_check": {
+   "passed": true,
+   "attempts": 0,
+   "rejected": [],
+   "fallback": false,
+   "fallback_reason": "",
+   "overrides": []
+  },
+  "source": "flag",
+  "template": "fix_story",
+  "language": "java",
+  "teaching_approach": "direct_explanation",
+  "eligible": [
+   "classic_explainer",
+   "narrative",
+   "interview",
+   "interview_rapid_fire",
+   "peer_discussion",
+   "mentor_student",
+   "bug_hunt",
+   "myth_vs_fact",
+   "common_mistakes",
+   "predict_the_output",
+   "under_the_hood",
+   "step_by_step_walkthrough",
+   "real_world_scenario",
+   "before_vs_after"
+  ]
+ },
+ "script": {
+  "reel_style": "motion",
+  "template": "fix_story",
+  "short_id": "stub_why_fails_on_two_equal_strings__motion",
+  "source_section_id": "2.1",
+  "topic": "How does why == fails on two equal strings work?",
+  "hook_question": "Why does my string check say false for same letters?",
+  "concept_name": "equals",
+  "promise": "Why == lies about strings",
+  "icon_vocabulary": [
+   {
+    "name": "link",
+    "label": "Reference"
+   },
+   {
+    "name": "layers",
+    "label": "Objects"
+   },
+   {
+    "name": "check",
+    "label": "Equal"
+   }
+  ],
+  "takeaways": [
+   {
+    "icon": "link",
+    "line": "== compares references",
+    "sub": "the addresses"
+   },
+   {
+    "icon": "layers",
+    "line": "New strings, new objects",
+    "sub": "built at run time"
+   },
+   {
+    "icon": "check",
+    "line": "equals compares text",
+    "sub": "every character"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s01",
+    "beat": "hook",
+    "speech": "Why does my string check say false for same letters?",
+    "captions": [
+     {
+      "text": "Why does my string check say <b>false</b> for same letters?",
+      "speaker": "INTERVIEWER"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Interview: two strings both reading hello; the check prints false; status pill 'False'.",
+    "code": [],
+    "scene": {
+     "field": "navy",
+     "transition": "cut",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "identity_title",
+       "props": {}
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "Same letters",
+        "tone": "bad",
+        "icon": "alert"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "check",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "Same letters",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.85
+   },
+   {
+    "id": "s02",
+    "beat": "title",
+    "speech": "Because double equals compares references, not the text.",
+    "captions": [
+     {
+      "text": "Because double equals compares <b>references</b>, not the text.",
+      "speaker": "CANDIDATE"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Title card: series label, 'equals', the promise line, three icon tiles.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "iris",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "title_card",
+       "props": {
+        "title": "equals",
+        "promise": "Why == lies about strings",
+        "icons": [
+         {
+          "name": "link",
+          "label": "Reference"
+         },
+         {
+          "name": "layers",
+          "label": "Objects"
+         },
+         {
+          "name": "check",
+          "label": "Equal"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "not",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.08
+   },
+   {
+    "id": "s03",
+    "beat": "setup",
+    "speech": "Here are two strings with the same letters. Both say hello. So why does the check print false?",
+    "captions": [
+     {
+      "text": "Here are two strings with the same letters.",
+      "speaker": "INTERVIEWER"
+     },
+     {
+      "text": "Both say hello.",
+      "speaker": "INTERVIEWER"
+     },
+     {
+      "text": "So why does the check print false?",
+      "speaker": "INTERVIEWER"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Code window Main.java, the two new String lines highlighted in turn.",
+    "code": [
+     "a = new String(\"hello\");",
+     "b = new String(\"hello\");"
+    ],
+    "scene": {
+     "field": "paper",
+     "transition": "bar_wipe",
+     "label": "THE CODE",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "code_window",
+       "props": {
+        "file": "Main.java",
+        "lines": [
+         "a = new String(\"hello\");",
+         "b = new String(\"hello\");"
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "start",
+       "do": "type",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "strings",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "Both",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      },
+      {
+       "at": "does",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "print",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.92
+   },
+   {
+    "id": "s04",
+    "beat": "break_1",
+    "speech": "A string variable holds a reference, an address in memory. These are two separate objects at two addresses.",
+    "captions": [
+     {
+      "text": "A string variable holds a reference, an address in memory.",
+      "speaker": "CANDIDATE"
+     },
+     {
+      "text": "These are two separate <b>objects</b> at two addresses.",
+      "speaker": "CANDIDATE"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Two boxes in memory, each with its own address; two arrows from a and b.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "cut",
+     "label": "WHY IT FAILS",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "token_row",
+       "props": {
+        "items": [
+         "objects"
+        ],
+        "tones": [
+         "plain"
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "variable",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "reference",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "These",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "objects",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.92
+   },
+   {
+    "id": "s05",
+    "beat": "fix_idea",
+    "speech": "So how do I compare the text? Use the equals method. It compares the characters, not the addresses.",
+    "captions": [
+     {
+      "text": "So how do I compare the text?",
+      "speaker": "INTERVIEWER"
+     },
+     {
+      "text": "Use the <b>equals</b> method.",
+      "speaker": "CANDIDATE"
+     },
+     {
+      "text": "It compares the characters, not the addresses.",
+      "speaker": "CANDIDATE"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "The concept in display caps; the comparison chip flips to the equals method.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "double_bar_wipe",
+     "label": "THE FIX",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "kinetic_title",
+       "props": {
+        "text": "EQUALS",
+        "accent": [
+         "EQUALS"
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "compare",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "text",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "equals",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "characters",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.92
+   },
+   {
+    "id": "s06",
+    "beat": "fix_flow",
+    "speech": "It walks both strings character by character. Every character matches, so it returns true.",
+    "captions": [
+     {
+      "text": "It walks both strings character by character.",
+      "speaker": "CANDIDATE"
+     },
+     {
+      "text": "Every character matches, so it returns <b>true</b>.",
+      "speaker": "CANDIDATE"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Two rows of letters compared pair by pair; each pair lights; result pill 'True'.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "diagonal_stripes",
+     "label": "HOW IT WORKS",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "trigger_chip",
+       "props": {
+        "label": "true"
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "It updates",
+        "tone": "ok",
+        "icon": "check"
+       }
+      },
+      {
+       "id": "o3",
+       "kind": "connector",
+       "props": {
+        "from": "o1",
+        "to": "o2",
+        "tone": "info"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "character",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "character matches",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "true",
+       "do": "enter",
+       "target": "o3",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "true",
+       "do": "pulse",
+       "target": "o3",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 5.38
+   },
+   {
+    "id": "s07",
+    "beat": "code_map",
+    "speech": "Show me both checks. The first compares the references. The second compares the characters.",
+    "captions": [
+     {
+      "text": "Show me both checks.",
+      "speaker": "INTERVIEWER"
+     },
+     {
+      "text": "The first compares the <b>references</b>.",
+      "speaker": "CANDIDATE"
+     },
+     {
+      "text": "The second compares the <b>characters</b>.",
+      "speaker": "CANDIDATE"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Code map card: the two checks, each lit as it is named.",
+    "code": [
+     "a == b       // false",
+     "a.equals(b)  // true"
+    ],
+    "scene": {
+     "field": "paper",
+     "transition": "cut",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "code_map",
+       "props": {
+        "lines": [
+         "a == b       // false",
+         "a.equals(b)  // true"
+        ],
+        "parts": [
+         {
+          "code": "equals",
+          "icon": "link",
+          "label": "Reference"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "checks",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "first",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "references",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "compares",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 5.38
+   },
+   {
+    "id": "s08",
+    "beat": "payoff",
+    "speech": "Now your string check says true for the same letters.",
+    "captions": [
+     {
+      "text": "Now your string check says <b>true</b> for the same letters.",
+      "speaker": "CANDIDATE"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "The hook's two hello strings again: the comparison prints true; status pill 'True'.",
+    "code": [],
+    "scene": {
+     "field": "navy",
+     "transition": "stack_rise",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "kinetic_title",
+       "props": {
+        "text": "NOW YOUR STRING CHECK SAYS TRUE FOR THE SAME",
+        "accent": [
+         "TRUE"
+        ]
+       }
+      },
+      {
+       "id": "o2",
+       "kind": "status_pill",
+       "props": {
+        "text": "True",
+        "tone": "ok",
+        "icon": "check"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "string",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "true",
+       "do": "enter",
+       "target": "o2",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "same",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.85
+   },
+   {
+    "id": "s09",
+    "beat": "recap",
+    "speech": "Remember: double equals compares references. New strings are new objects. The equals method compares the text.",
+    "captions": [
+     {
+      "text": "Remember: double equals compares references.",
+      "speaker": "INTERVIEWER"
+     },
+     {
+      "text": "New strings are new objects.",
+      "speaker": "INTERVIEWER"
+     },
+     {
+      "text": "The equals method compares the text.",
+      "speaker": "INTERVIEWER"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "Takeaway list: three rows with the link, layers and check icons.",
+    "code": [],
+    "scene": {
+     "field": "paper",
+     "transition": "iris",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "takeaway_list",
+       "props": {
+        "heading": "Key takeaways",
+        "rows": [
+         {
+          "icon": "link",
+          "line": "== compares references",
+          "sub": "the addresses"
+         },
+         {
+          "icon": "layers",
+          "line": "New strings, new objects",
+          "sub": "built at run time"
+         },
+         {
+          "icon": "check",
+          "line": "equals compares text",
+          "sub": "every character"
+         }
+        ]
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "objects",
+       "do": "highlight",
+       "target": "o1",
+       "value": "1",
+       "tone": null
+      },
+      {
+       "at": "compares",
+       "do": "highlight",
+       "target": "o1",
+       "value": "2",
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 6.15
+   },
+   {
+    "id": "s10",
+    "beat": "cta",
+    "speech": "Follow for more, one idea at a time.",
+    "captions": [
+     {
+      "text": "Follow for more, one idea at a time.",
+      "speaker": "INTERVIEWER"
+     }
+    ],
+    "chapter": null,
+    "example": [],
+    "visual": "End card: Up next, Follow button, tags.",
+    "code": [],
+    "scene": {
+     "field": "blue",
+     "transition": "bar_wipe",
+     "label": "",
+     "objects": [
+      {
+       "id": "o1",
+       "kind": "end_card",
+       "props": {
+        "up_next": "Comparing safely"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "at": "start",
+       "do": "enter",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      },
+      {
+       "at": "time",
+       "do": "pulse",
+       "target": "o1",
+       "value": null,
+       "tone": null
+      }
+     ]
+    },
+    "estimated_seconds": 3.08
+   }
+  ],
+  "chapters": [],
+  "running_example": null,
+  "series": "@learnthesimpleway",
+  "next_topic": "Comparing safely",
+  "tts_provider": null,
+  "voice_ref": null,
+  "theme": "interview",
+  "language": "java",
+  "speakers": [
+   {
+    "role": "INTERVIEWER",
+    "identity": "host",
+    "label": "Interviewer",
+    "voice_slot": "motion_host"
+   },
+   {
+    "role": "CANDIDATE",
+    "identity": "java",
+    "label": "Candidate",
+    "voice_slot": "motion_char_2"
+   }
+  ],
+  "estimated_seconds": 51.53
+ },
+ "facts": [
+  {
+   "kind": "number",
+   "value": "2",
+   "section": "2.1",
+   "role": "main",
+   "shots": [
+    "s03",
+    "s04"
+   ]
+  }
+ ],
+ "cost_log": {
+  "short_id": "stub_why_fails_on_two_equal_strings__motion",
+  "runs": [
+   {
+    "started": "2026-10-09T11:41:38+00:00",
+    "ended": "2026-10-09T11:41:38+00:00",
+    "stub": true,
+    "calls": [],
+    "cost": 0
+   }
+  ],
+  "total": {
+   "calls": 0,
+   "cost": 0,
+   "estimated": false,
+   "by_label": {}
+  }
+ },
+ "plan_url": "/motion-demo/interview_java_characters.json",
+ "audio_url": null,
+ "demo": "interview_java_characters"
+}

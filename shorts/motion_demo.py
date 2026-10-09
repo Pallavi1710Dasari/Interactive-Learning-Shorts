@@ -1,5 +1,5 @@
 """
-The stub demo reels (RESTYLE_TO_MOTION_REELS.md phase 3): three stub reels
+The stub demo reels (RESTYLE_TO_MOTION_REELS.md phase 3): seven stub reels
 run end to end in a TEMP folder — never output/ — and copied to
 web/public/motion-demo/: each one's plan (<name>.json, for the player), its
 bundle (<name>.bundle.json: script, theme, approach, tags, facts, cost — what
@@ -21,9 +21,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DEMO_DIR = ROOT / "web" / "public" / "motion-demo"
+#: name, document, runner flags. Two-speaker reels in three languages (React,
+#: OS, CSS) and single-narrator reels in three (React, OS, CS).
 DEMOS = [
     ("interview", "content/react_usestate_basics.md", ["--theme", "interview"]),
+    ("peer_discussion", "content/react_usestate_basics.md", ["--theme", "peer_discussion"]),
+    ("mentor_os", "content/session_18_paging.md", ["--theme", "mentor_student", "--section", "3.4"]),
+    ("interview_css", "content/css_specificity.md", ["--theme", "interview", "--section", "4.1"]),
+    ("interview_characters", "content/react_usestate_basics.md", ["--theme", "interview", "--characters"]),
+    ("interview_java_characters", "content/java_string_equality.md",
+     ["--theme", "interview", "--section", "2.1", "--characters"]),
+    ("classic_os_characters", "content/session_18_paging.md",
+     ["--theme", "classic_explainer", "--section", "3.4", "--characters"]),
     ("classic", "content/react_usestate_basics.md", ["--theme", "classic_explainer"]),
+    ("classic_os", "content/session_18_paging.md", ["--theme", "classic_explainer", "--section", "3.4"]),
     ("walkthrough", "content/tokenization_basics.md", ["--template", "walkthrough"]),
 ]
 
@@ -39,11 +50,12 @@ def main() -> int:
         index: list[dict] = []
         for name, doc, args in DEMOS:
             before = set(Path(d).glob("*/plan.json"))
-            with contextlib.redirect_stdout(io.StringIO()):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
                 code = motion_reel.main([str(ROOT / doc), "--yes", *args])
             new = set(Path(d).glob("*/plan.json")) - before
             if code != 0 or len(new) != 1:
-                print(f"{name}: the stub run failed (exit {code})", file=sys.stderr)
+                print(f"{name}: the stub run failed (exit {code})\n{buf.getvalue()[-1500:]}", file=sys.stderr)
                 return 1
             plan_file = new.pop()
             plan = json.loads(plan_file.read_text(encoding="utf-8"))

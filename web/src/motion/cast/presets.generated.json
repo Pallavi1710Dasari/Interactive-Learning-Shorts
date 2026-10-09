@@ -1,0 +1,647 @@
+{
+ "_comment": "GENERATED from shorts/motion_character_presets.yaml by `python -m shorts.motion_character_presets export` \u2014 do not edit by hand. Defaults only; the designer's saved presets come from the API.",
+ "host": {
+  "name": "Arjun",
+  "gender": "male",
+  "art": "soft",
+  "shading": "flat",
+  "skinTone": "#F8C9A8",
+  "hair": {
+   "style": "quiff",
+   "color": "#151515"
+  },
+  "face": {
+   "jaw": "square",
+   "brows": "medium",
+   "eyes": "oval",
+   "mouth": "full"
+  },
+  "outfit": {
+   "top": "shirtTie",
+   "topColor": "#FFFFFF",
+   "bottom": "trousers",
+   "bottomColor": "#1B2238",
+   "shoeColor": "#2A2F45",
+   "accentColor": "#6C6F7A"
+  },
+  "accessories": {
+   "belt": true
+  },
+  "build": {
+   "height": 1.0,
+   "shoulders": 1.0
+  }
+ },
+ "languages": {
+  "python": {
+   "name": "Python",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "wheatish",
+   "hair": {
+    "style": "ponytail",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "thin",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "tshirt",
+    "topColor": "#2268C3",
+    "bottom": "jeans",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {
+    "glasses": "round"
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "javascript": {
+   "name": "JavaScript",
+   "gender": "male",
+   "art": "soft",
+   "skinTone": "medium",
+   "hair": {
+    "style": "sidePart",
+    "color": "darkBrown"
+   },
+   "face": {
+    "jaw": "square",
+    "brows": "medium",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "polo",
+    "topColor": "#C9951D",
+    "bottom": "trousers",
+    "bottomColor": "#2A2F45",
+    "shoeColor": "#2A2F45"
+   },
+   "accessories": {
+    "watch": true,
+    "belt": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "typescript": {
+   "name": "TypeScript",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "fair",
+   "hair": {
+    "style": "bob",
+    "color": "darkBrown"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "thin",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "blouse",
+    "topColor": "#29668E",
+    "bottom": "skirt",
+    "bottomColor": "#171A3B",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {
+    "glasses": "rect",
+    "earrings": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "react": {
+   "name": "React",
+   "gender": "male",
+   "art": "soft",
+   "skinTone": "wheatish",
+   "hair": {
+    "style": "curly",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "round",
+    "brows": "medium",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "hoodie",
+    "topColor": "#12B5DE",
+    "bottom": "jeans",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#2A2F45"
+   },
+   "accessories": {},
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "node": {
+   "name": "Node",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "dusky",
+   "hair": {
+    "style": "braid",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "medium",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "kurta",
+    "topColor": "#60B82E",
+    "bottom": "salwar",
+    "bottomColor": "#F4F7FA",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {
+    "earrings": true,
+    "bindi": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "django": {
+   "name": "Django",
+   "gender": "male",
+   "art": "soft",
+   "skinTone": "dusky",
+   "hair": {
+    "style": "short",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "square",
+    "brows": "thick",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "shirt",
+    "topColor": "#2E8A3A",
+    "bottom": "trousers",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#2A2F45"
+   },
+   "accessories": {
+    "beard": "short",
+    "belt": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "html": {
+   "name": "HTML",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "medium",
+   "hair": {
+    "style": "long",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "thin",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "tshirt",
+    "topColor": "#CF6017",
+    "bottom": "jeans",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {
+    "necklace": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "css": {
+   "name": "CSS",
+   "gender": "male",
+   "art": "soft",
+   "skinTone": "fair",
+   "hair": {
+    "style": "quiff",
+    "color": "brown"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "medium",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "shirtTie",
+    "topColor": "#BA369F",
+    "bottom": "trousers",
+    "bottomColor": "#171A3B",
+    "shoeColor": "#2A2F45",
+    "accentColor": "#1B2238"
+   },
+   "accessories": {
+    "glasses": "round",
+    "belt": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "sql": {
+   "name": "SQL",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "deep",
+   "hair": {
+    "style": "bun",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "round",
+    "brows": "medium",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "polo",
+    "topColor": "#BDB828",
+    "bottom": "trousers",
+    "bottomColor": "#2A2F45",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {
+    "earrings": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "java": {
+   "name": "Java",
+   "gender": "male",
+   "art": "soft",
+   "skinTone": "medium",
+   "hair": {
+    "style": "sidePart",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "square",
+    "brows": "thick",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "shirt",
+    "topColor": "#A53C27",
+    "bottom": "trousers",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#2A2F45"
+   },
+   "accessories": {
+    "beard": "stubble",
+    "watch": true,
+    "belt": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "c": {
+   "name": "C",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "wheatish",
+   "hair": {
+    "style": "wavy",
+    "color": "darkBrown"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "thin",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "shirt",
+    "topColor": "#566B8F",
+    "bottom": "skirt",
+    "bottomColor": "#171A3B",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {
+    "glasses": "rect"
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "cpp": {
+   "name": "C++",
+   "gender": "male",
+   "art": "soft",
+   "skinTone": "deep",
+   "hair": {
+    "style": "buzz",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "square",
+    "brows": "thick",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "tshirt",
+    "topColor": "#9B734B",
+    "bottom": "jeans",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#2A2F45"
+   },
+   "accessories": {
+    "beard": "short"
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "docker": {
+   "name": "Docker",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "fair",
+   "hair": {
+    "style": "ponytail",
+    "color": "auburn"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "thin",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "hoodie",
+    "topColor": "#5E9CBA",
+    "bottom": "jeans",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {},
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "os": {
+   "name": "OS",
+   "gender": "male",
+   "art": "soft",
+   "skinTone": "wheatish",
+   "hair": {
+    "style": "short",
+    "color": "darkBrown"
+   },
+   "face": {
+    "jaw": "round",
+    "brows": "medium",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "kurta",
+    "topColor": "#2F6B6B",
+    "bottom": "trousers",
+    "bottomColor": "#F4F7FA",
+    "shoeColor": "#2A2F45"
+   },
+   "accessories": {
+    "glasses": "rect",
+    "watch": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "cs": {
+   "name": "CS",
+   "gender": "female",
+   "art": "line",
+   "skinTone": "dusky",
+   "hair": {
+    "style": "bob",
+    "color": "black"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "thin",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "blouse",
+    "topColor": "#A82454",
+    "bottom": "skirt",
+    "bottomColor": "#171A3B",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {
+    "flower": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  }
+ },
+ "extras": {
+  "arjun": {
+   "name": "Arjun",
+   "gender": "male",
+   "art": "soft",
+   "shading": "flat",
+   "skinTone": "#F8C9A8",
+   "hair": {
+    "style": "quiff",
+    "color": "#151515"
+   },
+   "face": {
+    "jaw": "square",
+    "brows": "medium",
+    "eyes": "oval",
+    "mouth": "full"
+   },
+   "outfit": {
+    "top": "shirtTie",
+    "topColor": "#FFFFFF",
+    "bottom": "trousers",
+    "bottomColor": "#1B2238",
+    "shoeColor": "#2A2F45"
+   },
+   "accessories": {
+    "belt": true
+   },
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  },
+  "riya": {
+   "name": "Riya",
+   "gender": "female",
+   "art": "line",
+   "shading": "flat",
+   "skinTone": "#F5A68E",
+   "hair": {
+    "style": "bun",
+    "color": "#1A1F3D"
+   },
+   "face": {
+    "jaw": "oval",
+    "brows": "thin",
+    "eyes": "dot",
+    "mouth": "line"
+   },
+   "outfit": {
+    "top": "blouse",
+    "topColor": "#5B6EE1",
+    "bottom": "skirt",
+    "bottomColor": "#171A3B",
+    "shoeColor": "#1A1F3D"
+   },
+   "accessories": {},
+   "build": {
+    "height": 1.0,
+    "shoulders": 1.0
+   }
+  }
+ },
+ "options": {
+  "gender": [
+   "male",
+   "female"
+  ],
+  "art": [
+   "soft",
+   "line"
+  ],
+  "shading": [
+   "flat",
+   "lit"
+  ],
+  "skinTone": [
+   "fair",
+   "wheatish",
+   "medium",
+   "dusky",
+   "deep"
+  ],
+  "hairStyle": [
+   "short",
+   "sidePart",
+   "quiff",
+   "curly",
+   "buzz",
+   "braid",
+   "ponytail",
+   "bob",
+   "long",
+   "bun",
+   "wavy"
+  ],
+  "hairColor": [
+   "black",
+   "darkBrown",
+   "brown",
+   "auburn",
+   "grey"
+  ],
+  "jaw": [
+   "round",
+   "oval",
+   "square"
+  ],
+  "brows": [
+   "thin",
+   "medium",
+   "thick"
+  ],
+  "eyes": [
+   "oval",
+   "dot"
+  ],
+  "mouth": [
+   "full",
+   "line"
+  ],
+  "top": [
+   "shirt",
+   "shirtTie",
+   "tshirt",
+   "kurta",
+   "hoodie",
+   "blouse",
+   "polo"
+  ],
+  "bottom": [
+   "trousers",
+   "jeans",
+   "skirt",
+   "salwar",
+   "shorts"
+  ],
+  "glasses": [
+   "none",
+   "round",
+   "rect"
+  ],
+  "beard": [
+   "none",
+   "stubble",
+   "short"
+  ],
+  "flags": [
+   "earrings",
+   "bindi",
+   "watch",
+   "flower",
+   "necklace",
+   "belt"
+  ]
+ }
+}

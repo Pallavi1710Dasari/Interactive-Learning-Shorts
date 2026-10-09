@@ -709,6 +709,19 @@ MAX_MOTION_SCRIPT_RETRIES = _i("MAX_MOTION_SCRIPT_RETRIES", 3)
 MAX_MOTION_HOOK_FIX_RETRIES = _i("MAX_MOTION_HOOK_FIX_RETRIES", 2)
 #: Phase 3: repair calls for failing scenes after the first scenes call.
 MAX_MOTION_SCENE_RETRIES = _i("MAX_MOTION_SCENE_RETRIES", 2)
+#: A 1-second language intro sting before a motion reel's first shot (the
+#: identity symbol animating in its colour). Off by default; MOTION_INTRO_STING=1
+#: turns it on for the plans the timing stage writes from then on.
+MOTION_INTRO_STING = os.getenv("MOTION_INTRO_STING", "0").strip().lower() in ("1", "true", "yes")
+MOTION_INTRO_SECONDS = 1.0
+#: Animated characters (the rig in web/src/motion/characters, the people in
+#: shorts/motion_character_presets.yaml) as an optional layer, one per
+#: speaker: two on a two-speaker reel, one narrator on a one-narrator reel. Off by default; MOTION_CHARACTERS=1 (or motion_reel
+#: --characters) adds them to the plans the timing stage writes from then on.
+MOTION_CHARACTERS = os.getenv("MOTION_CHARACTERS", "0").strip().lower() in ("1", "true", "yes")
+#: The character preset that plays the reel's language (motion_reel --character;
+#: shorts/motion_character_presets.yaml). None = the language's own preset.
+MOTION_CHARACTER_PRESET = os.getenv("MOTION_CHARACTER_PRESET") or None
 
 
 # --------------------------------------------------------------- image generation

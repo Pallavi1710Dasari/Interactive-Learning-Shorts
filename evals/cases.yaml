@@ -3415,6 +3415,82 @@ cases:
       passed: false
       reason_contains: "final state"
 
+
+  # --------------------------------------------- identities (phase 3 badges)
+  # Motion reels draw no people: the language is a badge, a hook mark and a
+  # colour (shorts/motion_identities.yaml). Two new two-speaker goldens give
+  # dialogue in two more languages than React.
+
+  - id: E218
+    name: The OS mentor & student golden passes every motion grader
+    why: "The TLB reel as a student / mentor dialogue (language os): proves the two-speaker rules hold for a third role pair and a non-React lesson with no code."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/tlb_mentor_student_golden.json
+    input: content/session_18_paging.md
+    expect:
+      passed: true
+
+  - id: E219
+    name: The CSS specificity interview golden passes every motion grader
+    why: "An interview in a third language (css) from a different lesson: every fact and number from section 4.1."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/css_interview_golden.json
+    input: content/css_specificity.md
+    expect:
+      passed: true
+
+  - id: E220
+    name: Default scenes for the OS mentor dialogue pass every scene grader
+    why: "The hook in a two-speaker reel shows the language mark and the symptom (the question is in the chat), and must still move every 2.5 s."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/tlb_mentor_student_golden.json
+    expect:
+      passed: true
+
+  - id: E221
+    name: Default scenes for the CSS interview pass every scene grader
+    why: "Two speakers, CSS identity, a code window named styles.css."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/css_interview_golden.json
+    expect:
+      passed: true
+
+  - id: E222
+    name: A hook without the language mark is rejected
+    why: "The language must be clear within the first second: the hook opens with the identity mark (symbol + 'REACT · INTERVIEW' chip)."
+    type: motion_scene_grader
+    grader: scene_valid
+    fixture: evals/fixtures/motion/usestate_golden.json
+    patch:
+      - {path: shots.0.scene.objects.0.kind, value: status_pill}
+      - {path: shots.0.scene.objects.0.props, value: {text: "Stuck", tone: bad}}
+    expect:
+      passed: false
+      reason_contains: "shows no identity_title"
+
+  - id: E223
+    name: The Java string equality interview golden passes every motion grader
+    why: "A fourth language (java) for the per-language characters demo: every fact from section 2.1 of content/java_string_equality.md, code lines within 30 characters."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/java_interview_golden.json
+    input: content/java_string_equality.md
+    expect:
+      passed: true
+
+  - id: E224
+    name: Default scenes for the Java interview pass every scene grader
+    why: "Two speakers, the Java identity, a code window named Main.java."
+    type: motion_scene_grader
+    grader: all
+    fixture: evals/fixtures/motion/java_interview_golden.json
+    expect:
+      passed: true
+
 # ============================================================================
 # RUBRIC — what the LLM judge scores, 1 to 5. Keep the wording stable; changing
 # a rubric invalidates every historical score you have logged.

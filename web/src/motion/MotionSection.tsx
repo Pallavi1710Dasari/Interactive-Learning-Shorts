@@ -10,11 +10,15 @@
 //
 // A reel page shows its player, theme (and why), teaching approach, tags, the
 // script with speaker labels, the fact sources and the cost of every LLM call.
-// The phase 2 gallery and the avatars are one click away. Read-only: nothing
+// The phase 2 gallery and the language identities (#motion/identities) are
+// one click away. Read-only: nothing
 // here runs or changes a reel.
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { PlanPlayer, loadPlan } from "./scene/MotionPlayer";
+import { IdentitySheet } from "./identity/IdentitySheet";
+import { CharacterSheet } from "./cast/CharacterSheet";
+import { CharacterDesigner } from "./cast/CharacterDesigner";
 import type { MotionPlan } from "./scene/types";
 
 interface Summary {
@@ -31,7 +35,7 @@ interface Bundle extends Summary {
                  rejected: { theme: string; attempt: number; problems: string[] }[] };
   } | null;
   script: {
-    concept_name: string; promise: string; hook_question: string; speakers: { role: string; name: string; avatar: string; voice_slot: string }[];
+    concept_name: string; promise: string; hook_question: string; speakers: { role: string; label: string; identity: string; voice_slot: string }[];
     shots: { id: string; beat: string; chapter: number | null; speech: string; visual: string; code: string[];
              captions: { text: string; speaker: string | null }[]; scene: { field: string; transition: string } | null }[];
   } | null;
@@ -49,8 +53,11 @@ const card: CSSProperties = { background: "#151A33", borderRadius: 14, padding: 
 const muted = "#9AA0C0";
 const link: CSSProperties = { color: "#FDD13E", textDecoration: "none", fontWeight: 700 };
 
-function route(): { view: "list" | "reel" | "demo"; id?: string } {
+function route(): { view: "list" | "reel" | "demo" | "identities" | "characters" | "designer"; id?: string } {
   const parts = location.hash.replace(/^#/, "").split("?")[0].split("/");
+  if (parts[1] === "identities") return { view: "identities" };
+  if (parts[1] === "characters" && parts[2] === "designer") return { view: "designer" };
+  if (parts[1] === "characters") return { view: "characters" };
   if (parts[1] === "reel" && parts[2]) return { view: "reel", id: decodeURIComponent(parts[2]) };
   if (parts[1] === "demo" && parts[2]) return { view: "demo", id: decodeURIComponent(parts[2]) };
   return { view: "list" };
@@ -72,7 +79,9 @@ function Nav() {
       <a href="#motion" style={{ ...link, fontSize: 24, color: "#E9EBF7" }}>Motion</a>
       <a href="#motion" style={link}>All motion reels</a>
       <ScreenLink to="#motion-gallery">Scene library (gallery)</ScreenLink>
-      <ScreenLink to="#motion-gallery/avatars">Avatars</ScreenLink>
+      <a href="#motion/identities" style={link}>Language identities</a>
+      <a href="#motion/characters" style={link}>Characters</a>
+      <a href="#motion/characters/designer" style={link}>Character designer</a>
       <ScreenLink to="#" style={{ color: muted, marginLeft: "auto" }}>Explainer workspace</ScreenLink>
     </nav>
   );
@@ -119,8 +128,16 @@ function ListView() {
   const [realError, setRealError] = useState<string | null>(null);
   const [demos, setDemos] = useState<Summary[]>([]);
   useEffect(() => {
-    fetch("/api/motion").then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-      .then((d) => setReal(d.reels)).catch(() => setRealError("The API server is not reachable, so reels in output/ can't be listed. Start it with `python -m shorts.server`."));
+    fetch("/api/motion").then(async (r) => {
+      if (r.ok) { setReal((await r.json()).reels); return; }
+      // Tell "no server" apart from "a server running older code": a server
+      // started before the Motion endpoints existed answers /api/health but
+      // 404s /api/motion (Python does not pick up new code until restarted).
+      const health = await fetch("/api/health").then((h) => h.ok).catch(() => false);
+      setRealError(health
+        ? `The API server is running but has no /api/motion (HTTP ${r.status}) — it was started before the Motion section existed. Restart it: stop it, then run \`python -m shorts.server\` again.`
+        : "The API server is not reachable, so reels in output/ can't be listed. Start it with `python -m shorts.server` (it must be on 127.0.0.1:8000, where the dev server proxies /api).");
+    }).catch(() => setRealError("The API server is not reachable, so reels in output/ can't be listed. Start it with `python -m shorts.server` (it must be on 127.0.0.1:8000, where the dev server proxies /api)."));
     fetch("/motion-demo/index.json").then((r) => r.json()).then((d) => setDemos(d.reels)).catch(() => setDemos([]));
   }, []);
   return (
@@ -224,7 +241,7 @@ function DetailView({ source, id }: { source: "reel" | "demo"; id: string }) {
       </div>
 
       <Section title="Script" note={b.script?.speakers?.length
-        ? `Two speakers: ${b.script.speakers.map((s) => `${s.role} = ${s.name} (${s.avatar}, voice ${s.voice_slot})`).join(" · ")}`
+        ? `Two speakers: ${b.script.speakers.map((s) => `${s.label} (${s.identity} badge, voice ${s.voice_slot})`).join(" · ")}`
         : "One narrator."}>
         {b.script ? <>
           <div style={{ marginBottom: 10, fontSize: 14 }}>
@@ -296,7 +313,11 @@ export function MotionSection() {
   return (
     <div style={page}>
       <Nav />
-      {r.view === "list" ? <ListView /> : <DetailView key={r.view + r.id} source={r.view} id={r.id!} />}
+      {r.view === "list" ? <ListView />
+        : r.view === "identities" ? <IdentitySheet />
+        : r.view === "characters" ? <CharacterSheet />
+        : r.view === "designer" ? <CharacterDesigner />
+        : <DetailView key={r.view + r.id} source={r.view} id={r.id!} />}
     </div>
   );
 }

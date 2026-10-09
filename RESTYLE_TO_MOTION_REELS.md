@@ -1,6 +1,6 @@
 # Restyle: motion reels (`REEL_STYLE=motion`)
 
-Status: **Phases 1, 1b, 2, 2b and 3 done (script contract, both templates, scene library, themes and tags, scenes / timing / avatars / voices); 3 is awaiting review.** Built and verified with `SHORTS_STUB=1`, plus one short real Chatterbox sample to check caption timing. No real LLM call has been made in motion mode yet.
+Status: **Phases 1, 1b, 2, 2b and 3 done and approved (script contract, both templates, scene library, themes and tags, scenes / timing / voices). Since approved: the phase 3 badge change (language identities replace the avatars), the optional character layer, and per-language characters with the designer.** Built and verified with `SHORTS_STUB=1`, plus one short real Chatterbox sample to check caption timing. No real LLM call has been made in motion mode yet.
 
 **Read `REFERENCE_STYLE_ADDENDUM.md` with this file. Where they disagree, the addendum wins.** It adds the second reference reel (tokenization), the `walkthrough` template, the 120 s cap, karaoke sentence captions, and the motion system phase 2 builds.
 
@@ -242,6 +242,8 @@ In stub mode the theme call picks the first eligible theme that has a golden fix
 
 ## Phase 3: scenes, timing, avatars, voices
 
+> The avatars described in this section were retired by the phase 3 badge change below; they remain in git history (`257df1c`).
+
 The runner now runs `setup -> theme -> script -> scenes -> voice -> timing -> render -> report`. Scenes, voice and timing are built; render is phase 4. Until then a reel plays in the browser at `#motion-reel/<short_id>` (from the API server), or at `#motion-reel?src=<plan url>`.
 
 ### The scene format
@@ -407,10 +409,127 @@ The second command has no `SHORTS_STUB`. It shows the estimate and asks before a
   - the script shot by shot, with speaker labels, highlights, code and visual brief;
   - fact sources;
   - cost (per step and per call).
-- There are links to the scene library (`#motion-gallery`) and the avatars (`#motion-gallery/avatars`).
+- There are links to the scene library (`#motion-gallery`) and the language identities (`#motion/identities`; this replaced the avatars page in the badge change).
 - `shorts/motion_bundle.py` builds the reel data (`GET /api/motion/<id>/bundle`), and `motion_demo` writes the same shape for the demos.
 
 **Standing rules** are in `CLAUDE.md`: the user reviews everything, everything is viewable, no commit before approval, no push unless asked, and no paid calls unless the user runs them.
+
+## Phase 3 badges: language identities replace avatars (2026-10-09)
+
+**The 16 SVG avatars are retired** (`shorts/motion_avatars.yaml` and `web/src/motion/avatars/` are deleted; both are in git history at `257df1c`). No reel draws a person.
+
+**The identity registry: `shorts/motion_identities.yaml`**, loaded and validated by `shorts/motion_identities.py`.
+- Each of the 15 course languages has a display name, a signature colour, an original geometric symbol (1–8 rects, circles or stroked paths on a 100 × 100 grid), a code file name (the code tab shows `App.jsx`, `styles.css`, `kernel.c` …) and a voice (`character_1` or `character_2`).
+- The **host** is a neutral grey identity (#6C6F7A, a mic symbol) and is the asking role in every two-speaker reel.
+- **Colours are never drawn raw.** Each derives two tones by moving only its lightness: `on_dark` reaches ≥ 3:1 on navy and blue, `on_light` reaches ≥ 3:1 on paper and yellow.
+- **Reserved colours stay free.** The colour and both tones stay ≥ 60 RGB units from coral, mint and lavender. A failing entry is refused with the reason.
+- `python -m shorts.motion_identities export` writes the player's copy, `web/src/motion/identity/identities.generated.json`. A test checks it is current.
+- **Voices:** the 4-slot plan belongs to identities: narrator, host, `motion_char_1`, `motion_char_2`. The mapping is in `docs/reference/phase3/voices.md`. The fallback clips stay until real clips are supplied.
+
+**In every motion reel** (`web/src/motion/scene/MotionStage.tsx`, `web/src/motion/identity/Identity.tsx`):
+- a language badge (symbol + name) in the top-right corner for the whole reel;
+- a hook that opens with `identity_title`: the symbol large and a chip such as "REACT · INTERVIEW". `scene_valid` requires it on the hook and only there;
+- progress segments (and the walkthrough step chip) in the language tone;
+- tags as chips on the end card;
+- an optional 1 s intro sting, **off by default** (`MOTION_INTRO_STING=1` adds it to plans written from then on; the shots are offset by `MOTION_INTRO_SECONDS`).
+
+**Two-speaker reels: a chat, not captions.**
+- Circular badges with role labels: the host is grey with its role's initial, on the left; the language speaker shows the symbol in the language colour, on the right.
+- Bubbles hold the spoken line with karaoke highlighting. The newest bubble is at the bottom, and older ones dim.
+- Only the active speaker's badge glows and shows a waveform. The listener's badge is still (a test checks this).
+- The chat has its own region (`library.json` `frame.chat`, y 880–1560). Scene objects lay out above it (`frame.duo`, y 240–840), so a bubble never covers an object.
+- On a full-frame shot (title, code map, recap, end card) there is no chat. A small badge and label name the speaker above the normal caption.
+
+**Single-narrator reels** keep the normal karaoke captions, plus the badge, the hook mark and the coloured progress.
+
+**Runner:** `--section <id>` pins topic selection to one section (used by the OS and CSS demos); an unknown id prints "no such section".
+
+**Evals:** E218–E222 cover an OS mentor & student golden, a CSS interview golden, default scenes for both, and a hook without the language mark being rejected.
+
+**Where to look:**
+- `#motion/identities`: the registry, the sting strip, and each identity's symbol, tones with contrast ratios, badge on all four fields and hook chip.
+- `#motion/demo/<name>` for `interview`, `peer_discussion`, `mentor_os`, `interview_css` (two speakers) and `classic`, `classic_os`, `walkthrough` (one narrator).
+- `docs/reference/phase3-badges/`: hook, dialogue, narrator and end-card frames in React, OS, CSS and CS, plus the registry page and the player.
+
+## Optional animated characters: Arjun and Riya (2026-10-09)
+
+**Imported** from the characters lab (`Web-Slides`, branch `lab/characters`, `slide-kit/characters-lab`, commit `d7d512d`, by jeevansravanth) into `web/src/motion/characters/`: `skins/`, `rig/` (with `Actor.tsx`) and `actions/`. The playground, `shoot.mjs` and `record.mjs` were left out. `SOURCE.md` there records the source, the three small local changes and how to update.
+
+**Pure in t.**
+- The lab's `<Actor time>` starts each gesture whenever its React effect runs, so the reel does not use it.
+- `characters/performance.ts` lays every clip on the reel clock up front and feeds the lab's own `composeAt` and life layer. The same t gives the same pose.
+- A cold seek to the end of a 72 s reel costs about 110 ms per character. Playback costs about 0.1 ms per frame.
+
+**Lip-sync.**
+- `characters/lipsync.ts` places the lab's mouth shapes inside each word's own start and end, using the forced-alignment timings of the Chatterbox audio (even timings in stub mode).
+- The lips close in pauses, and a listener's mouth stays shut.
+
+**The switch, off by default.**
+- Turn it on with `MOTION_CHARACTERS=1` or `motion_reel --characters`.
+- It applies only to interview, peer_discussion and mentor_student.
+- Arjun plays the asking speaker on the left, Riya the answering speaker on the right.
+
+**Gestures.**
+- `shorts/motion_characters.py` is a deterministic, rule-based director with no LLM call, so it costs $0. It cues gestures and expressions on spoken words, like scene actions: "why" → shrug, counting words → count gestures, highlighted words → explaining gestures, the last line → thumbs up.
+- The listener nods at the end of statements.
+- One-handed gestures are mirrored so they face the other speaker.
+- The vocabulary is in `library.json` under `characters`. A TS test checks every name exists in the rig.
+
+**Never over objects or captions.**
+- The characters have their own region (`frame.characters`, y 852–1250), below the scene objects (which end at 840).
+- With characters on, the chat moves down to y 1262–1560 and is clipped to that region.
+- On full-frame shots (title, code map, recap, end card) the characters are hidden.
+- Badges, bubbles and the language identity are unchanged.
+
+**Where to look:** `#motion/characters` (every expression and gesture on both characters, plus a lip-sync sample), `#motion/demo/interview_characters` (the playable demo), and `docs/reference/phase3-characters/`.
+
+## Characters v2: one per language, a designer, one per speaker (2026-10-09)
+
+**Per-language characters.**
+- `shorts/motion_character_presets.yaml` (ours, outside the copied rig) defines:
+  - the shared **host**: Arjun, with the tie in the host's grey;
+  - a **default for every language** in `motion_identities.yaml`, each a different person whose top is the language's signature colour;
+  - the lab's original Arjun and Riya, as extras.
+- `shorts/motion_character_presets.py` validates every preset against the rig's option lists, and requires a default for every language.
+- `python -m shorts.motion_character_presets export` writes `web/src/motion/cast/presets.generated.json`. A test checks it is current.
+- Our TS code moved from `web/src/motion/characters/` to `web/src/motion/cast/`, so the copied folder holds only the copy.
+
+**Designer** (`#motion/characters/designer?preset=<id>`).
+- Pick a preset, then edit skin tone, hair, face, top and bottom (style and colour, with the language's signature and field tones as swatches), shoes, tie or hair band, glasses, beard, other accessories and build.
+- It previews live: a looping wave, a lip-synced line, a point up and a thumbs up, on any of the four fields, plus the character in the reel's band with the badge.
+- **Save** sends `PUT /api/motion-characters/presets/<id>` and writes `shorts/motion_character_presets.saved.yaml`. **Reset to default** sends `DELETE` and removes that entry. Bad values are rejected with 422.
+- Without the API server the page shows the defaults and cannot save.
+- A plan embeds the config it was made with (`MotionCharacterTrack.config`), so a save changes the reels made after it and never one already made.
+
+**Per-reel override.** `motion_reel --character <preset>` picks who plays the language for that reel only (for example `--character riya`). It implies `--characters`, and an unknown id exits with the list of presets.
+
+**As many characters as speakers.**
+- Every two-speaker theme (interview, interview_rapid_fire, peer_discussion, mentor_student) gets two: the host asking on the left, the language's character answering on the right.
+- Every one-narrator reel gets one: the language's character, centred, with its gestures cued on the narrator's words.
+- `MotionShotPlan.characters` says per shot whether they show:
+  - never on a full-frame card;
+  - on a one-narrator shot, only when its objects fit the upper region (y 240–840, the same region two-speaker reels use). They are then laid out there, and the characters stand below them and above the captions.
+
+**Demos.** `interview_characters` (React), `interview_java_characters` (Java, from the new `content/java_string_equality.md` and golden `java_interview_golden.json`; evals E223–E224) and `classic_os_characters` (one narrator).
+
+**Screenshots.** `docs/reference/phase3-characters-v2/`.
+
+## Approval fixes (2026-10-09)
+
+**Contrast.**
+- Small text must reach **4.5:1** against what is behind it. That covers role labels, speaker tags, chat bubble words (spoken, upcoming and older), corner badge names and end-card tag chips.
+- Large symbols and big titles stay at **3:1**: the identity symbol, waveforms, the hook chip and the host badge's initial.
+- Each identity gains `text_on_dark` / `text_on_light` tones at 4.5:1 (`shorts/motion_identities.py`).
+  - They are exempt from the reserved-colour rule, which covers fills and marks. To read on navy a tone must be pale, and every pale tint sits near lavender.
+- Upcoming and older bubble words are now dimmed by colour, never by transparency (`identity/contrast.ts` `readableDim`), so they keep 4.5:1. Older bubbles recede by their badge and border.
+- The language speaker's bubble on the blue field uses a navy veil, so yellow highlights reach 4.5:1 there.
+- `identity/contrast.ts` holds the colour functions the player draws with. The table on `#motion/identities` and `motion.test.tsx` check those same functions: 222 checks.
+
+**Backdrop.** Each character stands on a soft round backdrop: a navy tint on the light fields, a light one on the dark fields. It fades out inside the characters' region, so it is never cut.
+
+**Characters = speakers.** Every two-speaker theme gets two characters, `interview_rapid_fire` included. A one-narrator reel gets one.
+
+**Saved presets are tracked.** `shorts/motion_character_presets.saved.yaml` is committed (empty until the designer saves), and a test fails if it goes missing or a `.gitignore` rule hides it.
 
 ## Phases still to come
 

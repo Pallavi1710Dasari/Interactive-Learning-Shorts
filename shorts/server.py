@@ -46,7 +46,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import anthropic
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi import Body, FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -1852,6 +1852,41 @@ def motion_audio(short_id: str):
     if not path.exists():
         raise HTTPException(404, "no audio for this motion reel")
     return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/motion-characters/presets")
+def motion_character_presets_list():
+    """The character presets (shorts/motion_character_presets.yaml): every
+    default, what the designer has saved over them, and the effective config
+    of each — the designer's data (#motion/characters/designer)."""
+    from . import motion_character_presets as mcp
+    defaults, saved = mcp.defaults(), mcp.saved()
+    return {"defaults": defaults, "saved": saved,
+            "effective": {k: saved.get(k) or v for k, v in defaults.items()},
+            "options": {k: list(v) for k, v in mcp.OPTIONS.items()}}
+
+
+@app.put("/api/motion-characters/presets/{preset_id}")
+def motion_character_preset_save(preset_id: str, config_body: dict = Body(...)):
+    """Save a preset over its default (validated against the rig's options).
+    Reels made from now on use it; reels already made keep theirs."""
+    from . import motion_character_presets as mcp
+    if preset_id not in mcp.ids():
+        raise HTTPException(404, f"no character preset {preset_id!r}")
+    try:
+        cfg = mcp.save(preset_id, config_body)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return {"id": preset_id, "config": cfg, "saved": True}
+
+
+@app.delete("/api/motion-characters/presets/{preset_id}")
+def motion_character_preset_reset(preset_id: str):
+    """Reset a preset to its default (drop the designer's saved entry)."""
+    from . import motion_character_presets as mcp
+    if preset_id not in mcp.ids():
+        raise HTTPException(404, f"no character preset {preset_id!r}")
+    return {"id": preset_id, "config": mcp.reset(preset_id), "saved": False}
 
 
 @app.get("/api/story/{short_id}/frame/{filename}")

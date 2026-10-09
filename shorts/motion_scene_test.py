@@ -1,5 +1,5 @@
 """
-RESTYLE_TO_MOTION_REELS.md phase 3: scenes, timing, avatars and voices.
+RESTYLE_TO_MOTION_REELS.md phase 3: scenes, timing, language identities and voices.
 
 Covers the scene library contract (web/src/motion/library.json against the
 player's renderers), the default beat -> scene mapping on every golden
@@ -43,7 +43,8 @@ FIXTURES = ROOT / "evals" / "fixtures" / "motion"
 REACT_DOC = ROOT / "content" / "react_usestate_basics.md"
 TOKEN_DOC = ROOT / "content" / "tokenization_basics.md"
 ALL = ["usestate_golden", "usestate_interview_golden", "usestate_peer_discussion_golden",
-       "usestate_bug_hunt_golden", "tlb_golden", "tokenization_golden", "hash_table_golden"]
+       "usestate_bug_hunt_golden", "tlb_golden", "tokenization_golden", "hash_table_golden",
+       "tlb_mentor_student_golden", "css_interview_golden", "java_interview_golden"]
 
 
 def _script(name: str) -> MotionScript:
@@ -98,24 +99,22 @@ def test_every_library_kind_has_a_renderer():
             assert spec.get("height"), f"{kind} has no height to lay it out with"
 
 
-def test_avatar_json_matches_the_yaml():
-    assert mt.AVATARS_JSON.read_text(encoding="utf-8") == mt.avatars_json(), \
-        "web/src/motion/avatars/avatars.generated.json is stale — run " \
-        "`python -m shorts.motion_themes export-avatars`"
-    reg = mt.avatars()
-    vocab = lib.library()["avatar"]
-    for a in [reg.host, *reg.characters.values()]:
-        assert a.art.body in vocab["bodies"] and a.art.hair in vocab["hair"], a.id
-        assert a.palette.primary.upper() not in mt.FIELD_COLOURS, f"{a.id} wears a field colour"
+def test_identity_json_matches_the_yaml():
+    from shorts import motion_identities as mi
+    assert mi.EXPORT.read_text(encoding="utf-8") == mi.export_json(), \
+        "web/src/motion/identity/identities.generated.json is stale — run " \
+        "`python -m shorts.motion_identities export`"
+    assert not (ROOT / "shorts" / "motion_avatars.yaml").exists()
+    assert not (ROOT / "web" / "src" / "motion" / "avatars").exists()   # retired; in git history
 
 
-def test_avatar_palette_refuses_a_field_colour():
-    try:
-        mt.AvatarPalette(primary="#283EE6", secondary="#000000", accent="#FFFFFF", ink="#151936")
-    except ValueError as e:
-        assert "field colour" in str(e)
-    else:
-        raise AssertionError("a blue body on the blue field was accepted")
+def test_no_reel_draws_people():
+    """The player draws badges and symbols, never the retired avatars: nothing
+    under web/src/motion references them. (The animated characters are a
+    separate, opt-in layer — motion_characters_test.)"""
+    for path in (ROOT / "web" / "src" / "motion").rglob("*.tsx"):   # explainer mode keeps its own
+        text = path.read_text(encoding="utf-8")
+        assert "avatars/Avatar" not in text and "<Avatar " not in text, path
 
 
 # =========================================================== default scenes
@@ -150,13 +149,48 @@ def test_default_scenes_are_built_from_the_scripts_own_words():
                     assert item.lower() in corpus, (name, s.id, item)
 
 
-def test_two_speaker_scenes_fit_above_the_avatars():
-    script = _scened("usestate_interview_golden")
+def test_two_speaker_scenes_fit_above_the_chat():
+    """The chat (badges and bubbles) has its own region; the scene objects of
+    every two-speaker shot stay above it, so a bubble never covers them."""
     f = lib.library()["frame"]
-    for s in script.shots:
-        for o in ms.layout_scene(s.scene, duo=True):
-            if o.box and o.box.h:
-                assert o.box.y + o.box.h <= f["duo"]["bottom"] <= f["avatars"]["top"], (s.id, o)
+    assert f["duo"]["bottom"] <= f["chat"]["top"]
+    for name in ("usestate_interview_golden", "usestate_peer_discussion_golden",
+                 "tlb_mentor_student_golden", "css_interview_golden"):
+        script = _scened(name)
+        for s in script.shots:
+            for o in ms.layout_scene(s.scene, duo=True):
+                if o.box and o.box.h:
+                    assert o.box.y + o.box.h <= f["duo"]["bottom"], (name, s.id, o.kind)
+
+
+def test_every_hook_opens_with_the_language_mark():
+    for name in ALL:
+        script = _scened(name)
+        assert [o.kind for o in script.shots[0].scene.objects][0] == "identity_title", name
+        assert all(o.kind != "identity_title" for s in script.shots[1:] for o in s.scene.objects), name
+    base = _scened("usestate_golden")
+    hook = base.shots[0].scene
+    bare = hook.model_copy(update={"objects": [o for o in hook.objects if o.kind != "identity_title"],
+                                   "actions": [a for a in hook.actions if a.target != "o1"]})
+    r = checks.check_motion_scene_valid(_with_scene(base, 0, bare))
+    assert not r.passed and "shows no identity_title" in r.reason, r.reason
+    extra = base.shots[3].scene.model_copy(update={"objects": base.shots[3].scene.objects
+                                                   + [MotionSceneObject(id="o9", kind="identity_title")]})
+    r = checks.check_motion_scene_valid(_with_scene(base, 3, extra))
+    assert not r.passed and "belongs on the hook only" in r.reason, r.reason
+
+
+def test_the_plan_carries_the_identity_and_the_sting_offset():
+    script = _scened("css_interview_golden")
+    plan = mtl.build_plan(script, mtl.shot_timings(script), tags=["#css", "#interview"])
+    assert plan.identity.name == "CSS" and plan.identity.file == "styles.css"
+    assert plan.theme_label == "Interview" and plan.tags == ["#css", "#interview"] and plan.intro == 0
+    clocks = mtl.shot_timings(script, offset=1.0)
+    stung = mtl.build_plan(script, clocks, intro=1.0)
+    assert stung.intro == 1.0 and stung.shots[0].start == 1.0
+    assert abs(stung.duration - plan.duration - 1.0) < 1e-6
+    code = next(o for s in script.shots for o in s.scene.objects if o.kind == "code_window")
+    assert code.props["file"] == "styles.css"
 
 
 def test_walkthrough_changes_field_per_chapter():
@@ -338,7 +372,7 @@ def test_caption_speech_splits_exactly():
 def test_two_speakers_get_two_voice_slots():
     iv = _script("usestate_interview_golden")
     slots = mv.speaker_slots(iv)
-    assert slots["INTERVIEWER"] == "motion_host" and slots["CANDIDATE"] == "motion_react"
+    assert slots["INTERVIEWER"] == "motion_host" and slots["CANDIDATE"] == "motion_char_1"
     assert slots["INTERVIEWER"] != slots["CANDIDATE"]
     assert mv.speaker_slots(_script("usestate_bug_hunt_golden")) == {None: "motion_narrator"}
 
@@ -383,7 +417,7 @@ def test_voice_and_mix_in_stub():
         manifest = mv.voice_script(script, log=lambda *_: None)
         rows = [r for s in script.shots for r in manifest["shots"][s.id]]
         assert len(rows) == sum(len(s.captions) for s in script.shots)
-        assert {r["voice_slot"] for r in rows} == {"motion_host", "motion_react"}
+        assert {r["voice_slot"] for r in rows} == {"motion_host", "motion_char_1"}
         assert all((out / "v__motion" / "audio" / r["file"]).exists() for r in rows)
         clocks = mtl.shot_timings(script, {s.id: [r["seconds"] for r in manifest["shots"][s.id]]
                                            for s in script.shots})
@@ -459,7 +493,9 @@ def test_runner_builds_scenes_voice_timing_and_a_plan():
         plan = MotionPlan.model_validate_json(plan_file.read_text(encoding="utf-8"))
         assert [m.role for m in plan.cast] == ["INTERVIEWER", "CANDIDATE"]
         assert [m.side for m in plan.cast] == ["left", "right"]
-        assert plan.cast[0].avatar.id == "host" and plan.cast[1].avatar.id == "react"
+        assert plan.cast[0].identity.id == "host" and plan.cast[1].identity.id == "react"
+        assert [m.label for m in plan.cast] == ["Interviewer", "Candidate"]
+        assert plan.identity.id == "react" and plan.theme_label == "Interview" and plan.tags[1] == "#interview"
         assert all(s.layout == "duo" for s in plan.shots) and plan.timing_source == "even"
         assert (plan_file.parent / "audio" / "reel.wav").exists()
         for stage in ("Approve scenes?", "=== voice:", "=== timing:", "render: not built yet"):
@@ -475,6 +511,17 @@ def test_runner_builds_scenes_voice_timing_and_a_plan():
             and "timing: resumed" in text, text
         code, text = _run("--topic", short_id, "--yes", "--force-stage", "scenes")
         assert code == 0 and "Approve scenes?" in text and "=== voice:" in text, text
+
+
+def test_runner_section_flag_picks_the_topic_section():
+    with _temp_output() as out:
+        code, text = _run("--yes", "--theme", "mentor_student", "--section", "3.4",
+                          doc=ROOT / "content" / "session_18_paging.md")
+        assert code == 0, text
+        [setup] = list(out.glob("*/setup.json"))
+        assert json.loads(setup.read_text(encoding="utf-8"))["section_id"] == "3.4"
+        code, text = _run("--yes", "--section", "9.9")
+        assert code == 1 and "no such section" in text
 
 
 def test_runner_solo_reel_has_no_cast():
@@ -523,10 +570,13 @@ def test_server_serves_the_plan_and_audio():
 
 
 def test_demo_plans_are_valid_and_current():
-    for name in ("interview", "classic", "walkthrough"):
+    with_characters = {"interview_characters": 2, "interview_java_characters": 2, "classic_os_characters": 1}
+    for name in ("interview", "peer_discussion", "mentor_os", "interview_css", *with_characters,
+                 "classic", "classic_os", "walkthrough"):
         path = ROOT / "web" / "public" / "motion-demo" / f"{name}.json"
         plan = MotionPlan.model_validate_json(path.read_text(encoding="utf-8"))
         assert plan.audio is None and plan.shots
+        assert len(plan.characters) == with_characters.get(name, 0), name   # off by default
     iv = json.loads((ROOT / "web" / "public" / "motion-demo" / "interview.json").read_text(encoding="utf-8"))
     assert iv["cast"] and iv["theme"] == "interview"
 
@@ -597,7 +647,10 @@ def test_motion_reels_are_listed_with_their_bundle():
 def test_demo_bundles_match_the_index():
     demo = ROOT / "web" / "public" / "motion-demo"
     index = json.loads((demo / "index.json").read_text(encoding="utf-8"))["reels"]
-    assert [r["demo"] for r in index] == ["interview", "classic", "walkthrough"]
+    assert [r["demo"] for r in index] == ["interview", "peer_discussion", "mentor_os", "interview_css",
+                                          "interview_characters", "interview_java_characters",
+                                          "classic_os_characters", "classic", "classic_os", "walkthrough"]
+    assert {r["language"] for r in index} >= {"react", "os", "css", "cs"}
     for r in index:
         b = json.loads((demo / f"{r['demo']}.bundle.json").read_text(encoding="utf-8"))
         assert b["stub"] and b["script"]["shots"] and b["plan_url"] == f"/motion-demo/{r['demo']}.json"

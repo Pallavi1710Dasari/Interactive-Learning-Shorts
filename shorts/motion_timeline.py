@@ -98,15 +98,17 @@ class ShotClock:
 
 def shot_timings(script: MotionScript, caption_seconds: dict[str, list[float]] | None = None,
                  word_times: dict[str, list[list[tuple[float, float]] | None]] | None = None,
-                 sources: dict[str, list[str]] | None = None) -> list[ShotClock]:
+                 sources: dict[str, list[str]] | None = None,
+                 offset: float = 0.0) -> list[ShotClock]:
     """Every shot and caption on one clock.
 
     caption_seconds: shot id -> each caption's real audio length (the voice
     stage). Missing: estimated. word_times: shot id -> per caption, each
     word's (start, end) relative to that caption's audio, or None for an
-    even split. sources: shot id -> per caption, the timing source."""
+    even split. sources: shot id -> per caption, the timing source. offset:
+    seconds before the first shot (the optional intro sting)."""
     clocks: list[ShotClock] = []
-    t = 0.0
+    t = float(offset)
     for shot in script.shots:
         secs = (caption_seconds or {}).get(shot.id) or estimated_caption_seconds(shot)
         times = (word_times or {}).get(shot.id) or [None] * len(shot.captions)
@@ -148,16 +150,44 @@ _SOURCE_RANK = {"forced_alignment": 2, "whisper": 1, "even": 0}
 
 
 def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None = None,
-               cast: list[MotionCastMember] | None = None) -> MotionPlan:
+               cast: list[MotionCastMember] | None = None, tags: list[str] | None = None,
+               intro: float = 0.0, characters: bool = False,
+               character: str | None = None) -> MotionPlan:
     """The player's input: every shot's scene laid out, every cue resolved to
-    seconds, every caption and word on the reel's clock."""
-    from .motion_scenes import layout_scene, resolve_actions
+    seconds, every caption and word on the reel's clock.
+
+    `characters` adds the animated-character layer (motion_characters;
+    config.MOTION_CHARACTERS): one character per speaker — two on a
+    two-speaker reel, one narrator on a one-narrator reel.
+    `character` names the preset that plays the reel's language (default:
+    the language's own). The characters show on every shot that is not a
+    full-frame card; on a one-narrator reel, only where the shot's objects fit
+    the upper region (the same one a two-speaker reel uses), which is then
+    where they are laid out."""
+    from . import motion_library as lib
+    from .motion_scenes import layout_scene, resolve_actions, stack_height
+    from . import motion_characters
+    duo = bool(script.speakers)
+    if not characters:
+        cast_mode = None
+    elif duo:
+        cast_mode = "duo" if cast and len(cast) == len(script.speakers) == 2 else None
+    else:
+        cast_mode = "narrator"
+    upper = lib.library()["frame"]["duo"]
+    full_kinds = {k for k, spec in lib.object_kinds().items() if spec["layout"] == "full"}
     shots: list[MotionShotPlan] = []
     weakest = "forced_alignment"
     for shot, clock in zip(script.shots, clocks):
         if shot.scene is None:
             raise ValueError(f"{shot.id} has no scene — run the scenes stage first")
-        duo = bool(script.speakers)
+        full = any(o.kind in full_kinds for o in shot.scene.objects)
+        if cast_mode == "duo":
+            shown = not full
+        elif cast_mode == "narrator":
+            shown = not full and stack_height(shot.scene) <= upper["bottom"] - upper["top"]
+        else:
+            shown = False
         actions = [MotionActionTiming(t=t, do=a.do, target=a.target, value=a.value,
                                       tone=a.tone, cue=a.at)
                    for a, t in resolve_actions(shot, clock)]
@@ -167,11 +197,22 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
         shots.append(MotionShotPlan(
             id=shot.id, beat=shot.beat, chapter=shot.chapter, start=clock.start, end=clock.end,
             field=shot.scene.field, transition=shot.scene.transition, label=shot.scene.label,
-            layout="duo" if duo else "solo",
-            objects=layout_scene(shot.scene, duo=duo),
+            layout="duo" if duo else "solo", characters=shown,
+            objects=layout_scene(shot.scene, duo=duo or shown),
             actions=actions, captions=clock.captions))
+    from .motion_identities import identity, languages
+    from .motion_themes import theme_for_script
+    from .schema import MotionIdentitySpec
+    ident = (MotionIdentitySpec(**identity(script.language).spec())
+             if script.language in languages() else None)
+    captions = [c for s in shots for c in s.captions]
+    tracks = (motion_characters.direct(cast or [], captions, script.language, character) if cast_mode == "duo"
+              else motion_characters.direct_narrator(captions, script.language, character)
+              if cast_mode == "narrator" else [])
     return MotionPlan(short_id=script.short_id, template=script.template, theme=script.theme,
                       series=script.series, concept_name=script.concept_name,
                       duration=total_seconds(clocks), audio=audio,
                       timing_source=weakest if shots else "even",
-                      cast=cast or [], shots=shots)
+                      identity=ident, theme_label=theme_for_script(script).display,
+                      tags=list(tags or []), intro=float(intro),
+                      cast=cast or [], characters=tracks, shots=shots)

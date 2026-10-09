@@ -3034,7 +3034,7 @@ class CaptionChunk(BaseModel):
     #: Two-speaker themes only (phase 2b): who says this sentence, as the
     #: theme's role label ("INTERVIEWER", "CANDIDATE"). None on every
     #: one-narrator reel, so phase 1 files load unchanged. Phase 3 voices each
-    #: caption with its speaker's avatar voice.
+    #: caption with its speaker's voice slot.
     speaker: Optional[str] = None
 
 
@@ -3207,7 +3207,7 @@ class MotionScript(BaseModel):
     #: its template's base theme (classic_explainer / step_by_step_walkthrough).
     theme: Optional[str] = None
     language: Optional[str] = None
-    #: Two-speaker themes only: each role and the avatar that plays it. Set in
+    #: Two-speaker themes only: each role, its identity badge and voice. Set in
     #: Python from the theme and the language, never by the LLM.
     speakers: list["MotionSpeaker"] = Field(default_factory=list)
 
@@ -3233,12 +3233,13 @@ class MotionScript(BaseModel):
 # Literal: adding a theme is a registry entry, never a schema change.
 
 class MotionSpeaker(BaseModel):
-    """One speaking role of a two-speaker reel and the avatar that plays it
-    (shorts/motion_avatars.yaml). Phase 3 draws the avatar and voices its
-    lines from voices/motion/<voice_slot>.wav."""
+    """One speaking role of a two-speaker reel: its identity badge (the grey
+    host, or the reel's language — shorts/motion_identities.yaml), its
+    display label, and the voice slot its lines are spoken in
+    (voices/motion/<voice_slot>.wav)."""
     role: str                    #: "INTERVIEWER", as on the captions
-    avatar: str                  #: "host" or the language ("python")
-    name: str                    #: the character's name
+    identity: str                #: "host" or the language ("python")
+    label: str                   #: "Interviewer", under the badge
     voice_slot: str              #: the Chatterbox reference clip's name
 
 
@@ -3374,28 +3375,64 @@ class MotionShotPlan(BaseModel):
     transition: str
     label: str = ""
     layout: Literal["solo", "duo"] = "solo"
+    #: The animated characters show on this shot (plan.characters non-empty,
+    #: not a full-frame card, and the objects laid out above their region).
+    characters: bool = False
     objects: list[MotionPlacedObject]
     actions: list[MotionActionTiming]
     captions: list[MotionCaptionTiming]
 
 
-class MotionAvatarSpec(BaseModel):
-    """What the player needs to draw one avatar (shorts/motion_avatars.yaml)."""
+class MotionIdentitySpec(BaseModel):
+    """What the player needs to draw one identity (shorts/motion_identities.py):
+    its name, signature colour and the tones of it that read on dark and on
+    light fields, its symbol's shapes and its code file name."""
     id: str
     name: str
-    body: str
-    head: str
-    hair: str
-    skin: str
-    accessories: list[str] = Field(default_factory=list)
-    palette: dict
+    colour: str
+    on_dark: str
+    on_light: str
+    #: the same at 4.5:1, for small text in the identity's colour (role labels);
+    #: empty in plans written before it existed (the player falls back to on_*)
+    text_on_dark: str = ""
+    text_on_light: str = ""
+    file: str = ""
+    symbol: list[dict] = Field(default_factory=list)
 
 
 class MotionCastMember(BaseModel):
+    """One speaker of a two-speaker reel as the player draws it: a badge on
+    its side of the screen, its label, and its identity."""
     role: str
     side: Literal["left", "right"]
+    label: str
     voice_slot: str
-    avatar: MotionAvatarSpec
+    identity: MotionIdentitySpec
+
+
+class MotionCharacterCue(BaseModel):
+    """One gesture or expression of an animated character, landing on a
+    spoken word like a scene action (shorts/motion_characters.py)."""
+    t: float                                     #: seconds on the reel's clock
+    kind: Literal["gesture", "expression"]
+    name: str                                    #: a name in the rig's ACTIONS / EXPRESSIONS
+    side: Optional[Literal["L", "R"]] = None     #: R mirrors a one-handed gesture
+    cue: str = ""                                #: the spoken word it is cued on
+
+
+class MotionCharacterTrack(BaseModel):
+    """One speaker drawn as an animated character: the host or the language
+    character of a two-speaker reel (left / right), or the narrator of a
+    one-narrator reel (center). The mouth is not here: the player drives it
+    from this role's caption words (role None = the narrator's captions)."""
+    role: Optional[str] = None
+    preset: str                                  #: shorts/motion_character_presets.yaml id
+    #: The rig's CharacterConfig as it was when the plan was written, so a
+    #: later preset edit never changes this reel.
+    config: dict
+    side: Literal["left", "right", "center"]
+    seed: int = 1
+    cues: list[MotionCharacterCue] = Field(default_factory=list)
 
 
 class MotionPlan(BaseModel):
@@ -3409,5 +3446,15 @@ class MotionPlan(BaseModel):
     duration: float
     audio: Optional[str] = None      #: the mixed narration, relative to the plan
     timing_source: str = "even"      #: the weakest source any caption used
+    #: The reel's language identity: the corner badge, the hook mark and chip,
+    #: the progress colour. None for a plan with no language.
+    identity: Optional[MotionIdentitySpec] = None
+    theme_label: str = ""            #: "Interview" — the hook chip's second half
+    tags: list[str] = Field(default_factory=list)   #: shown on the end card
+    #: Seconds of the optional language intro sting before the first shot
+    #: (config.MOTION_INTRO_STING); 0 = no sting. Every shot starts after it.
+    intro: float = 0.0
     cast: list[MotionCastMember] = Field(default_factory=list)
+    #: The optional animated characters (config.MOTION_CHARACTERS); empty = off.
+    characters: list[MotionCharacterTrack] = Field(default_factory=list)
     shots: list[MotionShotPlan]

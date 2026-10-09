@@ -1,0 +1,240 @@
+{
+ "_comment": "Phase 3 characters v2 golden: a Java string equality INTERVIEW, language java, from content/java_string_equality.md section 2.1. Every fact is in that section: == compares references, equals compares the characters, two strings built at run time are two objects. Also the stub answer for the interview theme on the Java lesson.",
+ "reel_style": "motion",
+ "template": "fix_story",
+ "theme": "interview",
+ "language": "java",
+ "short_id": "java_string_equality_interview__motion",
+ "source_section_id": "2.1",
+ "topic": "Why does == report false for two strings with the same letters?",
+ "hook_question": "Why does my string check say false for same letters?",
+ "concept_name": "equals",
+ "promise": "Why == lies about strings",
+ "icon_vocabulary": [
+  {
+   "name": "link",
+   "label": "Reference"
+  },
+  {
+   "name": "layers",
+   "label": "Objects"
+  },
+  {
+   "name": "check",
+   "label": "Equal"
+  }
+ ],
+ "takeaways": [
+  {
+   "icon": "link",
+   "line": "== compares references",
+   "sub": "the addresses"
+  },
+  {
+   "icon": "layers",
+   "line": "New strings, new objects",
+   "sub": "built at run time"
+  },
+  {
+   "icon": "check",
+   "line": "equals compares text",
+   "sub": "every character"
+  }
+ ],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "speech": "Why does my string check say false for same letters?",
+   "captions": [
+    {
+     "text": "Why does my string check say <b>false</b> for same letters?",
+     "speaker": "INTERVIEWER"
+    }
+   ],
+   "visual": "Interview: two strings both reading hello; the check prints false; status pill 'False'.",
+   "code": []
+  },
+  {
+   "id": "s02",
+   "beat": "title",
+   "speech": "Because double equals compares references, not the text.",
+   "captions": [
+    {
+     "text": "Because double equals compares <b>references</b>, not the text.",
+     "speaker": "CANDIDATE"
+    }
+   ],
+   "visual": "Title card: series label, 'equals', the promise line, three icon tiles.",
+   "code": []
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "speech": "Here are two strings with the same letters. Both say hello. So why does the check print false?",
+   "captions": [
+    {
+     "text": "Here are two strings with the same letters.",
+     "speaker": "INTERVIEWER"
+    },
+    {
+     "text": "Both say hello.",
+     "speaker": "INTERVIEWER"
+    },
+    {
+     "text": "So why does the check print false?",
+     "speaker": "INTERVIEWER"
+    }
+   ],
+   "visual": "Code window Main.java, the two new String lines highlighted in turn.",
+   "code": [
+    "a = new String(\"hello\");",
+    "b = new String(\"hello\");"
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "break_1",
+   "speech": "A string variable holds a reference, an address in memory. These are two separate objects at two addresses.",
+   "captions": [
+    {
+     "text": "A string variable holds a reference, an address in memory.",
+     "speaker": "CANDIDATE"
+    },
+    {
+     "text": "These are two separate <b>objects</b> at two addresses.",
+     "speaker": "CANDIDATE"
+    }
+   ],
+   "visual": "Two boxes in memory, each with its own address; two arrows from a and b.",
+   "code": []
+  },
+  {
+   "id": "s05",
+   "beat": "fix_idea",
+   "speech": "So how do I compare the text? Use the equals method. It compares the characters, not the addresses.",
+   "captions": [
+    {
+     "text": "So how do I compare the text?",
+     "speaker": "INTERVIEWER"
+    },
+    {
+     "text": "Use the <b>equals</b> method.",
+     "speaker": "CANDIDATE"
+    },
+    {
+     "text": "It compares the characters, not the addresses.",
+     "speaker": "CANDIDATE"
+    }
+   ],
+   "visual": "The concept in display caps; the comparison chip flips to the equals method.",
+   "code": []
+  },
+  {
+   "id": "s06",
+   "beat": "fix_flow",
+   "speech": "It walks both strings character by character. Every character matches, so it returns true.",
+   "captions": [
+    {
+     "text": "It walks both strings character by character.",
+     "speaker": "CANDIDATE"
+    },
+    {
+     "text": "Every character matches, so it returns <b>true</b>.",
+     "speaker": "CANDIDATE"
+    }
+   ],
+   "visual": "Two rows of letters compared pair by pair; each pair lights; result pill 'True'.",
+   "code": []
+  },
+  {
+   "id": "s07",
+   "beat": "code_map",
+   "speech": "Show me both checks. The first compares the references. The second compares the characters.",
+   "captions": [
+    {
+     "text": "Show me both checks.",
+     "speaker": "INTERVIEWER"
+    },
+    {
+     "text": "The first compares the <b>references</b>.",
+     "speaker": "CANDIDATE"
+    },
+    {
+     "text": "The second compares the <b>characters</b>.",
+     "speaker": "CANDIDATE"
+    }
+   ],
+   "visual": "Code map card: the two checks, each lit as it is named.",
+   "code": [
+    "a == b       // false",
+    "a.equals(b)  // true"
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "payoff",
+   "speech": "Now your string check says true for the same letters.",
+   "captions": [
+    {
+     "text": "Now your string check says <b>true</b> for the same letters.",
+     "speaker": "CANDIDATE"
+    }
+   ],
+   "visual": "The hook's two hello strings again: the comparison prints true; status pill 'True'.",
+   "code": []
+  },
+  {
+   "id": "s09",
+   "beat": "recap",
+   "speech": "Remember: double equals compares references. New strings are new objects. The equals method compares the text.",
+   "captions": [
+    {
+     "text": "Remember: double equals compares references.",
+     "speaker": "INTERVIEWER"
+    },
+    {
+     "text": "New strings are new objects.",
+     "speaker": "INTERVIEWER"
+    },
+    {
+     "text": "The equals method compares the text.",
+     "speaker": "INTERVIEWER"
+    }
+   ],
+   "visual": "Takeaway list: three rows with the link, layers and check icons.",
+   "code": []
+  },
+  {
+   "id": "s10",
+   "beat": "cta",
+   "speech": "Follow for more, one idea at a time.",
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time.",
+     "speaker": "INTERVIEWER"
+    }
+   ],
+   "visual": "End card: Up next, Follow button, tags.",
+   "code": []
+  }
+ ],
+ "series": "@learnthesimpleway",
+ "next_topic": "",
+ "tts_provider": null,
+ "voice_ref": null,
+ "speakers": [
+  {
+   "role": "INTERVIEWER",
+   "identity": "host",
+   "label": "Interviewer",
+   "voice_slot": "motion_host"
+  },
+  {
+   "role": "CANDIDATE",
+   "identity": "java",
+   "label": "Candidate",
+   "voice_slot": "motion_char_2"
+  }
+ ]
+}

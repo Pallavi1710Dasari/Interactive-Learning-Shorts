@@ -7412,6 +7412,12 @@ MOTION_MAX_SECONDS = 120.0
 #: one, ~195 words at MOTION_WORDS_PER_SECOND).
 MOTION_TEMPLATE_WORDS = {"fix_story": (110, 200), "walkthrough": (160, 300)}
 MOTION_TEMPLATE_SECONDS = {"fix_story": (40.0, 75.0), "walkthrough": (60.0, 120.0)}
+#: Phase 2b review (user decision 2026-10-09): a fix_story reel in any theme
+#: other than classic_explainer — interview, narrative, bug_hunt, ... — gets
+#: 40-120 s. 120 s is a cap, not a target: explain the concept fully, then stop.
+#: classic_explainer keeps fix_story's own 40-75 s.
+MOTION_THEMED_SECONDS = (40.0, 120.0)
+MOTION_THEMED_WORDS = (110, 312)             #: 120 s at MOTION_WORDS_PER_SECOND
 
 MOTION_SHOT_COUNT = (10, 11)                 #: fix_story: 11 beats, break_2 optional
 MOTION_OPTIONAL_BEATS = frozenset({"break_2"})
@@ -7820,11 +7826,16 @@ def check_motion_word_budget(script) -> GraderResult:
     seconds = script.estimated_seconds
     lo, hi = MOTION_TEMPLATE_WORDS[template]
     slo_s, shi_s = MOTION_TEMPLATE_SECONDS[template]
+    kind = f"a {template}"
+    theme = _motion_theme(script)
+    if not theme.base:
+        (lo, hi), (slo_s, shi_s) = MOTION_THEMED_WORDS, MOTION_THEMED_SECONDS
+        kind = f"a {theme.id} reel"
     if not lo <= total <= hi:
-        problems.append(f"{total} spoken words, a {template} needs {lo}-{hi} "
+        problems.append(f"{total} spoken words, {kind} needs {lo}-{hi} "
                         f"({'too long' if total > hi else 'too short'})")
     elif not slo_s <= seconds <= shi_s:
-        problems.append(f"~{seconds:.1f}s estimated, a {template} needs {slo_s:g}-{shi_s:g}s "
+        problems.append(f"~{seconds:.1f}s estimated, {kind} needs {slo_s:g}-{shi_s:g}s "
                         f"({'too long' if seconds > shi_s else 'too short'})")
     length_ok = not problems
     slo, shi = MOTION_SHOT_WORDS
@@ -8280,15 +8291,34 @@ def check_motion_theme_variety(theme_id: str, history: list[str]) -> GraderResul
                         f"{theme_id} after {history[-4:] or 'no earlier reels'}")
 
 
-def check_motion_tags(tags: list[str], section_text: str | None = None) -> GraderResult:
+def check_motion_tags(tags: list[str]) -> GraderResult:
     """The tag format (phase 2b): '#' plus lowercase letters and digits, one
     language tag first from the fixed list, one theme tag second from the
-    registry, then 1-3 concept tags taken from the section."""
+    registry, then 1-3 concept tags."""
     from .motion_themes import tag_problems
-    problems = tag_problems(tags, section_text)
+    problems = tag_problems(tags)
     if problems:
         return GraderResult("motion_tags", False, "; ".join(problems))
     return GraderResult("motion_tags", True, " ".join(tags))
+
+
+def check_motion_tag_concepts(tags: list[str], headings: list[str],
+                              section_text: str) -> GraderResult:
+    """Concept tags are searchable concepts (phase 2b review): each is a term
+    the material's headings or defined terms name — never a code identifier
+    from the example (#setcount, #likes), never a stray word (#different).
+    `headings` are the document title and the reel's section titles;
+    `section_text` the reel's own sections. The language and theme tags
+    (the first two) are motion_tags's job."""
+    from .motion_themes import concept_tag_problems, concept_vocabulary
+    concepts = [t for t in tags[2:]]
+    problems = concept_tag_problems(concepts, concept_vocabulary(headings, section_text),
+                                    section_text)
+    if problems:
+        return GraderResult("motion_tag_concepts", False, "; ".join(problems))
+    return GraderResult("motion_tag_concepts", True,
+                        f"{' '.join(concepts)}: named in the material's headings or "
+                        f"defined terms")
 
 
 def check_walkthrough_chapters(script) -> GraderResult:

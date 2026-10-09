@@ -45,7 +45,7 @@ THEMED = {"interview": "usestate_interview_golden.json",
           "peer_discussion": "usestate_peer_discussion_golden.json",
           "bug_hunt": "usestate_bug_hunt_golden.json"}
 EXPECTED_THEMES = [
-    "classic_explainer", "story", "interview", "interview_rapid_fire", "peer_discussion",
+    "classic_explainer", "narrative", "interview", "interview_rapid_fire", "peer_discussion",
     "mentor_student", "bug_hunt", "myth_vs_fact", "common_mistakes", "predict_the_output",
     "under_the_hood", "step_by_step_walkthrough", "real_world_scenario", "before_vs_after"]
 
@@ -150,13 +150,13 @@ def test_registry_refuses_a_broken_entry():
             return str(e)
         raise AssertionError(f"accepted {change}")
 
-    beats = copy.deepcopy(_registry_data()["themes"]["story"]["beats"])
+    beats = copy.deepcopy(_registry_data()["themes"]["narrative"]["beats"])
     del beats["payoff"]
-    assert "missing ['payoff']" in broken("story", beats=beats)
-    assert "is not one of" in broken("story", template="listicle")
-    assert "lowercase letters and digits" in broken("story", tag="Story Time")
-    assert "is not a teaching approach" in broken("story", works_with=["vibes"])
-    assert "hook style" in broken("story", hook={"style": "shout", "openers": ["hey"]})
+    assert "missing ['payoff']" in broken("narrative", beats=beats)
+    assert "is not one of" in broken("narrative", template="listicle")
+    assert "lowercase letters and digits" in broken("narrative", tag="Story Time")
+    assert "is not a teaching approach" in broken("narrative", works_with=["vibes"])
+    assert "hook style" in broken("narrative", hook={"style": "shout", "openers": ["hey"]})
     iv = copy.deepcopy(_registry_data()["themes"]["interview"]["beats"])
     iv["title"]["speakers"] = ["HOST"]
     assert "unknown speaker(s) ['HOST']" in broken("interview", beats=iv)
@@ -181,7 +181,7 @@ def test_a_new_theme_is_only_a_registry_entry():
         system, hook_fix = script_mod.motion_system_for("fix_story", reg.themes["quiz_show"])
         assert "FORMAT — THEME: quiz_show" in system and "Pop quiz..." in system
         assert "quiz_show format" in hook_fix
-        assert mt.tag_problems(["#react", "#quiz", "#usestate"]) == []
+        assert mt.tag_problems(["#react", "#quiz", "#state"]) == []
         data = _fixture("usestate_golden.json")
         data["theme"] = "quiz_show"
         r = checks.check_motion_hook_curiosity(MotionScript(**data))
@@ -242,14 +242,14 @@ def test_section_code_detection():
 
 def test_variety_rule():
     assert mt.variety_problems("interview", []) == []
-    assert "previous reel" in mt.variety_problems("interview", ["story", "interview"])[0]
+    assert "previous reel" in mt.variety_problems("interview", ["narrative", "interview"])[0]
     # Window of 5 with the new reel: two earlier interviews in the last four -> 3.
-    p = mt.variety_problems("interview", ["interview", "story", "interview", "bug_hunt"])
+    p = mt.variety_problems("interview", ["interview", "narrative", "interview", "bug_hunt"])
     assert p == ["variety: interview would be 3 of the last 5 reels, max 2"], p
-    assert mt.variety_problems("interview", ["interview", "story", "bug_hunt", "myth_vs_fact"]) == []
+    assert mt.variety_problems("interview", ["interview", "narrative", "bug_hunt", "myth_vs_fact"]) == []
     # The fifth reel back has left the window.
     assert mt.variety_problems("interview",
-                               ["interview", "interview", "story", "bug_hunt", "myth_vs_fact"]) == []
+                               ["interview", "interview", "narrative", "bug_hunt", "myth_vs_fact"]) == []
 
 
 def test_history_reads_tags_json_in_the_same_language():
@@ -259,13 +259,13 @@ def test_history_reads_tags_json_in_the_same_language():
             (out / short_id / "tags.json").write_text(MotionTags(
                 short_id=short_id, language=language, theme=theme, concepts=["x"],
                 tags=[f"#{language}", "#x", "#x"], created_at=when).model_dump_json())
-        put("b", "react", "story", "2026-10-02T00:00:00+00:00")
+        put("b", "react", "narrative", "2026-10-02T00:00:00+00:00")
         put("a", "react", "interview", "2026-10-01T00:00:00+00:00")
         put("c", "python", "bug_hunt", "2026-10-03T00:00:00+00:00")
         (out / "d").mkdir()
         (out / "d" / "tags.json").write_text("not json")
         hist = mt.reel_history(out, "react")
-        assert [h.theme for h in hist] == ["interview", "story"]
+        assert [h.theme for h in hist] == ["interview", "narrative"]
         assert [h.theme for h in mt.reel_history(out, "react", exclude_id="b")] == ["interview"]
 
 
@@ -286,11 +286,14 @@ def test_the_llm_judges_fit_among_eligible_themes_only():
     choice, calls = _choose([MotionThemeDraft(theme="interview", reason="crisp Q&A",
                                               concept_tags=["Plain variable", "re-render",
                                                             "useState"])],
-                            history=["bug_hunt"])
+                            history=["bug_hunt"], headings=_react_headings("7.2")[0])
     assert choice.theme == "interview" and choice.source == "llm"
     assert choice.fit_check.passed and choice.fit_check.attempts == 1
-    # useState is not in section 7.2, so it is dropped: tags come from the section.
-    assert choice.tags == ["#react", "#interview", "#plainvariable", "#rerender"], choice.tags
+    # Neither "plain variable", "re-render" nor useState is a heading term or
+    # defined term of 7.2, so all three are dropped and the section's own
+    # candidates stand in.
+    assert choice.tags == ["#react", "#interview", "#state", "#variable"], choice.tags
+    assert "CONCEPT TERMS (headings and defined terms): state, components, variable" in calls[0]
     assert "bug_hunt" not in choice.eligible            # variety, before the call
     assert "- bug_hunt [" not in calls[0] and "- interview [" in calls[0]
     assert "APPROVED TEACHING APPROACH: code" in calls[0]
@@ -299,9 +302,9 @@ def test_the_llm_judges_fit_among_eligible_themes_only():
 
 def test_a_rejected_pick_gets_one_retry_with_the_reason():
     choice, calls = _choose([MotionThemeDraft(theme="bug_hunt", reason="r"),
-                             MotionThemeDraft(theme="story", reason="a story")],
+                             MotionThemeDraft(theme="narrative", reason="a story")],
                             history=["bug_hunt"])
-    assert choice.theme == "story" and choice.fit_check.attempts == 2
+    assert choice.theme == "narrative" and choice.fit_check.attempts == 2
     [rej] = choice.fit_check.rejected
     assert rej.theme == "bug_hunt" and "previous reel" in rej.problems[0]
     assert "YOUR PREVIOUS PICK 'bug_hunt' WAS REJECTED" in calls[1]
@@ -350,33 +353,74 @@ def test_theme_flag_overrides_variety_but_not_requirements():
 
 # ====================================================================== tags
 
+def _react_headings(section_id: str):
+    sections = parse_markdown(REACT_DOC)
+    section = find_section(sections, section_id)
+    return mt.reel_headings(REACT_DOC.read_text(encoding="utf-8"), [section.title]), section
+
+
 def test_tag_format():
-    _, section = _react()
-    ok = checks.check_motion_tags(["#react", "#interview", "#plainvariable"], section.text)
+    ok = checks.check_motion_tags(["#react", "#interview", "#state", "#variable"])
     assert ok.passed, ok.reason
     for tags, needle in (
-        (["#React", "#interview", "#usestate"], "lowercase"),
-        (["#react", "#inter view", "#usestate"], "no spaces"),
-        (["#interview", "#react", "#usestate"], "language tag, first"),
-        (["#react", "#usestate"], "2 tags"),
-        (["#react", "#podcast", "#usestate"], "theme tag"),
-        (["#react", "#interview", "#closures"], "not taken from the section"),
+        (["#React", "#interview", "#state"], "lowercase"),
+        (["#react", "#inter view", "#state"], "no spaces"),
+        (["#interview", "#react", "#state"], "language tag, first"),
+        (["#react", "#state"], "2 tags"),
+        (["#react", "#podcast", "#state"], "theme tag"),
         (["#react", "#interview", "#a", "#b", "#c", "#d"], "6 tags"),
         (["#react", "#interview", "#python"], "exactly one language tag"),
+        (["#react", "#story", "#state"], "theme tag"),          # renamed to #narrative
     ):
-        r = checks.check_motion_tags(tags, section.text)
+        r = checks.check_motion_tags(tags)
         assert not r.passed and needle in r.reason, (tags, r.reason)
 
 
-def test_concept_tags_are_taken_from_the_section():
-    _, section = _react()
+def test_concept_tags_are_searchable_concepts():
+    """Phase 2b review: concept tags come from headings and defined terms;
+    a code identifier or a stray word is rejected."""
+    headings, section = _react_headings("7.2")
+    ok = checks.check_motion_tag_concepts(["#react", "#interview", "#state", "#variable"],
+                                          headings, section.text)
+    assert ok.passed, ok.reason
+    for tag, needle in (("#count", "code identifier"), ("#counter", "code identifier"),
+                        ("#screen", "stray word"), ("#different", "stray word"),
+                        ("#closures", "stray word")):
+        r = checks.check_motion_tag_concepts(["#react", "#interview", tag], headings,
+                                             section.text)
+        assert not r.passed and needle in r.reason, (tag, r.reason)
+    # An identifier a HEADING names is a concept: useState in 7.3's title.
+    headings, section = _react_headings("7.3")
+    r = checks.check_motion_tag_concepts(["#react", "#interview", "#usestate"], headings,
+                                         section.text)
+    assert r.passed, r.reason
+    r = checks.check_motion_tag_concepts(["#react", "#interview", "#setcount"], headings,
+                                         section.text)
+    assert not r.passed and "code identifier" in r.reason, r.reason
+    # Defined terms count: "called its vocabulary".
+    tok = parse_markdown(TOKEN_DOC)
+    s13 = find_section(tok, "1.3")
+    h = mt.reel_headings(TOKEN_DOC.read_text(encoding="utf-8"), [s13.title])
+    assert mt.concept_vocabulary(h, s13.text).get("vocabulary") == "defined term" or \
+        "vocabulary" in mt.concept_vocabulary(h, s13.text)
+
+
+def test_concept_tags_are_taken_from_headings_and_defined_terms():
+    headings, section = _react_headings("7.2")
     exclude = set(mt.language_tags()) | set(mt.registry().tags().values())
-    kept, dropped = mt.clean_concept_tags(["useState", "Re-render", "closures", "react", "#count"],
-                                          section.text + " useState", exclude)
-    assert kept == ["usestate", "rerender", "count"], kept
-    assert any("closures" in d for d in dropped) and any("react" in d for d in dropped)
-    cands = mt.candidate_concept_tags(section.title, section.text, exclude)
-    assert 1 <= len(cands) <= 3 and all(c in mt.section_terms(section.text) for c in cands)
+    kept, dropped = mt.clean_concept_tags(["State", "variable", "setCount", "react", "#count",
+                                           "state"], headings, section.text, exclude)
+    assert kept == ["state", "variable"], kept
+    assert any("'#count'" in d and "code identifier" in d for d in dropped), dropped
+    assert any("setCount" in d and "stray word" in d for d in dropped), dropped   # not in 7.2 at all
+    assert any("'react'" in d and "language or theme" in d for d in dropped), dropped
+    assert any("repeated" in d for d in dropped), dropped
+    assert mt.candidate_concept_tags(headings, section.text, exclude) == ["state", "variable"]
+    paging = PAGING_DOC.read_text(encoding="utf-8")
+    sec = find_section(parse_markdown(PAGING_DOC), "3.2")
+    cands = mt.candidate_concept_tags(mt.reel_headings(paging, [sec.title]), sec.text, exclude)
+    assert cands[:2] == ["addresstranslation", "pagetable"], cands
+    assert mt.doc_title("# Session 18: Paging and Virtual Memory\n") == "Paging and Virtual Memory"
 
 
 def test_language_detection():
@@ -384,7 +428,12 @@ def test_language_detection():
     assert mt.detect_language("", react)[0] == "react"
     assert mt.detect_language("```python\nx = 1\n```", "")[0] == "python"
     assert mt.detect_language("", "# Session 19: CSS Specificity\n\nrules")[0] == "css"
-    assert mt.detect_language("", PAGING_DOC.read_text(encoding="utf-8"))[0] == "cs"
+    assert mt.detect_language("", PAGING_DOC.read_text(encoding="utf-8"))[0] == "os"
+    assert mt.detect_language("", TOKEN_DOC.read_text(encoding="utf-8"))[0] == "cs"
+    assert mt.detect_language("", "# Django views\n\n```python\ndef v(r): pass\n```")[0] == "django"
+    assert mt.detect_language("", "# Routing in Express\n\n```js\napp.get(h)\n```")[0] == "node"
+    assert mt.detect_language("```dockerfile\nFROM python\n```", "")[0] == "docker"
+    assert mt.detect_language("", "# Lists\n\n```python\nx = [1]\n```")[0] == "python"
 
 
 # =================================================== prompts and script graders
@@ -403,10 +452,15 @@ def test_a_themed_prompt_swaps_only_format_and_beats():
     assert "[INTERVIEWER then CANDIDATE]" in system
     assert '"speaker": "INTERVIEWER"' in system and '"speaker": "INTERVIEWER"' in hook_fix
     for rule in ("LENGTH", "WORDS", "SPEECH AND CAPTIONS ARE SEPARATE FIELDS", "CODE",
-                 "VISUAL", "ICONS", "110 to 195 spoken words"):
+                 "VISUAL", "ICONS"):
         assert rule in system, rule
-    assert base[base.index("LENGTH"):] .split("Return JSON")[0] == \
-        system[system.index("LENGTH"):].split("Return JSON")[0]
+    # Themed reels get 40-120 s, the cap stated as a cap; every other rule is
+    # the base prompt's, word for word.
+    assert "110 to 312 spoken words in total (40 to 120 seconds spoken)" in system
+    assert "hard CAP, not a target" in system and "(40-120 seconds)" in system
+    assert "110 to 195" not in system
+    tail = lambda text: text[text.index("- Every shot:"):].split("Return JSON")[0]
+    assert tail(base) == tail(system)
 
 
 def test_themed_fixtures_pass_every_grader():
@@ -418,6 +472,31 @@ def test_themed_fixtures_pass_every_grader():
         assert checks.all_passed(results), (theme, [str(r) for r in results if not r.passed])
     two = MotionScript(**_fixture(THEMED["interview"]))
     assert all(c.speaker in ("INTERVIEWER", "CANDIDATE") for s in two.shots for c in s.captions)
+
+
+def test_themed_reels_get_forty_to_one_twenty_seconds():
+    """Phase 2b review: themed reels may run 40-120 s; classic_explainer keeps
+    fix_story's 40-75 s. Over 120 s still fails. (Shot-level word caps are a
+    separate rule — this checks only the whole-reel window, details.length_ok.)"""
+    def padded(theme: str, sentences: int) -> MotionScript:
+        data = _fixture(THEMED["bug_hunt"])
+        data["theme"] = theme
+        extra = "It keeps the same value safe through every single render."
+        for i in range(sentences):
+            shot = data["shots"][3 + i % 6]
+            shot["speech"] += " " + extra
+            shot["captions"].append({"text": extra})
+        return MotionScript(**data)
+
+    mid = padded("bug_hunt", 6)                         # ~58 s + 6 x 10 words
+    assert 75 < mid.estimated_seconds < 120, mid.estimated_seconds
+    assert checks.check_motion_word_budget(mid).details["length_ok"]
+    classic = padded("classic_explainer", 6)
+    r = checks.check_motion_word_budget(classic)
+    assert not r.details["length_ok"] and "a fix_story needs 110-200" in r.reason, r.reason
+    long = padded("bug_hunt", 18)                       # past 312 words
+    r = checks.check_motion_word_budget(long)
+    assert not r.details["length_ok"] and "a bug_hunt reel needs 110-312" in r.reason, r.reason
 
 
 def test_theme_speaker_grader():

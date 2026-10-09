@@ -367,10 +367,15 @@ _FENCE_LANGUAGES = {
     "py": "python", "python": "python", "python3": "python", "html": "html",
     "css": "css", "sql": "sql", "java": "java", "c": "c", "h": "c",
     "cpp": "cpp", "c++": "cpp", "cc": "cpp", "hpp": "cpp",
+    "dockerfile": "docker", "docker": "docker", "compose": "docker",
 }
 #: Words that name a language in prose — counted, highest wins.
 _NAME_PATTERNS = {
     "react": r"\bReact\b|\buse[A-Z]\w+\b|\bJSX\b",
+    "node": r"\bNode(?:\.js|JS)?\b|\bExpress(?:\.js)?\b|\bnpm\b|\brequire\(",
+    "django": r"\bDjango\b",
+    "docker": r"\bDocker(?:file)?\b|\bcontainers?\b|\bdocker-compose\b",
+    "os": r"\b[Oo]perating [Ss]ystems?\b|\bOS\b|\bkernel\b|\bpaging\b|\bpage table\b|\bprocess scheduling\b",
     "python": r"\bPython\b",
     "javascript": r"\bJavaScript\b",
     "typescript": r"\bTypeScript\b",
@@ -380,20 +385,31 @@ _NAME_PATTERNS = {
     "java": r"\bJava\b(?!Script)",
     "cpp": r"\bC\+\+",
 }
+#: A framework or tool written IN a base language wins over that language when
+#: the material names it: Django code is fenced ```python, Express code ```js.
+_FRAMEWORKS = {"python": ("django",), "javascript": ("node", "react"),
+               "typescript": ("node", "react")}
 
 
 def detect_language(section_text: str, doc_text: str = "") -> tuple[str, str]:
     """The course language a reel is in, and how it was decided: the selected
-    section's fenced code, then the document's, then a language named in the
-    document's title, then the one named most often (twice or more), else `cs`. Deterministic, never the LLM. Pass
+    section's fenced code, then the document's (a framework the material names
+    wins over its base language: ```python in a Django lesson is django), then
+    a language named in the document's title, then the one named most often
+    (twice or more), else `cs`. Deterministic, never the LLM. Pass
     --language to override it."""
     langs = set(language_tags())
+    everything = (section_text or "") + "\n" + (doc_text or "")
+    title = next(iter(re.findall(r"^#\s+(.+)$", doc_text or "", re.M)), "")
     for where, text in (("section", section_text), ("document", doc_text)):
         for label in re.findall(r"^```\s*([\w+#-]+)", text or "", re.M):
             lang = _FENCE_LANGUAGES.get(label.lower())
             if lang in langs:
+                for fw in _FRAMEWORKS.get(lang, ()):
+                    named = len(re.findall(_NAME_PATTERNS[fw], everything))
+                    if fw in langs and (named >= 2 or re.search(_NAME_PATTERNS[fw], title)):
+                        return fw, f"```{label} code in material about {fw}"
                 return lang, f"the {where}'s ```{label} code"
-    title = next(iter(re.findall(r"^#\s+(.+)$", doc_text or "", re.M)), "")
     for lang, p in _NAME_PATTERNS.items():
         if lang in langs and re.search(p, title):
             return lang, f"the document title {title.strip()!r}"
@@ -418,62 +434,189 @@ def section_has_code(text: str) -> bool:
 
 
 # ===================================================================== tags
+#
+# Concept tags are SEARCHABLE CONCEPTS — #usestate, #rerender, #tokenization,
+# #pagetable — never a code identifier the example happens to use (#setcount,
+# #likes) and never a stray word (#different, #screen). So they are taken
+# from where material NAMES its concepts: its headings (the document title
+# and the reel's own sections' titles) and its defined terms (**bold**, "...
+# called X", "known as X"). Phase 2b review, user decision 2026-10-09.
 
 _STOPWORDS = frozenset("""
 a an and are as at be because but by can do does each every for from has have how
 if in into is it its just like more not of on or so that the their them then there
 these this those to up was what when where which while who why will with without
-you your why does doesnt dont plain actually value values way thing things one two
-work works working update updates change changes changing make makes new old same
-different other another first second simply really very also than
+you your doesnt dont one two three four five six seven eight nine ten
 """.split())
+#: Words that name no concept on their own — verbs, adjectives and filler that
+#: headings use around a concept ("How a hash table FINDS a value WITHOUT
+#: SEARCHING"). General English, not tuned to any one topic.
+_GENERIC_WORDS = frozenset("""
+actually also another basic basics brand change changes changing cost costs create
+creates creating different does exist exists extra find finds first glance happen
+happens important inserting into material matter matters mean means middle need
+needs nothing other plain really reproduction read reads remember remembers same
+score scores screen searching second session simple simply special than thin
+tie ties trigger triggers update updates very want wants way work works your
+introduction overview part chapter lesson value values item items thing things
+again inside once twice back away out off over path cutting new old good bad
+""".split())
+#: A defined term: "..., called its vocabulary", "known as a page fault".
+_DEFINER = re.compile(r"\b(?:called|known as|named|termed)\s+(?:a |an |the |its |their )?"
+                      r"([A-Za-z][\w-]*(?:\s+[A-Za-z][\w-]*)?)")
 
 
 def _norm(word: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (word or "").lower())
 
 
-def section_terms(text: str) -> set[str]:
-    """Every word of the section in tag form, plus each adjacent pair joined
-    ("plain variable" -> "plainvariable", "re-render" -> "rerender") — what a
-    concept tag must be one of."""
-    words = [_norm(w) for w in re.findall(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*", text or "")]
-    words = [w for w in words if w]
-    return set(words) | {a + b for a, b in zip(words, words[1:])}
+def _words(text: str) -> list[str]:
+    """Words as written, hyphenated and camelCase terms kept whole
+    ("re-render", "useState")."""
+    return re.findall(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*", text or "")
 
 
-def candidate_concept_tags(section_title: str, section_text: str,
-                           exclude: set[str] = frozenset(), limit: int = MAX_CONCEPT_TAGS) -> list[str]:
-    """Concept tags taken from the section, with no LLM: code identifiers the
-    section names (`useState`), its bold terms, and its title's words, ranked
-    by how often the section uses them. The fallback when the theme call's own
-    tags do not survive validation, and the stub's answer."""
-    text = section_text or ""
-    found: list[str] = []
-    for span in re.findall(r"`([^`\n]+)`", text):
-        m = re.fullmatch(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(.*\))?\s*", span)
-        if m:
-            found.append(m.group(1))
-    found += re.findall(r"\*\*([^*\n]+)\*\*", text)
-    found += re.findall(r"[A-Za-z][A-Za-z0-9-]+", section_title or "")
-    flat = text.lower()
-    scored: dict[str, int] = {}
-    for raw in found:
-        tag = _norm(raw)
-        if (len(tag) < 3 or tag in _STOPWORDS or tag in exclude or tag in scored
-                or not tag.isascii() or tag.isdigit()):
+def _content(word: str) -> bool:
+    w = _norm(word)
+    return len(w) >= 3 and not w.isdigit() and w not in _STOPWORDS and w not in _GENERIC_WORDS
+
+
+def doc_title(doc_text: str) -> str:
+    """The document's H1, without a "Session 7:" style prefix."""
+    title = next(iter(re.findall(r"^#\s+(.+)$", doc_text or "", re.M)), "")
+    return re.sub(r"^\s*(?:session|lesson|chapter|unit|module|part)\s*\d+\s*[:.\-–—]\s*", "",
+                  title, flags=re.I).strip()
+
+
+def code_identifiers(text: str) -> set[str]:
+    """Every identifier the material's code uses (fenced blocks and inline
+    spans), in tag form: `setCount` -> setcount, `likes` -> likes."""
+    code = " ".join(re.findall(r"```.*?```", text or "", re.S)
+                    + re.findall(r"`([^`\n]+)`", text or ""))
+    return {_norm(t) for t in re.findall(r"[A-Za-z_$][A-Za-z0-9_$]*", code)} - {""}
+
+
+def _heading_terms(heading: str) -> list[tuple[str, bool]]:
+    """A heading's concept terms in tag form, each with whether it is a NAMED
+    term — a camelCase or hyphenated word, or two adjacent content words
+    joined ("hash table" -> hashtable). A pair with a language in it
+    ("JavaScript variable") is not a concept of its own."""
+    langs = set(language_tags())
+    words = _words(heading)
+    out: list[tuple[str, bool]] = []
+    for i, w in enumerate(words):
+        if not _content(w):
             continue
-        spoken = raw.lower()
-        scored[tag] = len(re.findall(rf"\b{re.escape(spoken)}\b", flat)) or 1
-    ranked = sorted(scored, key=lambda t: -scored[t])
-    return ranked[:limit]
+        out.append((_norm(w), bool(re.search(r"[a-z][A-Z]|-", w))))
+        nxt = words[i + 1] if i + 1 < len(words) else ""
+        if nxt and _content(nxt) and not {_norm(w), _norm(nxt)} & langs:
+            out.append((_norm(w) + _norm(nxt), True))
+    return out
 
 
-def clean_concept_tags(tags: list[str], section_text: str, exclude: set[str]) -> tuple[list[str], list[str]]:
-    """The LLM's concept tags, kept only when each is (after lowercasing and
-    removing spaces and punctuation) a word or word pair of the section, not a
-    language or theme tag, and not a repeat. Returns (kept, dropped reasons)."""
-    terms = section_terms(section_text)
+def _defined_terms(section_text: str) -> list[str]:
+    out: list[str] = []
+    for term in re.findall(r"\*\*([^*\n]+)\*\*", section_text or "") + \
+            _DEFINER.findall(section_text or ""):
+        words = [w for w in _words(term) if _content(w)]
+        if words:
+            out.append(_norm(words[0]))
+            if len(words) > 1:
+                out.append(_norm(words[0]) + _norm(words[1]))
+    return out
+
+
+def concept_vocabulary(headings: list[str], section_text: str) -> dict[str, str]:
+    """Every concept the material NAMES, in tag form -> where it was found:
+    the content words of each heading, adjacent content-word pairs joined
+    ("hash table" -> hashtable), and the section's defined terms (**bold**,
+    "called X", "known as X"). What a concept tag must be one of."""
+    vocab: dict[str, str] = {}
+    for heading in headings:
+        for term, _named in _heading_terms(heading):
+            vocab.setdefault(term, "heading")
+    for term in _defined_terms(section_text):
+        vocab.setdefault(term, "defined term")
+    return vocab
+
+
+def concept_tag_problems(concepts: list[str], vocabulary: dict[str, str],
+                         section_text: str = "") -> list[str]:
+    """Why each concept tag is not a searchable concept: a code identifier
+    from the material that no heading names, a tag shaped like code
+    (digits), or a word that is neither a heading term nor a defined term.
+    An identifier a heading DOES name is a concept (`useState` in "How
+    useState creates state" -> #usestate)."""
+    idents = code_identifiers(section_text)
+    problems: list[str] = []
+    for c in concepts:
+        tag = _norm(c.lstrip("#"))
+        if tag in vocabulary:
+            continue
+        if tag in idents:
+            problems.append(f"#{tag} is a code identifier from the example, not a concept")
+        elif re.search(r"\d", tag):
+            problems.append(f"#{tag} looks like code (it has digits), not a concept")
+        else:
+            problems.append(f"#{tag} is not a heading term or a defined term of the material "
+                            f"(a stray word, not a searchable concept)")
+    return problems
+
+
+def _norm_text(text: str) -> str:
+    """Section text squashed for counting: lowercase, hyphens dropped, every
+    other non-alphanumeric run a single space."""
+    return re.sub(r"[^a-z0-9]+", " ", re.sub(r"(?<=\w)-(?=\w)", "", (text or "").lower()))
+
+
+def candidate_concept_tags(headings: list[str], section_text: str,
+                           exclude: set[str] = frozenset(),
+                           limit: int = MAX_CONCEPT_TAGS) -> list[str]:
+    """Concept tags with no LLM, from concept_vocabulary, in this order:
+    named terms of the reel's own section headings and its defined terms,
+    then the document title's main concept, then single heading words — each
+    group by how often the section uses it. A single word already inside a
+    chosen pair is skipped (#hashtable, not also #hash). The fallback when
+    the theme call's own tags do not survive, and the stub's answer.
+    `headings` is reel_headings(): the document title first."""
+    title, own = (headings[0], headings[1:]) if len(headings) > 1 else ("", headings)
+    flat = _norm_text(section_text)
+    ranked: list[tuple[int, int, int, str]] = []
+    seen: set[str] = set()
+
+    def add(term: str, group: int):
+        if term in seen or term in exclude:
+            return
+        seen.add(term)
+        ranked.append((group, -flat.count(term), len(ranked), term))
+
+    own_terms = [t for h in own for t in _heading_terms(h)]
+    for term, named in own_terms:
+        if named:
+            add(term, 0)
+    for term in _defined_terms(section_text):
+        add(term, 0)
+    title_terms = _heading_terms(title)
+    named_title = [t for t, named in title_terms if named and t not in exclude]
+    main = named_title[:1] or [t for t, _ in title_terms if t not in exclude][:1]
+    for term in main:
+        add(term, 1)
+    for term, named in own_terms:
+        add(term, 2)
+    chosen: list[str] = []
+    for *_, term in sorted(ranked):
+        if any(term != c and term in c for c in chosen):
+            continue
+        chosen.append(term)
+    return chosen[:limit]
+
+
+def clean_concept_tags(tags: list[str], headings: list[str], section_text: str,
+                       exclude: set[str]) -> tuple[list[str], list[str]]:
+    """The LLM's concept tags, kept only when each is a searchable concept
+    (concept_tag_problems), not a language or theme tag, and not a repeat.
+    Returns (kept, dropped reasons)."""
+    vocab = concept_vocabulary(headings, section_text)
     kept: list[str] = []
     dropped: list[str] = []
     for raw in tags:
@@ -482,12 +625,14 @@ def clean_concept_tags(tags: list[str], section_text: str, exclude: set[str]) ->
             dropped.append(f"{raw!r}: empty")
         elif tag in exclude:
             dropped.append(f"{raw!r}: a language or theme tag, not a concept")
-        elif tag not in terms:
-            dropped.append(f"{raw!r}: not taken from the section")
         elif tag in kept:
             dropped.append(f"{raw!r}: repeated")
         else:
-            kept.append(tag)
+            problems = concept_tag_problems([tag], vocab, section_text)
+            if problems:
+                dropped.append(f"{raw!r}: {problems[0]}")
+            else:
+                kept.append(tag)
     return kept[:MAX_CONCEPT_TAGS], dropped
 
 
@@ -496,11 +641,12 @@ def build_tags(language: str, theme: ThemeSpec, concepts: list[str]) -> list[str
     return [f"#{language}", f"#{theme.tag}"] + [f"#{c}" for c in concepts[:MAX_CONCEPT_TAGS]]
 
 
-def tag_problems(tags: list[str], section_text: str | None = None) -> list[str]:
-    """The tag format rule (checks.check_motion_tags): every tag lowercase,
+def tag_problems(tags: list[str]) -> list[str]:
+    """The tag FORMAT rule (checks.check_motion_tags): every tag lowercase,
     no spaces, #letters-and-digits; exactly one language tag first, from the
     fixed list; exactly one theme tag second, from the registry; then 1-3
-    concept tags, each taken from the section when the section is given."""
+    concept tags. Whether those are real concepts is
+    checks.check_motion_tag_concepts's job."""
     langs = set(language_tags())
     theme_tags = set(registry().tags().values())
     problems: list[str] = []
@@ -522,12 +668,14 @@ def tag_problems(tags: list[str], section_text: str | None = None) -> list[str]:
     if len(in_themes) != 1 or len(plain) < 2 or plain[1] not in theme_tags:
         problems.append(f"needs exactly one theme tag, second, from {sorted(theme_tags)}; "
                         f"got {in_themes or 'none'}")
-    if section_text is not None:
-        terms = section_terms(section_text)
-        stray = [t for t in plain[2:] if t not in terms]
-        if stray:
-            problems.append(f"concept tag(s) {stray} are not taken from the section")
     return problems
+
+
+def reel_headings(doc_text: str, section_titles: list[str]) -> list[str]:
+    """The headings a reel's concept tags may come from: the document title
+    first, then the titles of the reel's own sections."""
+    title = doc_title(doc_text)
+    return ([title] if title else []) + [t for t in section_titles if t]
 
 
 # ============================================================ history, variety

@@ -391,16 +391,22 @@ def stage_theme(short_id: str, state: dict, sections: list, doc_text: str, yes: 
         if not _money_gate("theme", short_id, plan, yes, reel_cursor):
             return None
     try:
+        headings = motion_themes.reel_headings(
+            doc_text, [section.title] + [find_section(sections, sid).title
+                                         for sid in state["pool_ids"]
+                                         if sid != section.section_id])
         choice = choose_theme(section, source_text=source_text, approach=approach,
                               language=language, history=history, template_pin=pin,
-                              override=override)
+                              override=override, headings=headings)
     except ValueError as e:
         print(f"\n  {e}")
         return None
     print_theme(choice, how, history)
-    tag_check = checks.check_motion_tags(choice.tags, source_text)
-    print(f"  {tag_check}")
-    if not tag_check.passed:
+    tag_checks = [checks.check_motion_tags(choice.tags),
+                  checks.check_motion_tag_concepts(choice.tags, headings, source_text)]
+    for r in tag_checks:
+        print(f"  {r}")
+    if not checks.all_passed(tag_checks):
         print("  GIVING UP — the tags are not valid (see above).")
         return None
     if not _confirm("Approve theme?", yes):

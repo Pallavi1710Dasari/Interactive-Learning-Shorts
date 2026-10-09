@@ -44,7 +44,7 @@ from .skills import understanding as understanding_module
 from . import workflow as workflow_module
 from . import server as server_module
 
-REACT_PROPS_DOC = "output/uploads/db8cbe8790f9.md"
+REACT_PROPS_DOC = "evals/fixtures/react_props.md"
 
 
 def _section(section_id, title, text) -> Section:
@@ -467,19 +467,19 @@ def test_workflow_advance_script_branch_uses_resolved_evidence():
         stub_script = Script(short_id=workflow.selection.topic.id, question="What are props?",
                              beats=[Beat(speaker="interviewer", line="q",
                                         on_screen="", visual_ref="v0")])
-        return workflow.model_copy(update={"script": stub_script})
+        return workflow.model_copy(update={"script": stub_script}), []
 
     def fake_plan_strategy_for_workflow(workflow, sec, **kwargs):
         return workflow   # visual planning is out of scope for this test
 
-    old_write = workflow_module.write_script_for_workflow
+    old_write = workflow_module.write_and_grade_script_for_workflow
     old_plan = workflow_module.plan_strategy_for_workflow
-    workflow_module.write_script_for_workflow = fake_write_script_for_workflow
+    workflow_module.write_and_grade_script_for_workflow = fake_write_script_for_workflow
     workflow_module.plan_strategy_for_workflow = fake_plan_strategy_for_workflow
     try:
         progress = workflow_module.advance(wf, sections, source_text=resolved)
     finally:
-        workflow_module.write_script_for_workflow = old_write
+        workflow_module.write_and_grade_script_for_workflow = old_write
         workflow_module.plan_strategy_for_workflow = old_plan
 
     assert captured["source_text"] == resolved
@@ -503,19 +503,19 @@ def test_workflow_advance_omits_source_text_by_default():
         stub_script = Script(short_id=workflow.selection.topic.id, question="q",
                              beats=[Beat(speaker="interviewer", line="q",
                                         on_screen="", visual_ref="v0")])
-        return workflow.model_copy(update={"script": stub_script})
+        return workflow.model_copy(update={"script": stub_script}), []
 
     def fake_plan_strategy_for_workflow(workflow, sec, **kwargs):
         return workflow
 
-    old_write = workflow_module.write_script_for_workflow
+    old_write = workflow_module.write_and_grade_script_for_workflow
     old_plan = workflow_module.plan_strategy_for_workflow
-    workflow_module.write_script_for_workflow = fake_write_script_for_workflow
+    workflow_module.write_and_grade_script_for_workflow = fake_write_script_for_workflow
     workflow_module.plan_strategy_for_workflow = fake_plan_strategy_for_workflow
     try:
         workflow_module.advance(wf, sections)   # source_text omitted entirely
     finally:
-        workflow_module.write_script_for_workflow = old_write
+        workflow_module.write_and_grade_script_for_workflow = old_write
         workflow_module.plan_strategy_for_workflow = old_plan
 
     assert captured["source_text"] is None
@@ -545,22 +545,22 @@ def test_advance_many_resolves_evidence_once_per_section_and_shares_it():
         stub_script = Script(short_id=workflow.selection.topic.id, question="q",
                              beats=[Beat(speaker="interviewer", line="q",
                                         on_screen="", visual_ref="v0")])
-        return workflow.model_copy(update={"script": stub_script})
+        return workflow.model_copy(update={"script": stub_script}), []
 
     def fake_plan_strategy_for_workflow(workflow, sec, **kwargs):
         return workflow
 
     old_ask_json = understanding_module.ask_json
-    old_write = workflow_module.write_script_for_workflow
+    old_write = workflow_module.write_and_grade_script_for_workflow
     old_plan = workflow_module.plan_strategy_for_workflow
     understanding_module.ask_json = fake_ask_json
-    workflow_module.write_script_for_workflow = fake_write_script_for_workflow
+    workflow_module.write_and_grade_script_for_workflow = fake_write_script_for_workflow
     workflow_module.plan_strategy_for_workflow = fake_plan_strategy_for_workflow
     try:
         [progress] = workflow_module.advance_many([wf], sections)
     finally:
         understanding_module.ask_json = old_ask_json
-        workflow_module.write_script_for_workflow = old_write
+        workflow_module.write_and_grade_script_for_workflow = old_write
         workflow_module.plan_strategy_for_workflow = old_plan
         _clear_understanding_cache()
 

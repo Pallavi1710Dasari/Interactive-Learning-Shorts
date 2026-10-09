@@ -2590,6 +2590,17 @@ def motion_system_for(template: str, theme=None) -> tuple[str, str]:
                     lambda m: _theme_format_block(theme) + "\n\n", system, count=1, flags=re.S)
     system = re.sub(r"THE BEATS.*?\n\n(?=LENGTH)",
                     lambda m: _theme_beats_block(theme) + "\n\n", system, count=1, flags=re.S)
+    from ..checks import MOTION_THEMED_SECONDS, MOTION_THEMED_WORDS
+    lo_s, hi_s = MOTION_THEMED_SECONDS
+    system = system.replace(
+        "ONE short vertical teaching reel (40-75 seconds)",
+        f"ONE short vertical teaching reel ({lo_s:g}-{hi_s:g} seconds)", 1)
+    system = system.replace(
+        "- 110 to 195 spoken words in total (at most 75 seconds spoken).",
+        f"- {MOTION_THEMED_WORDS[0]} to {MOTION_THEMED_WORDS[1]} spoken words in total "
+        f"({lo_s:g} to {hi_s:g} seconds spoken). {hi_s:g} seconds is a hard CAP, not a "
+        f"target: use the words the concept needs to be explained FULLY, then stop. Never "
+        f"pad to reach it.", 1)
     if theme.two_speaker:
         system = system.replace(
             '"captions": [{"text": "..."}],',

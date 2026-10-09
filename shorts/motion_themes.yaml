@@ -68,8 +68,8 @@ themes:
       brief: A curiosity question naming a concrete, visible symptom.
     beats: fix_story
 
-  story:
-    tag: story
+  narrative:
+    tag: narrative
     template: fix_story
     description: >-
       One narrator tells a short second-person story: you, at a real moment,

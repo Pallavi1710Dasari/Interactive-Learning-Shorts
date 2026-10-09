@@ -157,7 +157,7 @@ The registry is `shorts/motion_themes.yaml`, loaded and validated by `shorts/mot
 | Theme | Tag | Template | Speakers (avatar) | Needs code | Works with | Incompatible with | Hook |
 |---|---|---|---|---|---|---|---|
 | classic_explainer | explainer | fix_story (own beats) | narrator | no | all but process_demonstration | — | symptom question |
-| story | story | fix_story | narrator | no | real_world_example, analogy, conceptual_visual, direct_explanation, code | — | scene |
+| narrative (was `story`; renamed in the 2b review so it is not confused with `REEL_STYLE=story`) | narrative | fix_story | narrator | no | real_world_example, analogy, conceptual_visual, direct_explanation, code | — | scene |
 | interview | interview | fix_story | INTERVIEWER (host, asks) / CANDIDATE (language) | no | code, direct_explanation, comparison, conceptual_visual | — | question |
 | interview_rapid_fire | rapidfire | fix_story | INTERVIEWER (host, asks) / CANDIDATE (language) | no | direct_explanation, code, comparison | process_demonstration, analogy | question |
 | peer_discussion | discussion | fix_story | PEER_A (host, asks) / PEER_B (language, asks) | no | analogy, comparison, conceptual_visual, direct_explanation, code | — | question |
@@ -190,23 +190,26 @@ Each entry also has a description, the kinds of concepts it suits, hook openers 
 
 ### Tags
 
-Every motion reel gets one language tag, one theme tag and 1–3 concept tags, e.g. `#react #interview #plainvariable #rerender`.
+Every motion reel gets one language tag, one theme tag and 1–3 concept tags, e.g. `#react #interview #usestate #rerender`.
 
 - Tags are lowercase with no spaces: `#` plus letters and digits.
-- Language tags come from a fixed list: `python javascript typescript react html css sql java c cpp cs` (`cs` covers material with no programming language). Theme tags come from the registry.
-- Concept tags must be words, or adjacent word pairs, of the section. The LLM's tags are cleaned against the section, and if none survive the section's own candidates are used.
-- The language comes from the section's fenced code, then the document's, then a language named in the document title, then the one named most often, else `cs`. Override with `--language`.
+- Language tags come from a fixed list: `python javascript typescript react node django html css sql java c cpp docker os cs`. `node` covers Node.js and Express, `os` is operating systems, and `cs` covers material with no programming language (data structures, AI). Theme tags come from the registry.
+- **Concept tags are searchable concepts** (2b review). They are taken from the material's headings (the document title and the reel's own section titles) and its defined terms (`**bold**`, "called X", "known as X"). Two-word concepts are joined: "page table" becomes `#pagetable`. A general list of filler words ("finds", "screen", "different") is never a concept.
+- `motion_tag_concepts` rejects a code identifier from the example (`#setcount`, `#count`), unless a heading names it (`useState` in "How useState creates and updates state" gives `#usestate`), and rejects any stray word.
+- The LLM's tags are cleaned by the same rule; if none survive, the material's own candidates are used.
+- The language comes from the section's fenced code, then the document's (a framework the material names wins over its base language: ```python in a Django lesson is `django`), then a language named in the document title, then the one named most often, else `cs`. Override with `--language`.
 - Tags are saved in `tags.json` and printed in the report.
 
 ### Script by theme
 
 - `write_motion_script(theme=, language=)`. A non-base theme replaces only the prompt's FORMAT and THE BEATS (`skills.script.motion_system_for`). LENGTH, WORDS, captions, CODE, VISUAL and ICONS are untouched, so the 2-minute cap (a cap, not a target), the source-scope rule and the topic-agnostic rules all still apply.
+- **Length** (2b review): every theme except classic_explainer gets **40–120 s** (110–312 words). 120 s is a cap, not a target: the prompt says to explain the concept fully, then stop, never pad. classic_explainer keeps fix_story's 40–75 s, and the walkthrough keeps 60–120 s.
 - Two-speaker themes write **speaker-labelled lines**: each caption, which is one sentence, carries `speaker` (`INTERVIEWER`, `CANDIDATE`). Labels never appear in `speech`. The hook repair has a themed prompt of its own.
 - `MotionScript` gains `theme`, `language` and `speakers` (role → avatar → voice slot, set in Python). `CaptionChunk` gains `speaker`. All are optional, so phase 1 files load unchanged and are graded as their template's base theme.
 
 ### Avatars: contract only
 
-`shorts/motion_avatars.yaml` holds one original character per course language, plus a shared **host**. Each has a name, a look note, a palette and a Chatterbox voice slot (`voices/motion/<slot>.wav`, recorded in phase 3).
+`shorts/motion_avatars.yaml` holds one original character per course language (15, including node, django, docker and os since the 2b review), plus a shared **host**. Each has a name, a look note, a palette and a Chatterbox voice slot (`voices/motion/<slot>.wav`, recorded in phase 3).
 
 - Only two-speaker themes use avatars: the asking role is the host and the answering role is the language's character, so a reel always has two characters and two voices.
 - Palettes may not use coral, mint or lavender, which are reserved colour meanings. The loader rejects them.
@@ -221,11 +224,13 @@ Every motion reel gets one language tag, one theme tag and 1–3 concept tags, e
 | `motion_not_qa` (themed) | No speaker label in speech. Questions only in the hook, a beat marked `asks`, or a line by a role that `asks`. |
 | `motion_theme_fit` | Registry entry, requirements met, approach not incompatible, pinned template respected. |
 | `motion_theme_variety` | Not the previous reel's theme; at most 2 in the last 5. |
-| `motion_tags` | Format, one language tag first, one theme tag second, 1–3 concept tags from the section. |
+| `motion_tags` | Format: one language tag first, one theme tag second, 1–3 concept tags. |
+| `motion_tag_concepts` | Each concept tag is a heading term or defined term; code identifiers and stray words are rejected. |
 
-- `evals/cases.yaml` **E175–E197** (23 cases) cover all of these. The new case type `motion_theme_grader` is in `run_evals.run_motion_theme_case`.
+- `evals/cases.yaml` **E175–E201** (27 cases) cover all of these. The new case type `motion_theme_grader` is in `run_evals.run_motion_theme_case`.
 - New golden fixtures, which are also the stubs for their themes: `usestate_interview_golden.json`, `usestate_peer_discussion_golden.json` and `usestate_bug_hunt_golden.json`. With the useState (classic_explainer) and tokenization (step_by_step_walkthrough) fixtures, five themes run end to end in stub mode.
-- `shorts/motion_theme_test.py`: 34 tests.
+- `shorts/motion_theme_test.py`: 36 tests.
+- `shorts/evidence_grouping_test.py` reads `evals/fixtures/react_props.md` (a rebuilt React props lesson) instead of a local upload in `output/uploads/`, and patches the renamed `write_and_grade_script_for_workflow`.
 
 ```
 SHORTS_STUB=1 python -m shorts.motion_reel content/react_usestate_basics.md --yes --theme interview

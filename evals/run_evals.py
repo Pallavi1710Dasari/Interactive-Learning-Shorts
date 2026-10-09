@@ -175,8 +175,9 @@ def run_motion_theme_case(case: dict, sections) -> tuple[bool, str]:
     case's own inputs — no fixture script. theme_fit: `theme`, `approach`,
     `input` + `section_id`, optional `template` (a human pin) and `language`.
     theme_variety: `theme` and `history` (earlier reels' themes, oldest
-    first). tags: `tags`, and `input` + `section_id` when concept tags must
-    come from that section."""
+    first). tags: `tags` (format only). tag_concepts: `tags`, `input` and
+    `section_id` — concept tags must be the document title's or that
+    section's heading terms, or its defined terms."""
     doc = parse_markdown(ROOT / case["input"]) if case.get("input") else sections
     section_text = (find_section(doc, case["section_id"]).text
                     if case.get("section_id") else None)
@@ -188,7 +189,12 @@ def run_motion_theme_case(case: dict, sections) -> tuple[bool, str]:
     elif grader == "theme_variety":
         result = checks.check_motion_theme_variety(case["theme"], case.get("history", []))
     elif grader == "tags":
-        result = checks.check_motion_tags(case["tags"], section_text)
+        result = checks.check_motion_tags(case["tags"])
+    elif grader == "tag_concepts":
+        from shorts.motion_themes import doc_title
+        title = doc_title((ROOT / case["input"]).read_text(encoding="utf-8"))
+        headings = [title, find_section(doc, case["section_id"]).title]
+        result = checks.check_motion_tag_concepts(case["tags"], headings, section_text)
     else:
         raise ValueError(f"unknown motion theme grader {grader!r}")
     exp = case["expect"]

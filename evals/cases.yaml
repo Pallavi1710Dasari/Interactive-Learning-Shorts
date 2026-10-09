@@ -3111,7 +3111,7 @@ cases:
     type: motion_theme_grader
     grader: theme_variety
     theme: interview
-    history: [story, bug_hunt, interview]
+    history: [narrative, bug_hunt, interview]
     expect:
       passed: false
       reason_contains: "was the previous reel's theme"
@@ -3122,7 +3122,7 @@ cases:
     type: motion_theme_grader
     grader: theme_variety
     theme: interview
-    history: [interview, story, interview, bug_hunt]
+    history: [interview, narrative, interview, bug_hunt]
     expect:
       passed: false
       reason_contains: "3 of the last 5 reels, max 2"
@@ -3133,18 +3133,16 @@ cases:
     type: motion_theme_grader
     grader: theme_variety
     theme: interview
-    history: [interview, interview, story, bug_hunt, myth_vs_fact]
+    history: [interview, interview, narrative, bug_hunt, myth_vs_fact]
     expect:
       passed: true
 
   - id: E193
-    name: Valid tags pass
-    why: "One language tag first, one theme tag second, then 1-3 concept tags from the section."
+    name: Valid tags pass the format check
+    why: "One language tag first, one theme tag second, then 1-3 concept tags."
     type: motion_theme_grader
     grader: tags
-    tags: ["#react", "#interview", "#plainvariable", "#rerender"]
-    input: content/react_usestate_basics.md
-    section_id: "7.2"
+    tags: ["#react", "#interview", "#state", "#variable"]
     expect:
       passed: true
 
@@ -3163,32 +3161,78 @@ cases:
     why: "Every reel has exactly one language tag, from the fixed list, first."
     type: motion_theme_grader
     grader: tags
-    tags: ["#interview", "#react", "#rerender"]
+    tags: ["#interview", "#react", "#state"]
     expect:
       passed: false
       reason_contains: "language tag, first"
 
   - id: E196
     name: An unknown theme tag is rejected
-    why: "Theme tags come from the registry only, so tags can be counted and filtered."
+    why: "Theme tags come from the registry only, so tags can be counted and filtered. #story was renamed #narrative in the 2b review."
     type: motion_theme_grader
     grader: tags
-    tags: ["#react", "#podcast", "#rerender"]
+    tags: ["#react", "#story", "#state"]
     expect:
       passed: false
       reason_contains: "exactly one theme tag"
 
   - id: E197
-    name: A concept tag the section never uses is rejected
-    why: "Concept tags are taken from the section, never invented: #closures on a useState section is a wrong tag."
+    name: A concept tag the material never names is rejected
+    why: "Concept tags are searchable concepts the material names, never invented: #closures on a useState section is a wrong tag."
     type: motion_theme_grader
-    grader: tags
+    grader: tag_concepts
     tags: ["#react", "#interview", "#closures"]
     input: content/react_usestate_basics.md
     section_id: "7.2"
     expect:
       passed: false
-      reason_contains: "not taken from the section"
+      reason_contains: "not a heading term or a defined term"
+
+  - id: E198
+    name: A code identifier as a concept tag is rejected
+    why: "2b review: #setcount and #count are the example's variable names, not concepts anyone searches for. The stub's first tags were exactly this (#count #setcount)."
+    type: motion_theme_grader
+    grader: tag_concepts
+    tags: ["#react", "#interview", "#setcount"]
+    input: content/react_usestate_basics.md
+    section_id: "7.3"
+    expect:
+      passed: false
+      reason_contains: "is a code identifier from the example"
+
+  - id: E199
+    name: An identifier the headings name is a concept
+    why: "useState is a code identifier AND the concept a heading names ('How useState creates and updates state'), so #usestate is the searchable tag."
+    type: motion_theme_grader
+    grader: tag_concepts
+    tags: ["#react", "#interview", "#usestate", "#state"]
+    input: content/react_usestate_basics.md
+    section_id: "7.3"
+    expect:
+      passed: true
+
+  - id: E200
+    name: A stray heading word is not a concept tag
+    why: "'screen' is in 7.2's heading but names no concept; heading words go through a general filler list."
+    type: motion_theme_grader
+    grader: tag_concepts
+    tags: ["#react", "#interview", "#screen"]
+    input: content/react_usestate_basics.md
+    section_id: "7.2"
+    expect:
+      passed: false
+      reason_contains: "stray word"
+
+  - id: E201
+    name: Joined heading terms are concept tags
+    why: "Two-word concepts are joined with no space: 'page table' -> #pagetable, 'address translation' -> #addresstranslation; the document title gives #virtualmemory."
+    type: motion_theme_grader
+    grader: tag_concepts
+    tags: ["#os", "#underthehood", "#pagetable", "#addresstranslation", "#virtualmemory"]
+    input: content/session_18_paging.md
+    section_id: "3.2"
+    expect:
+      passed: true
 
 # ============================================================================
 # RUBRIC — what the LLM judge scores, 1 to 5. Keep the wording stable; changing

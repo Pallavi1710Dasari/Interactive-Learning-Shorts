@@ -43,10 +43,12 @@ suits:
 - the APPROVED TEACHING APPROACH (a theme that lists it under "works with" carries it
   most naturally).
 
-Also give 1 to 3 concept tags: each ONE lowercase word, or two words joined with no
-space, written exactly as the section writes them ("usestate", "rerender",
-"closures"). They name the concept and what it is about. Not the language, not the
-theme.
+Also give 1 to 3 concept tags: SEARCHABLE CONCEPTS someone would look up, such as
+"usestate", "rerender", "tokenization", "pagetable". Each is one lowercase word, or
+two words joined with no space, taken from the material's HEADINGS or its DEFINED
+TERMS (CONCEPT TERMS below lists them). Never a variable or function name the
+example happens to use ("setcount", "likes"), never a filler word. Not the language,
+not the theme.
 
 Return JSON:
 {"theme": "<an id from ELIGIBLE THEMES>",
@@ -66,7 +68,7 @@ def _theme_line(spec: mt.ThemeSpec) -> str:
 
 def _user_prompt(section: Section, source_text: str, approach: TeachingApproach | None,
                  language: str, concept_tags: list[str], history: list[str],
-                 eligible: list[str]) -> str:
+                 eligible: list[str], vocabulary: list[str]) -> str:
     reg = mt.registry()
     if approach is not None:
         combined = f" (with {', '.join(approach.combined_with)})" if approach.combined_with else ""
@@ -80,6 +82,7 @@ def _user_prompt(section: Section, source_text: str, approach: TeachingApproach 
         f"\nLANGUAGE: {language}",
         f"APPROVED TEACHING APPROACH: {approach_line}",
         f"CONCEPT TAGS (from the section): {', '.join(concept_tags) or 'none found'}",
+        f"CONCEPT TERMS (headings and defined terms): {', '.join(vocabulary) or 'none'}",
         "EARLIER REELS IN THIS LANGUAGE (oldest first): "
         + (", ".join(history) if history else "none"),
         "\nELIGIBLE THEMES:",
@@ -89,7 +92,7 @@ def _user_prompt(section: Section, source_text: str, approach: TeachingApproach 
 
 def choose_theme(section: Section, *, source_text: str, approach: TeachingApproach | None,
                  language: str, history: list[str], template_pin: str | None = None,
-                 override: str | None = None,
+                 override: str | None = None, headings: list[str] | None = None,
                  log=print) -> MotionThemeChoice:
     """Choose this reel's theme.
 
@@ -98,6 +101,9 @@ def choose_theme(section: Section, *, source_text: str, approach: TeachingApproa
     in the same language, oldest first (motion_themes.reel_history).
     `template_pin` is a template a human chose (--template or the reviewer);
     None lets the theme decide the template. `override` is --theme.
+    `headings` (the document title and the reel's section titles; default
+    the section's own title) are where concept tags may come from, with the
+    section's defined terms.
 
     Raises ValueError when --theme names a theme that is unknown, needs what
     the section lacks, or does not work with the approved approach — those
@@ -107,7 +113,8 @@ def choose_theme(section: Section, *, source_text: str, approach: TeachingApproa
     kind = approach.primary if approach is not None else None
     has_code = mt.section_has_code(source_text)
     exclude = set(mt.language_tags()) | set(reg.tags().values())
-    candidates = mt.candidate_concept_tags(section.title, source_text, exclude)
+    headings = headings if headings is not None else [section.title]
+    candidates = mt.candidate_concept_tags(headings, source_text, exclude)
 
     def problems(theme_id: str) -> list[str]:
         return mt.theme_problems(theme_id, approach=kind, has_code=has_code,
@@ -152,8 +159,9 @@ def choose_theme(section: Section, *, source_text: str, approach: TeachingApproa
                     fit, candidates, eligible)
 
     # ------------------------------------------------------- the fit call
+    vocabulary = [t for t in mt.concept_vocabulary(headings, source_text) if t not in exclude]
     base = _user_prompt(section, source_text, approach, language, candidates, history,
-                        eligible)
+                        eligible, vocabulary)
     user = base
     rejected: list[ThemeRejection] = []
     for attempt in range(1, MAX_THEME_ATTEMPTS + 1):
@@ -161,7 +169,8 @@ def choose_theme(section: Section, *, source_text: str, approach: TeachingApproa
                          label="motion_theme")
         found = problems(draft.theme)
         if not found:
-            kept, dropped = mt.clean_concept_tags(draft.concept_tags, source_text, exclude)
+            kept, dropped = mt.clean_concept_tags(draft.concept_tags, headings, source_text,
+                                                  exclude)
             for d in dropped:
                 log(f"  theme: concept tag dropped — {d}")
             fit = ThemeFitCheck(passed=True, attempts=attempt, rejected=rejected)

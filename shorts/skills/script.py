@@ -2614,10 +2614,18 @@ def _motion_material_block(topic: Topic, section: Section,
     parts = [f"TEMPLATE: {template}"]
     if theme is not None:
         parts.append(f"THEME: {theme.id}")
+    others = (source_text.replace(section.text, "").strip()
+              if template == "fix_story" and section.text else "")
     parts += [
         "QUESTION THIS REEL ANSWERS: " + topic.topic,
-        f"\nMATERIAL:\n{source_text}",
+        f"\nMATERIAL (the selected section, {section.section_id} — the explanation and the "
+        f"running example, its code and the names in it, come from here):\n"
+        f"{section.text if others else source_text}",
     ]
+    if others:
+        parts.append("\nSUPPORTING SECTIONS (other sections). Take ONLY numbers and defined "
+                     "terms from here; never the example, its code or its names — a name only "
+                     "these use fails review:\n" + others)
     if supporting_text:
         parts.append("\nSUPPORTING MATERIAL (other sections of the same lesson). Take ONLY "
                      "numbers and defined terms from here. The explanation itself — every "
@@ -2631,6 +2639,11 @@ def _motion_material_block(topic: Topic, section: Section,
         combined = f" (with {', '.join(approach.combined_with)})" if approach.combined_with else ""
         parts.append(f"\nTHE APPROVED TEACHING APPROACH: {approach.primary}{combined}"
                      + (f" — {approach.rationale}" if approach.rationale else ""))
+        ruled_out = checks.approach_exclusions(approach)
+        if ruled_out:
+            parts.append("RULED OUT BY THE APPROVED APPROACH — binding. Never show these in any "
+                         "shot's code, and never teach them in the narration:\n"
+                         + "\n".join(f"  - {r['clause']}" for r in ruled_out))
     parts.append(f"\nSERIES (the cta asks them to follow this): {series}")
     parts.append("NEXT TOPIC (the cta names it): "
                  + (next_topic or "none — the cta just asks them to follow"))
@@ -2670,7 +2683,9 @@ def _assemble_motion(draft: MotionScriptDraft, topic: Topic, section: Section,
 
 def regenerate_motion_hook(script: MotionScript, material: str, source_text: str,
                            results: list,
-                           main_text: str | None = None) -> tuple[MotionScript | None, list]:
+                           main_text: str | None = None,
+                           selected_text: str | None = None,
+                           approach: TeachingApproach | None = None) -> tuple[MotionScript | None, list]:
     """Rewrite only the hook shot, up to config.MAX_MOTION_HOOK_FIX_RETRIES
     times. Returns (the repaired script, its grader results) once every grader
     passes, else (None, the last results)."""
@@ -2691,7 +2706,8 @@ def regenerate_motion_hook(script: MotionScript, material: str, source_text: str
         candidate = script.model_copy(update={
             "hook_question": fix.hook_question,
             "shots": [new_hook] + list(script.shots[1:])})
-        results = checks.run_motion_script_graders(candidate, source_text, main_text=main_text)
+        results = checks.run_motion_script_graders(candidate, source_text, main_text=main_text,
+                                                   selected_text=selected_text, approach=approach)
         if checks.all_passed(results):
             return candidate, results
         feedback = "; ".join(r.reason for r in results if not r.passed)
@@ -2743,6 +2759,10 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                                       approach, series, next_topic, template,
                                       supporting_text, spec)
     main_text = source_text if supporting_text else None
+    # fix_story: the running example comes from the selected section; other
+    # sections supply only numbers and defined terms (source-scope rule,
+    # 2026-10-10). A walkthrough keeps check_walkthrough_main_source.
+    selected_text = section.text if template == "fix_story" else None
     if supporting_text:
         source_text = source_text + "\n\n" + supporting_text
     user = material
@@ -2752,12 +2772,13 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                          label="motion_script")
         script = _assemble_motion(draft, topic, section, short_id, series, next_topic,
                                   template, spec, language)
-        results = checks.run_motion_script_graders(script, source_text, main_text=main_text)
+        results = checks.run_motion_script_graders(script, source_text, main_text=main_text,
+                                                   selected_text=selected_text, approach=approach)
         if checks.all_passed(results):
             return script, results
         if checks.motion_failures_are_hook_only(results):
             fixed, fixed_results = regenerate_motion_hook(script, material, source_text, results,
-                                                          main_text)
+                                                          main_text, selected_text, approach)
             if fixed is not None:
                 return fixed, fixed_results
             results = fixed_results

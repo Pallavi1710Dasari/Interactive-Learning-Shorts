@@ -8446,7 +8446,10 @@ def check_motion_numbers_sourced(script, source_text: str) -> GraderResult:
     without a source: a chapter card's step number, the number of chapters,
     and any count the grader can recompute from the running example's own
     states ("two words became seven tokens"). The word "one" is never
-    checked (it is rarely a quantity); a digit 1 is."""
+    checked (it is rarely a quantity); a digit 1 is. A supporting section
+    may supply a number (source-scope rule, 2026-10-10) — the facts table
+    labels it with its section; where the EXAMPLE comes from is
+    check_motion_example_from_selected's job."""
     allowed = motion_source_numbers(source_text)
     derived = {str(len(script.chapters))} if script.chapters else set()
     ex = script.running_example
@@ -8584,12 +8587,216 @@ MOTION_HOOK_GRADERS = frozenset({
 })
 
 
+#: Words that mark a clause of a teaching approach's rationale as something
+#: the reel must NOT teach. "rather than" / "instead of": only what follows.
+_EXCLUSION_MARKERS = re.compile(
+    r"out of scope|beyond (?:the )?scope|outside (?:the )?scope|not in scope|"
+    r"\b(?:not|never|won't|doesn't|don't) (?:cover|covering|show|showing|teach|teaching|explain|"
+    r"explaining|introduce|introducing|mention|mentioning|go into|get into|walk through)\b|"
+    r"\bno need to\b|\bleav(?:e|es|ing) out\b|\bskip(?:s|ping)?\b|\bunnecessary\b|"
+    r"\bnot (?:needed|necessary|required)\b|\bavoid(?:s|ing)?\b", re.I)
+_CONTRAST_MARKERS = re.compile(r"\b(?:rather than|instead of)\b", re.I)
+#: An exclusion about HOW something is written rules out its code, not its name.
+_FORM_WORDS = frozenset("called call calling calls syntax signature written write writing declared "
+                        "declare declaring arguments argument parameters returns code".split())
+
+
+def _code_identifiers(text: str) -> list[str]:
+    """Identifiers a clause names: `backticked`, camelCase (useState,
+    setCount) or call-shaped (render())."""
+    found = re.findall(r"`([^`]+)`", text)
+    found += re.findall(r"\b[a-z]+[A-Z][A-Za-z0-9]*\b", text)
+    found += re.findall(r"\b([A-Za-z_]\w*)\(", text)
+    out: list[str] = []
+    for f in found:
+        f = re.sub(r"\(.*", "", f).strip()
+        if f and f not in out:
+            out.append(f)
+    return out
+
+
+def approach_exclusions(approach) -> list[dict]:
+    """What an approved teaching approach rules out, from its rationale:
+    [{"clause": text, "identifiers": [...], "form_only": bool}] — form_only
+    when the clause is about how something is written ("how useState is
+    called"), so its code is out but its name may still be said."""
+    text = getattr(approach, "rationale", "") or ""
+    out: list[dict] = []
+    for clause in re.split(r"(?<=[.;!?])\s+|;\s*|\s+—\s+|\s+-\s+", text):
+        clause = clause.strip()
+        part = None
+        contrast = _CONTRAST_MARKERS.search(clause)
+        if contrast:
+            part = clause[contrast.end():]
+        elif _EXCLUSION_MARKERS.search(clause):
+            part = clause
+        if not part:
+            continue
+        words = {w.lower() for w in re.findall(r"[A-Za-z]+", part)}
+        out.append({"clause": part.strip(" .,"), "identifiers": _code_identifiers(part),
+                    "form_only": bool(words & _FORM_WORDS)})
+    return out
+
+
+def check_motion_respects_approach(script, approach=None) -> GraderResult:
+    """The script respects what the APPROVED teaching approach rules out
+    (decision 2026-10-10: the first real reel's approach said "how useState is
+    called is out of scope" and s08 still showed the useState call). Checked
+    mechanically for every identifier an exclusion names: never in a shot's
+    code; and, unless the exclusion is only about how it is written, never in
+    the narration either. An exclusion naming no identifier is the prompt's
+    rule alone (listed in the reason, so a reviewer can check it)."""
+    from .schema import motion_plain_text
+    if approach is None:
+        return GraderResult("motion_respects_approach", True, "no approved approach given")
+    rules = approach_exclusions(approach)
+    if not rules:
+        return GraderResult("motion_respects_approach", True, "the approach rules nothing out")
+
+    def squash(t: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", t.lower())
+
+    problems: list[str] = []
+    off: list[str] = []
+    for rule in rules:
+        for ident in rule["identifiers"]:
+            key = squash(ident)
+            if not key:
+                continue
+            for s in script.shots:
+                where = []
+                if any(key in squash(line) for line in s.code):
+                    where.append("code")
+                spoken = squash(s.speech + " " + " ".join(motion_plain_text(c.text) for c in s.captions))
+                if not rule["form_only"] and key in spoken:
+                    where.append("narration")
+                if where:
+                    problems.append(f"{s.id} shows {ident} in its {' and '.join(where)}, but the approved "
+                                    f"approach rules it out (\"{rule['clause']}\")")
+                    off.append(s.id)
+    if problems:
+        return GraderResult("motion_respects_approach", False, "; ".join(problems),
+                            {"shots": sorted(set(off))})
+    unchecked = [r["clause"] for r in rules if not r["identifiers"]]
+    return GraderResult("motion_respects_approach", True,
+                        f"{len(rules)} exclusion(s) respected"
+                        + (f"; checked by the prompt only: {unchecked}" if unchecked else ""))
+
+
+#: Words of code that name no example: keywords and builtins across the
+#: course languages. An identifier the example check sees is anything else.
+_CODE_KEYWORDS = frozenset("""
+let const var function return if else for while do switch case break continue new
+this class extends import export from default true false null undefined typeof
+async await try catch finally throw of in and or not is def print self none pass
+lambda elif with as yield public private protected static void int float double
+char boolean bool string str long short final string system out println main
+""".split())
+
+
+def _example_names(script) -> dict[str, list[str]]:
+    """name -> shot ids, for every name the reel's example is built from:
+    identifiers in its code, `backticked` code in its captions, and
+    CamelCase / camelCase names in its narration (a component, a variable)."""
+    from .schema import motion_plain_text
+    out: dict[str, list[str]] = {}
+    # the reel's own subject is not an example ("React", "State")
+    own = {w.lower() for w in re.findall(r"[A-Za-z]+", " ".join(
+        [script.topic or "", script.concept_name or "", script.language or ""]))}
+
+    def add(name: str, sid: str) -> None:
+        if (len(name) < 2 or name.lower() in _CODE_KEYWORDS or name.isdigit()
+                or name.lower() in own):
+            return
+        name = next((n for n in out if n.lower() == name.lower()), name)   # count = Count
+        if sid not in out.setdefault(name, []):
+            out[name].append(sid)
+    for s in script.shots:
+        for line in s.code:
+            for name in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", line):
+                add(name, s.id)
+        for c in s.captions:
+            for code in re.findall(r"`([^`]+)`", c.text):
+                for name in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code):
+                    add(name, s.id)
+        spoken = s.speech + " " + " ".join(motion_plain_text(c.text) for c in s.captions)
+        for name in re.findall(r"\b(?:[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*|[a-z]+[A-Z][A-Za-z0-9]*)\b", spoken):
+            add(name, s.id)
+    return out
+
+
+def _states_name(text: str, name: str) -> bool:
+    """Does `text` state `name` as a whole word (case-insensitive, markdown
+    code ticks ignored)?"""
+    return re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])",
+                     re.sub(r"[`*]", "", text or ""), re.I) is not None
+
+
+def invented_example_names(script, document_text: str) -> dict[str, list[str]]:
+    """name -> shot ids, for every name the running example is built from
+    (_example_names) that NO section of the document states — an invented
+    example. Allowed, never a failure (user decision 2026-10-10), but the
+    shot list and the report show it as a WARNING for the reviewer."""
+    return {name: ids for name, ids in _example_names(script).items()
+            if not _states_name(document_text, name)}
+
+
+def invented_example_warning(script, document_text: str) -> str:
+    """The WARNING line for the shot list and the report, or "" when the
+    example comes from the material."""
+    names = invented_example_names(script, document_text)
+    if not names:
+        return ""
+    listed = ", ".join(f"{n} ({', '.join(ids)})" for n, ids in names.items())
+    return f"WARNING — invented example: {listed} — not in any section, please review"
+
+
+def check_motion_example_from_selected(script, selected_text: str | None,
+                                       other_text: str = "") -> GraderResult:
+    """fix_story: the running example comes from the SELECTED section
+    (source-scope rule, 2026-10-10 — the first real reel's counter, `let
+    count = 0` inside Counter, came from 7.2 while its section was 7.4).
+    Checked for every name the example is built from (_example_names): a
+    name another section states but the selected section never does fails.
+    Names in neither section pass here: an invented example is allowed and
+    shown as a WARNING instead (invented_example_warning). Supporting numbers
+    and defined terms stay allowed (check_motion_numbers_sourced, the facts
+    table)."""
+    template = _template(script)
+    if template != "fix_story":
+        return _not_this_template("motion_example_from_selected", template)
+    if selected_text is None:
+        return GraderResult("motion_example_from_selected", True, "no selected section given")
+
+    states = _states_name
+    problems: list[str] = []
+    off: list[str] = []
+    for name, shot_ids in _example_names(script).items():
+        if not states(selected_text, name) and states(other_text, name):
+            problems.append(f"{name} ({', '.join(shot_ids)}) comes from another section, "
+                            f"not the selected section {script.source_section_id}")
+            off += shot_ids
+    if problems:
+        return GraderResult("motion_example_from_selected", False,
+                            "; ".join(problems) + " — the running example must come from the "
+                            "selected section (other sections may supply only numbers and "
+                            "defined terms)", {"shots": sorted(set(off))})
+    return GraderResult("motion_example_from_selected", True,
+                        "the example comes from the selected section")
+
+
 def run_motion_script_graders(script, source_text: str, icon_names=None,
-                              main_text: str | None = None) -> list[GraderResult]:
+                              main_text: str | None = None,
+                              selected_text: str | None = None,
+                              approach=None) -> list[GraderResult]:
     """Motion mode's counterpart to run_script_graders / run_story_graders.
     `source_text` is everything the reel may draw on; `main_text` is the
     selected section's own evidence when a walkthrough also sees supporting
-    sections (None: the whole source is main)."""
+    sections (None: the whole source is main). `selected_text` is the
+    selected section alone, which a fix_story's running example must come
+    from (None: not checked). `approach` is the approved TeachingApproach,
+    whose exclusions the script must respect (None: not checked)."""
+    other = (source_text.replace(selected_text, "") if selected_text else "")
     return [
         check_motion_template_beats(script),
         check_motion_duration_cap(script),
@@ -8608,6 +8815,8 @@ def run_motion_script_graders(script, source_text: str, icon_names=None,
         check_walkthrough_running_example(script),
         check_walkthrough_main_source(script, main_text),
         check_motion_numbers_sourced(script, source_text),
+        check_motion_example_from_selected(script, selected_text, other),
+        check_motion_respects_approach(script, approach),
     ]
 
 

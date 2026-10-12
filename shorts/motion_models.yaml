@@ -36,13 +36,17 @@ typical_share: 0.6
 # Every LLM call a motion reel can make, by its llm.ask_json label -> a tier
 # above (or a full model id). Everything else in the pipeline — parsing the
 # document, tags, variety, layout, cue timing, every grader — is plain code and
-# makes no LLM call at all.
+# makes no LLM call at all. During a motion run a label missing here is an
+# error before anything is sent (llm.ask_json), never a silent fallback to
+# config.py's models — the first real reel's `screen` call ran on
+# claude-sonnet-5 that way.
 #
 # For each: the most calls one reel can make (retries and repairs included) and
 # rough tokens per call, for the estimate printed before a reel starts. `typical`
 # is the usual number of calls when nothing needs a retry.
 steps:
   select:                       {tier: deliberate, worst: 1, typical: 1, input: doc+3500, output: 2500}
+  screen:                       {tier: mechanical, worst: 1, typical: 1, input: 6500, output: 600}
   understanding:                {tier: deliberate, worst: 2, typical: 1, input: 6000, output: 2000}
   framing:                      {tier: mechanical, worst: 2, typical: 1, input: 3000, output: 500}
   regenerate_question:          {tier: mechanical, worst: 0, typical: 0, input: 3000, output: 300}

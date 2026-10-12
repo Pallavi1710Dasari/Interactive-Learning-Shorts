@@ -11,7 +11,8 @@ here spends money or touches the network:
   - outside a motion run every request is exactly as before (explainer and
     story unchanged);
   - inside one, each model gets its motion_models.yaml setting: Opus thinking
-    on with a budget added on top of max_tokens, Sonnet off;
+    on with a budget added on top of max_tokens, Sonnet on too (OpenRouter
+    refuses thinking off for it as well: the same 400, 2026-10-10);
   - thinking / redacted_thinking blocks and inlined <thinking> text never
     reach a parser, even when they contain braces;
   - the YAML is validated; the estimate counts thinking tokens;
@@ -130,11 +131,12 @@ def test_the_failure_reproduced_and_fixed():
 def test_each_model_gets_its_own_setting_and_it_ends_with_the_run():
     with fake_client() as m:
         with mm.use():
-            llm.ask_json("s", "u", Ok, label="framing", max_tokens=600)          # sonnet: off
+            llm.ask_json("s", "u", Ok, label="framing", max_tokens=600)          # sonnet: on
             llm.ask_json("s", "u", Ok, label="motion_scenes", max_tokens=9000)   # opus: on
             llm.call("s", "u", model=OPUS, max_tokens=500, label="raw")
         sonnet, opus, raw = m.requests
-        assert sonnet["model"] == SONNET and sonnet["thinking"] == {"type": "disabled"} and sonnet["max_tokens"] == 600
+        assert sonnet["model"] == SONNET and sonnet["thinking"] == {"type": "enabled", "budget_tokens": 1024}
+        assert sonnet["max_tokens"] == 600 + 1024
         assert opus["model"] == OPUS and opus["thinking"]["type"] == "enabled" and opus["max_tokens"] == 9000 + 1024
         assert raw["max_tokens"] == 500 + 1024
     assert llm._MODEL_REASONING == {} and llm._LABEL_MODELS == {}
@@ -159,7 +161,7 @@ def test_thinking_never_reaches_the_parser():
 
 def test_the_yaml_is_validated():
     good = yaml.safe_load(mm.PATH.read_text(encoding="utf-8"))
-    assert good["reasoning"][OPUS]["thinking"] == "on" and good["reasoning"][SONNET]["thinking"] == "off"
+    assert good["reasoning"][OPUS]["thinking"] == "on" and good["reasoning"][SONNET]["thinking"] == "on"
 
     def check(data) -> str:
         """Load `data` as the YAML — from a temp file; the real one is never written."""
@@ -188,7 +190,7 @@ def test_the_yaml_is_validated():
 
 def test_the_estimate_counts_thinking():
     rows = {r["label"]: r for r in mm.estimate("x" * 4000)}
-    assert rows["select"]["thinking"] == 1024 and rows["framing"]["thinking"] == 0
+    assert rows["select"]["thinking"] == 1024 and rows["framing"]["thinking"] == 1024   # Sonnet thinks too
     from shorts import preflight
     bare = preflight.text_cost_per_call(OPUS, 1000 + 3500, 2500)
     assert rows["select"]["per_call_worst"] > bare

@@ -279,9 +279,9 @@ def test_change_cadence_rejects_a_still_shot():
 def test_color_semantics():
     base = _scened("usestate_golden")
     title = base.shots[1].scene
+    mint = MotionSceneObject(id="o9", kind="status_pill", props={"text": "Works", "tone": "ok", "icon": "check"})
     r = checks.check_motion_color_semantics(_with_scene(base, 3, base.shots[3].scene.model_copy(update={
-        "objects": [o.model_copy(update={"props": {**o.props, "tone": "ok"}}) if o.kind == "status_pill" else o
-                    for o in base.shots[3].scene.objects]})))
+        "objects": base.shots[3].scene.objects + [mint]})))
     assert not r.passed and "s04 (break_1)" in r.reason and "mint" in r.reason, r.reason
     stamp = MotionSceneObject(id="o9", kind="stamp", props={"text": "FIXED"})
     r = checks.check_motion_color_semantics(_with_scene(base, 6, base.shots[6].scene.model_copy(update={
@@ -337,14 +337,14 @@ def test_an_unrepairable_scene_falls_back_to_the_default():
     assert len(calls) == 1 + config.MAX_MOTION_SCENE_RETRIES
     assert checks.all_passed(results)
     assert out.shots[3].scene == ms.default_scenes(plain)[3]
-    assert any("using the default scene" in line for line in logged), logged
+    assert any("default scene for s04" in line for line in logged), logged
 
 
 def test_the_scenes_prompt_names_the_library_and_the_rules():
     system = scenes_mod.system_prompt()
     for kind in lib.object_kinds():
         assert f"  {kind} [" in system, kind
-    for rule in ("2.5 seconds", "MIRRORS the hook", "coral", "COPIED from this shot's captions"):
+    for rule in ("2.5 seconds", "The payoff MIRRORS it", "coral", "COPIED from this shot's captions"):
         assert rule in system, rule
 
 

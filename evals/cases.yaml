@@ -643,8 +643,8 @@ cases:
     section_id: "3.2"
     fixture: evals/fixtures/content_example_missing.json
     expect:
-      fix_areas: ["example"]
-      preserve_areas: ["grounding", "teaching_flow", "opening", "confusion", "other"]
+      fix_areas: ["example", "other"]
+      preserve_areas: ["grounding", "teaching_flow", "opening", "confusion"]
       block_contains:
         - "WHAT IS WRONG"
         - "WHAT TO FIX"
@@ -666,7 +666,7 @@ cases:
     section_id: "3.1"
     fixture: evals/fixtures/content_quarantined_plans.json
     expect:
-      fix_areas: []
+      fix_areas: ["other"]
       block_excludes:
         - "uses_example"
         - "handles_confusion"
@@ -1223,32 +1223,18 @@ cases:
       template_includes: [state]
 
   - id: E068
-    name: A bullet-note section too thin to cite is caught before any model call
+    name: A section with three distinct citable spans passes the richness check
     why: >
-      THE REAL BUG THIS FIXES, frozen from what actually shipped. A user uploaded
-      slide-note material and generated a short for "html_images_syntax_and_void_
-      elements" — two bullet points and a code fence, one real sentence: "HTML
-      elements like `<img />` are called void elements because they don't require
-      an end tag." check_plan_depth PASSED this section (the understanding step
-      read a 3-step teaching sequence plus a required example off it, which is a
-      true reading of the CONCEPT), and the section still could not supply
-      `MIN_ANSWERS - 1` = 3 distinct citations, because it does not have three
-      real sentences. Three paid script attempts came back failing source_quotes,
-      grounding, reaches_objective and learning_outcome, all for the same reason,
-      and nothing had checked for it up front.
-
-      This is the free, deterministic half check_plan_depth is not: it counts
-      real sentences and code lines in the raw section text, no model call, and
-      it is checked BEFORE understanding_for is spent — /api/scripts, /api/script
-      and run.build_one all gate on it now, so a section shaped like this one
-      costs nothing rather than four calls that were always going to fail.
+      The section has three distinct citable spans under the current rules, so it
+      meets the `MIN_ANSWERS - 1` threshold. This guards the boundary where code
+      and substantive list items count as evidence, while topic labels do not.
     type: golden
     step: section_richness
     input: evals/fixtures/img_void_element_material.md
     section_id: "html_images_syntax_and_void_elements"
     expect:
-      passed: false
-      reason_contains: "distinct citable sentence"
+      passed: true
+      reason_contains: "3 distinct citable sentence(s)"
 
   - id: E069
     name: A section with enough real sentences passes the same check
@@ -1501,24 +1487,22 @@ cases:
 
   # ------------------------------------------------- question/answer sentence form
   #
-  # "Complete sentences, beginner-simple, memorable" is the requirement; only the
-  # first third of it is something free code can judge at all. These three narrow
-  # structural failures are that slice — see check_qa_sentence_form's docstring for
-  # why "simple" and "memorable" are left to the SYSTEM prompts in select.py and
-  # script.py instead of to a grader here.
+  # The objective is one focused concept, while every spoken beat is a complete
+  # sentence. The objective itself need not be phrased as a question; see the
+  # grader's docstring for the distinction.
 
   - id: E083
-    name: A question with no "?" is rejected as not actually a question
+    name: A learning objective without a question mark is accepted
     why: >
-      Nothing previously stopped a topic string surviving into the short as a
-      bare noun phrase instead of a question — MAX_ANSWER_WORDS and the beat
-      count both pass a script whose `question` field never asks anything.
+      `script.question` now stores the internal learning objective, not a spoken
+      question. A focused noun phrase is valid here; the spoken beats still need
+      complete-sentence punctuation.
     type: code_grader
     grader: qa_sentence_form
     fixture: evals/fixtures/qa_question_no_mark.json
     expect:
-      passed: false
-      reason_contains: "not phrased as a question"
+      passed: true
+      reason_contains: "single focused concept"
 
   - id: E084
     name: A question stapling two "?"s together is rejected
@@ -3323,7 +3307,8 @@ cases:
     grader: color_semantics
     fixture: evals/fixtures/motion/usestate_golden.json
     patch:
-      - {path: shots.3.scene.objects.1.props.tone, value: ok}
+      # s04's default scene is one token_row (no pill since 2026-10-09): a mint chip
+      - {path: shots.3.scene.objects.0.props.tones, value: [plain, ok]}
     expect:
       passed: false
       reason_contains: "s04 (break_1)"

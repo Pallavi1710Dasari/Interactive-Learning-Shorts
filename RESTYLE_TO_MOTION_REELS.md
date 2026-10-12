@@ -538,7 +538,7 @@ The second command has no `SHORTS_STUB`. It shows the estimate and asks before a
 **Fix.**
 - **Per-model reasoning** in `shorts/motion_models.yaml` (`reasoning`), applied by `motion_models.use()` for a motion run only:
   - Opus 5.5: `thinking: "on"` with `effort: low` (a 1024-token budget, the API minimum). This sends `thinking={"type":"enabled","budget_tokens":1024}`.
-  - Sonnet 5.5: `thinking: "off"`.
+  - Sonnet 5.5: `thinking: "on"`, `effort: low` too. (Briefly set to off on 2026-10-10; OpenRouter refused it with the same 400, "Reasoning is mandatory", so it is on for good.)
   - `effort` is low / medium / high (1024 / 4096 / 12000 tokens); or give a `budget` directly.
   - The budget is added to each call's `max_tokens`, so thinking never takes the room the JSON needs.
   - The YAML is validated: every model a run uses needs a setting.
@@ -546,6 +546,20 @@ The second command has no `SHORTS_STUB`. It shows the estimate and asks before a
 - **Thinking never reaches a parser.** `llm.visible_text()` reads only `text` blocks (not `thinking`, `redacted_thinking` or `reasoning`) and strips any `<thinking>`/`<think>`/`<reasoning>` text a gateway inlines. `ask_json` and `text_of` both use it.
 - **The estimate counts thinking.** Thinking is billed as output: a typical call counts 60% of its budget (`typical_share`), the worst case all of it. For the useState lesson: **$0.63 typical, $1.77 worst** (was $0.56 / $1.38), under `MAX_REEL_USD` ($2.00).
 - **Preflight.** `python -m shorts.motion_reel --check-models` makes ONE tiny call per model with its reasoning setting, and reports OK or the exact error, with its billed cost: at most about $0.02 in all. With `SHORTS_STUB=1` it is a dry run that shows what it would send.
+
+## First real reel fixes (2026-10-10)
+
+The first real reel (`what_state_means__motion`, 7.4 of `content/react_usestate_basics.md`) failed at scenes. Its script is the fixture `evals/fixtures/motion/what_state_means_script.json`. Its run folder stayed on the other machine, so the per-attempt s01 diagnosis and the cost backfill for its earlier runs were skipped.
+
+- **Scenes.** The hook and the payoff fall back together, so a fallback never breaks the mirror. The scenes prompt carries every kind, prop, height, region and action, and says plainly that there is no side-by-side layout: two things are STACKED, the failing one above. The `before_vs_after` theme now says the same instead of "side by side". (`shorts/motion_scenes_fix_test.py`)
+- **Cost.** `output/<id>/cost.json` is written after every call and when a run ends however it ends (a crash or Ctrl+C included). `MAX_REEL_USD` counts the reel's earlier runs, not only the current one.
+- **Source scope** (user rule). The explanation and the running example come from the selected section; other sections may supply supporting numbers and defined terms, labelled with their section in the facts table (`7.2 (supporting)`). New grader `motion_example_from_selected` (fix_story): a name the example is built from (identifiers in its code, `backticked` code in captions, camelCase/PascalCase names) that another section states and the selected section never does fails. On the first reel: `count` (s03, s08) came from 7.2 and fails; its "zero" is a supporting number and passes. The script prompt shows the selected section as MATERIAL and the rest as SUPPORTING SECTIONS. Walkthroughs keep `walkthrough_main_source`. An **invented** example (its names are in no section of the document) is allowed, not a failure, but the shot list and the report print `WARNING — invented example: likes (s03, s08), … — not in any section, please review` (`checks.invented_example_warning`).
+- **Teaching approach.** New grader `motion_respects_approach`: what the approved approach's rationale rules out ("how useState is called is out of scope") is listed in the script prompt as binding, and an identifier it names may not appear in any shot's code (nor in the narration, unless the exclusion is only about how it is written). On the first reel: s08's `useState(0)` fails.
+- **Routing.** `screen` (topic screening) is in `shorts/motion_models.yaml`. During a motion run an `ask_json` label missing from the YAML is an error before anything is sent.
+- **Reasoning.** Opus 5.5 and Sonnet 5.5 both think (`effort: low`, 1024 tokens): OpenRouter refuses thinking off for both.
+- **Handle.** `BRAND_HANDLE` / `MOTION_SERIES` in `.env` (documented in `.env.example`); each motion run prints the handle it uses.
+
+Tests: `SHORTS_STUB=1 python -m shorts.motion_first_reel_fixes_test` (cost, source scope, approach, routing, reasoning).
 
 ## Phases still to come
 

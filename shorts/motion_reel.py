@@ -98,6 +98,10 @@ def _confirm(prompt: str, yes: bool) -> bool:
         return False
 
 
+#: The run in progress: its start, which keys its entry in cost.json.
+_RUN: dict = {"started": None}
+
+
 def _money_gate(stage: str, short_id: str, plan: list, yes: bool, reel_cursor: int) -> bool:
     """Same pre-spend gate as story_reel._money_gate: print + persist the
     pre-flight plan (always, even under --yes), refuse past MAX_REEL_USD,
@@ -105,7 +109,7 @@ def _money_gate(stage: str, short_id: str, plan: list, yes: bool, reel_cursor: i
     built = preflight.build_plan(f"motion_{stage}", short_id, plan)
     preflight.print_plan(built)
     preflight.write_preflight_json(short_id, built)
-    spent = usage.since(reel_cursor)["cost"]
+    spent = round(earlier_runs_cost(short_id, _RUN["started"]) + usage.since(reel_cursor)["cost"], 6)
     projected = round(spent + built["total_cost"], 4)
     if projected > config.MAX_REEL_USD:
         print(f"  MAX_REEL_USD (${config.MAX_REEL_USD:.2f}) would be exceeded: "
@@ -450,11 +454,29 @@ def _now_iso() -> str:
 
 def fact_sources(script: MotionScript, sections: list, state: dict) -> list[dict]:
     """Every number and long term the script says, with the section it came
-    from (checks.motion_fact_sources), against this reel's own main and
-    supporting sections."""
-    main = [(sid, find_section(sections, sid).text) for sid in state["pool_ids"]]
+    from (checks.motion_fact_sources): the selected section first, then every
+    other section as SUPPORTING, labelled with its id (source-scope rule,
+    2026-10-10)."""
+    selected = state["section_id"]
+    pool = [(sid, find_section(sections, sid).text) for sid in state["pool_ids"]]
     support = [(sid, find_section(sections, sid).text) for sid in state.get("support_ids", [])]
-    return checks.motion_fact_sources(script, main, support)
+    if state.get("template") == "walkthrough":
+        # a walkthrough's whole pool is its main material (decision 2026-10-01)
+        return checks.motion_fact_sources(script, pool, support)
+    main = [(sid, t) for sid, t in pool if sid == selected] or [
+        (selected, find_section(sections, selected).text)]
+    others = [(sid, t) for sid, t in pool if sid != selected]
+    return checks.motion_fact_sources(script, main, others + support)
+
+
+def print_invented_example(script: MotionScript, sections: list) -> str:
+    """Print the invented-example WARNING (checks.invented_example_warning)
+    when the running example's names are in no section; returns it ("" when
+    there is none)."""
+    warning = checks.invented_example_warning(script, "\n\n".join(s.text for s in sections))
+    if warning:
+        print(f"\n  {warning}")
+    return warning
 
 
 def print_fact_sources(rows: list[dict]) -> None:
@@ -546,6 +568,7 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
     print_shot_list(script, results)
     facts = fact_sources(script, sections, state)
     print_fact_sources(facts)
+    print_invented_example(script, sections)
     if not _confirm("Approve shot list?", yes):
         print(f"Stopped after script — rerun with --topic {short_id} to continue "
               f"(the script was NOT saved — declining means try again, not skip ahead).")
@@ -749,22 +772,40 @@ def _print_call(call) -> None:
           f"   ${call.cost:.4f}{est}")
 
 
-def record_cost(short_id: str, calls: list[dict], started: str) -> dict:
-    """Append this run's calls to output/<short_id>/cost.json and return the
-    reel's whole history: every run, every call, and the total."""
-    from datetime import datetime, timezone
+def _load_cost(short_id: str) -> dict:
     path = cost_path(short_id)
-    data = {"short_id": short_id, "runs": []}
     if path.exists():
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            return json.loads(path.read_text(encoding="utf-8"))
         except ValueError:
             pass
-    if calls or not data["runs"]:
-        data["runs"].append({"started": started,
-                             "ended": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                             "stub": bool(config.STUB), "calls": calls,
-                             "cost": round(sum(c["cost"] for c in calls), 6)})
+    return {"short_id": short_id, "runs": []}
+
+
+def earlier_runs_cost(short_id: str, started: str | None) -> float:
+    """What every OTHER run of this reel has spent (output/<short_id>/cost.json),
+    so MAX_REEL_USD caps the reel, not just the run in progress."""
+    return round(sum(r.get("cost", 0.0) for r in _load_cost(short_id)["runs"]
+                     if r.get("started") != started), 6)
+
+
+def record_cost(short_id: str, calls: list[dict], started: str) -> dict:
+    """Write this run's calls into output/<short_id>/cost.json — the run
+    started at `started` is replaced, so this is called after EVERY call and
+    once more when the run ends, however it ends (a crash or Ctrl+C included:
+    the first real reel's history lost the setup, theme and script runs).
+    Returns the reel's whole history: every run, every call, and the total."""
+    from datetime import datetime, timezone
+    path = cost_path(short_id)
+    data = _load_cost(short_id)
+    run = {"started": started, "ended": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "stub": bool(config.STUB), "calls": calls,
+           "cost": round(sum(c["cost"] for c in calls), 6)}
+    same = [i for i, r in enumerate(data["runs"]) if r.get("started") == started]
+    if same:
+        data["runs"][same[0]] = run
+    elif calls or not data["runs"]:
+        data["runs"].append(run)
     every = [c for r in data["runs"] for c in r["calls"]]
     by_label: dict[str, dict] = {}
     for c in every:
@@ -789,6 +830,8 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
     from datetime import datetime, timezone
     from . import motion_models
     print(_MOTION_MODE_BANNER)
+    print(f"  handle: {config.BRAND_HANDLE!r}   series: {config.MOTION_SERIES!r}   "
+          f"(BRAND_HANDLE / MOTION_SERIES in .env)")
     if estimate_only or (not config.STUB and topic_short_id is None):
         doc_text = Path(doc_path).read_text(encoding="utf-8")
         typical, worst = motion_models.print_estimate(motion_models.estimate(doc_text))
@@ -804,16 +847,32 @@ def run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         print("Cannot proceed — ANTHROPIC_API_KEY is not set (every text call goes "
               "through it). Copy .env.example to .env, or run with SHORTS_STUB=1.")
         return 1
-    started = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # milliseconds: the start keys this run's entry in cost.json
+    started = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    _RUN["started"] = started
     cursor = usage.mark()
     ctx: dict = {"short_id": topic_short_id}
+
+    def _save(_call=None) -> None:
+        # after every call: a run that dies later still has its spend on disk
+        # (setup's calls are written with the first call after the id is known)
+        if ctx.get("short_id"):
+            record_cost(ctx["short_id"], usage.calls_since(cursor), started)
+
     usage.add_listener(_print_call)
+    usage.add_listener(_save)
     try:
         with motion_models.use():
             code = _run(doc_path, topic_short_id, from_stage, force_stage, yes, template,
                         theme, language, ctx, section)
     finally:
         usage.remove_listener(_print_call)
+        usage.remove_listener(_save)
+        _RUN["started"] = None
+        _save()
+        if not ctx.get("short_id") and usage.calls_since(cursor):
+            print(f"\n  no reel was created; this run's {len(usage.calls_since(cursor))} call(s), "
+                  f"${usage.since(cursor)['cost']:.4f}, are in {usage.STORE} only")
     if ctx.get("short_id"):
         data = record_cost(ctx["short_id"], usage.calls_since(cursor), started)
         this = usage.since(cursor)
@@ -903,6 +962,7 @@ def _run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
             motion_path(short_id).read_text(encoding="utf-8"))
         print(f"\n=== script: resumed from {motion_path(short_id)} ===")
         print_shot_list(script)
+        print_invented_example(script, sections)
 
     # --------------------------------------------------------------- scenes
     redone = False
@@ -952,6 +1012,7 @@ def _run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         print(f"  theme: {choice.theme} ({choice.source}) — {choice.reason}")
         print(f"  tags: {' '.join(choice.tags)}   ({tags_path(short_id)})")
     print_fact_sources(fact_sources(script, sections, state))
+    print_invented_example(script, sections)
     if plan_path(short_id).exists():
         print(f"  plan: {plan_path(short_id)}   (#motion-reel/{short_id} in the app)")
     if timing_results and not checks.all_passed(timing_results):

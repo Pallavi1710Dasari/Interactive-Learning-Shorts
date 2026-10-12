@@ -277,6 +277,10 @@ def text_of(resp) -> str:
 _LABEL_MODELS: dict[str, str] = {}
 
 
+class UnroutedLabel(RuntimeError):
+    """A motion-run call whose label has no route in motion_models.yaml."""
+
+
 def set_label_models(mapping: dict[str, str]) -> None:
     _LABEL_MODELS.clear()
     _LABEL_MODELS.update({k: v for k, v in mapping.items() if v})
@@ -311,6 +315,11 @@ def ask_json(
     burns the remaining attempts on the same truncation; the budget is what was
     wrong, so the budget is what changes.
     """
+    if _LABEL_MODELS and label not in _LABEL_MODELS:
+        # a motion run routes EVERY call; an unrouted label would silently use
+        # config.py's model (the first real reel's `screen` ran on claude-sonnet-5)
+        raise UnroutedLabel(f"motion run: LLM call {label!r} is not routed — add it to "
+                            f"shorts/motion_models.yaml `steps` (nothing was sent)")
     if config.STUB:
         from .stubs import fake
         return fake(model_cls, system, user)

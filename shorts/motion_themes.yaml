@@ -442,8 +442,10 @@ themes:
     tag: beforeafter
     template: fix_story
     description: >-
-      One narrator sets two versions side by side, the broken before and the
-      working after, and shows the one change that makes the difference.
+      One narrator sets two versions against each other, the broken before and
+      the working after, and shows the one change that makes the difference.
+      On screen the two are STACKED, the before above the after (the scene
+      library has one column; there is no side-by-side layout).
     speakers:
       - {role: NARRATOR}
     needs_code: false
@@ -454,9 +456,9 @@ themes:
       style: question
       openers: ["same", "spot the difference", "why does this", "why does one", "why do these", "these look", "one of these"]
       symptom: true
-      brief: Two versions side by side; why does one show the visible symptom?
+      brief: Two versions, the before above the after; why does one show the visible symptom?
     beats:
-      hook:     {does: "Before and after side by side: why does one show the symptom?"}
+      hook:     {does: "Before and after, one above the other: why does one show the symptom?"}
       title:    {does: "Name the concept that makes the difference, in one line."}
       setup:    {does: "The before: exactly as a beginner writes it."}
       break_1:  {does: "Why the before fails, as a mechanism."}

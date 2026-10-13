@@ -98,14 +98,16 @@ def _asked(user: str) -> list[str]:
 
 def test_the_prompt_says_what_the_graders_check():
     p = sk.system_prompt()
-    for must in ("identity_title (no props)", "ONLY the hook", "NO side-by-side", "phone", "STACK them",
-                 "1000 tall", "600 tall", "gap between objects 48", "entity_card [placed] 330",
+    gap = sk.lib.library()["frame"]["gap"]           # the layout's own number, whatever it is
+    for must in ("identity_title (no props", "ONLY the hook", "NO free layout", "ONE compare object",
+                 "SHOW IT, DON'T WRITE IT", "app_screen", "memory_box", "ONLY on a shot whose script has code",
+                 "1000 tall", "600 tall", f"gap between objects {gap}", "entity_card [placed] 330",
                  "kinetic_title [placed] 106 per line", "code_window [placed] 174 + 120 per line",
                  "without the <b> tags", "SAME object\n  kinds", "every 2.5 seconds"):
         assert must.replace("\n  ", " ") in p.replace("\n  ", " "), must
     assert "__" not in p
     block = sk._script_block(SCRIPT)
-    assert "budget: ~" in block and "needs >= " in block and "FIRST object identity_title" in block
+    assert "budget: ~" in block and "needs >= " in block and "act the problem out" in block
     assert "mirror the hook's kinds" in block
     assert "cue words: Why does one counter stay stuck at zero?" in block      # tags stripped
     assert "colours: coral (bad) allowed, no mint" in block
@@ -113,12 +115,14 @@ def test_the_prompt_says_what_the_graders_check():
 
 def test_the_prompts_example_is_a_valid_scene():
     p = sk.system_prompt()
-    ex = p.split("would use less height):\n", 1)[1].split("\n(In the hook", 1)[0]
+    ex = p.split("has 600 of height):\n", 1)[1].split("\n(In the hook", 1)[0]
     draft = MotionScenesDraft(**json.loads(ex))
     for s in draft.shots:
         for o in s.scene.objects:
             assert not ms.object_problems(o), (s.id, o)
-    assert ms.stack_height(draft.shots[0].scene) == 776
+    # kinetic_title 2 lines (2 x 106.4) + gap 60 + app_screen 560 — the arithmetic the prompt states
+    assert round(ms.stack_height(draft.shots[0].scene)) == 833, ms.stack_height(draft.shots[0].scene)
+    assert {a.do for a in draft.shots[0].scene.actions} >= {"tap", "state"}
 
 
 # ======================================================== cues and transitions
@@ -197,14 +201,18 @@ def test_a_first_attempt_that_passes_makes_one_call():
 
 # ============================================================ the default hook
 
-def test_the_default_hook_names_the_question_and_the_symptom():
+def test_the_default_hook_names_the_question_and_acts_out_the_symptom():
+    """The hook: the question above, and the failure acted out below it (an
+    app screen whose button is tapped and whose number stays put)."""
     hook = ms.default_scenes(SCRIPT)[0]
     kinds = [(o.kind, o.props) for o in hook.objects]
     title = next(p for k, p in kinds if k == "kinetic_title")["text"]
-    pill = next(p for k, p in kinds if k == "status_pill")["text"]
-    assert title == "WHY DOES ONE COUNTER STAY STUCK AT ZERO?"
-    assert pill == "Stuck at zero"
-    assert "." not in pill and "Why" not in pill
+    assert title == "Why does one counter stay stuck at zero?"   # the player sets the case per design
+    screen = next(o for o in hook.objects if o.kind in checks.MOTION_ACTION_KINDS)
+    acts = [(a.do, a.tone) for a in hook.actions if a.target == screen.id]
+    assert ("state", "bad") in acts, acts
+    if screen.kind == "app_screen":
+        assert ("tap", None) in acts, acts
     assert checks.all_passed(checks.run_motion_scene_graders(ms.with_default_scenes(SCRIPT)))
 
 

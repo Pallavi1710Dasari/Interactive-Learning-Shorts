@@ -298,7 +298,8 @@ def _bg_scale_for(workers: int) -> float:
 
 
 def _capture_slice(chrome: str, base: str, short_id: str, outdir: Path,
-                   indices: list[int], fps: int, on_frame, bg_scale: float = 0.5) -> None:
+                   indices: list[int], fps: int, on_frame, bg_scale: float = 0.5,
+                   route: str | None = None) -> None:
     """Photograph one worker's share of the frames. Owns its own browser."""
     port = _free_port()
     profile = outdir / f"profile-{port}"
@@ -315,7 +316,9 @@ def _capture_slice(chrome: str, base: str, short_id: str, outdir: Path,
         dev.send("Emulation.setDeviceMetricsOverride",
                  {"width": WIDTH, "height": HEIGHT, "deviceScaleFactor": 1,
                   "mobile": False})
-        url = f"{base}/#capture/{short_id}?bgscale={bg_scale}"
+        # a motion reel is photographed in its own player, drawn alone at
+        # 1080x1920 (#motion-reel/<id>?bare=1) — the same window.__capture.seek
+        url = f"{base}/{route}" if route else f"{base}/#capture/{short_id}?bgscale={bg_scale}"
         dev.send("Page.navigate", {"url": url})
 
         deadline = time.monotonic() + 45
@@ -432,9 +435,20 @@ def render(short_id: str, force: bool = False,
     audio.mp3.
     """
     is_story = is_story_reel(short_id)
+    from . import motion_bundle
+    is_motion = (not is_story and not (config.OUTPUT_DIR / f"{short_id}.json").exists()
+                 and (config.OUTPUT_DIR / short_id / "plan.json").exists()
+                 and motion_bundle.is_motion_reel(config.OUTPUT_DIR, short_id))
 
     unit: ShortUnit | None = None
-    if is_story:
+    if is_motion:
+        # MOTION REELS (2026-10-13): the plan is the timeline, the mixed
+        # narration is audio/reel.wav, and the player is the motion player
+        path = config.OUTPUT_DIR / short_id / "plan.json"
+        total = float(json.loads(path.read_text(encoding="utf-8"))["duration"])
+        if total <= 0:
+            raise RuntimeError(f"{short_id} has a zero-length plan")
+    elif is_story:
         path = config.OUTPUT_DIR / f"{short_id}.story.json"
         total = _story_total_seconds(short_id)
         if total <= 0:
@@ -474,7 +488,9 @@ def render(short_id: str, force: bool = False,
                            "The renderer photographs the built app.")
 
     chrome, ff = _chrome(), _ffmpeg()
-    if is_story:
+    if is_motion:
+        audio = outdir / "audio" / "reel.wav"
+    elif is_story:
         audio_dir = outdir / "audio"
         audio = audio_dir / "mix_with_music.wav"
         if not audio.exists():
@@ -505,8 +521,9 @@ def render(short_id: str, force: bool = False,
         bg_scale = _bg_scale_for(workers)
         errors: list[BaseException] = []
         with ThreadPoolExecutor(max_workers=workers) as pool:
+            route = f"#motion-reel/{short_id}?bare=1" if is_motion else None
             futures = [pool.submit(_capture_slice, chrome, base, short_id,
-                                   tmpdir, part, fps, tick, bg_scale)
+                                   tmpdir, part, fps, tick, bg_scale, route)
                        for part in slices if part]
             for f in futures:
                 try:

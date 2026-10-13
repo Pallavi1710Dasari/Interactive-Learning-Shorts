@@ -7,18 +7,20 @@
 //                           the stub demos in web/public/motion-demo/ (Vite only)
 //   #motion/reel/<id>       one reel from output/
 //   #motion/demo/<name>     one stub demo
+//   #motion/job/<id>        a reel being made — its steps in the workspace (StepMotion.tsx)
 //
 // A reel page shows its player, theme (and why), teaching approach, tags, the
 // script with speaker labels, the fact sources and the cost of every LLM call.
 // The phase 2 gallery and the language identities (#motion/identities) are
-// one click away. Read-only: nothing
-// here runs or changes a reel.
+// one click away. Only the job page (and Resume, which opens one) runs a
+// reel; the list and reel pages are read-only.
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { PlanPlayer, loadPlan } from "./scene/MotionPlayer";
 import { IdentitySheet } from "./identity/IdentitySheet";
 import { CharacterSheet } from "./cast/CharacterSheet";
 import { CharacterDesigner } from "./cast/CharacterDesigner";
+import { JobList, ResumeReel, openJob } from "./MotionJob";
 import type { MotionPlan } from "./scene/types";
 
 interface Summary {
@@ -53,13 +55,14 @@ const card: CSSProperties = { background: "#151A33", borderRadius: 14, padding: 
 const muted = "#9AA0C0";
 const link: CSSProperties = { color: "#FDD13E", textDecoration: "none", fontWeight: 700 };
 
-function route(): { view: "list" | "reel" | "demo" | "identities" | "characters" | "designer"; id?: string } {
+function route(): { view: "list" | "reel" | "demo" | "job" | "identities" | "characters" | "designer"; id?: string } {
   const parts = location.hash.replace(/^#/, "").split("?")[0].split("/");
   if (parts[1] === "identities") return { view: "identities" };
   if (parts[1] === "characters" && parts[2] === "designer") return { view: "designer" };
   if (parts[1] === "characters") return { view: "characters" };
   if (parts[1] === "reel" && parts[2]) return { view: "reel", id: decodeURIComponent(parts[2]) };
   if (parts[1] === "demo" && parts[2]) return { view: "demo", id: decodeURIComponent(parts[2]) };
+  if (parts[1] === "job" && parts[2]) return { view: "job", id: decodeURIComponent(parts[2]) };
   return { view: "list" };
 }
 
@@ -78,11 +81,12 @@ function Nav() {
     <nav style={{ display: "flex", gap: 22, alignItems: "baseline", flexWrap: "wrap", marginBottom: 22 }}>
       <a href="#motion" style={{ ...link, fontSize: 24, color: "#E9EBF7" }}>Motion</a>
       <a href="#motion" style={link}>All motion reels</a>
+      <ScreenLink to="#">+ New reel</ScreenLink>
       <ScreenLink to="#motion-gallery">Scene library (gallery)</ScreenLink>
       <a href="#motion/identities" style={link}>Language identities</a>
       <a href="#motion/characters" style={link}>Characters</a>
       <a href="#motion/characters/designer" style={link}>Character designer</a>
-      <ScreenLink to="#" style={{ color: muted, marginLeft: "auto" }}>Explainer workspace</ScreenLink>
+      <ScreenLink to="#reels" style={{ color: muted, marginLeft: "auto" }}>Reels feed</ScreenLink>
     </nav>
   );
 }
@@ -95,7 +99,7 @@ function Badge({ children, tone = "plain" }: { children: ReactNode; tone?: "plai
 
 const money = (n: number | null | undefined) => `$${(n ?? 0).toFixed(4)}`;
 
-function ReelTable({ rows, hrefOf }: { rows: Summary[]; hrefOf: (r: Summary) => string }) {
+function ReelTable({ rows, hrefOf, resumable }: { rows: Summary[]; hrefOf: (r: Summary) => string; resumable?: boolean }) {
   if (!rows.length) return <div style={{ color: muted }}>None.</div>;
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
@@ -114,7 +118,7 @@ function ReelTable({ rows, hrefOf }: { rows: Summary[]; hrefOf: (r: Summary) => 
             <td>{r.teaching_approach ?? "—"}</td>
             <td style={{ fontSize: 12, color: "#C9CCF0" }}>{r.tags.join(" ")}</td>
             <td>{r.duration ? `${r.duration.toFixed(1)}s` : "—"}</td>
-            <td>{r.stage}</td>
+            <td>{r.stage}{resumable && !r.has_plan && <div style={{ marginTop: 4 }}><ResumeReel shortId={r.short_id} /></div>}</td>
             <td>{money(r.cost)}{r.cost_estimated ? "*" : ""}</td>
           </tr>
         ))}
@@ -142,6 +146,7 @@ function ListView() {
   }, []);
   return (
     <>
+      <JobList />
       <div style={card}>
         <h2 style={{ margin: "0 0 4px", fontSize: 18 }}>Reels in output/</h2>
         <p style={{ margin: "0 0 12px", color: muted, fontSize: 13 }}>
@@ -150,7 +155,7 @@ function ListView() {
         </p>
         {realError ? <div style={{ color: "#FFB524" }}>{realError}</div>
           : real === null ? <div style={{ color: muted }}>Loading…</div>
-          : <ReelTable rows={real} hrefOf={(r) => `#motion/reel/${encodeURIComponent(r.short_id)}`} />}
+          : <ReelTable rows={real} resumable hrefOf={(r) => `#motion/reel/${encodeURIComponent(r.short_id)}`} />}
       </div>
       <div style={card}>
         <h2 style={{ margin: "0 0 4px", fontSize: 18 }}>Stub demos</h2>
@@ -212,7 +217,8 @@ function DetailView({ source, id }: { source: "reel" | "demo"; id: string }) {
       </div>
 
       <Section title="Player" note={plan ? "Play, scrub, or jump to a shot. Captions light word by word from the timing; the source is shown per caption." : undefined}>
-        {plan ? <PlanPlayer plan={plan} initialT={Math.min(2, plan.duration)} /> : <div style={{ color: muted }}>No playable plan yet — this reel stopped at "{b.stage}". The plan is written by the timing stage.</div>}
+        {plan ? <PlanPlayer plan={plan} initialT={Math.min(2, plan.duration)} /> : <div style={{ color: muted }}>No playable plan yet — this reel stopped at "{b.stage}". The plan is written by the timing stage.
+          {source === "reel" && <div style={{ marginTop: 8 }}><ResumeReel shortId={b.short_id} /></div>}</div>}
       </Section>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
@@ -303,6 +309,13 @@ function DetailView({ source, id }: { source: "reel" | "demo"; id: string }) {
   );
 }
 
+/** #motion/job/<id> reached by a hash change inside this section: the
+ * reel's steps are in the workspace, so reload into it. */
+function OpenSteps({ id }: { id: string }) {
+  useEffect(() => { openJob(id); }, [id]);
+  return <div style={{ color: muted }}>Opening the reel…</div>;
+}
+
 export function MotionSection() {
   const [r, setR] = useState(route);
   useEffect(() => {
@@ -317,6 +330,7 @@ export function MotionSection() {
         : r.view === "identities" ? <IdentitySheet />
         : r.view === "characters" ? <CharacterSheet />
         : r.view === "designer" ? <CharacterDesigner />
+        : r.view === "job" ? <OpenSteps id={r.id!} />
         : <DetailView key={r.view + r.id} source={r.view} id={r.id!} />}
     </div>
   );

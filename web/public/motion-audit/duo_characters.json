@@ -1,0 +1,3328 @@
+{
+ "short_id": "audit_duo__motion",
+ "template": "fix_story",
+ "theme": "interview",
+ "design": "classic",
+ "rev": 2,
+ "series": "@learnthesimpleway",
+ "concept_name": "useState",
+ "duration": 99.908,
+ "audio": null,
+ "timing_source": "even",
+ "identity": {
+  "id": "react",
+  "name": "React",
+  "colour": "#12B5DE",
+  "on_dark": "#12B9E3",
+  "on_light": "#0D83A1",
+  "text_on_dark": "#76DBF4",
+  "text_on_light": "#0A647B",
+  "file": "App.jsx",
+  "symbol": [
+   {
+    "path": "M50 30 L26 70 M50 30 L74 70",
+    "r": 0,
+    "stroke": 7.0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     50.0,
+     24.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     26.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "main"
+   },
+   {
+    "circle": [
+     74.0,
+     74.0,
+     13.0
+    ],
+    "r": 0,
+    "tone": "soft"
+   }
+  ]
+ },
+ "theme_label": "Interview",
+ "tags": [
+  "#react",
+  "#audit"
+ ],
+ "intro": 0.0,
+ "cast": [
+  {
+   "role": "INTERVIEWER",
+   "side": "left",
+   "label": "Interviewer",
+   "voice_slot": "motion_host",
+   "identity": {
+    "id": "host",
+    "name": "Host",
+    "colour": "#6C6F7A",
+    "on_dark": "#A6A8B0",
+    "on_light": "#6C6F7A",
+    "text_on_dark": "#CCCDD2",
+    "text_on_light": "#595B64",
+    "file": "",
+    "symbol": [
+     {
+      "rect": [
+       36.0,
+       12.0,
+       28.0,
+       46.0
+      ],
+      "r": 14.0,
+      "tone": "main"
+     },
+     {
+      "path": "M24 44 C24 66 76 66 76 44",
+      "r": 0,
+      "stroke": 8.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       46.0,
+       64.0,
+       8.0,
+       18.0
+      ],
+      "r": 3.0,
+      "tone": "main"
+     },
+     {
+      "rect": [
+       32.0,
+       80.0,
+       36.0,
+       8.0
+      ],
+      "r": 4.0,
+      "tone": "main"
+     }
+    ]
+   }
+  },
+  {
+   "role": "CANDIDATE",
+   "side": "right",
+   "label": "Candidate",
+   "voice_slot": "motion_char_1",
+   "identity": {
+    "id": "react",
+    "name": "React",
+    "colour": "#12B5DE",
+    "on_dark": "#12B9E3",
+    "on_light": "#0D83A1",
+    "text_on_dark": "#76DBF4",
+    "text_on_light": "#0A647B",
+    "file": "App.jsx",
+    "symbol": [
+     {
+      "path": "M50 30 L26 70 M50 30 L74 70",
+      "r": 0,
+      "stroke": 7.0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       50.0,
+       24.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       26.0,
+       74.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "main"
+     },
+     {
+      "circle": [
+       74.0,
+       74.0,
+       13.0
+      ],
+      "r": 0,
+      "tone": "soft"
+     }
+    ]
+   }
+  }
+ ],
+ "characters": [
+  {
+   "role": "INTERVIEWER",
+   "preset": "host",
+   "config": {
+    "name": "Arjun",
+    "gender": "male",
+    "art": "soft",
+    "shading": "flat",
+    "skinTone": "#F8C9A8",
+    "hair": {
+     "style": "quiff",
+     "color": "#151515"
+    },
+    "face": {
+     "jaw": "square",
+     "brows": "medium",
+     "eyes": "oval",
+     "mouth": "full"
+    },
+    "outfit": {
+     "top": "shirtTie",
+     "topColor": "#FFFFFF",
+     "bottom": "trousers",
+     "bottomColor": "#1B2238",
+     "shoeColor": "#2A2F45",
+     "accentColor": "#6C6F7A"
+    },
+    "accessories": {
+     "belt": true
+    },
+    "build": {
+     "height": 1.0,
+     "shoulders": 1.0
+    }
+   },
+   "side": "left",
+   "seed": 303,
+   "cues": [
+    {
+     "t": 0.0,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": ""
+    },
+    {
+     "t": 0.15,
+     "kind": "gesture",
+     "name": "shrug",
+     "side": null,
+     "cue": "Why"
+    },
+    {
+     "t": 0.25,
+     "kind": "expression",
+     "name": "confused",
+     "side": null,
+     "cue": "Why"
+    },
+    {
+     "t": 3.727,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "You"
+    },
+    {
+     "t": 5.985,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "changes."
+    },
+    {
+     "t": 7.119,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 9.827,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "A"
+    },
+    {
+     "t": 12.085,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "to."
+    },
+    {
+     "t": 13.219,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Here"
+    },
+    {
+     "t": 15.812,
+     "kind": "gesture",
+     "name": "countOne",
+     "side": null,
+     "cue": "first."
+    },
+    {
+     "t": 16.696,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "It"
+    },
+    {
+     "t": 19.338,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "updates."
+    },
+    {
+     "t": 20.473,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Each"
+    },
+    {
+     "t": 23.565,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Nothing"
+    },
+    {
+     "t": 25.823,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "again."
+    },
+    {
+     "t": 26.958,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 29.281,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "That"
+    },
+    {
+     "t": 31.923,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "fix."
+    },
+    {
+     "t": 33.058,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 36.535,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "When"
+    },
+    {
+     "t": 39.177,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "again."
+    },
+    {
+     "t": 40.312,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Calling"
+    },
+    {
+     "t": 43.019,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 45.277,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "redraws."
+    },
+    {
+     "t": 46.412,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "There"
+    },
+    {
+     "t": 49.119,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Keep"
+    },
+    {
+     "t": 52.146,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "redraw."
+    },
+    {
+     "t": 53.281,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Two"
+    },
+    {
+     "t": 55.988,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Each"
+    },
+    {
+     "t": 57.862,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "token."
+    },
+    {
+     "t": 58.996,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 62.088,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "They"
+    },
+    {
+     "t": 64.731,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "before."
+    },
+    {
+     "t": 65.865,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Every"
+    },
+    {
+     "t": 69.727,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 71.985,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "numbers."
+    },
+    {
+     "t": 73.119,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "You"
+    },
+    {
+     "t": 75.442,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "And"
+    },
+    {
+     "t": 77.315,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "screen."
+    },
+    {
+     "t": 78.45,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 81.542,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Then"
+    },
+    {
+     "t": 83.8,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "zero."
+    },
+    {
+     "t": 84.935,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 87.258,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 89.131,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "value."
+    },
+    {
+     "t": 90.265,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "A"
+    },
+    {
+     "t": 92.204,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "But"
+    },
+    {
+     "t": 92.923,
+     "kind": "gesture",
+     "name": "nod",
+     "side": null,
+     "cue": "remembers."
+    },
+    {
+     "t": 94.058,
+     "kind": "expression",
+     "name": "neutral",
+     "side": null,
+     "cue": "Every"
+    },
+    {
+     "t": 96.765,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "And"
+    }
+   ]
+  },
+  {
+   "role": "CANDIDATE",
+   "preset": "react",
+   "config": {
+    "name": "React",
+    "gender": "male",
+    "art": "soft",
+    "skinTone": "wheatish",
+    "hair": {
+     "style": "curly",
+     "color": "black"
+    },
+    "face": {
+     "jaw": "round",
+     "brows": "medium",
+     "eyes": "oval",
+     "mouth": "full"
+    },
+    "outfit": {
+     "top": "hoodie",
+     "topColor": "#12B5DE",
+     "bottom": "jeans",
+     "bottomColor": "#1B2238",
+     "shoeColor": "#2A2F45"
+    },
+    "accessories": {},
+    "build": {
+     "height": 1.0,
+     "shoulders": 1.0
+    }
+   },
+   "side": "right",
+   "seed": 90,
+   "cues": [
+    {
+     "t": 0.0,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": ""
+    },
+    {
+     "t": 0.35,
+     "kind": "expression",
+     "name": "thinking",
+     "side": null,
+     "cue": "Why"
+    },
+    {
+     "t": 3.627,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "You"
+    },
+    {
+     "t": 3.912,
+     "kind": "gesture",
+     "name": "handsSpread",
+     "side": null,
+     "cue": "click"
+    },
+    {
+     "t": 7.219,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 9.727,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "A"
+    },
+    {
+     "t": 10.012,
+     "kind": "gesture",
+     "name": "point",
+     "side": "R",
+     "cue": "plain"
+    },
+    {
+     "t": 13.319,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Here"
+    },
+    {
+     "t": 16.596,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "It"
+    },
+    {
+     "t": 16.881,
+     "kind": "gesture",
+     "name": "pointUp",
+     "side": "R",
+     "cue": "looks"
+    },
+    {
+     "t": 20.573,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Each"
+    },
+    {
+     "t": 23.365,
+     "kind": "gesture",
+     "name": "okSign",
+     "side": "R",
+     "cue": "Nothing"
+    },
+    {
+     "t": 23.465,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "Nothing"
+    },
+    {
+     "t": 27.058,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 29.181,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "That"
+    },
+    {
+     "t": 30.235,
+     "kind": "gesture",
+     "name": "presentLeft",
+     "side": null,
+     "cue": "bug"
+    },
+    {
+     "t": 33.158,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 36.335,
+     "kind": "gesture",
+     "name": "handsSpread",
+     "side": null,
+     "cue": "When"
+    },
+    {
+     "t": 36.435,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "When"
+    },
+    {
+     "t": 40.412,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Calling"
+    },
+    {
+     "t": 42.819,
+     "kind": "gesture",
+     "name": "point",
+     "side": "R",
+     "cue": "React"
+    },
+    {
+     "t": 42.919,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 46.512,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "There"
+    },
+    {
+     "t": 48.919,
+     "kind": "gesture",
+     "name": "pointUp",
+     "side": "R",
+     "cue": "Keep"
+    },
+    {
+     "t": 49.019,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "Keep"
+    },
+    {
+     "t": 53.381,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Two"
+    },
+    {
+     "t": 55.888,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "Each"
+    },
+    {
+     "t": 59.096,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 61.888,
+     "kind": "gesture",
+     "name": "okSign",
+     "side": "R",
+     "cue": "They"
+    },
+    {
+     "t": 61.988,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "They"
+    },
+    {
+     "t": 65.965,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Every"
+    },
+    {
+     "t": 69.627,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 69.912,
+     "kind": "gesture",
+     "name": "presentLeft",
+     "side": null,
+     "cue": "model"
+    },
+    {
+     "t": 73.219,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "You"
+    },
+    {
+     "t": 75.342,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "And"
+    },
+    {
+     "t": 78.55,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 81.342,
+     "kind": "gesture",
+     "name": "handsSpread",
+     "side": null,
+     "cue": "Then"
+    },
+    {
+     "t": 81.442,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "Then"
+    },
+    {
+     "t": 85.035,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "The"
+    },
+    {
+     "t": 87.158,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "React"
+    },
+    {
+     "t": 90.365,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "A"
+    },
+    {
+     "t": 92.104,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "But"
+    },
+    {
+     "t": 94.158,
+     "kind": "expression",
+     "name": "listening",
+     "side": null,
+     "cue": "Every"
+    },
+    {
+     "t": 96.665,
+     "kind": "expression",
+     "name": "happy",
+     "side": null,
+     "cue": "And"
+    },
+    {
+     "t": 98.873,
+     "kind": "gesture",
+     "name": "thumbsUp",
+     "side": "R",
+     "cue": "value."
+    },
+    {
+     "t": 99.073,
+     "kind": "expression",
+     "name": "grin",
+     "side": null,
+     "cue": "value."
+    }
+   ]
+  }
+ ],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "setup",
+   "chapter": null,
+   "start": 0.0,
+   "end": 6.869,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "identity_title",
+     "props": {},
+     "box": {
+      "x": 60.0,
+      "y": 240.0,
+      "w": 960.0,
+      "h": 270.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "Why does your counter stay stuck at zero?",
+      "accent": [
+       "zero"
+      ],
+      "lines": [
+       "Why does your",
+       "counter stay stuck",
+       "at zero?"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 570.0,
+      "w": 960.0,
+      "h": 319.2
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "status_pill",
+     "props": {
+      "text": "Still 0",
+      "tone": "bad",
+      "icon": "alert"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 949.2,
+      "w": 960.0,
+      "h": 104.0
+     }
+    }
+   ],
+   "actions": [],
+   "captions": [
+    {
+     "text": "Why does your counter stay stuck at zero?",
+     "speaker": "INTERVIEWER",
+     "start": 0.35,
+     "end": 3.427,
+     "words": [
+      {
+       "text": "Why",
+       "start": 0.35,
+       "end": 0.735,
+       "hl": false
+      },
+      {
+       "text": "does",
+       "start": 0.735,
+       "end": 1.119,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 1.119,
+       "end": 1.504,
+       "hl": false
+      },
+      {
+       "text": "counter",
+       "start": 1.504,
+       "end": 1.888,
+       "hl": false
+      },
+      {
+       "text": "stay",
+       "start": 1.888,
+       "end": 2.273,
+       "hl": false
+      },
+      {
+       "text": "stuck",
+       "start": 2.273,
+       "end": 2.658,
+       "hl": false
+      },
+      {
+       "text": "at",
+       "start": 2.658,
+       "end": 3.042,
+       "hl": false
+      },
+      {
+       "text": "zero?",
+       "start": 3.042,
+       "end": 3.427,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "You click and click, but nothing changes.",
+     "speaker": "CANDIDATE",
+     "start": 3.727,
+     "end": 6.419,
+     "words": [
+      {
+       "text": "You",
+       "start": 3.727,
+       "end": 4.112,
+       "hl": false
+      },
+      {
+       "text": "click",
+       "start": 4.112,
+       "end": 4.496,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 4.496,
+       "end": 4.881,
+       "hl": false
+      },
+      {
+       "text": "click,",
+       "start": 4.881,
+       "end": 5.265,
+       "hl": false
+      },
+      {
+       "text": "but",
+       "start": 5.265,
+       "end": 5.65,
+       "hl": false
+      },
+      {
+       "text": "nothing",
+       "start": 5.65,
+       "end": 6.035,
+       "hl": false
+      },
+      {
+       "text": "changes.",
+       "start": 6.035,
+       "end": 6.419,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "beat": "setup",
+   "chapter": null,
+   "start": 6.869,
+   "end": 12.969,
+   "field": "blue",
+   "transition": "cut",
+   "label": "THE IDEA",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "kinetic_title",
+     "props": {
+      "text": "React only redraws when state changes",
+      "accent": [
+       "state"
+      ],
+      "lines": [
+       "React only redraws",
+       "when state changes"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 433.6,
+      "w": 960.0,
+      "h": 212.8
+     }
+    }
+   ],
+   "actions": [],
+   "captions": [
+    {
+     "text": "React only redraws when state changes.",
+     "speaker": "INTERVIEWER",
+     "start": 7.219,
+     "end": 9.527,
+     "words": [
+      {
+       "text": "React",
+       "start": 7.219,
+       "end": 7.604,
+       "hl": false
+      },
+      {
+       "text": "only",
+       "start": 7.604,
+       "end": 7.988,
+       "hl": false
+      },
+      {
+       "text": "redraws",
+       "start": 7.988,
+       "end": 8.373,
+       "hl": false
+      },
+      {
+       "text": "when",
+       "start": 8.373,
+       "end": 8.758,
+       "hl": false
+      },
+      {
+       "text": "state",
+       "start": 8.758,
+       "end": 9.142,
+       "hl": false
+      },
+      {
+       "text": "changes.",
+       "start": 9.142,
+       "end": 9.527,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "A plain variable never tells it to.",
+     "speaker": "CANDIDATE",
+     "start": 9.827,
+     "end": 12.519,
+     "words": [
+      {
+       "text": "A",
+       "start": 9.827,
+       "end": 10.212,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 10.212,
+       "end": 10.596,
+       "hl": false
+      },
+      {
+       "text": "variable",
+       "start": 10.596,
+       "end": 10.981,
+       "hl": false
+      },
+      {
+       "text": "never",
+       "start": 10.981,
+       "end": 11.365,
+       "hl": false
+      },
+      {
+       "text": "tells",
+       "start": 11.365,
+       "end": 11.75,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 11.75,
+       "end": 12.135,
+       "hl": false
+      },
+      {
+       "text": "to.",
+       "start": 12.135,
+       "end": 12.519,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "beat": "setup",
+   "chapter": null,
+   "start": 12.969,
+   "end": 20.223,
+   "field": "paper",
+   "transition": "cut",
+   "label": "THE CODE",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "code_window",
+     "props": {
+      "file": "Counter.jsx",
+      "lines": [
+       "let count = 0;",
+       "count = count + 1;"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 251.0,
+      "w": 960.0,
+      "h": 414.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Plain variable",
+      "tone": "warn"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 725.0,
+      "w": 960.0,
+      "h": 104.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 12.969,
+     "do": "type",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Here is the code a beginner writes first.",
+     "speaker": "INTERVIEWER",
+     "start": 13.319,
+     "end": 16.396,
+     "words": [
+      {
+       "text": "Here",
+       "start": 13.319,
+       "end": 13.704,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 13.704,
+       "end": 14.088,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 14.088,
+       "end": 14.473,
+       "hl": false
+      },
+      {
+       "text": "code",
+       "start": 14.473,
+       "end": 14.858,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 14.858,
+       "end": 15.242,
+       "hl": false
+      },
+      {
+       "text": "beginner",
+       "start": 15.242,
+       "end": 15.627,
+       "hl": false
+      },
+      {
+       "text": "writes",
+       "start": 15.627,
+       "end": 16.012,
+       "hl": false
+      },
+      {
+       "text": "first.",
+       "start": 16.012,
+       "end": 16.396,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "It looks fine, but the screen never updates.",
+     "speaker": "CANDIDATE",
+     "start": 16.696,
+     "end": 19.773,
+     "words": [
+      {
+       "text": "It",
+       "start": 16.696,
+       "end": 17.081,
+       "hl": false
+      },
+      {
+       "text": "looks",
+       "start": 17.081,
+       "end": 17.465,
+       "hl": false
+      },
+      {
+       "text": "fine,",
+       "start": 17.465,
+       "end": 17.85,
+       "hl": false
+      },
+      {
+       "text": "but",
+       "start": 17.85,
+       "end": 18.235,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 18.235,
+       "end": 18.619,
+       "hl": false
+      },
+      {
+       "text": "screen",
+       "start": 18.619,
+       "end": 19.004,
+       "hl": false
+      },
+      {
+       "text": "never",
+       "start": 19.004,
+       "end": 19.388,
+       "hl": false
+      },
+      {
+       "text": "updates.",
+       "start": 19.388,
+       "end": 19.773,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "beat": "setup",
+   "chapter": null,
+   "start": 20.223,
+   "end": 26.708,
+   "field": "paper",
+   "transition": "cut",
+   "label": "WHY IT FAILS",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "click",
+       "count + 1",
+       "no redraw"
+      ],
+      "tones": [
+       "plain",
+       "plain",
+       "bad"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 410.0,
+      "w": 960.0,
+      "h": 96.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Screen stays at 0",
+      "tone": "bad"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 566.0,
+      "w": 960.0,
+      "h": 104.0
+     }
+    }
+   ],
+   "actions": [],
+   "captions": [
+    {
+     "text": "Each click changes the number in memory.",
+     "speaker": "INTERVIEWER",
+     "start": 20.573,
+     "end": 23.265,
+     "words": [
+      {
+       "text": "Each",
+       "start": 20.573,
+       "end": 20.958,
+       "hl": false
+      },
+      {
+       "text": "click",
+       "start": 20.958,
+       "end": 21.342,
+       "hl": false
+      },
+      {
+       "text": "changes",
+       "start": 21.342,
+       "end": 21.727,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 21.727,
+       "end": 22.112,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 22.112,
+       "end": 22.496,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 22.496,
+       "end": 22.881,
+       "hl": false
+      },
+      {
+       "text": "memory.",
+       "start": 22.881,
+       "end": 23.265,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Nothing asks React to draw it again.",
+     "speaker": "CANDIDATE",
+     "start": 23.565,
+     "end": 26.258,
+     "words": [
+      {
+       "text": "Nothing",
+       "start": 23.565,
+       "end": 23.95,
+       "hl": false
+      },
+      {
+       "text": "asks",
+       "start": 23.95,
+       "end": 24.335,
+       "hl": false
+      },
+      {
+       "text": "React",
+       "start": 24.335,
+       "end": 24.719,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 24.719,
+       "end": 25.104,
+       "hl": false
+      },
+      {
+       "text": "draw",
+       "start": 25.104,
+       "end": 25.488,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 25.488,
+       "end": 25.873,
+       "hl": false
+      },
+      {
+       "text": "again.",
+       "start": 25.873,
+       "end": 26.258,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "beat": "setup",
+   "chapter": null,
+   "start": 26.708,
+   "end": 32.808,
+   "field": "paper",
+   "transition": "cut",
+   "label": "WHAT YOU SEE",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "entity_card",
+     "props": {
+      "label": "<Counter />",
+      "value": "0",
+      "tone": "bad"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 293.0,
+      "w": 960.0,
+      "h": 330.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Stuck",
+      "tone": "bad"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 683.0,
+      "w": 960.0,
+      "h": 104.0
+     }
+    },
+    {
+     "id": "o3",
+     "kind": "stamp",
+     "props": {
+      "text": "BUG"
+     },
+     "box": {
+      "x": 751.2,
+      "y": 458.0,
+      "w": 0.0,
+      "h": 0.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 26.708,
+     "do": "stamp",
+     "target": "o3",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "The screen still shows zero.",
+     "speaker": "INTERVIEWER",
+     "start": 27.058,
+     "end": 28.981,
+     "words": [
+      {
+       "text": "The",
+       "start": 27.058,
+       "end": 27.442,
+       "hl": false
+      },
+      {
+       "text": "screen",
+       "start": 27.442,
+       "end": 27.827,
+       "hl": false
+      },
+      {
+       "text": "still",
+       "start": 27.827,
+       "end": 28.212,
+       "hl": false
+      },
+      {
+       "text": "shows",
+       "start": 28.212,
+       "end": 28.596,
+       "hl": false
+      },
+      {
+       "text": "zero.",
+       "start": 28.596,
+       "end": 28.981,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "That is the bug we need to fix.",
+     "speaker": "CANDIDATE",
+     "start": 29.281,
+     "end": 32.358,
+     "words": [
+      {
+       "text": "That",
+       "start": 29.281,
+       "end": 29.665,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 29.665,
+       "end": 30.05,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 30.05,
+       "end": 30.435,
+       "hl": false
+      },
+      {
+       "text": "bug",
+       "start": 30.435,
+       "end": 30.819,
+       "hl": false
+      },
+      {
+       "text": "we",
+       "start": 30.819,
+       "end": 31.204,
+       "hl": false
+      },
+      {
+       "text": "need",
+       "start": 31.204,
+       "end": 31.588,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 31.588,
+       "end": 31.973,
+       "hl": false
+      },
+      {
+       "text": "fix.",
+       "start": 31.973,
+       "end": 32.358,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "beat": "setup",
+   "chapter": null,
+   "start": 32.808,
+   "end": 40.062,
+   "field": "blue",
+   "transition": "cut",
+   "label": "HOW IT WORKS",
+   "layout": "duo",
+   "characters": false,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "entity_card",
+     "props": {
+      "label": "<Counter />",
+      "value": "1",
+      "tone": "ok"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 240.0,
+      "w": 960.0,
+      "h": 330.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "connector",
+     "props": {
+      "from": "o1",
+      "to": "o3",
+      "tone": "info",
+      "points": [
+       [
+        540.0,
+        580.0
+       ],
+       [
+        540.0,
+        680.0
+       ]
+      ]
+     },
+     "box": null
+    },
+    {
+     "id": "o3",
+     "kind": "system_panel",
+     "props": {
+      "title": "React",
+      "status": "Watching",
+      "slot_name": "count",
+      "slot_value": "1"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 690.0,
+      "w": 960.0,
+      "h": 300.0
+     }
+    }
+   ],
+   "actions": [],
+   "captions": [
+    {
+     "text": "React keeps the value in its own memory.",
+     "speaker": "INTERVIEWER",
+     "start": 33.158,
+     "end": 36.235,
+     "words": [
+      {
+       "text": "React",
+       "start": 33.158,
+       "end": 33.542,
+       "hl": false
+      },
+      {
+       "text": "keeps",
+       "start": 33.542,
+       "end": 33.927,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 33.927,
+       "end": 34.312,
+       "hl": false
+      },
+      {
+       "text": "value",
+       "start": 34.312,
+       "end": 34.696,
+       "hl": false
+      },
+      {
+       "text": "in",
+       "start": 34.696,
+       "end": 35.081,
+       "hl": false
+      },
+      {
+       "text": "its",
+       "start": 35.081,
+       "end": 35.465,
+       "hl": false
+      },
+      {
+       "text": "own",
+       "start": 35.465,
+       "end": 35.85,
+       "hl": false
+      },
+      {
+       "text": "memory.",
+       "start": 35.85,
+       "end": 36.235,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "When it changes, React draws the screen again.",
+     "speaker": "CANDIDATE",
+     "start": 36.535,
+     "end": 39.612,
+     "words": [
+      {
+       "text": "When",
+       "start": 36.535,
+       "end": 36.919,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 36.919,
+       "end": 37.304,
+       "hl": false
+      },
+      {
+       "text": "changes,",
+       "start": 37.304,
+       "end": 37.688,
+       "hl": false
+      },
+      {
+       "text": "React",
+       "start": 37.688,
+       "end": 38.073,
+       "hl": false
+      },
+      {
+       "text": "draws",
+       "start": 38.073,
+       "end": 38.458,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 38.458,
+       "end": 38.842,
+       "hl": false
+      },
+      {
+       "text": "screen",
+       "start": 38.842,
+       "end": 39.227,
+       "hl": false
+      },
+      {
+       "text": "again.",
+       "start": 39.227,
+       "end": 39.612,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s07",
+   "beat": "setup",
+   "chapter": null,
+   "start": 40.062,
+   "end": 46.162,
+   "field": "blue",
+   "transition": "cut",
+   "label": "THE FIX",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "trigger_chip",
+     "props": {
+      "label": "setCount(1)"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 403.0,
+      "w": 960.0,
+      "h": 110.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "status_pill",
+     "props": {
+      "text": "Redraws",
+      "tone": "ok",
+      "icon": "refresh"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 573.0,
+      "w": 960.0,
+      "h": 104.0
+     }
+    }
+   ],
+   "actions": [],
+   "captions": [
+    {
+     "text": "Calling the setter is the trigger.",
+     "speaker": "INTERVIEWER",
+     "start": 40.412,
+     "end": 42.719,
+     "words": [
+      {
+       "text": "Calling",
+       "start": 40.412,
+       "end": 40.796,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 40.796,
+       "end": 41.181,
+       "hl": false
+      },
+      {
+       "text": "setter",
+       "start": 41.181,
+       "end": 41.565,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 41.565,
+       "end": 41.95,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 41.95,
+       "end": 42.335,
+       "hl": false
+      },
+      {
+       "text": "trigger.",
+       "start": 42.335,
+       "end": 42.719,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "React runs your component again and redraws.",
+     "speaker": "CANDIDATE",
+     "start": 43.019,
+     "end": 45.712,
+     "words": [
+      {
+       "text": "React",
+       "start": 43.019,
+       "end": 43.404,
+       "hl": false
+      },
+      {
+       "text": "runs",
+       "start": 43.404,
+       "end": 43.788,
+       "hl": false
+      },
+      {
+       "text": "your",
+       "start": 43.788,
+       "end": 44.173,
+       "hl": false
+      },
+      {
+       "text": "component",
+       "start": 44.173,
+       "end": 44.558,
+       "hl": false
+      },
+      {
+       "text": "again",
+       "start": 44.558,
+       "end": 44.942,
+       "hl": false
+      },
+      {
+       "text": "and",
+       "start": 44.942,
+       "end": 45.327,
+       "hl": false
+      },
+      {
+       "text": "redraws.",
+       "start": 45.327,
+       "end": 45.712,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s08",
+   "beat": "setup",
+   "chapter": null,
+   "start": 46.162,
+   "end": 53.031,
+   "field": "navy",
+   "transition": "cut",
+   "label": "THREE PARTS",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "icon_row",
+     "props": {
+      "icons": [
+       {
+        "name": "memory",
+        "label": "Remember"
+       },
+       {
+        "name": "bolt",
+        "label": "Trigger"
+       },
+       {
+        "name": "refresh",
+        "label": "Redraw"
+       }
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 425.0,
+      "w": 960.0,
+      "h": 230.0
+     }
+    }
+   ],
+   "actions": [],
+   "captions": [
+    {
+     "text": "There are three parts to remember.",
+     "speaker": "INTERVIEWER",
+     "start": 46.512,
+     "end": 48.819,
+     "words": [
+      {
+       "text": "There",
+       "start": 46.512,
+       "end": 46.896,
+       "hl": false
+      },
+      {
+       "text": "are",
+       "start": 46.896,
+       "end": 47.281,
+       "hl": false
+      },
+      {
+       "text": "three",
+       "start": 47.281,
+       "end": 47.665,
+       "hl": false
+      },
+      {
+       "text": "parts",
+       "start": 47.665,
+       "end": 48.05,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 48.05,
+       "end": 48.435,
+       "hl": false
+      },
+      {
+       "text": "remember.",
+       "start": 48.435,
+       "end": 48.819,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Keep the value, trigger the change, see the redraw.",
+     "speaker": "CANDIDATE",
+     "start": 49.119,
+     "end": 52.581,
+     "words": [
+      {
+       "text": "Keep",
+       "start": 49.119,
+       "end": 49.504,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 49.504,
+       "end": 49.888,
+       "hl": false
+      },
+      {
+       "text": "value,",
+       "start": 49.888,
+       "end": 50.273,
+       "hl": false
+      },
+      {
+       "text": "trigger",
+       "start": 50.273,
+       "end": 50.658,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 50.658,
+       "end": 51.042,
+       "hl": false
+      },
+      {
+       "text": "change,",
+       "start": 51.042,
+       "end": 51.427,
+       "hl": false
+      },
+      {
+       "text": "see",
+       "start": 51.427,
+       "end": 51.812,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 51.812,
+       "end": 52.196,
+       "hl": false
+      },
+      {
+       "text": "redraw.",
+       "start": 52.196,
+       "end": 52.581,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s09",
+   "beat": "setup",
+   "chapter": null,
+   "start": 53.031,
+   "end": 58.746,
+   "field": "yellow",
+   "transition": "cut",
+   "label": "THE RESULT",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "big_counter",
+     "props": {
+      "value": "7",
+      "label": "TOKENS"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 360.0,
+      "w": 960.0,
+      "h": 360.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 53.031,
+     "do": "count",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Two words became seven small pieces.",
+     "speaker": "INTERVIEWER",
+     "start": 53.381,
+     "end": 55.688,
+     "words": [
+      {
+       "text": "Two",
+       "start": 53.381,
+       "end": 53.765,
+       "hl": false
+      },
+      {
+       "text": "words",
+       "start": 53.765,
+       "end": 54.15,
+       "hl": false
+      },
+      {
+       "text": "became",
+       "start": 54.15,
+       "end": 54.535,
+       "hl": false
+      },
+      {
+       "text": "seven",
+       "start": 54.535,
+       "end": 54.919,
+       "hl": false
+      },
+      {
+       "text": "small",
+       "start": 54.919,
+       "end": 55.304,
+       "hl": false
+      },
+      {
+       "text": "pieces.",
+       "start": 55.304,
+       "end": 55.688,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Each piece is called a token.",
+     "speaker": "CANDIDATE",
+     "start": 55.988,
+     "end": 58.296,
+     "words": [
+      {
+       "text": "Each",
+       "start": 55.988,
+       "end": 56.373,
+       "hl": false
+      },
+      {
+       "text": "piece",
+       "start": 56.373,
+       "end": 56.758,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 56.758,
+       "end": 57.142,
+       "hl": false
+      },
+      {
+       "text": "called",
+       "start": 57.142,
+       "end": 57.527,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 57.527,
+       "end": 57.912,
+       "hl": false
+      },
+      {
+       "text": "token.",
+       "start": 57.912,
+       "end": 58.296,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "beat": "setup",
+   "chapter": null,
+   "start": 58.746,
+   "end": 65.615,
+   "field": "paper",
+   "transition": "cut",
+   "label": "LOOK CLOSELY",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "token_row",
+     "props": {
+      "items": [
+       "To",
+       "##ken",
+       "##ization"
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 362.0,
+      "w": 960.0,
+      "h": 96.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "callout",
+     "props": {
+      "label": "##",
+      "text": "means this piece joins the one before it"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 518.0,
+      "w": 960.0,
+      "h": 200.0
+     }
+    }
+   ],
+   "actions": [],
+   "captions": [
+    {
+     "text": "The two hash marks are a signal.",
+     "speaker": "INTERVIEWER",
+     "start": 59.096,
+     "end": 61.788,
+     "words": [
+      {
+       "text": "The",
+       "start": 59.096,
+       "end": 59.481,
+       "hl": false
+      },
+      {
+       "text": "two",
+       "start": 59.481,
+       "end": 59.865,
+       "hl": false
+      },
+      {
+       "text": "hash",
+       "start": 59.865,
+       "end": 60.25,
+       "hl": false
+      },
+      {
+       "text": "marks",
+       "start": 60.25,
+       "end": 60.635,
+       "hl": false
+      },
+      {
+       "text": "are",
+       "start": 60.635,
+       "end": 61.019,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 61.019,
+       "end": 61.404,
+       "hl": false
+      },
+      {
+       "text": "signal.",
+       "start": 61.404,
+       "end": 61.788,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "They mean this piece joins the one before.",
+     "speaker": "CANDIDATE",
+     "start": 62.088,
+     "end": 65.165,
+     "words": [
+      {
+       "text": "They",
+       "start": 62.088,
+       "end": 62.473,
+       "hl": false
+      },
+      {
+       "text": "mean",
+       "start": 62.473,
+       "end": 62.858,
+       "hl": false
+      },
+      {
+       "text": "this",
+       "start": 62.858,
+       "end": 63.242,
+       "hl": false
+      },
+      {
+       "text": "piece",
+       "start": 63.242,
+       "end": 63.627,
+       "hl": false
+      },
+      {
+       "text": "joins",
+       "start": 63.627,
+       "end": 64.012,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 64.012,
+       "end": 64.396,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 64.396,
+       "end": 64.781,
+       "hl": false
+      },
+      {
+       "text": "before.",
+       "start": 64.781,
+       "end": 65.165,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s11",
+   "beat": "setup",
+   "chapter": null,
+   "start": 65.615,
+   "end": 72.869,
+   "field": "paper",
+   "transition": "cut",
+   "label": "THE SHELF",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "lookup_table",
+     "props": {
+      "header": [
+       "ID",
+       "TOKEN"
+      ],
+      "rows": [
+       [
+        "101",
+        "[CLS]"
+       ],
+       [
+        "2000",
+        "the"
+       ],
+       [
+        "11469",
+        "To"
+       ],
+       [
+        "11862",
+        "##ken"
+       ],
+       [
+        "102",
+        "[SEP]"
+       ]
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 294.0,
+      "w": 960.0,
+      "h": 492.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 65.615,
+     "do": "highlight",
+     "target": "o1",
+     "value": "3",
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Every piece has a fixed number on the shelf.",
+     "speaker": "INTERVIEWER",
+     "start": 65.965,
+     "end": 69.427,
+     "words": [
+      {
+       "text": "Every",
+       "start": 65.965,
+       "end": 66.35,
+       "hl": false
+      },
+      {
+       "text": "piece",
+       "start": 66.35,
+       "end": 66.735,
+       "hl": false
+      },
+      {
+       "text": "has",
+       "start": 66.735,
+       "end": 67.119,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 67.119,
+       "end": 67.504,
+       "hl": false
+      },
+      {
+       "text": "fixed",
+       "start": 67.504,
+       "end": 67.888,
+       "hl": false
+      },
+      {
+       "text": "number",
+       "start": 67.888,
+       "end": 68.273,
+       "hl": false
+      },
+      {
+       "text": "on",
+       "start": 68.273,
+       "end": 68.658,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 68.658,
+       "end": 69.042,
+       "hl": false
+      },
+      {
+       "text": "shelf.",
+       "start": 69.042,
+       "end": 69.427,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "The model only ever sees those numbers.",
+     "speaker": "CANDIDATE",
+     "start": 69.727,
+     "end": 72.419,
+     "words": [
+      {
+       "text": "The",
+       "start": 69.727,
+       "end": 70.112,
+       "hl": false
+      },
+      {
+       "text": "model",
+       "start": 70.112,
+       "end": 70.496,
+       "hl": false
+      },
+      {
+       "text": "only",
+       "start": 70.496,
+       "end": 70.881,
+       "hl": false
+      },
+      {
+       "text": "ever",
+       "start": 70.881,
+       "end": 71.265,
+       "hl": false
+      },
+      {
+       "text": "sees",
+       "start": 71.265,
+       "end": 71.65,
+       "hl": false
+      },
+      {
+       "text": "those",
+       "start": 71.65,
+       "end": 72.035,
+       "hl": false
+      },
+      {
+       "text": "numbers.",
+       "start": 72.035,
+       "end": 72.419,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s12",
+   "beat": "setup",
+   "chapter": null,
+   "start": 72.869,
+   "end": 78.2,
+   "field": "navy",
+   "transition": "cut",
+   "label": "",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "app_screen",
+     "props": {
+      "title": "App",
+      "button": "Like",
+      "label": "Likes",
+      "value": "0"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 260.0,
+      "w": 960.0,
+      "h": 560.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 72.869,
+     "do": "tap",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    },
+    {
+     "t": 75.827,
+     "do": "state",
+     "target": "o1",
+     "value": "0",
+     "tone": "bad",
+     "cue": "nothing"
+    }
+   ],
+   "captions": [
+    {
+     "text": "You tap the like button.",
+     "speaker": "INTERVIEWER",
+     "start": 73.219,
+     "end": 75.142,
+     "words": [
+      {
+       "text": "You",
+       "start": 73.219,
+       "end": 73.604,
+       "hl": false
+      },
+      {
+       "text": "tap",
+       "start": 73.604,
+       "end": 73.988,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 73.988,
+       "end": 74.373,
+       "hl": false
+      },
+      {
+       "text": "like",
+       "start": 74.373,
+       "end": 74.758,
+       "hl": false
+      },
+      {
+       "text": "button.",
+       "start": 74.758,
+       "end": 75.142,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "And nothing changes on the screen.",
+     "speaker": "CANDIDATE",
+     "start": 75.442,
+     "end": 77.75,
+     "words": [
+      {
+       "text": "And",
+       "start": 75.442,
+       "end": 75.827,
+       "hl": false
+      },
+      {
+       "text": "nothing",
+       "start": 75.827,
+       "end": 76.212,
+       "hl": false
+      },
+      {
+       "text": "changes",
+       "start": 76.212,
+       "end": 76.596,
+       "hl": false
+      },
+      {
+       "text": "on",
+       "start": 76.596,
+       "end": 76.981,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 76.981,
+       "end": 77.365,
+       "hl": false
+      },
+      {
+       "text": "screen.",
+       "start": 77.365,
+       "end": 77.75,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s13",
+   "beat": "setup",
+   "chapter": null,
+   "start": 78.2,
+   "end": 84.685,
+   "field": "paper",
+   "transition": "cut",
+   "label": "IN MEMORY",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "memory_box",
+     "props": {
+      "name": "likes",
+      "value": "0"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 415.0,
+      "w": 960.0,
+      "h": 250.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 79.704,
+     "do": "state",
+     "target": "o1",
+     "value": "1",
+     "tone": null,
+     "cue": "one"
+    },
+    {
+     "t": 83.85,
+     "do": "reset",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "zero"
+    }
+   ],
+   "captions": [
+    {
+     "text": "The box holds one after the tap.",
+     "speaker": "INTERVIEWER",
+     "start": 78.55,
+     "end": 81.242,
+     "words": [
+      {
+       "text": "The",
+       "start": 78.55,
+       "end": 78.935,
+       "hl": false
+      },
+      {
+       "text": "box",
+       "start": 78.935,
+       "end": 79.319,
+       "hl": false
+      },
+      {
+       "text": "holds",
+       "start": 79.319,
+       "end": 79.704,
+       "hl": false
+      },
+      {
+       "text": "one",
+       "start": 79.704,
+       "end": 80.088,
+       "hl": false
+      },
+      {
+       "text": "after",
+       "start": 80.088,
+       "end": 80.473,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 80.473,
+       "end": 80.858,
+       "hl": false
+      },
+      {
+       "text": "tap.",
+       "start": 80.858,
+       "end": 81.242,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "Then it is wiped back to zero.",
+     "speaker": "CANDIDATE",
+     "start": 81.542,
+     "end": 84.235,
+     "words": [
+      {
+       "text": "Then",
+       "start": 81.542,
+       "end": 81.927,
+       "hl": false
+      },
+      {
+       "text": "it",
+       "start": 81.927,
+       "end": 82.312,
+       "hl": false
+      },
+      {
+       "text": "is",
+       "start": 82.312,
+       "end": 82.696,
+       "hl": false
+      },
+      {
+       "text": "wiped",
+       "start": 82.696,
+       "end": 83.081,
+       "hl": false
+      },
+      {
+       "text": "back",
+       "start": 83.081,
+       "end": 83.465,
+       "hl": false
+      },
+      {
+       "text": "to",
+       "start": 83.465,
+       "end": 83.85,
+       "hl": false
+      },
+      {
+       "text": "zero.",
+       "start": 83.85,
+       "end": 84.235,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s14",
+   "beat": "setup",
+   "chapter": null,
+   "start": 84.685,
+   "end": 90.015,
+   "field": "blue",
+   "transition": "cut",
+   "label": "HOW IT WORKS",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "flow",
+     "props": {
+      "steps": [
+       {
+        "name": "tap",
+        "label": "Tap"
+       },
+       {
+        "name": "bolt",
+        "label": "setLikes"
+       },
+       {
+        "name": "refresh",
+        "label": "Redraw"
+       }
+      ],
+      "packet": "1"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 390.0,
+      "w": 960.0,
+      "h": 300.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 86.573,
+     "do": "travel",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "setter"
+    }
+   ],
+   "captions": [
+    {
+     "text": "The tap calls the setter.",
+     "speaker": "INTERVIEWER",
+     "start": 85.035,
+     "end": 86.958,
+     "words": [
+      {
+       "text": "The",
+       "start": 85.035,
+       "end": 85.419,
+       "hl": false
+      },
+      {
+       "text": "tap",
+       "start": 85.419,
+       "end": 85.804,
+       "hl": false
+      },
+      {
+       "text": "calls",
+       "start": 85.804,
+       "end": 86.188,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 86.188,
+       "end": 86.573,
+       "hl": false
+      },
+      {
+       "text": "setter.",
+       "start": 86.573,
+       "end": 86.958,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "React redraws with the new value.",
+     "speaker": "CANDIDATE",
+     "start": 87.258,
+     "end": 89.565,
+     "words": [
+      {
+       "text": "React",
+       "start": 87.258,
+       "end": 87.642,
+       "hl": false
+      },
+      {
+       "text": "redraws",
+       "start": 87.642,
+       "end": 88.027,
+       "hl": false
+      },
+      {
+       "text": "with",
+       "start": 88.027,
+       "end": 88.412,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 88.412,
+       "end": 88.796,
+       "hl": false
+      },
+      {
+       "text": "new",
+       "start": 88.796,
+       "end": 89.181,
+       "hl": false
+      },
+      {
+       "text": "value.",
+       "start": 89.181,
+       "end": 89.565,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s15",
+   "beat": "setup",
+   "chapter": null,
+   "start": 90.015,
+   "end": 93.808,
+   "field": "paper",
+   "transition": "cut",
+   "label": "THE FIX",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "compare",
+     "props": {
+      "left": "Plain variable",
+      "right": "useState",
+      "left_icon": "x",
+      "right_icon": "memory",
+      "left_note": "forgets",
+      "right_note": "remembers"
+     },
+     "box": {
+      "x": 60.0,
+      "y": 330.0,
+      "w": 960.0,
+      "h": 420.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 92.588,
+     "do": "reveal",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "useState"
+    }
+   ],
+   "captions": [
+    {
+     "text": "A plain variable forgets.",
+     "speaker": "INTERVIEWER",
+     "start": 90.365,
+     "end": 91.904,
+     "words": [
+      {
+       "text": "A",
+       "start": 90.365,
+       "end": 90.75,
+       "hl": false
+      },
+      {
+       "text": "plain",
+       "start": 90.75,
+       "end": 91.135,
+       "hl": false
+      },
+      {
+       "text": "variable",
+       "start": 91.135,
+       "end": 91.519,
+       "hl": false
+      },
+      {
+       "text": "forgets.",
+       "start": 91.519,
+       "end": 91.904,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "But useState remembers.",
+     "speaker": "CANDIDATE",
+     "start": 92.204,
+     "end": 93.358,
+     "words": [
+      {
+       "text": "But",
+       "start": 92.204,
+       "end": 92.588,
+       "hl": false
+      },
+      {
+       "text": "useState",
+       "start": 92.588,
+       "end": 92.973,
+       "hl": false
+      },
+      {
+       "text": "remembers.",
+       "start": 92.973,
+       "end": 93.358,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  },
+  {
+   "id": "s16",
+   "beat": "setup",
+   "chapter": null,
+   "start": 93.808,
+   "end": 99.908,
+   "field": "navy",
+   "transition": "cut",
+   "label": "AGAIN AND AGAIN",
+   "layout": "duo",
+   "characters": true,
+   "objects": [
+    {
+     "id": "o1",
+     "kind": "cycle",
+     "props": {
+      "steps": [
+       {
+        "name": "tap",
+        "label": "Tap"
+       },
+       {
+        "name": "refresh",
+        "label": "Render"
+       },
+       {
+        "name": "eye",
+        "label": "Screen"
+       }
+      ]
+     },
+     "box": {
+      "x": 60.0,
+      "y": 260.0,
+      "w": 960.0,
+      "h": 560.0
+     }
+    }
+   ],
+   "actions": [
+    {
+     "t": 93.808,
+     "do": "travel",
+     "target": "o1",
+     "value": null,
+     "tone": null,
+     "cue": "start"
+    }
+   ],
+   "captions": [
+    {
+     "text": "Every tap starts a new render.",
+     "speaker": "INTERVIEWER",
+     "start": 94.158,
+     "end": 96.465,
+     "words": [
+      {
+       "text": "Every",
+       "start": 94.158,
+       "end": 94.542,
+       "hl": false
+      },
+      {
+       "text": "tap",
+       "start": 94.542,
+       "end": 94.927,
+       "hl": false
+      },
+      {
+       "text": "starts",
+       "start": 94.927,
+       "end": 95.312,
+       "hl": false
+      },
+      {
+       "text": "a",
+       "start": 95.312,
+       "end": 95.696,
+       "hl": false
+      },
+      {
+       "text": "new",
+       "start": 95.696,
+       "end": 96.081,
+       "hl": false
+      },
+      {
+       "text": "render.",
+       "start": 96.081,
+       "end": 96.465,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    },
+    {
+     "text": "And the screen shows the new value.",
+     "speaker": "CANDIDATE",
+     "start": 96.765,
+     "end": 99.458,
+     "words": [
+      {
+       "text": "And",
+       "start": 96.765,
+       "end": 97.15,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 97.15,
+       "end": 97.535,
+       "hl": false
+      },
+      {
+       "text": "screen",
+       "start": 97.535,
+       "end": 97.919,
+       "hl": false
+      },
+      {
+       "text": "shows",
+       "start": 97.919,
+       "end": 98.304,
+       "hl": false
+      },
+      {
+       "text": "the",
+       "start": 98.304,
+       "end": 98.688,
+       "hl": false
+      },
+      {
+       "text": "new",
+       "start": 98.688,
+       "end": 99.073,
+       "hl": false
+      },
+      {
+       "text": "value.",
+       "start": 99.073,
+       "end": 99.458,
+       "hl": false
+      }
+     ],
+     "source": "even"
+    }
+   ]
+  }
+ ]
+}

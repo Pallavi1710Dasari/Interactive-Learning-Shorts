@@ -16,7 +16,7 @@ export function Frame({ field, children, style }: {
   field: FieldName; children?: ReactNode; style?: CSSProperties;
 }) {
   return (
-    <div style={{
+    <div data-frame="" style={{
       position: "relative", width: W, height: H, overflow: "hidden",
       background: FIELDS[field], fontFamily: FONT.body, ...style,
     }}>

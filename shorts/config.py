@@ -722,6 +722,20 @@ MOTION_CHARACTERS = os.getenv("MOTION_CHARACTERS", "0").strip().lower() in ("1",
 #: The character preset that plays the reel's language (motion_reel --character;
 #: shorts/motion_character_presets.yaml). None = the language's own preset.
 MOTION_CHARACTER_PRESET = os.getenv("MOTION_CHARACTER_PRESET") or None
+#: The motion reel's DESIGN: the look the player draws it in (colours, glass,
+#: type, camera, transitions — web/src/motion/designs.ts). Chosen when a reel
+#: is set up and saved in its setup.json, so a reel keeps its look; a reel set
+#: up before designs existed has none saved and stays "classic". New reels get
+#: "midnight_lab" (picked 2026-10-12); MOTION_DESIGN=classic switches back.
+MOTION_DESIGNS = ("classic", "midnight_lab")
+#: Motion reel VOICES. "chatterbox" (the default): every line is recorded with
+#: the local Chatterbox voice — free and offline, so even a stub-mode test reel
+#: speaks (2026-10-13: "voice not coming for newly created reels"). "silent":
+#: silence of the estimated length — what the automated tests use
+#: (shorts.testing sets it), because recording takes minutes.
+MOTION_VOICE = os.getenv("MOTION_VOICE", "chatterbox").strip().lower() or "chatterbox"
+MOTION_SILENT = MOTION_VOICE == "silent"
+MOTION_DESIGN = os.getenv("MOTION_DESIGN", "midnight_lab").strip() or "midnight_lab"
 
 
 # --------------------------------------------------------------- image generation

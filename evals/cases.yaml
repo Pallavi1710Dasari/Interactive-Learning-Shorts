@@ -3295,7 +3295,8 @@ cases:
     grader: payoff_mirrors_hook
     fixture: evals/fixtures/motion/usestate_golden.json
     patch:
-      - {path: shots.8.scene.objects.1.props.tone, value: plain}
+      # the payoff's picture appears but never changes to a success (no ok state)
+      - {path: shots.8.scene.actions, value: [{at: start, do: enter, target: o1}, {at: start, do: enter, target: o2}]}
     expect:
       passed: false
       reason_contains: "must show success"
@@ -3445,17 +3446,17 @@ cases:
       passed: true
 
   - id: E222
-    name: A hook without the language mark is rejected
-    why: "The language must be clear within the first second: the hook opens with the identity mark (symbol + 'REACT · INTERVIEW' chip)."
+    name: The language mark after the hook is rejected
+    why: "The identity mark (symbol + 'REACT · INTERVIEW' chip) belongs to the hook alone; the corner badge names the language from then on. Since 2026-10-13 the hook may leave it out to make room for acting its problem out."
     type: motion_scene_grader
     grader: scene_valid
     fixture: evals/fixtures/motion/usestate_golden.json
     patch:
-      - {path: shots.0.scene.objects.0.kind, value: status_pill}
-      - {path: shots.0.scene.objects.0.props, value: {text: "Stuck", tone: bad}}
+      - {path: shots.4.scene.objects, value: [{id: o1, kind: identity_title, props: {}}]}
+      - {path: shots.4.scene.actions, value: [{at: start, do: enter, target: o1}]}
     expect:
       passed: false
-      reason_contains: "shows no identity_title"
+      reason_contains: "belongs on the hook only"
 
   - id: E223
     name: The Java string equality interview golden passes every motion grader
@@ -3473,6 +3474,17 @@ cases:
     type: motion_scene_grader
     grader: all
     fixture: evals/fixtures/motion/java_interview_golden.json
+    expect:
+      passed: true
+
+  - id: E225
+    name: The plain-variable walkthrough shaped like the rejected Opus drafts passes every grader
+    why: "plain_variable_no_rerender__motion's walkthrough run (2026-10-12) was rejected four times by grader bugs, not script problems: a 'Why...' hook, the prompt's own 'Step one. Counter runs.' card caption, the example 'let count = 0, inside Counter' said as 'equals zero', and chapter titles using 'you', 'notices', 'resets'. This script has all four. If a grader rejects it again, the prompt and the checks disagree — fix that before paying for another run."
+    type: motion_grader
+    grader: all
+    fixture: evals/fixtures/motion/plain_variable_walkthrough_script.json
+    input: content/react_usestate_basics.md
+    main_sections: ["7.2", "7.4"]
     expect:
       passed: true
 

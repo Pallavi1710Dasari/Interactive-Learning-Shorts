@@ -185,7 +185,14 @@ def layout_scene(scene: MotionScene, duo: bool) -> list[MotionPlacedObject]:
         if o.kind == "kinetic_title":
             props["lines"] = kinetic_lines(str(o.props.get("text", "")))
         if layout == "overlay":
-            box = MotionBox(x=f["w"] / 2, y=round((top + bottom) / 2, 1), w=0, h=0)
+            # a stamp marks the first object: in its right half, low, where an
+            # entity card and a code window carry no text (its label is top
+            # left, its value bottom left) — never on the region's centre,
+            # where it covered the card's own words
+            first = boxes.get(placed[0].id) if placed else None
+            box = (MotionBox(x=round(first.x + first.w * 0.72, 1), y=round(first.y + first.h * 0.5, 1),
+                             w=0, h=0) if first is not None
+                   else MotionBox(x=f["w"] / 2, y=round((top + bottom) / 2, 1), w=0, h=0))
         if layout == "link":
             a, b = boxes.get(str(o.props.get("from"))), boxes.get(str(o.props.get("to")))
             if a and b:
@@ -248,7 +255,8 @@ def object_problems(obj: MotionSceneObject) -> list[str]:
             continue
         cap = spec.get("max", {}).get(name)
         val = obj.props[name]
-        length = (len(" ".join(str(v) for v in val)) if isinstance(val, list) else len(str(val)))
+        length = (len(" ".join(str(v.get("label", "")) if isinstance(v, dict) else str(v) for v in val))
+                  if isinstance(val, list) else len(str(val)))
         if cap and length > cap:
             problems.append(f"{obj.id} ({obj.kind}) {name} is {length} characters, max {cap} "
                             f"(it would not fit its box)")
@@ -380,6 +388,8 @@ def _kinetic(text: str, cap: int = 54) -> str:
     return text
 
 
+# Kinetic titles keep the writer's case ("useState"): the player sets the case
+# per design — classic draws them in caps, Midnight Lab in sentence case.
 def _whole_title(shot: MotionShot, script) -> str:
     """The hook's kinetic title: the hook's own question sentence, the reel's
     question, or its first sentence — the first that fits the title's lines
@@ -389,10 +399,10 @@ def _whole_title(shot: MotionShot, script) -> str:
     k = lib.library()["kinetic"]
     questions = [motion_plain_text(c.text) for c in shot.captions if motion_plain_text(c.text).rstrip().endswith("?")]
     for text in (*questions, script.hook_question, _first_sentence(shot)):
-        t = (text or "").upper().strip()
+        t = (text or "").strip()
         if t and len(kinetic_lines(t)) <= k["max_lines"] and len(t) <= 54:
             return t
-    return _kinetic(_first_sentence(shot).upper())
+    return _kinetic(_first_sentence(shot))
 
 
 def _first_sentence(shot: MotionShot) -> str:
@@ -602,6 +612,8 @@ def _highlight_count(b: _Builder, oid: str) -> int:
         return len(p.get("parts") or [])
     if o.kind == "icon_row":
         return len(p.get("icons") or [])
+    if o.kind in ("flow", "cycle"):
+        return len(p.get("steps") or [])
     if o.kind == "lookup_table":
         return len(p.get("rows") or [])
     return 0
@@ -637,6 +649,192 @@ def _code_file(language: str | None) -> str:
     return identity(language).file if language in languages() else ""
 
 
+#: Words that mean the material is about something a user sees and does on a
+#: screen — then the hook acts it out on an app screen.
+_UI_WORDS = frozenset("click clicks clicked clicking tap taps tapped button buttons screen screens "
+                      "form forms cart counter browser app apps webpage".split())
+
+
+def _is_ui(script: MotionScript) -> bool:
+    text = " ".join(s.speech for s in script.shots).lower()
+    return len(set(re.findall(r"[a-z]+", text)) & _UI_WORDS) >= 2
+
+
+def _number(shot: MotionShot, nth: int = 0) -> str | None:
+    """The nth number the shot says, as digits."""
+    found = re.findall(r"\b\d+\b", motion_plain_text(" ".join(c.text for c in shot.captions)))
+    return found[nth] if len(found) > nth else None
+
+
+def _last_word(items: list[str]) -> str:
+    return items[-1].split()[-1] if items and items[-1].split() else ""
+
+
+def _later_word(shot: MotionShot, skip: int) -> str:
+    """A content word about `skip` words in: an action on it lands while the
+    narrator is talking about the picture, not at the very start."""
+    spoken = motion_plain_text(" ".join(c.text for c in shot.captions)).split()
+    for w in spoken[skip:]:
+        k = _key(w)
+        if len(k) >= 3 and k not in _WEAK_CUES:
+            return re.sub(r"[^\w'-]", "", w)
+    return "start"
+
+
+def _steps(script: MotionScript, shot: MotionShot, vocab_first: bool = False) -> list[dict]:
+    """2-4 steps {name: icon, label} for a flow or cycle: what THIS shot says
+    (its highlights, else its own content words, with the reel's icons), or —
+    `vocab_first`, for the title — the reel's icon vocabulary (the concept's
+    parts), else its chapters."""
+    names = sorted(lib.icon_names())
+    vocab = [i for i in script.icon_vocabulary if i.name in names]
+    icons = [i.name for i in vocab] or ["cursor", "bolt", "check"]
+    hl = [h for h in _highlights(shot) if len(h) <= 12]
+    if not vocab_first:
+        # what this shot says: its highlights, topped up with its best words
+        said = [w[:1].upper() + w[1:] for w in _said_words(shot, script)
+                if _key(w) not in {_key(x) for h in hl for x in h.split()}]
+        picked = (hl + said)[:3]
+        if len(picked) >= 2:
+            return [{"name": icons[k % len(icons)], "label": _fit(h, 12)} for k, h in enumerate(picked)]
+    out = [{"name": i.name, "label": _fit(i.label, 12)} for i in vocab[:4]]
+    if len(out) < 2 and script.chapters:
+        icons = ["file", "layers", "search", "check"]
+        out = [{"name": icons[k % 4], "label": _fit(c.title, 12)} for k, c in enumerate(script.chapters[:4])]
+    if len(out) < 2:
+        hl = _highlights(shot) or [script.concept_name or "Start", "Result"]
+        out = [{"name": ["cursor", "bolt", "check"][k % 3], "label": _fit(h, 12)} for k, h in enumerate(hl[:3])]
+    while len(out) < 2:
+        out.append({"name": "check", "label": "Done"})
+    return out[:4]
+
+
+def _memory(b: "_Builder", shot: MotionShot, script: MotionScript, name: str, tone: str | None = None) -> str:
+    # the box is named with a word the shot says: its highlight, else its
+    # first content word (the concept's name may not be said here)
+    if _key(name) not in "".join(shot_words(shot)):
+        said = [re.sub(r"[^\w'-]", "", w) for w in motion_plain_text(" ".join(c.text for c in shot.captions)).split()]
+        name = next((w for w in said if len(w) >= 4 and _key(w) not in _WEAK_CUES), name)
+    return b.add("memory_box", name=_fit(name, 16), value=_number(shot) or "?", tone=tone)
+
+
+#: Words that never make a good label on their own.
+_NOT_LABELS = frozenset("worse never always every ever really just only plain still again back "
+                        "first last next then same other more most much many very also even each "
+                        "starts start fresh wondered stays stuck climbing changing changed keeps "
+                        "why what how when where who which does do did doesn't don't stay can will "
+                        "would should could have has had make makes your you here there now "
+                        "works work worked moment act acts thing things way".split())
+
+
+def _code_names(script: MotionScript) -> list[str]:
+    """Names in the reel's code: likes, setLikes, useState."""
+    out: list[str] = []
+    for sh in script.shots:
+        for line in sh.code or []:
+            for w in re.findall(r"[A-Za-z_][A-Za-z0-9_]{2,}", line):
+                if w not in out and w not in {"let", "const", "var", "function", "return", "new", "import",
+                                              "from", "def", "class", "true", "false", "null", "this"}:
+                    out.append(w)
+    return out
+
+
+def _said_words(shot: MotionShot, script: MotionScript | None = None) -> list[str]:
+    """The shot's own words that make good labels, best first: names from the
+    reel's code, technical terms, highlights' words — never adjectives,
+    adverbs or -ing words ("Worse", "never", "changing" made nonsense labels)."""
+    from .checks import motion_terms
+    code = {c.lower() for c in (_code_names(script) if script else [])}
+    terms = {w for t in motion_terms().values() for w in t.get("words", [])}
+    hl = {w.lower() for h in _highlights(shot) for w in h.split()}
+    scored: list[tuple[int, int, str]] = []
+    seen: set[str] = set()
+    for i, w in enumerate(motion_plain_text(" ".join(c.text for c in shot.captions)).split()):
+        k = re.sub(r"[^\w'-]", "", w)
+        low = k.lower()
+        if len(k) < 3 or low in seen or _key(k) in _WEAK_CUES or low in _NOT_LABELS:
+            continue
+        if low.endswith(("ing", "ly")) or (low.endswith("ed") and low not in code):
+            continue
+        seen.add(low)
+        score = 3 if low in code else 2 if low in terms or low in hl else 1
+        scored.append((-score, i, k))
+    return [k for _, _, k in sorted(scored)]
+
+
+def _act_somewhere(b: "_Builder", do: str, target: str, cues: list[str], **kw) -> None:
+    """The action on the first of `cues` that is still ahead, else at the start
+    — it must happen (the hook's failure, the payoff's success)."""
+    for c in cues:
+        if c and c != "start":
+            n = len(b.actions)
+            b.act(do, target, c, **kw)
+            if len(b.actions) > n:
+                return
+    b.actions.append(MotionSceneAction(at="start", do=do, target=target, **kw))
+
+
+def _ui_names(script: MotionScript, shot: MotionShot) -> tuple[str, str]:
+    """An app screen's button and the name of the number it shows, from what
+    the reel says: "the like button" -> Like; the value is the variable in its
+    code (likes), else the noun next to "count"/"counter", else the button's."""
+    speech = " ".join(s.speech for s in script.shots)
+    m = re.search(r"\b(\w+)\s+button", speech, re.I)
+    button = (m.group(1) if m and m.group(1).lower() not in {"the", "a", "this", "that", "your", "one"} else
+              next((w for w in ("Click", "Tap", "Press", "Add", "Submit") if w.lower() in speech.lower()), "Tap"))
+    code = _code_names(script)
+    var = next((c for c in code if not c.startswith(("set", "use", "on", "handle")) and c.islower()), None)
+    m2 = re.search(r"\b(\w+)\s+(?:count|counter)\b", speech, re.I)
+    name = var or (m2.group(1) if m2 else None) or button
+    # the screen shows something this shot says: else its value is named
+    # with the shot's best word
+    said_here = set(shot_words(shot))
+    if _key(button) not in said_here and _key(name) not in said_here:
+        best = _said_words(shot, script) or [
+            re.sub(r"[^\w'-]", "", w) for w in motion_plain_text(" ".join(c.text for c in shot.captions)).split()
+            if len(re.sub(r"[^\w'-]", "", w)) >= 4 and _key(w) not in _WEAK_CUES]
+        if best:
+            name = best[0]
+    return button[:1].upper() + button[1:], name[:1].upper() + name[1:]
+
+
+def _wrong_idea(script: MotionScript, shot: MotionShot) -> str:
+    """What the reel shows going wrong, by name: the first highlight of the
+    setup or break shots that is not the concept itself (plain variable)."""
+    concept = _key(script.concept_name or "")
+    for sh in script.shots:
+        if sh.beat in ("setup", "break_1", "break_2"):
+            for h in _highlights(sh):
+                if _key(h) != concept and len(h) <= 18 and not re.search(r"\d", h):
+                    return h[:1].upper() + h[1:]
+    return _symptom(shot) or "Before"
+
+
+def _demo(b: "_Builder", shot: MotionShot, script: MotionScript, ui: bool, ok: bool) -> str:
+    """The hook's picture (ok=False: it fails) and the payoff's (ok=True: the
+    same picture, working). A UI topic is an app screen whose button is
+    tapped; anything else is a memory box whose value is set. Its words are
+    words the shot says."""
+    said = _said_words(shot, script)
+    symptom = _symptom(shot)
+    when = [_cue_for(symptom) if symptom and not ok else "", _later_word(shot, 6), _later_word(shot, 4)]
+    if ui:
+        button, value_name = _ui_names(script, shot)
+        o = b.add("app_screen", title="App", button=_fit(button, 16), label=_fit(value_name, 16),
+                  value=_number(shot) or "0", tone=None if ok else "bad")
+        b.act("enter", o)
+        b.act("tap", o, _later_word(shot, 3))
+    else:
+        o = b.add("memory_box", name=_fit(said[0] if said else (script.concept_name or "Value"), 16),
+                  value=_number(shot) or "?", tone=None if ok else "bad")
+        b.act("enter", o)
+    if ok:
+        _act_somewhere(b, "state", o, when, value=_number(shot, 1) or ("1" if ui else "✓"), tone="ok")
+    else:
+        _act_somewhere(b, "state", o, when, tone="bad")
+    return o
+
+
 def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionScene:
     """One shot's scene from the script's own words. See the module docstring."""
     b = _Builder(shot)
@@ -648,37 +846,32 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
     label = ""
     primary_nudge: tuple[str, str] | None = None
 
+    ui = _is_ui(script)
+    steps = _steps(script, shot, vocab_first=beat in ("title", "name_it"))
     if beat == "hook":
+        # ACT THE PROBLEM OUT (2026-10-13): the hook shows the failure
+        # happening — a tap that changes nothing on an app screen, or a value
+        # in a memory box that does not change — with the question above it
+        # (one narrator) or alone (two speakers: the question is in the chat).
         field = "navy"
-        # The language mark first, so the language is clear within the first
-        # second (phase 3 badges). In a two-speaker reel the question is in the
-        # chat bubble, so the hook shows the mark and the symptom only.
-        mark = b.add("identity_title")
-        b.act("enter", mark)
         duo = bool(script.speakers)
+        # the whole question (up to 3 lines + the screen still fit: 319 + 60 + 560)
         o1 = None if duo else b.add("kinetic_title", text=_whole_title(shot, script),
-                                    accent=[h.upper() for h in hl[:2]])
+                                    accent=list(hl[:2]))
         if o1:
             b.act("enter", o1)
-        if walk:
-            rest = [motion_plain_text(c.text) for c in shot.captions[1:]]
-            if rest:
-                o2 = b.add("kinetic_title", text=_kinetic(rest[0].upper(), 30))
-                b.act("enter", o2, rest[0].split()[0])
-        else:
-            o2 = b.add("status_pill", text=_symptom(shot), tone="bad", icon="alert")
-            b.act("enter", o2, _cue_for(_symptom(shot)) if _symptom(shot) else "start")
-            if o1 is None:
-                o1 = mark          # two speakers: the mark pulses on the spoken words
-        primary_nudge = (o1, "highlight") if o1 else None
+        o2 = _demo(b, shot, script, ui, ok=False)
+        primary_nudge = (o2, "pulse")
     elif beat == "title":
+        # the concept, and its parts going round
         field = "blue"
-        icons = [{"name": i.name, "label": _fit(i.label, 12)} for i in script.icon_vocabulary[:3]]
-        o1 = b.add("title_card", title=_fit(concept, 22), promise=_fit(script.promise, 40),
-                   icons=icons)
-        b.act("enter", o1)
-        if icons:
-            primary_nudge = (o1, "highlight")
+        if not script.speakers:                  # (two speakers: the loop alone fits)
+            o1 = b.add("kinetic_title", text=_fit(concept, 30), accent=[concept])
+            b.act("enter", o1)
+        o2 = b.add("cycle", steps=steps)
+        b.act("enter", o2, _later_word(shot, 2))
+        b.act("travel", o2, _later_word(shot, 4))
+        primary_nudge = (o2, "highlight")
     elif beat in ("setup", "chapter") and shot.code:
         o1 = b.add("code_window", file=_code_file(script.language), lines=shot.code)
         b.act("enter", o1)
@@ -688,50 +881,72 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         label = "THE CODE"
         primary_nudge = (o1, "highlight")
     elif beat in ("setup", "break_1", "break_2", "fix_idea", "fix_flow", "takeaway") and not walk:
-        fail = beat in ("setup", "break_1", "break_2")
         label = {"setup": "THE SETUP", "break_1": "WHY IT FAILS", "break_2": "AND ALSO",
                  "fix_idea": "THE FIX", "fix_flow": "HOW IT WORKS", "takeaway": "REMEMBER"}[beat]
-        if beat == "fix_idea":
-            field = "blue"
-            o1 = b.add("kinetic_title", text=_fit(concept.upper(), 30), accent=[concept.upper()])
-            b.act("enter", o1, concept if concept.lower() in shot.speech.lower().replace(" ", "")
-                  else "start")
-            rest = [h for h in hl if _key(h) != _key(concept)]
-            if rest:
-                o2 = b.add("token_row", items=_chips(rest), tones=["info"] * len(_chips(rest)))
-                b.act("enter", o2, _cue_for(rest[0]))
-            primary_nudge = (o1, "highlight")
-        elif beat == "fix_flow":
-            trig = hl[0] if hl else _fit(_first_sentence(shot), 22)
-            o1 = b.add("trigger_chip", label=_fit(trig, 22))
-            o3_text = _fit(hl[-1] if len(hl) > 1 else "It updates", 26)
-            o3 = b.add("status_pill", text=o3_text[:1].upper() + o3_text[1:], tone="ok", icon="check")
-            o2 = b.add("connector", **{"from": o1, "to": o3, "tone": "info"})
+        if beat == "setup" and ui:
+            # what is remembered, and its value
+            o1 = _memory(b, shot, script, hl[0] if hl else concept)
             b.act("enter", o1)
-            b.act("enter", o2, _cue_for(trig) if hl else "start")
-            b.act("pulse", o2, _cue_for(trig) if hl else "start")
-            last_caption = motion_plain_text(shot.captions[-1].text).split() if len(shot.captions) > 1 else []
-            if len(hl) > 1:
-                b.act("enter", o3, _cue_for(hl[-1]))
-            elif last_caption:
-                b.act("enter", o3, next((w for w in last_caption
-                                         if len(_key(w)) >= 3 and _key(w) not in _WEAK_CUES),
-                                        last_caption[0]))
-            else:
-                b.act("enter", o3)
+            b.act("state", o1, _later_word(shot, 5), value=_number(shot) or _fit(_last_word(hl) or "?", 10))
             primary_nudge = (o1, "pulse")
-        else:
-            items = _chips(hl or [_fit(_first_sentence(shot), 14)])
-            o1 = b.add("token_row", items=items, tones=["plain"] * len(items))
+        elif beat == "setup":
+            # how it goes, step by step
+            o1 = b.add("flow", steps=steps)
             b.act("enter", o1)
+            b.act("travel", o1, _later_word(shot, 3))
+            primary_nudge = (o1, "highlight")
+        elif beat == "break_1":
+            # the failure, acted out: the tap that changes nothing (a UI topic),
+            # or the value wiped away
+            if ui:
+                button, value_name = _ui_names(script, shot)
+                o1 = b.add("app_screen", title="App", button=_fit(button, 16), label=_fit(value_name, 16),
+                           value=_number(shot) or "0")
+                b.act("enter", o1)
+                b.act("tap", o1, _later_word(shot, 3))
+                _act_somewhere(b, "state", o1, [_cue_for(_symptom(shot)) if _symptom(shot) else "",
+                                                _later_word(shot, 6)], tone="bad")
+            else:
+                o1 = _memory(b, shot, script, hl[0] if hl else concept, tone="bad")
+                b.act("enter", o1)
+                b.act("reset", o1, _cue_for(_symptom(shot)) if _symptom(shot) else _later_word(shot, 4))
+            primary_nudge = (o1, "pulse")
+        elif beat == "break_2":
+            # it happens again and again: the steps on a loop (two speakers:
+            # a flow, so the symptom still fits under it)
+            o1 = b.add("flow" if script.speakers else "cycle", steps=steps)
+            b.act("enter", o1)
+            b.act("travel", o1, _later_word(shot, 3))
             symptom = _symptom(shot)
-            if fail and _key(symptom) not in {_key(i) for i in items}:
-                # (a pill that only repeats a chip says nothing new)
+            if symptom:
                 o2 = b.add("status_pill", text=symptom, tone="bad", icon="x")
                 b.act("enter", o2, _cue_for(symptom))
-            if fail and len(items) > 1:
-                tones = ["plain"] * (len(items) - 1) + ["bad"]
-                b.act("state", o1, _cue_for(items[-1]), value=",".join(tones))
+            primary_nudge = (o1, "highlight")
+        elif beat == "fix_idea":
+            # the wrong way beside the right way; the right appears on its name
+            field = "blue"
+            wrong = _fit(_wrong_idea(script, shot), 18)
+            right = _fit(concept or (hl[-1] if hl else "After"), 18)
+            o1 = b.add("compare", left=wrong, right=right, left_icon="x",
+                       right_icon=(steps[0]["name"] if steps else "check"))
+            b.act("enter", o1)
+            b.act("reveal", o1, concept if _key(concept.split()[0] if concept else "") in shot_words(shot)
+                  else _later_word(shot, 4))
+            primary_nudge = (o1, "pulse")
+        elif beat == "fix_flow":
+            # the fix as cause and effect: something travels to the result
+            o1 = b.add("flow", steps=steps, packet=_fit(hl[0], 10) if hl and len(hl[0]) <= 10 else None)
+            b.act("enter", o1)
+            b.act("travel", o1, _cue_for(hl[0]) if hl else _later_word(shot, 3))
+            ok_text = _fit(hl[-1] if len(hl) > 1 else "It works", 26)
+            o2 = b.add("status_pill", text=ok_text[:1].upper() + ok_text[1:], tone="ok", icon="check")
+            b.act("enter", o2, _cue_for(hl[-1]) if len(hl) > 1 else _later_word(shot, 8))
+            primary_nudge = (o1, "highlight")
+        else:      # takeaway: the steps it names, travelled once more
+            field = "navy"
+            o1 = b.add("flow", steps=steps)
+            b.act("enter", o1)
+            b.act("travel", o1, _later_word(shot, 2))
             primary_nudge = (o1, "highlight")
     elif beat == "code_map":
         if shot.code:
@@ -752,24 +967,28 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
             for i, part in enumerate(parts):
                 b.act("highlight", o1, _cue_for(part["code"]), value=str(i + 1))
             primary_nudge = (o1, "highlight")
-        else:
-            icons = [{"name": i.name, "label": _fit(i.label, 12), "tone": "info"}
-                     for i in script.icon_vocabulary[:3]] or [{"name": "list", "label": "", "tone": "info"}]
-            o1 = b.add("icon_row", icons=icons)
+        elif ui:
+            # no code in the material: the value now kept and changing, working
+            o1 = _memory(b, shot, script, concept or (hl[0] if hl else "Value"), tone="ok")
             b.act("enter", o1)
-            for i, h in enumerate(hl[:len(icons)]):
-                b.act("highlight", o1, _cue_for(h), value=str(i + 1))
-            label = "HOW IT MAPS"
+            b.act("state", o1, _later_word(shot, 4), value=_number(shot, 1) or "✓", tone="ok")
+            label = "HOW IT WORKS"
+            primary_nudge = (o1, "pulse")
+        else:
+            o1 = b.add("cycle", steps=steps)
+            b.act("enter", o1)
+            b.act("travel", o1, _later_word(shot, 3))
+            label = "HOW IT WORKS"
             primary_nudge = (o1, "highlight")
     elif beat == "payoff":
+        # the hook's picture again, now working
         field = "navy"
-        o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()),
-                   accent=[h.upper() for h in hl[:2]])
-        b.act("enter", o1)
-        ok_text = _fit((hl[-1] if hl else "It works"), 26)
-        o2 = b.add("status_pill", text=ok_text[:1].upper() + ok_text[1:], tone="ok", icon="check")
-        b.act("enter", o2, _cue_for(hl[-1]) if hl else None)
-        primary_nudge = (o1, "highlight")
+        duo = bool(script.speakers)
+        o1 = None if duo else b.add("kinetic_title", text=_kinetic(_first_sentence(shot), 36), accent=list(hl[:2]))
+        if o1:
+            b.act("enter", o1)
+        o2 = _demo(b, shot, script, ui, ok=True)
+        primary_nudge = (o2, "pulse")
     elif beat == "recap" and not walk:
         rows = [{"icon": t.icon, "line": t.line, "sub": t.sub} for t in script.takeaways] or \
                [{"icon": "check", "line": _fit(h, 20), "sub": ""} for h in hl[:3]]
@@ -789,8 +1008,10 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         primary_nudge = (o1, "pulse")
     elif beat == "name_it":
         field = "blue"
-        o1 = b.add("kinetic_title", text=_fit(concept.upper(), 30), accent=[concept.upper()])
-        b.act("enter", o1, concept if _key(concept) in "".join(shot_words(shot)) else "start")
+        # the steps to come, as a flow something travels through
+        o1 = b.add("flow", steps=steps)
+        b.act("enter", o1)
+        b.act("travel", o1, concept if _key(concept) in "".join(shot_words(shot)) else _later_word(shot, 3))
         primary_nudge = (o1, "highlight")
     elif beat == "example":
         items = _chips(script.running_example.items if script.running_example else hl, 44)
@@ -827,10 +1048,11 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
             b.act("enter", o2, hl[0] if hl else None)
             primary_nudge = (o2, "highlight")
     elif beat == "takeaway":
+        # the steps it names, travelled once more
         field = "navy"
-        o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()),
-                   accent=[h.upper() for h in hl[:2]])
+        o1 = b.add("flow", steps=steps)
         b.act("enter", o1)
+        b.act("travel", o1, _later_word(shot, 2))
         primary_nudge = (o1, "highlight")
     else:
         o1 = b.add("kinetic_title", text=_kinetic(_first_sentence(shot).upper()))

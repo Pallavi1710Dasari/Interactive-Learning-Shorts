@@ -145,7 +145,7 @@ def _speak(me: _Actor, cap: MotionCaptionTiming, last: bool, explain: list[str])
 
 
 def direct(cast: list[MotionCastMember], captions: list[MotionCaptionTiming], language: str | None,
-           override: str | None = None) -> list[MotionCharacterTrack]:
+           override: str | None = None, host: str | None = None) -> list[MotionCharacterTrack]:
     """Two characters for a two-speaker reel: the host (left, asking) and the
     language character (right, answering)."""
     v = vocabulary()
@@ -153,7 +153,10 @@ def direct(cast: list[MotionCastMember], captions: list[MotionCaptionTiming], la
         return []
     ex = v["expressions"]
     lang = language_preset(language, override)
-    actors = {m.role: _Actor(m.role, "host" if m.side == "left" else lang, m.side, v["min_gap"]) for m in cast}
+    left = host if host else "host"          # the reviewer may pick who asks (2026-10-13)
+    if host:
+        presets.preset(host)                  # raises on an unknown id
+    actors = {m.role: _Actor(m.role, left if m.side == "left" else lang, m.side, v["min_gap"]) for m in cast}
     asking = next((m.role for m in cast if m.side == "left"), cast[0].role)
     spoken = [c for c in captions if c.speaker in actors and c.words]
     for a in actors.values():

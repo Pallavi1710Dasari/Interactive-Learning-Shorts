@@ -15,7 +15,8 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { At } from "../Stage";
-import { C, FONT, theme, type FieldName } from "../tokens";
+import { C, FONT, display, theme, type FieldName } from "../tokens";
+import { plainWord } from "../KaraokeCaption";
 import { clamp, ease, hash3, seg } from "../time";
 import { bubbleColours, textToneOn } from "./contrast";
 
@@ -77,7 +78,7 @@ export function LanguageBadge({ spec, field, right, top, p = 1 }: {
   const th = theme(field);
   const tone = toneOn(spec, field);
   return (
-    <div style={{ position: "absolute", right, top, opacity: clamp(p), display: "flex", alignItems: "center",
+    <div data-part="badge" style={{ position: "absolute", right, top, opacity: clamp(p), display: "flex", alignItems: "center",
                   gap: 12, padding: "8px 18px 8px 10px", borderRadius: 999, background: th.surface,
                   border: `3px solid ${th.dark ? "rgba(255,255,255,0.12)" : C.line}` }}>
       <IdentitySymbol spec={spec} size={34} colour={tone} />
@@ -102,7 +103,7 @@ export function IdentityTitle({ spec, label, field, x, y, t }: {
       <div style={{ marginTop: 26, display: "inline-flex", alignItems: "center", gap: 14, padding: "12px 24px",
                     borderRadius: 999, background: tone, color: inkOn(field), opacity: chip,
                     transform: `translateY(${(1 - chip) * 14}px)` }}>
-        <span style={{ fontFamily: FONT.display, fontSize: 40, lineHeight: 1, letterSpacing: 1.5, textTransform: "uppercase" }}>
+        <span style={{ ...display(40), lineHeight: 1, letterSpacing: 1.5 }}>
           {spec.name}{label ? ` · ${label}` : ""}
         </span>
       </div>
@@ -121,7 +122,7 @@ export function IdentitySting({ spec, t }: { spec: IdentitySpec; t: number }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 34 }}>
         <IdentitySymbol spec={spec} size={300} colour={spec.on_dark} draw={draw}
                         style={{ transform: `rotate(${(1 - ease.outCubic(draw)) * -12}deg)` }} />
-        <div style={{ fontFamily: FONT.display, fontSize: 96, lineHeight: 1, color: C.white, textTransform: "uppercase",
+        <div style={{ ...display(96), lineHeight: 1, color: C.white,
                       opacity: name, transform: `translateY(${(1 - name) * 24}px)` }}>{spec.name}</div>
       </div>
     </div>
@@ -165,7 +166,7 @@ export function SpeakerBadge({ member, field, active, t, size = 112 }: {
       )}
       <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: tone, display: "grid", placeItems: "center" }}>
         {host
-          ? <span style={{ fontFamily: FONT.display, fontSize: size * 0.48, lineHeight: 1, color: inkOn(field) }}>{member.label.charAt(0)}</span>
+          ? <span style={{ ...display(size * 0.48), lineHeight: 1, color: inkOn(field) }}>{member.label.charAt(0)}</span>
           : <IdentitySymbol spec={member.identity} size={size * 0.56} colour={inkOn(field)} />}
       </div>
     </div>
@@ -189,6 +190,14 @@ export function bubbleHeight(text: string): number {
   return BUBBLE.labelH + BUBBLE.padY * 2 + bubbleLines(text, BUBBLE.chars) * BUBBLE.lineH;
 }
 
+/** A chat row's full height: its bubble, or its speaker badge (with the
+ * active ring) when that is taller — a one-line bubble is shorter than its
+ * badge, and stacking rows by the bubble alone clipped the newest badge. */
+export const BADGE_ROW = BUBBLE.labelH - 4 + 112 + 14;
+export function rowHeight(text: string): number {
+  return Math.max(bubbleHeight(text), BADGE_ROW);
+}
+
 /** One chat row: the speaker's badge on its side, its role label, and the
  * bubble with the caption's words lit as they are spoken (karaoke). */
 export function ChatRow({ member, field, words, active, t, y, fade = 1 }: {
@@ -207,7 +216,7 @@ export function ChatRow({ member, field, words, active, t, y, fade = 1 }: {
   /* Older bubbles recede by their badge and border, never by fading the text:
      every word stays at 4.5:1 against its bubble (contrast.ts). */
   return (
-    <div style={{ position: "absolute", left: 54, right: 54, top: y, display: "flex", gap: 22,
+    <div data-part={`chat:${member.role}:${y}`} style={{ position: "absolute", left: 54, right: 54, top: y, display: "flex", gap: 22,
                   flexDirection: left ? "row" : "row-reverse", alignItems: "flex-start",
                   transform: `translateY(${rise * 30}px)` }}>
       <div style={{ marginTop: BUBBLE.labelH - 4, opacity: fade }}>
@@ -227,7 +236,7 @@ export function ChatRow({ member, field, words, active, t, y, fade = 1 }: {
           {words.map((w, i) => {
             const lit = !older && t >= w.start + Math.min(0.08, (w.end - w.start) / 3);
             return <span key={i} style={{ color: !lit ? colours.dim : w.hl ? colours.accent : colours.ink }}>
-              {w.text}{i < words.length - 1 ? " " : ""}</span>;
+              {plainWord(w.text)}{i < words.length - 1 ? " " : ""}</span>;
           })}
           {!text && <span>&nbsp;</span>}
         </div>

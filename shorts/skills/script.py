@@ -20,7 +20,7 @@ from ..schema import (Script, Topic, Section, SectionUnderstanding, QuestionWork
                       MotionScript, MotionScriptDraft, MotionHookFix, MOTION_TEMPLATES,
                       MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND)
 from ..llm import ask_json
-from .. import revision, checks, config
+from .. import revision, checks, config, motion_repair
 from .audit import judge_story_metaphors   # audit.py -> checks/schema/config/llm only, no cycle
 
 MIN_WORDS = int(MIN_SECONDS * WORDS_PER_SECOND)   # 62
@@ -2327,6 +2327,11 @@ LENGTH
 
 WORDS
 - Beginner language. Explain any technical word in the same sentence you use it.
+- The viewer is a beginner with NO programming background. Short sentences (aim for 8-12
+  words), everyday words, about a grade 7 reading level.
+- Explain every technical term the first time you say it, in the same sentence or the
+  very next one, in plain words: "re-render" -> "React runs your component again to
+  redraw the screen". TECHNICAL TERMS in the material block lists the ones it uses.
 - No word longer than 4 syllables, except the concept's own name and at most 2 other
   terms the material itself uses — each explained in plain words in the same sentence
   ("..., called its vocabulary").
@@ -2416,13 +2421,15 @@ at most ONE short rhetorical question (at most 6 words), answered by the very ne
 sentence ("Token? Not on the shelf."). Every other shot is a plain statement.
 
 THE BEATS — in exactly this order:
-  hook          A question about how something works ("How does...", "What happens
-                when..."), then a surprising one-line answer ("It only reads numbers.").
-                Never name the concept. At most 16 words.
+  hook          A curiosity question opening with why, what or how ("Why does...",
+                "How does...", "What happens when..."), then a surprising one-line
+                answer that is not a question ("It only reads numbers."). Never name
+                the concept. At most 16 words.
   name_it       Name the concept: "This is called ...". 3 to 8 words.
   example       Introduce the ONE running example: "Let's follow one sentence: ...".
   then 2 to 4 CHAPTERS, each:
-    chapter_card  "Step one. <the chapter title, short>." 3 to 5 words.
+    chapter_card  "Step one. <the chapter title, short>." 3 to 5 words. Its caption may
+                  be that one line: the "Step one." label is not counted as a sentence.
     chapter       1 to 3 shots: what this step does to the running example.
   result        The before and after of the running example ("two words became seven
                 tokens").
@@ -2453,6 +2460,11 @@ WORDS
 - Beginner language. No word longer than 4 syllables, except the concept's own name and
   at most 2 other terms the material uses — each explained in plain words in the same
   sentence ("..., called its vocabulary").
+- The viewer is a beginner with NO programming background. Short sentences (aim for 8-12
+  words), everyday words, about a grade 7 reading level.
+- Explain every technical term the first time you say it, in the same sentence or the
+  very next one, in plain words: "re-render" -> "React runs your component again to
+  redraw the screen". TECHNICAL TERMS in the material block lists the ones it uses.
 - Every claim must be supported by the MATERIAL. concept_name is written exactly as the
   material writes it.
 - The explanation — every step, the running example — comes from MATERIAL. When a
@@ -2500,9 +2512,9 @@ SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX = """You are rewriting ONLY the opening hook 
 teaching reel that walks through how something works. Every other shot is final and
 not yours to change.
 
-The hook is ONE question about how something works ("How does...", "What happens
-when..."), then a surprising one-line answer that is not a question ("It only reads
-numbers."). It never names the concept. 8 to 16 words.
+The hook is ONE curiosity question opening with why, what or how ("Why does...",
+"How does...", "What happens when..."), then a surprising one-line answer that is
+not a question ("It only reads numbers."). It never names the concept. 8 to 16 words.
 
 speech is spelled for text-to-speech (code written as words). captions are the SAME
 words, one caption per sentence, each at most 14 words with at most 2 <b>...</b>
@@ -2644,6 +2656,11 @@ def _motion_material_block(topic: Topic, section: Section,
             parts.append("RULED OUT BY THE APPROVED APPROACH — binding. Never show these in any "
                          "shot's code, and never teach them in the narration:\n"
                          + "\n".join(f"  - {r['clause']}" for r in ruled_out))
+    terms = checks.terms_used(source_text + "\n" + (supporting_text or ""))
+    if terms:
+        parts.append("\nTECHNICAL TERMS this material uses. If you say one, explain it the first "
+                     "time, in plain words — for example:\n"
+                     + "\n".join(f"  - {t}: {v['meaning']}" for t, v in terms.items()))
     parts.append(f"\nSERIES (the cta asks them to follow this): {series}")
     parts.append("NEXT TOPIC (the cta names it): "
                  + (next_topic or "none — the cta just asks them to follow"))
@@ -2710,8 +2727,42 @@ def regenerate_motion_hook(script: MotionScript, material: str, source_text: str
                                                    selected_text=selected_text, approach=approach)
         if checks.all_passed(results):
             return candidate, results
+        motion_repair.save_rejected(candidate, results, kind="hook_fix")
         feedback = "; ".join(r.reason for r in results if not r.passed)
     return None, results
+
+
+def _motion_grading_texts(section: Section, source_text: str, supporting_text: str,
+                          template: str) -> tuple[str, str | None, str | None]:
+    """(source_text, main_text, selected_text) as the motion graders take them.
+    `source_text` comes back with the supporting sections appended; main_text
+    is the selected section's own evidence when there are supporting
+    sections; selected_text is the selected section alone for a fix_story,
+    whose running example must come from it (source-scope rule, 2026-10-10;
+    a walkthrough keeps check_walkthrough_main_source)."""
+    main_text = source_text if supporting_text else None
+    selected_text = section.text if template == "fix_story" else None
+    if supporting_text:
+        source_text = source_text + "\n\n" + supporting_text
+    return source_text, main_text, selected_text
+
+
+def reuse_saved_motion_script(section: Section, *, short_id: str, source_text: str,
+                              approach: TeachingApproach | None = None,
+                              template: str = "fix_story", supporting_text: str = "",
+                              theme: str | None = None):
+    """A saved rejected draft of this reel (motion_repair) that passes today's
+    graders, as it is or after a mechanical caption repair — so a fixed grader
+    costs nothing to benefit from. Returns (script, results, path, repaired)
+    or None. Makes no call."""
+    source_text, main_text, selected_text = _motion_grading_texts(
+        section, source_text, supporting_text, template)
+
+    def grade(candidate: MotionScript) -> list:
+        return checks.run_motion_script_graders(candidate, source_text, main_text=main_text,
+                                                selected_text=selected_text, approach=approach)
+
+    return motion_repair.best_saved(short_id, template, theme, section.section_id, grade)
 
 
 def write_motion_script(topic: Topic, section: Section, *, short_id: str,
@@ -2758,14 +2809,14 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
     material = _motion_material_block(topic, section, understanding, source_text,
                                       approach, series, next_topic, template,
                                       supporting_text, spec)
-    main_text = source_text if supporting_text else None
-    # fix_story: the running example comes from the selected section; other
-    # sections supply only numbers and defined terms (source-scope rule,
-    # 2026-10-10). A walkthrough keeps check_walkthrough_main_source.
-    selected_text = section.text if template == "fix_story" else None
-    if supporting_text:
-        source_text = source_text + "\n\n" + supporting_text
+    source_text, main_text, selected_text = _motion_grading_texts(
+        section, source_text, supporting_text, template)
     user = material
+
+    def grade(candidate: MotionScript) -> list:
+        return checks.run_motion_script_graders(candidate, source_text, main_text=main_text,
+                                                selected_text=selected_text, approach=approach)
+
     results: list = []
     for _ in range(config.MAX_MOTION_SCRIPT_RETRIES):
         draft = ask_json(system, user, MotionScriptDraft, max_tokens=6000,
@@ -2776,6 +2827,12 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                                                    selected_text=selected_text, approach=approach)
         if checks.all_passed(results):
             return script, results
+        motion_repair.save_rejected(script, results)
+        repaired = motion_repair.try_mechanical(script, results, grade)
+        if repaired is not None:
+            print("  repaired in code (caption re-cut), no further call: "
+                  + "; ".join(r.name for r in results if not r.passed))
+            return repaired
         if checks.motion_failures_are_hook_only(results):
             fixed, fixed_results = regenerate_motion_hook(script, material, source_text, results,
                                                           main_text, selected_text, approach)

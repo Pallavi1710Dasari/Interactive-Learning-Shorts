@@ -1841,7 +1841,43 @@ def motion_plan(short_id: str):
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("audio"):
         data["audio_url"] = f"/api/motion/{short_id}/audio"
+    # "stub": the narration is stub silence, so the player says so rather than
+    # leave the reviewer wondering whether the sound is broken
+    manifest = config.OUTPUT_DIR / short_id / "audio" / "manifest.json"
+    try:
+        engine = json.loads(manifest.read_text(encoding="utf-8")).get("engine")
+    except (OSError, ValueError):
+        engine = None
+    data["voice"] = "stub" if engine == "stub" else ("recorded" if data.get("audio") else "none")
     return data
+
+
+class MotionRedrawIn(BaseModel):
+    note: str
+
+
+@app.post("/api/motion/{short_id}/redraw")
+def motion_redraw_start(short_id: str, body: MotionRedrawIn):
+    """Redraw a motion reel's visuals from a note (shorts/motion_redraw.py):
+    the scenes again, on the same script and voice. One paid scenes call
+    (free in stub mode); the feed shows its most-it-can-cost first."""
+    from . import motion_redraw
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", short_id):
+        raise HTTPException(400, "bad short id")
+    try:
+        return motion_redraw.start(short_id, body.note)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/motion/{short_id}/redraw")
+def motion_redraw_status(short_id: str):
+    from . import motion_redraw
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", short_id):
+        raise HTTPException(400, "bad short id")
+    return motion_redraw.status(short_id)
 
 
 @app.get("/api/motion/{short_id}/audio")
@@ -1852,6 +1888,162 @@ def motion_audio(short_id: str):
     if not path.exists():
         raise HTTPException(404, "no audio for this motion reel")
     return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+
+# ------------------------------------------------- motion reels made in the UI
+#
+# shorts/motion_jobs.py runs python -m shorts.motion_reel's stages and gates
+# for the web UI. These routes are thin: they parse the request, call it, and
+# return the job as the browser shows it (motion_jobs.view). A job's stage
+# work runs on a thread; the page polls GET /api/motion-jobs/<id>.
+#
+# Cost shape: creating a job and reading its options and estimate are free.
+# /start spends the setup calls (selection, understanding, framing, teaching
+# approach) the estimate was shown for. Every later paid stage (theme fit,
+# script, scenes) stops at a pre-flight first and spends only on "proceed".
+# Voice and timing are local and free.
+
+def _motion_job(job_id: str) -> dict:
+    from . import motion_jobs
+    try:
+        return motion_jobs.load(job_id)
+    except KeyError:
+        raise HTTPException(404, "no such motion job")
+
+
+def _motion_job_call(fn, *args, **kw) -> dict:
+    from . import motion_jobs
+    try:
+        return motion_jobs.view(fn(*args, **kw))
+    except motion_jobs.Busy:
+        raise HTTPException(409, "This reel is busy with a step right now. Wait for it to finish.")
+    except motion_jobs.Stale:
+        raise HTTPException(409, "This step has already moved on (a second click, or another "
+                                 "tab). The page now shows where the reel is.")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/motion-jobs")
+async def motion_job_create(text: str | None = Form(default=None),
+                            file: UploadFile | None = File(default=None)):
+    """Upload reading material for a new MOTION reel. Free: it saves the
+    document and returns the job at its options screen."""
+    from . import motion_jobs
+    if file is not None:
+        raw = (await file.read()).decode("utf-8", errors="replace")
+        name = Path(file.filename or "upload.md").name
+    elif text:
+        raw, name = text, "pasted text"
+    else:
+        raise HTTPException(400, "provide pasted text or a file")
+    raw = raw.strip()
+    if len(raw) < 200:
+        raise HTTPException(400, "material is too short to make a reel from (need ~200+ chars)")
+    if len(raw) > MAX_MATERIAL_CHARS:
+        raise HTTPException(413, f"material over {MAX_MATERIAL_CHARS} chars — split it up")
+    path = UPLOADS / f"{uuid.uuid4().hex[:12]}.md"
+    path.write_text(raw, encoding="utf-8")
+    if not parse_markdown(path):
+        path.unlink(missing_ok=True)
+        raise HTTPException(422, "no sections found. Use markdown headings like "
+                                 "'## 3.1 Why paging exists' so the reel can cite where it came from.")
+    return motion_jobs.view(motion_jobs.new_job(path, name))
+
+
+@app.get("/api/motion-jobs")
+def motion_job_list():
+    """Every motion reel started in the UI, newest first — the ones still in
+    progress are resumable."""
+    from . import motion_jobs
+    return {"jobs": motion_jobs.list_jobs()}
+
+
+@app.get("/api/motion-jobs/{job_id}")
+def motion_job_get(job_id: str):
+    from . import motion_jobs
+    return motion_jobs.view(_motion_job(job_id))
+
+
+@app.get("/api/motion-jobs/{job_id}/options")
+def motion_job_options(job_id: str):
+    """The options screen: sections, languages, themes, templates, character
+    presets, and the whole-reel cost estimate. Free."""
+    from . import motion_jobs
+    return motion_jobs.options_info(_motion_job(job_id))
+
+
+@app.get("/api/motion-jobs/{job_id}/cast")
+def motion_job_cast(job_id: str):
+    """The Characters step: the reel's speakers with a recommended avatar and
+    voice each, and every alternative. Free."""
+    from . import motion_jobs
+    try:
+        return motion_jobs.cast_info(_motion_job(job_id))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/voices/{voice_id}")
+def voice_sample(voice_id: str):
+    """A voice's reference recording, to hear it before choosing it."""
+    from . import motion_voice
+    have = motion_voice.available_voices()
+    if voice_id not in have:
+        raise HTTPException(404, "no such voice")
+    import mimetypes
+    path = have[voice_id][0]
+    kind = mimetypes.guess_type(path)[0] or "audio/ogg"
+    # these clips are Ogg/Opus even when named .wav (the panel's recordings)
+    if path.endswith(".wav") and open(path, "rb").read(4) == b"OggS":
+        kind = "audio/ogg"
+    return FileResponse(path, media_type=kind, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/motion-jobs/{job_id}/start")
+def motion_job_start(job_id: str, options: dict = Body(default={})):
+    from . import motion_jobs
+    _motion_job(job_id)
+    return _motion_job_call(motion_jobs.locked, job_id, motion_jobs.start, options,
+                            expect="options/options")
+
+
+class MotionDecisionIn(BaseModel):
+    action: str
+    reason: str = ""
+    #: the "stage/status" the reviewer's screen showed — a click on a screen
+    #: the reel has already moved past is refused, never applied twice
+    expect: str | None = None
+    #: the reviewer's pick: a topic's index, an approach, a template, a theme
+    #: or a section id
+    choice: int | str | dict | None = None      # dict: the Characters step's picks
+
+
+@app.post("/api/motion-jobs/{job_id}/decide")
+def motion_job_decide(job_id: str, body: MotionDecisionIn):
+    from . import motion_jobs
+    _motion_job(job_id)
+    return _motion_job_call(motion_jobs.locked, job_id, motion_jobs.decide, body.action,
+                            body.reason, body.choice, expect=body.expect)
+
+
+@app.post("/api/motion-jobs/{job_id}/resume")
+def motion_job_resume(job_id: str):
+    from . import motion_jobs
+    _motion_job(job_id)
+    return _motion_job_call(motion_jobs.locked, job_id, motion_jobs.resume)
+
+
+@app.post("/api/motion/{short_id}/job")
+def motion_reel_job(short_id: str):
+    """The job that resumes a motion reel in the UI — its own, or a new one
+    for a reel the CLI started, at the stage its files say it reached."""
+    from . import motion_bundle, motion_jobs
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", short_id):
+        raise HTTPException(400, "bad short id")
+    if not motion_bundle.is_motion_reel(config.OUTPUT_DIR, short_id):
+        raise HTTPException(404, "no such motion reel")
+    return _motion_job_call(motion_jobs.job_for_reel, short_id)
 
 
 @app.get("/api/motion-characters/presets")
@@ -1987,7 +2179,8 @@ def start_render(short_id: str):
     rather than starting a second.
     """
     _check_id(short_id)
-    if not (config.OUTPUT_DIR / f"{short_id}.json").exists():
+    if not ((config.OUTPUT_DIR / f"{short_id}.json").exists()
+            or (config.OUTPUT_DIR / short_id / "plan.json").exists()):
         raise HTTPException(404, f"no such short: {short_id}")
 
     from . import video as videomod
@@ -2000,6 +2193,8 @@ def start_render(short_id: str):
         mp4 = videomod.mp4_path(short_id)
         stamp = config.OUTPUT_DIR / short_id / "reel.stamp"
         unit = config.OUTPUT_DIR / f"{short_id}.json"
+        if not unit.exists():                        # a motion reel: its plan
+            unit = config.OUTPUT_DIR / short_id / "plan.json"
         if mp4.exists() and videomod._stamp_matches(
                 stamp, videomod._renderer_fingerprint(), unit):
             _RENDERS[short_id] = {"status": "done", "done": 1, "total": 1, "error": None}
@@ -2416,6 +2611,11 @@ def main():
               f"  opens that address shares it — upload once, not once per device.")
         print(f"  note: recording from a microphone needs localhost or https, so\n"
               f"  on other devices use the upload button.\n")
+    # the MP4 renderer photographs THIS server's player: on another port it
+    # used to photograph :8000, which may not even have the reel
+    if not os.environ.get("VIDEO_BASE_URL"):
+        os.environ["VIDEO_BASE_URL"] = f"http://127.0.0.1:{args.port}"
+        config.VIDEO_BASE_URL = os.environ["VIDEO_BASE_URL"]
     uvicorn.run("shorts.server:app", host=args.host, port=args.port, reload=args.reload)
 
 

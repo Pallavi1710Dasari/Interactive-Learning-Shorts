@@ -1,0 +1,884 @@
+{
+ "contexts": {
+  "solo": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 3.96,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.29,
+    "characters": false
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 16.82,
+    "characters": false
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 23.54,
+    "characters": false
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 29.68,
+    "characters": false
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 36.21,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 42.74,
+    "characters": false
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 49.07,
+    "characters": false
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 55.21,
+    "characters": false
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 61.36,
+    "characters": false
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 68.27,
+    "characters": false
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 74.41,
+    "characters": false
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 80.17,
+    "characters": false
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 85.92,
+    "characters": false
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 90.34,
+    "characters": false
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 95.13,
+    "characters": false
+   },
+   {
+    "scene": "title_card",
+    "id": "s17",
+    "t": 100.7,
+    "characters": false
+   },
+   {
+    "scene": "code_map",
+    "id": "s18",
+    "t": 107.22,
+    "characters": false
+   },
+   {
+    "scene": "takeaway_list",
+    "id": "s19",
+    "t": 113.75,
+    "characters": false
+   },
+   {
+    "scene": "chapter_card",
+    "id": "s20",
+    "t": 117.78,
+    "characters": false
+   },
+   {
+    "scene": "recap_grid",
+    "id": "s21",
+    "t": 121.81,
+    "characters": false
+   },
+   {
+    "scene": "end_card",
+    "id": "s22",
+    "t": 126.41,
+    "characters": false
+   }
+  ],
+  "narrator": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 3.96,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.29,
+    "characters": true
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 16.82,
+    "characters": true
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 23.54,
+    "characters": true
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 29.68,
+    "characters": true
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 36.21,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 42.74,
+    "characters": true
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 49.07,
+    "characters": true
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 55.21,
+    "characters": true
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 61.36,
+    "characters": true
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 68.27,
+    "characters": true
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 74.41,
+    "characters": true
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 80.17,
+    "characters": true
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 85.92,
+    "characters": true
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 90.34,
+    "characters": true
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 95.13,
+    "characters": true
+   }
+  ],
+  "duo": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 4.03,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.52,
+    "characters": false
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 17.2,
+    "characters": false
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 24.07,
+    "characters": false
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 30.36,
+    "characters": false
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 37.04,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 43.71,
+    "characters": false
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 50.2,
+    "characters": false
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 56.49,
+    "characters": false
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 62.78,
+    "characters": false
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 69.84,
+    "characters": false
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 76.13,
+    "characters": false
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 82.04,
+    "characters": false
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 87.95,
+    "characters": false
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 92.51,
+    "characters": false
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 97.46,
+    "characters": false
+   }
+  ],
+  "duo_characters": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 4.03,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.52,
+    "characters": true
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 17.2,
+    "characters": true
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 24.07,
+    "characters": true
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 30.36,
+    "characters": true
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 37.04,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 43.71,
+    "characters": true
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 50.2,
+    "characters": true
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 56.49,
+    "characters": true
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 62.78,
+    "characters": true
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 69.84,
+    "characters": true
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 76.13,
+    "characters": true
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 82.04,
+    "characters": true
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 87.95,
+    "characters": true
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 92.51,
+    "characters": true
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 97.46,
+    "characters": true
+   }
+  ],
+  "lab_solo": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 3.96,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.29,
+    "characters": false
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 16.82,
+    "characters": false
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 23.54,
+    "characters": false
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 29.68,
+    "characters": false
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 36.21,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 42.74,
+    "characters": false
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 49.07,
+    "characters": false
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 55.21,
+    "characters": false
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 61.36,
+    "characters": false
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 68.27,
+    "characters": false
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 74.41,
+    "characters": false
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 80.17,
+    "characters": false
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 85.92,
+    "characters": false
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 90.34,
+    "characters": false
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 95.13,
+    "characters": false
+   },
+   {
+    "scene": "title_card",
+    "id": "s17",
+    "t": 100.7,
+    "characters": false
+   },
+   {
+    "scene": "code_map",
+    "id": "s18",
+    "t": 107.22,
+    "characters": false
+   },
+   {
+    "scene": "takeaway_list",
+    "id": "s19",
+    "t": 113.75,
+    "characters": false
+   },
+   {
+    "scene": "chapter_card",
+    "id": "s20",
+    "t": 117.78,
+    "characters": false
+   },
+   {
+    "scene": "recap_grid",
+    "id": "s21",
+    "t": 121.81,
+    "characters": false
+   },
+   {
+    "scene": "end_card",
+    "id": "s22",
+    "t": 126.41,
+    "characters": false
+   }
+  ],
+  "lab_narrator": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 3.96,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.29,
+    "characters": true
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 16.82,
+    "characters": true
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 23.54,
+    "characters": true
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 29.68,
+    "characters": true
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 36.21,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 42.74,
+    "characters": true
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 49.07,
+    "characters": true
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 55.21,
+    "characters": true
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 61.36,
+    "characters": true
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 68.27,
+    "characters": true
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 74.41,
+    "characters": true
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 80.17,
+    "characters": true
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 85.92,
+    "characters": true
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 90.34,
+    "characters": true
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 95.13,
+    "characters": true
+   }
+  ],
+  "lab_duo": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 4.03,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.52,
+    "characters": false
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 17.2,
+    "characters": false
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 24.07,
+    "characters": false
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 30.36,
+    "characters": false
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 37.04,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 43.71,
+    "characters": false
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 50.2,
+    "characters": false
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 56.49,
+    "characters": false
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 62.78,
+    "characters": false
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 69.84,
+    "characters": false
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 76.13,
+    "characters": false
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 82.04,
+    "characters": false
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 87.95,
+    "characters": false
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 92.51,
+    "characters": false
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 97.46,
+    "characters": false
+   }
+  ],
+  "lab_duo_characters": [
+   {
+    "scene": "hook",
+    "id": "s01",
+    "t": 4.03,
+    "characters": false
+   },
+   {
+    "scene": "kinetic_statement",
+    "id": "s02",
+    "t": 10.52,
+    "characters": true
+   },
+   {
+    "scene": "code_window",
+    "id": "s03",
+    "t": 17.2,
+    "characters": true
+   },
+   {
+    "scene": "token_row",
+    "id": "s04",
+    "t": 24.07,
+    "characters": true
+   },
+   {
+    "scene": "entity_stamp",
+    "id": "s05",
+    "t": 30.36,
+    "characters": true
+   },
+   {
+    "scene": "entity_to_panel",
+    "id": "s06",
+    "t": 37.04,
+    "characters": false
+   },
+   {
+    "scene": "trigger",
+    "id": "s07",
+    "t": 43.71,
+    "characters": true
+   },
+   {
+    "scene": "icon_row",
+    "id": "s08",
+    "t": 50.2,
+    "characters": true
+   },
+   {
+    "scene": "big_counter",
+    "id": "s09",
+    "t": 56.49,
+    "characters": true
+   },
+   {
+    "scene": "callout",
+    "id": "s10",
+    "t": 62.78,
+    "characters": true
+   },
+   {
+    "scene": "lookup_table",
+    "id": "s11",
+    "t": 69.84,
+    "characters": true
+   },
+   {
+    "scene": "app_screen",
+    "id": "s12",
+    "t": 76.13,
+    "characters": true
+   },
+   {
+    "scene": "memory_box",
+    "id": "s13",
+    "t": 82.04,
+    "characters": true
+   },
+   {
+    "scene": "flow",
+    "id": "s14",
+    "t": 87.95,
+    "characters": true
+   },
+   {
+    "scene": "compare",
+    "id": "s15",
+    "t": 92.51,
+    "characters": true
+   },
+   {
+    "scene": "cycle",
+    "id": "s16",
+    "t": 97.46,
+    "characters": true
+   }
+  ]
+ },
+ "scenes": [
+  "hook",
+  "kinetic_statement",
+  "code_window",
+  "token_row",
+  "entity_stamp",
+  "entity_to_panel",
+  "trigger",
+  "icon_row",
+  "big_counter",
+  "callout",
+  "lookup_table",
+  "app_screen",
+  "memory_box",
+  "flow",
+  "compare",
+  "cycle",
+  "title_card",
+  "code_map",
+  "takeaway_list",
+  "chapter_card",
+  "recap_grid",
+  "end_card"
+ ]
+}

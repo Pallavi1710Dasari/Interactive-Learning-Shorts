@@ -56,6 +56,9 @@ def summary(out_dir: Path, short_id: str) -> dict:
         "short_id": short_id,
         "topic": (setup.get("topic") or {}).get("topic", ""),
         "stub": _stub(out_dir, short_id, cost),
+        # no voice: its narration is silence (MOTION_VOICE=silent, or a stub
+        # reel from before test reels were voiced)
+        "silent": ((_read(d / "audio" / "manifest.json") or {}).get("engine") == "stub"),
         "theme": theme.get("theme"),
         "template": (script or {}).get("template") or setup.get("template"),
         "teaching_approach": approach.get("primary"),
@@ -64,8 +67,14 @@ def summary(out_dir: Path, short_id: str) -> dict:
         "duration": (plan or {}).get("duration"),
         "cost": ((cost or {}).get("total") or {}).get("cost", 0.0),
         "cost_estimated": ((cost or {}).get("total") or {}).get("estimated", False),
+        # tokens in and out over every run of every call (output/<id>/cost.json)
+        "tokens": sum(int(c.get("input_tokens") or 0) + int(c.get("output_tokens") or 0)
+                      for r in (cost or {}).get("runs", []) for c in r.get("calls", [])),
         "stage": stage,
         "has_plan": plan is not None,
+        #: when the reel was started (its setup.json): the reels feed lists
+        #: motion and explainer reels together, newest first
+        "created": (d / "setup.json").stat().st_mtime if (d / "setup.json").exists() else 0.0,
     }
 
 

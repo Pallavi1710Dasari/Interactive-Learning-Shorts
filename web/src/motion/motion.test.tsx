@@ -130,7 +130,7 @@ for (const { key, spec } of allIdentities()) {
 {
   const rows = contrastChecks(allIdentities());
   for (const r of rows) check(r.ratio >= r.min, `${r.element} (${r.who}, ${r.field}): ${r.fg} on ${r.bg} is ${r.ratio.toFixed(2)}:1, needs ${r.min}:1`);
-  check(rows.filter((r) => r.element === "role label / speaker tag").length === allIdentities().length * 4, "the role-label checks cover every identity on every field");
+  check(rows.filter((r) => r.element === "role label / speaker tag").length === allIdentities().length * FIELD_NAMES.length, "the role-label checks cover every identity on every field");
   check(allIdentities().every(({ spec }) => !!spec.text_on_dark && !!spec.text_on_light), "every identity has 4.5:1 text tones");
   const ivRow = renderToStaticMarkup(<MotionFrame plan={demoInterview} t={demoInterview.shots[3].start + 0.5} />);
   check(!/opacity:\s*0\.3/.test(ivRow), "bubble words are dimmed by colour, never by transparency");

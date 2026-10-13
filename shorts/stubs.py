@@ -128,6 +128,27 @@ def _truncate(text: str, max_words: int) -> str:
     return _terminate(" ".join(text.split()[:max_words]))
 
 
+_NAMES = {"react", "javascript", "python", "java", "html", "css", "sql", "node", "django", "docker",
+          "typescript", "linux", "windows", "git", "c", "c++"}
+_ASKS = ("what", "why", "how", "when", "where", "which", "who", "is", "are", "does", "do", "can", "should")
+
+
+def _stub_question(title: str) -> str:
+    """A section title as a plain question. A title that already asks
+    ("What Is React?", "Why changing a variable does not update") is kept as
+    one sentence-case question — wrapping it as "How does what Is React?
+    work?" read as nonsense in every stub reel; a noun phrase becomes "How
+    does <it> work?"."""
+    t = title.strip().rstrip("?.!").strip()
+    words = t.split()
+    if words and words[0].lower() in _ASKS:
+        # sentence case, keeping names and acronyms (React, JavaScript, HTML)
+        rest = [w if (w[1:].lower() != w[1:] or w.strip(",:;").lower() in _NAMES) else w.lower()
+                for w in words[1:]]
+        return " ".join([words[0].capitalize()] + rest) + "?"
+    return f"How does {t[0].lower() + t[1:]} work?" if t else "How does this work?"
+
+
 def _topics(user: str) -> dict:
     """One topic per section, read straight out of the prompt block."""
     found = re.findall(r"\[section_id: ([^\]]+)\]\s*(.*)", user)
@@ -137,7 +158,7 @@ def _topics(user: str) -> dict:
         slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")[:40]
         topics.append({
             "id": f"stub_{slug}" if slug else f"stub_{section_id.replace('.', '_')}",
-            "topic": f"How does {title[0].lower() + title[1:]} work?",
+            "topic": _stub_question(title),
             "why_it_matters": f"Stub topic generated from section {section_id}.",
             "source_section_id": section_id.strip(),
             "difficulty": "medium",
@@ -983,26 +1004,30 @@ def _motion_fixture_for(user: str) -> dict:
     """The golden fixture whose concept_name the material teaches AND whose
     template and theme are the ones asked for (the TEMPLATE: and THEME: lines
     of the material block; no THEME: line means the template's base theme).
-    A walkthrough asked of useState material has no fixture, and says so,
-    rather than handing back a fix_story the walkthrough graders then fail."""
+    With no such golden, the draft is built from the material
+    (stub_motion.draft) in the template and theme asked for — never a golden
+    of another template the graders would then fail."""
     material = (_find(r"MATERIAL:\n(.*?)(?:\n(?:CORE IDEA|THE APPROVED|SERIES)|\Z)",
                       user, re.S) or user)
     template = _find(r"^TEMPLATE:\s*(\w+)", user, re.M) or "fix_story"
     theme = _find(r"^THEME:\s*(\w+)", user, re.M) or _MOTION_BASE_THEMES[template]
-    taught = []
-    for path, data in _motion_fixtures_teaching(material):
-        if _fixture_kind(data) == (template, theme):
+    for _path, data in _motion_fixtures_teaching(material):
+        if _fixture_kind(data) == (template, theme) and _states_its_numbers(data, user):
             return data
-        tpl, thm = _fixture_kind(data)
-        taught.append(f"{path.name} ({tpl}" + (f", {thm}" if thm != _MOTION_BASE_THEMES[tpl]
-                                               else "") + ")")
-    raise NotImplementedError(
-        f"no {template} motion stub fixture teaches this material"
-        + (f" as {theme}" if theme != _MOTION_BASE_THEMES[template] else "")
-        + (f" (only {', '.join(taught)})" if taught else "")
-        + f" — add an evals/fixtures/motion/<name>_golden.json with template "
-        f"{template!r} and theme {theme!r} whose concept_name appears in it, "
-        f"or unset SHORTS_STUB.")
+    # No golden fits: write one from the material itself, so a stub run on
+    # any upload goes on to the player (shorts/stub_motion.py).
+    from . import stub_motion
+    return stub_motion.draft(user, template, theme)
+
+
+def _states_its_numbers(data: dict, user: str) -> bool:
+    """A golden whose narration says only numbers this prompt's material
+    states: one about useState(0) does not fit a section that never says 0."""
+    from .checks import _numbers_in, motion_source_numbers
+    have = motion_source_numbers(user)
+    said = {n for s in data["shots"] for n in _numbers_in(s["speech"])}
+    chapters = data.get("chapters") or []
+    return said <= have | ({str(len(chapters))} if chapters else set())
 
 
 def _motion_theme(user: str) -> dict:
@@ -1018,7 +1043,9 @@ def _motion_theme(user: str) -> dict:
     return {"theme": pick,
             "reason": f"stub: the first eligible theme with a golden fixture ({pick})",
             "concept_tags": [t.strip() for t in tags.split(",")
-                             if t.strip() and t.strip() != "none found"]}
+                             if t.strip() and t.strip() != "none found"],
+            "show_avatars": True,
+            "avatar_reason": "stub: a face for each speaker makes the reel easier to follow."}
 
 
 def _motion_script(user: str) -> dict:

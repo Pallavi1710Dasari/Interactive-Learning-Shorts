@@ -8,6 +8,8 @@ import { StepApprove } from "./StepApprove";
 import { StepTeachingApproach } from "./StepTeachingApproach";
 import { StepReview } from "./StepReview";
 import { StepBuild } from "./StepBuild";
+import { StepMotion } from "./StepMotion";
+import { MotionReel, type MotionSummary } from "./MotionFeedItem";
 import { VoiceLab } from "./VoiceLab";
 import { CaptureStage } from "./CaptureStage";
 import { StoryCaptureStage } from "./StoryStage";
@@ -27,7 +29,9 @@ import type { Feedback, QuestionWorkflow, StoryReel, Unit } from "./types";
 // that needs its own review — see StepBuild's docstring. The backend's
 // visual-plan approve/regenerate endpoints are untouched and still directly
 // callable; StepBuild just never stops on a click waiting for them.
-type Step = "material" | "approve" | "approach" | "review" | "building" | "reels";
+type Step = "material" | "approve" | "approach" | "review" | "building" | "reels" | "motion";
+// "motion": a MOTION reel's eight steps on one screen (StepMotion) — the
+// default for new reels. The crumbs above then show those steps instead.
 
 export default function App() {
   // #capture/<short_id> — the MP4 renderer's entry point, and deliberately the
@@ -42,6 +46,8 @@ export default function App() {
   // #motion-reel/<short_id> — a motion reel in the full-reel player (phase 3):
   // its plan and narration from the API, or any plan with ?src=<url>.
   if (location.hash.startsWith("#motion-reel")) return <MotionPlayer />;
+  // #motion/job/<id> — a motion reel being made: its steps, in the workspace.
+  if (location.hash.startsWith("#motion/job/")) return <Workspace />;
   // #motion — the Motion section: every motion reel with its player, theme,
   // approach, tags, script, fact sources and cost. The explainer screens below
   // are untouched by it.
@@ -108,9 +114,21 @@ function CaptureRoute({ shortId }: { shortId: string }) {
   return <CaptureStage unit={unit} />;
 }
 
+/** The motion job in the URL (#motion/job/<id>), if any. */
+const jobInHash = () => {
+  const m = location.hash.match(/^#motion\/job\/([a-f0-9]{12})/);
+  return m ? m[1] : null;
+};
+
 function Workspace() {
-  const [step, setStep] = useState<Step>("material");
+  const [motionJob, setMotionJob] = useState<string | null>(jobInHash);
+  const [, setMotionStage] = useState<string>("options");
+  const [motionReels, setMotionReels] = useState<MotionSummary[]>([]);
+  const [step, setStep] = useState<Step>(motionJob ? "motion" : "material");
   const [voiceOpen, setVoiceOpen] = useState(false);
+  // bumped when the voice studio closes: the Characters step lists the voices again
+  const [voiceVersion, setVoiceVersion] = useState(0);
+  useEffect(() => { if (!voiceOpen) setVoiceVersion((v) => v + 1); }, [voiceOpen]);
   // The cost breakdown is opt-in, not ambient. It used to render unconditionally
   // in the topbar, which put a running dollar figure and a token count in front
   // of a non-engineer reviewer on every screen — the product owner's own
@@ -136,7 +154,7 @@ function Workspace() {
   // GET /api/voice on every page load. Cost-free (no LLM call) but still a
   // duplicate request Step 7 asks to close.
   useEffect(() => { if (!voiceOpen) readVoice(); }, [voiceOpen, readVoice]);
-  const [material, setMaterial] = useState<MaterialResult | null>(null);
+  const [material] = useState<MaterialResult | null>(null);
   // Each stage's own gate output — the FULL QuestionWorkflow record, never a
   // reconstructed Topic, so the next screen always has the framing/approach/
   // script/visual-plan the previous human gate actually approved:
@@ -181,8 +199,33 @@ function Workspace() {
     getShorts()
       .then((s) => { setShorts(s); if (openingReels) setStep("reels"); })
       .catch(() => {});
+    loadMotionReels();
     getUsage().then(setTotal).catch(() => {});
   }, []);
+
+  // Motion reels join the same feed (newest first, marked "Motion").
+  // The feed waits for this list: a motion reel inserted on top AFTER the
+  // feed was drawn left the feed snapped to the old first reel (scroll snap
+  // keeps the reel it was on), so it opened on reel 2, not the newest.
+  const [motionLoaded, setMotionLoaded] = useState(false);
+  const loadMotionReels = useCallback(() => {
+    fetch("/api/motion").then((r) => (r.ok ? r.json() : { reels: [] }))
+      .then((d) => setMotionReels(d.reels ?? [])).catch(() => {})
+      .finally(() => setMotionLoaded(true));
+  }, []);
+  // The motion job's step, polled lightly so the crumbs follow it.
+  useEffect(() => {
+    if (!motionJob || step !== "motion") return;
+    const read = () => fetch(`/api/motion-jobs/${motionJob}`).then((r) => r.json())
+      .then((j) => setMotionStage(j.stage)).catch(() => {});
+    read();
+    const t = setInterval(read, 1500);
+    return () => clearInterval(t);
+  }, [motionJob, step]);
+  const openMotion = (id: string) => {
+    history.replaceState(null, "", `#motion/job/${id}`);
+    setMotionJob(id); setMotionStage("options"); setStep("motion");
+  };
 
   // Anything that spends money hands back its own cost plus the new running total.
   const onSpend = (d: UsageTotals, t: UsageTotals) => { setDelta(d); setTotal(t); };
@@ -191,28 +234,25 @@ function Workspace() {
     <div className="shell">
       <header className="topbar">
         <div className="brand"><span className="spark">▶</span> Learning Shorts</div>
-        <nav className="steps">
-          <Crumb n={1} label="Material" on={step === "material"} done={!!material}
+        <nav className={step === "motion" ? "steps msteps" : "steps"}>
+          {step === "motion" ? <>
+            {/* the steps' progress is on the page itself (StepMotion) */}
+            <Crumb n={1} label="Upload" on={false} done onClick={() => setStep("material")} />
+          </> : <>
+          {/* uploads make motion reels (their steps show above while one is
+              being made); the explainer's own steps are CLI-only now */}
+          <Crumb n={1} label="Upload" on={step === "material"} done={false}
                  onClick={() => setStep("material")} />
-          <Crumb n={2} label="Approve" on={step === "approve"} done={!!approvedWorkflows}
-                 disabled={!material} onClick={() => setStep("approve")} />
-          <Crumb n={3} label="Teaching approach" on={step === "approach"} done={!!taughtWorkflows}
-                 disabled={!approvedWorkflows} onClick={() => setStep("approach")} />
-          <Crumb n={4} label="Review Q&amp;A" on={step === "review"} done={!!scriptedWorkflows}
-                 disabled={!taughtWorkflows} onClick={() => setStep("review")} />
-          {/* "building" (visual plan + render) has no crumb of its own — it
-              is automatic, not a stage a human navigates back to. The Reels
-              crumb lights up while it runs so the nav still shows progress. */}
-          <Crumb n={5} label="Reels" on={step === "reels" || step === "building"} done={false}
-                 disabled={!shorts.length && step !== "building"} onClick={() => setStep("reels")} />
+          </>}
         </nav>
         {/* The Motion section (#motion): every motion reel with its player,
             theme, script and cost. App picks its screen once per page load,
             so this reloads at the new hash rather than swapping in place. */}
-        <button className="ghost sm" title="motion reels, scene library and avatars"
+        {/* hidden while a motion reel's nine step crumbs need the room */}
+        {step !== "motion" && <button className="ghost sm" title="motion reels, scene library and avatars"
                 onClick={() => { location.hash = "#motion"; location.reload(); }}>
           Motion
-        </button>
+        </button>}
         <span className="spacer" />
         {total && costOpen && <CostPill total={total} delta={delta} />}
         <button className="ghost sm costtoggle" onClick={() => setCostOpen((v) => !v)}
@@ -224,7 +264,7 @@ function Workspace() {
               number the toggle exists to remove. */}
           {!costOpen && delta && delta.cost > 0 && <i className="costdot" aria-hidden="true" />}
         </button>
-        <span className="hintline">{health ? (health.stub ? "stub mode" : health.model) : "…"}</span>
+        {step !== "motion" && <span className="hintline">{health ? (health.stub ? "stub mode" : health.model) : "…"}</span>}
         <button className={`ghost sm voicechip${voiceNow?.startsWith("chatterbox") ? " mine" : ""}`}
                 onClick={() => setVoiceOpen(true)}
                 title={voiceNow ? `narration: ${voiceNow}` : "set the narration voice"}>
@@ -233,6 +273,7 @@ function Workspace() {
         <button
           className="ghost sm"
           onClick={() => {
+            loadMotionReels();
             getShorts().then((s) => { setShorts(s); setStep("reels"); });
             getUsage().then(setTotal).catch(() => {});
           }}
@@ -242,17 +283,9 @@ function Workspace() {
       </header>
 
       {step === "material" && (
-        <StepMaterial
-          onDone={(r) => {
-            onSpend(r.usage, r.total);
-            setMaterial(r);
-            // A fresh material means a fresh pass through every later gate.
-            setApprovedWorkflows(null);
-            setTaughtWorkflows(null);
-            setScriptedWorkflows(null);
-            setStep("approve");
-          }}
-        />
+        // uploads always make motion reels; the explainer steps below stay for
+        // a material already in hand (the old pipeline itself is CLI-only)
+        <StepMaterial onMotion={openMotion} />
       )}
       {step === "approve" && material && (
         <StepApprove
@@ -320,8 +353,12 @@ function Workspace() {
         />
       )}
 
-      {step === "reels" && (
-        <Reels shorts={shorts} focus={focus}
+      {step === "motion" && motionJob && (
+        <StepMotion key={motionJob} jobId={motionJob} onFinished={loadMotionReels}
+                    onOpenVoice={() => setVoiceOpen(true)} voiceVersion={voiceOpen ? -1 : voiceVersion} />
+      )}
+      {step === "reels" && motionLoaded && (
+        <Reels shorts={shorts} motion={motionReels} focus={focus}
                // A redraw replaces one short's frames on the server; swap it in
                // here so the feed shows the new pictures without a refetch.
                onReplace={(next) => setShorts((all) =>
@@ -348,9 +385,17 @@ function Crumb({ n, label, on, done, disabled, onClick }: {
 }
 
 /** Step 3 — reels only. No Q&A panel: reviewing was step 2's job. */
-function Reels({ shorts, focus, onReplace }: {
-  shorts: Unit[]; focus?: string | null; onReplace: (u: Unit) => void;
+function Reels({ shorts, motion, focus, onReplace }: {
+  shorts: Unit[]; motion: MotionSummary[]; focus?: string | null; onReplace: (u: Unit) => void;
 }) {
+  // ONE FEED: explainer reels and motion reels together, newest first. A
+  // motion reel is its own item (MotionFeedItem.MotionReel), drawn and played
+  // like an explainer reel, right here in the feed. New motion reels are the
+  // newest, so they come first.
+  const items = [
+    ...shorts.map((u) => ({ kind: "explainer" as const, id: u.short_id, created: u.created ?? 0, unit: u })),
+    ...motion.filter((m) => m.has_plan).map((m) => ({ kind: "motion" as const, id: m.short_id, created: m.created ?? 0, motion: m })),
+  ].sort((a, b) => b.created - a.created || (a.kind === "motion" ? -1 : 1));
   const [active, setActive] = useState(0);
   const [voiceOn, setVoiceOn] = useState(true);
   const [rate, setRate] = useState(1);
@@ -370,18 +415,18 @@ function Reels({ shorts, focus, onReplace }: {
     );
     slots.current.forEach((el) => el && obs.observe(el));
     return () => obs.disconnect();
-  }, [shorts]);
+  }, [items.length]);
 
   // Jump to the short named in the URL. Done after the slots exist and without
   // smooth scrolling, so it lands as "this is where the page opened" rather than
   // as the feed visibly travelling past the shorts in between.
   useEffect(() => {
-    if (!focus || !shorts.length) return;
-    const i = shorts.findIndex((s) => s.short_id === focus);
+    if (!focus || !items.length) return;
+    const i = items.findIndex((s) => s.id === focus);
     if (i < 0) return;
     setActive(i);
     requestAnimationFrame(() => slots.current[i]?.scrollIntoView({ block: "center" }));
-  }, [focus, shorts]);
+  }, [focus, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onFeedback = useCallback((f: Feedback) => {
     setFeedback((prev) => {
@@ -467,7 +512,7 @@ function Reels({ shorts, focus, onReplace }: {
   // Reachable now only by opening the app with an empty output/ — a build that
   // produces nothing playable keeps the reviewer on step 2, next to the reasons,
   // instead of dumping them here to read setup advice for work they already did.
-  if (!shorts.length) {
+  if (!items.length) {
     return (
       <div className="center">
         <div>
@@ -512,17 +557,22 @@ function Reels({ shorts, focus, onReplace }: {
                 ? "no system voices — playing silently"
                 : `browser voice: ${picked.interviewer?.name ?? "?"} / ${picked.student?.name ?? "?"}`}
         </span>
-        <span className="hintline">{active + 1}/{shorts.length} · {feedback.length} signals</span>
+        <span className="hintline">{active + 1}/{items.length} · {motion.filter((m) => m.has_plan).length} motion · {feedback.length} signals</span>
       </div>
 
       <div className="feed">
-        {shorts.map((unit, i) => (
-          <div className="slot" key={unit.short_id} ref={(el) => { slots.current[i] = el; }}>
-            <Reel unit={unit} active={i === active} voiceOn={voiceOn} rate={rate}
-                  onFeedback={onFeedback} onDownload={download}
-                  downloading={saving === unit.short_id}
-                  downloadPct={saving === unit.short_id ? progress : 0}
-                  onRedrawn={onReplace} />
+        {items.map((item, i) => (
+          <div className="slot" key={`${item.kind}:${item.id}`} ref={(el) => { slots.current[i] = el; }}>
+            {item.kind === "motion"
+              ? <MotionReel reel={item.motion} active={i === active} near={Math.abs(i - active) <= 1}
+                            voiceOn={voiceOn} rate={rate} onFeedback={onFeedback}
+                            onDownload={() => download({ short_id: item.id } as Unit)}
+                            downloading={saving === item.id} downloadPct={saving === item.id ? progress : 0} />
+              : <Reel unit={item.unit} active={i === active} voiceOn={voiceOn} rate={rate}
+                      onFeedback={onFeedback} onDownload={download}
+                      downloading={saving === item.unit.short_id}
+                      downloadPct={saving === item.unit.short_id ? progress : 0}
+                      onRedrawn={onReplace} />}
           </div>
         ))}
       </div>

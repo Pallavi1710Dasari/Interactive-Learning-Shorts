@@ -153,6 +153,14 @@ export function Reel({
                              : n.speaking ? "on" : "idle"} />
           <em>{n.recorded ? "hd" : voiceOn ? "voice" : "muted"}</em>
         </div>
+
+        {/* What it cost. Explainer reels were never costed one by one (the
+            usage log has no reel id), so this says so; the $ button in the top
+            bar has the running total for everything. Motion reels show theirs. */}
+        <div className="railstate cost" title="This reel's cost was not recorded on its own. The $ button at the top shows the total spend.">
+          <b>—</b>
+          <em>tokens</em>
+        </div>
       </div>
 
       {/* The redraw composer. Anchored to the rail, over the reel, because the

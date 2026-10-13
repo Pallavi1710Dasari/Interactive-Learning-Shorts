@@ -8,7 +8,7 @@
 
 import type { ReactNode } from "react";
 import { At, Overlay } from "./Stage";
-import { C, FONT, MONO_ADVANCE, W, theme, type FieldName } from "./tokens";
+import { C, FONT, MONO_ADVANCE, W, display, theme, type FieldName } from "./tokens";
 import { clamp, ease, hash3, lerp, pathD, pointAt, polylineLength, seg, type Pt } from "./time";
 import {
   BigCounter, Chip, ChipTag, LookupGrid, LookupTable, SearchBar, Stamp, TokenRow,
@@ -31,7 +31,7 @@ export function TextScramble({ text, t, x, y, size, field, start = 0, dur = 0.8,
   const allDone = t >= start + dur;
   return (
     <At x={x} y={y} center={center}>
-      <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight: 1, whiteSpace: "pre", textTransform: "uppercase",
+      <div style={{ ...display(size), lineHeight: 1, whiteSpace: "pre",
                     color: allDone ? th.accent : th.dark ? "rgba(253,209,62,0.6)" : "rgba(40,62,230,0.6)" }}>
         {text.split("").map((ch, i) => {
           const settled = t >= start + (dur * (i + 1)) / n || ch === " ";
@@ -57,8 +57,8 @@ export function TypeAssemble({ text, t, x, y, size, field, center = true }: {
   const ul = ease.inOutCubic(seg(t, n * ASSEMBLE.gap + 0.1, ASSEMBLE.underline));
   return (
     <At x={x} y={y} center={center}>
-      <div style={{ position: "relative", fontFamily: FONT.display, fontSize: size, lineHeight: 1, whiteSpace: "pre",
-                    textTransform: "uppercase", color: th.ink }}>
+      <div style={{ position: "relative", ...display(size), lineHeight: 1, whiteSpace: "pre",
+ color: th.ink }}>
         {text.split("").map((ch, i) => {
           const p = ease.outBack(seg(t, i * ASSEMBLE.gap, ASSEMBLE.letter), 1.4);
           return (
@@ -309,9 +309,9 @@ export function GhostWord({ text, t, x = W / 2, y, size = 360, field, fadeIn = 0
   const a = seg(t, 0, fadeIn) * (1 - seg(t, fadeIn + hold, fadeOut));
   return (
     <At x={x} y={y} center style={{ opacity: a * 0.9 }}>
-      <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight: 1, color: "transparent", whiteSpace: "nowrap",
+      <div style={{ ...display(size), lineHeight: 1, color: "transparent", whiteSpace: "nowrap",
                     WebkitTextStroke: `4px ${th.dark ? "rgba(255,255,255,0.75)" : "rgba(21,25,54,0.55)"}`,
-                    textTransform: "uppercase", transform: `scale(${lerp(0.96, 1, ease.outCubic(seg(t, 0, fadeIn)))})` }}>
+                    transform: `scale(${lerp(0.96, 1, ease.outCubic(seg(t, 0, fadeIn)))})` }}>
         {text}
       </div>
     </At>

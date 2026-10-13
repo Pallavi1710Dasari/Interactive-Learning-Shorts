@@ -44,6 +44,11 @@ export function evenWords(text: string, start: number, end: number): CaptionSent
   };
 }
 
+/** A word as it is shown: markdown code ticks dropped ("`count`" -> "count"). */
+export function plainWord(text: string): string {
+  return text.replace(/`/g, "");
+}
+
 /** The sentence on screen at t: the last one that has started. */
 export function sentenceAt(sentences: CaptionSentence[], t: number): CaptionSentence | null {
   let cur: CaptionSentence | null = null;
@@ -67,8 +72,8 @@ export function KaraokeCaption({ sentences, t, field, size = 56 }: {
           const lit = clamp((t - w.start) / Math.max(0.05, (w.end - w.start) / 3));
           const color = w.hl ? th.accent : th.ink;
           return (
-            <span key={i} style={{ color, opacity: 0.35 + 0.65 * lit }}>
-              {w.text}{i < s.words.length - 1 ? " " : ""}
+            <span key={i} style={{ color, opacity: 0.35 + 0.65 * lit, textShadow: w.hl ? "var(--motion-glow, none)" : undefined }}>
+              {plainWord(w.text)}{i < s.words.length - 1 ? " " : ""}
             </span>
           );
         })}

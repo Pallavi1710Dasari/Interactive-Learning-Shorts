@@ -53,7 +53,7 @@ from .parse import find_section, parse_markdown, story_evidence_pool
 from .schema import (MOTION_TEMPLATES, MotionScript, MotionTags, MotionThemeChoice,
                      QuestionWorkflow, SectionUnderstanding, TeachingApproach, Topic,
                      motion_plain_text)
-from .skills.script import write_motion_script
+from .skills.script import reuse_saved_motion_script, write_motion_script
 from .skills.theme import MAX_THEME_ATTEMPTS, SYSTEM_MOTION_THEME, choose_theme
 from .skills.select import select_topics_with_selections
 from .skills.understanding import understanding_for
@@ -254,7 +254,11 @@ def _decide_template(default: str, yes: bool, override: str | None) -> tuple[str
     if answer and answer not in MOTION_TEMPLATES:
         print(f"  {answer!r} is not a template — keeping {default}")
         answer = ""
-    return (answer, "reviewer") if answer else (default, "default")
+    # The reviewer saw the template and kept or chose it: either way it is
+    # their choice, and it pins the theme step. Returning "default" for Enter
+    # let the theme step pick a fix_story theme after a reviewer had kept
+    # walkthrough (plain_variable_no_rerender__motion, 2026-10-12).
+    return answer or default, "reviewer"
 
 
 def _run_setup(sections: list, doc_text: str, yes: bool,
@@ -296,7 +300,17 @@ def _run_setup(sections: list, doc_text: str, yes: bool,
         return None
     template, template_source = _decide_template(default_template(approach), yes,
                                                  template_override)
+    return build_setup_state(sections, wf, understanding, template, template_source)
 
+
+def build_setup_state(sections: list, wf: QuestionWorkflow,
+                      understanding: SectionUnderstanding | None,
+                      template: str, template_source: str) -> dict:
+    """The setup state saved as output/<short_id>/setup.json, once the topic,
+    the teaching approach and the template are decided. Shared by the CLI's
+    setup and the web UI's (shorts/motion_jobs.py)."""
+    topic = wf.approved_topic
+    section = find_section(sections, topic.source_section_id)
     _pool, pool_ids = story_evidence_pool(
         sections, topic.source_section_id,
         teaching_sequence=understanding.teaching_sequence if understanding else None)
@@ -387,6 +401,36 @@ def stage_theme(short_id: str, state: dict, sections: list, doc_text: str, yes: 
     and on approval save theme.json and tags.json. The fit call is the only
     spend, and only when two or more themes are eligible and --theme is not
     given."""
+    t = theme_inputs(short_id, state, sections, doc_text, override, language_override)
+    if t["plan"] is not None and not _money_gate("theme", short_id, t["plan"], yes, reel_cursor):
+        return None
+    try:
+        choice = run_theme_choice(t, override)
+    except ValueError as e:
+        print(f"\n  {e}")
+        return None
+    print_theme(choice, t["how"], t["history"])
+    tag_checks = theme_tag_checks(choice, t)
+    for r in tag_checks:
+        print(f"  {r}")
+    if not checks.all_passed(tag_checks):
+        print("  GIVING UP — the tags are not valid (see above).")
+        return None
+    if not _confirm("Approve theme?", yes):
+        print(f"Stopped at the theme — nothing saved. Rerun with --topic {short_id} to see "
+              f"this pause again, or --topic {short_id} --theme <id> to choose it yourself "
+              f"({', '.join(motion_themes.registry().ids())}).")
+        return None
+    save_theme(short_id, choice)
+    return choice
+
+
+def theme_inputs(short_id: str, state: dict, sections: list, doc_text: str,
+                 override: str | None = None, language_override: str | None = None) -> dict:
+    """Everything the theme step decides from, free: the language (and how it
+    was decided), the reel history, the template pin, the eligible themes and
+    the fit call's pre-flight plan (None when no call is needed: --theme, or
+    one eligible theme)."""
     section = find_section(sections, state["section_id"])
     source_text = "\n\n".join(find_section(sections, sid).text for sid in state["pool_ids"])
     if language_override:
@@ -402,38 +446,37 @@ def stage_theme(short_id: str, state: dict, sections: list, doc_text: str, yes: 
     eligible = motion_themes.eligible_themes(
         approach=kind, has_code=motion_themes.section_has_code(source_text),
         template=pin, history=history, language=language)
+    plan = None
     if not override and len(eligible) > 1:
         plan = [preflight.ModelPlan(
             "motion_theme", _model("motion_theme"), MAX_THEME_ATTEMPTS,
             preflight.text_cost_per_call(_model("motion_theme"),
                                          (len(SYSTEM_MOTION_THEME) + len(source_text)) // 3
                                          + 120 * len(eligible), 300))]
-        if not _money_gate("theme", short_id, plan, yes, reel_cursor):
-            return None
-    try:
-        headings = motion_themes.reel_headings(
-            doc_text, [section.title] + [find_section(sections, sid).title
-                                         for sid in state["pool_ids"]
-                                         if sid != section.section_id])
-        choice = choose_theme(section, source_text=source_text, approach=approach,
-                              language=language, history=history, template_pin=pin,
-                              override=override, headings=headings)
-    except ValueError as e:
-        print(f"\n  {e}")
-        return None
-    print_theme(choice, how, history)
-    tag_checks = [checks.check_motion_tags(choice.tags),
-                  checks.check_motion_tag_concepts(choice.tags, headings, source_text)]
-    for r in tag_checks:
-        print(f"  {r}")
-    if not checks.all_passed(tag_checks):
-        print("  GIVING UP — the tags are not valid (see above).")
-        return None
-    if not _confirm("Approve theme?", yes):
-        print(f"Stopped at the theme — nothing saved. Rerun with --topic {short_id} to see "
-              f"this pause again, or --topic {short_id} --theme <id> to choose it yourself "
-              f"({', '.join(motion_themes.registry().ids())}).")
-        return None
+    headings = motion_themes.reel_headings(
+        doc_text, [section.title] + [find_section(sections, sid).title
+                                     for sid in state["pool_ids"]
+                                     if sid != section.section_id])
+    return {"section": section, "source_text": source_text, "language": language, "how": how,
+            "history": history, "pin": pin, "approach": approach, "eligible": eligible,
+            "plan": plan, "headings": headings}
+
+
+def run_theme_choice(t: dict, override: str | None = None) -> MotionThemeChoice:
+    """The theme call itself (skills/theme.choose_theme) on theme_inputs.
+    Raises ValueError when --theme cannot be used here."""
+    return choose_theme(t["section"], source_text=t["source_text"], approach=t["approach"],
+                        language=t["language"], history=t["history"], template_pin=t["pin"],
+                        override=override, headings=t["headings"])
+
+
+def theme_tag_checks(choice: MotionThemeChoice, t: dict) -> list:
+    return [checks.check_motion_tags(choice.tags),
+            checks.check_motion_tag_concepts(choice.tags, t["headings"], t["source_text"])]
+
+
+def save_theme(short_id: str, choice: MotionThemeChoice) -> None:
+    """The theme gate's approval: theme.json and tags.json."""
     path = theme_path(short_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(choice.model_dump_json(indent=2), encoding="utf-8")
@@ -442,7 +485,6 @@ def stage_theme(short_id: str, state: dict, sections: list, doc_text: str, yes: 
                       concepts=concepts, tags=choice.tags,
                       created_at=_now_iso())
     tags_path(short_id).write_text(tags.model_dump_json(indent=2), encoding="utf-8")
-    return choice
 
 
 def _now_iso() -> str:
@@ -535,30 +577,19 @@ def print_shot_list(script: MotionScript, results: list | None = None) -> None:
 
 def stage_script(short_id: str, state: dict, sections: list, yes: bool,
                  reel_cursor: int, theme: MotionThemeChoice | None = None) -> MotionScript | None:
-    plan = [preflight.ModelPlan(
-        "motion_script", _model("motion_script"),
-        config.MAX_MOTION_SCRIPT_RETRIES * (1 + config.MAX_MOTION_HOOK_FIX_RETRIES),
-        preflight.text_cost_per_call(_model("motion_script"), 7000, 4500))]
-    if not _money_gate("script", short_id, plan, yes, reel_cursor):
-        return None
-
-    topic = Topic(**state["topic"])
-    section = find_section(sections, state["section_id"])
-    understanding = (SectionUnderstanding(**state["understanding"])
-                     if state.get("understanding") else None)
-    wf = QuestionWorkflow(**state["workflow"])
-    source_text = "\n\n".join(find_section(sections, sid).text for sid in state["pool_ids"])
-    supporting_text = "\n\n".join(find_section(sections, sid).text
-                                   for sid in state.get("support_ids", []))
-
-    script, results = write_motion_script(
-        topic, section, short_id=short_id, source_text=source_text,
-        understanding=understanding, approach=wf.approved_teaching_approach,
-        next_topic=state.get("next_topic", ""),
-        template=theme.template if theme else state.get("template", "fix_story"),
-        supporting_text=supporting_text,
-        theme=theme.theme if theme else None,
-        language=theme.language if theme else None)
+    # A draft rejected on an earlier run may pass today's graders (a grader
+    # fixed since, or a caption re-cut): free, so it is tried before the
+    # money gate. The shot-list gate below still shows it for approval.
+    saved = reuse_script(short_id, state, sections, theme)
+    if saved is not None:
+        script, results, path, repaired = saved
+        print(f"\n=== script: a saved draft passes every grader"
+              f"{' after a caption re-cut' if repaired else ''} — no call made ===")
+        print(f"  from {path}")
+    else:
+        if not _money_gate("script", short_id, script_plan(), yes, reel_cursor):
+            return None
+        script, results = write_script(short_id, state, sections, theme)
     if script is None:
         print("  GIVING UP — no script passed the motion graders:")
         for r in results:
@@ -574,9 +605,62 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
               f"(the script was NOT saved — declining means try again, not skip ahead).")
         return None
     # Written ONLY on approval — same reasoning as story_reel.stage_mapping.
+    save_script(short_id, script, facts)
+    return script
+
+
+def _script_kwargs(short_id: str, state: dict, sections: list,
+                   theme: MotionThemeChoice | None) -> dict:
+    """The script stage's inputs from a reel's setup state and approved theme."""
+    return {
+        "topic": Topic(**state["topic"]),
+        "section": find_section(sections, state["section_id"]),
+        "understanding": (SectionUnderstanding(**state["understanding"])
+                          if state.get("understanding") else None),
+        "approach": QuestionWorkflow(**state["workflow"]).approved_teaching_approach,
+        "source_text": "\n\n".join(find_section(sections, sid).text
+                                    for sid in state["pool_ids"]),
+        "supporting_text": "\n\n".join(find_section(sections, sid).text
+                                        for sid in state.get("support_ids", [])),
+        "template": theme.template if theme else state.get("template", "fix_story"),
+        "theme": theme.theme if theme else None,
+        "language": theme.language if theme else None,
+        "next_topic": state.get("next_topic", ""),
+    }
+
+
+def reuse_script(short_id: str, state: dict, sections: list,
+                 theme: MotionThemeChoice | None):
+    """A saved rejected draft that passes today's graders (free), or None."""
+    k = _script_kwargs(short_id, state, sections, theme)
+    return reuse_saved_motion_script(
+        k["section"], short_id=short_id, source_text=k["source_text"], approach=k["approach"],
+        template=k["template"], supporting_text=k["supporting_text"], theme=k["theme"])
+
+
+def script_plan() -> list:
+    """The script stage's pre-flight plan: every attempt and hook fix."""
+    return [preflight.ModelPlan(
+        "motion_script", _model("motion_script"),
+        config.MAX_MOTION_SCRIPT_RETRIES * (1 + config.MAX_MOTION_HOOK_FIX_RETRIES),
+        preflight.text_cost_per_call(_model("motion_script"), 7000, 4500))]
+
+
+def write_script(short_id: str, state: dict, sections: list,
+                 theme: MotionThemeChoice | None) -> tuple[MotionScript | None, list]:
+    """The paid script call (skills.script.write_motion_script)."""
+    k = _script_kwargs(short_id, state, sections, theme)
+    return write_motion_script(
+        k["topic"], k["section"], short_id=short_id, source_text=k["source_text"],
+        understanding=k["understanding"], approach=k["approach"], next_topic=k["next_topic"],
+        template=k["template"], supporting_text=k["supporting_text"], theme=k["theme"],
+        language=k["language"])
+
+
+def save_script(short_id: str, script: MotionScript, facts: list[dict]) -> None:
+    """The shot-list gate's approval: the script and its fact sources."""
     motion_path(short_id).write_text(script.model_dump_json(indent=2), encoding="utf-8")
     _facts_path(short_id).write_text(json.dumps(facts, indent=2), encoding="utf-8")
-    return script
 
 
 # =================================================================== scenes
@@ -611,21 +695,9 @@ def print_scenes(script: MotionScript, results: list | None = None) -> None:
 
 def stage_scenes(short_id: str, script: MotionScript, yes: bool,
                  reel_cursor: int) -> MotionScript | None:
-    from .skills.scenes import SYSTEM_MOTION_SCENES, write_motion_scenes
-    plan = [preflight.ModelPlan(
-        "motion_scenes", _model("motion_scenes"), 1 + config.MAX_MOTION_SCENE_RETRIES,
-        preflight.text_cost_per_call(_model("motion_scenes"),
-                                     len(SYSTEM_MOTION_SCENES) // 3 + 3500, 6000))]
-    if not _money_gate("scenes", short_id, plan, yes, reel_cursor):
+    if not _money_gate("scenes", short_id, scenes_plan(), yes, reel_cursor):
         return None
-    attempts: list = []
-    try:
-        scripted, results = write_motion_scenes(script, attempts=attempts)
-    finally:
-        # every attempt's scenes, per-shot reasons and fallbacks — kept even
-        # when the stage gives up, so a failed run can be diagnosed from disk
-        scenes_attempts_path(short_id).write_text(json.dumps(
-            {"short_id": short_id, "attempts": attempts}, indent=1), encoding="utf-8")
+    scripted, results = write_scenes(short_id, script)
     print(f"  attempts: {scenes_attempts_path(short_id)}")
     print_scenes(scripted, results)
     if not checks.all_passed(results):
@@ -635,8 +707,35 @@ def stage_scenes(short_id: str, script: MotionScript, yes: bool,
         print(f"Stopped after scenes — nothing saved. Rerun with --topic {short_id} to see "
               f"this pause again.")
         return None
-    motion_path(short_id).write_text(scripted.model_dump_json(indent=2), encoding="utf-8")
+    save_scenes(short_id, scripted)
     return scripted
+
+
+def scenes_plan() -> list:
+    """The scenes stage's pre-flight plan: the first call and every repair."""
+    from .skills.scenes import SYSTEM_MOTION_SCENES
+    return [preflight.ModelPlan(
+        "motion_scenes", _model("motion_scenes"), 1 + config.MAX_MOTION_SCENE_RETRIES,
+        preflight.text_cost_per_call(_model("motion_scenes"),
+                                     len(SYSTEM_MOTION_SCENES) // 3 + 3500, 6000))]
+
+
+def write_scenes(short_id: str, script: MotionScript, log=print, note: str = "") -> tuple[MotionScript, list]:
+    """The paid scenes call (skills.scenes.write_motion_scenes)."""
+    from .skills.scenes import write_motion_scenes
+    attempts: list = []
+    try:
+        return write_motion_scenes(script, log=log, attempts=attempts, note=note)
+    finally:
+        # every attempt's scenes, per-shot reasons and fallbacks — kept even
+        # when the stage gives up, so a failed run can be diagnosed from disk
+        scenes_attempts_path(short_id).write_text(json.dumps(
+            {"short_id": short_id, "attempts": attempts}, indent=1), encoding="utf-8")
+
+
+def save_scenes(short_id: str, scripted: MotionScript) -> None:
+    """The scene gate's approval: the script, now with its scenes."""
+    motion_path(short_id).write_text(scripted.model_dump_json(indent=2), encoding="utf-8")
 
 
 # ============================================================ voice, timing
@@ -670,13 +769,14 @@ def _voice_current(script: MotionScript) -> bool:
         return False
 
 
-def stage_voice(short_id: str, script: MotionScript) -> dict | None:
+def stage_voice(short_id: str, script: MotionScript, progress=None,
+                voices: dict[str, str] | None = None) -> dict | None:
     """Every caption in its speaker's voice (shorts/motion_voice.py). Local
     and free — no money gate — but it prints which voice each slot uses."""
     from . import motion_voice
     slots = motion_voice.speaker_slots(script)
     print(f"\n=== voice: {sum(len(s.captions) for s in script.shots)} caption clip(s), "
-          f"{'stub silence' if config.STUB else 'Chatterbox (local, free)'} ===")
+          f"{'silence (MOTION_VOICE=silent)' if config.MOTION_SILENT else 'Chatterbox (local, free)'} ===")
     for role, slot in slots.items():
         if role is None and script.speakers:
             continue
@@ -684,7 +784,7 @@ def stage_voice(short_id: str, script: MotionScript) -> dict | None:
         print(f"  {role or 'NARRATOR':<12} slot {slot:<18} {how}"
               + (f" — {Path(ref).name}" if ref else ""))
     try:
-        manifest = motion_voice.voice_script(script, log=lambda *_: None)
+        manifest = motion_voice.voice_script(script, log=lambda *_: None, progress=progress, voices=voices)
     except RuntimeError as e:
         print(f"  GIVING UP — {e}")
         return None
@@ -708,10 +808,20 @@ def _cast(script: MotionScript) -> list:
     return out
 
 
-def stage_timing(short_id: str, script: MotionScript, manifest: dict) -> tuple[Path, list] | None:
+def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=None,
+                 characters: bool | None = None,
+                 character: str | None = None,
+                 host_character: str | None = None) -> tuple[Path, list] | None:
     """Word times from the real audio (motion_align: forced alignment, then
     whisper, then an even split), every shot on one clock, the scene graders
-    again on that clock, the narration mixed, and the player's plan written."""
+    again on that clock, the narration mixed, and the player's plan written.
+    `progress(done, total)` is told after every clip is aligned. `characters`
+    and `character` default to config.MOTION_CHARACTERS / _PRESET (the CLI's
+    --characters / --character)."""
+    characters = config.MOTION_CHARACTERS if characters is None else characters
+    character = config.MOTION_CHARACTER_PRESET if character is None else character
+    total_clips = sum(len(manifest["shots"].get(s.id, [])) for s in script.shots)
+    aligned = 0
     from . import motion_align, motion_timeline, motion_voice
     print(f"\n=== timing: {short_id} ===")
     seconds: dict[str, list[float]] = {}
@@ -727,7 +837,12 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict) -> tuple[P
             spoken, src = motion_align.align_clip(adir / row["file"], row["text"], row["seconds"])
             times[shot.id].append(motion_align.shown_times(spoken, rng))
             sources[shot.id].append(src)
+            aligned += 1
+            if progress is not None:
+                progress(aligned, total_clips)
     motion_align.close()
+    # each clip cut to its speech: no dead air between lines and shots
+    seconds, times, trims = motion_timeline.trim_to_speech(seconds, times, sources)
     intro = config.MOTION_INTRO_SECONDS if config.MOTION_INTRO_STING else 0.0
     clocks = motion_timeline.shot_timings(script, seconds, times, sources, offset=intro)
     counts: dict[str, int] = {}
@@ -739,13 +854,16 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict) -> tuple[P
         checks.check_motion_duration_cap(script, measured_seconds=motion_timeline.total_seconds(clocks))]
     for r in results:
         print(f"  {r}")
-    audio = motion_voice.mix(script, manifest, clocks)
+    audio = motion_voice.mix(script, manifest, clocks, trims)
     tags = []
     if tags_path(short_id).exists():
         tags = json.loads(tags_path(short_id).read_text(encoding="utf-8")).get("tags", [])
+    # the look chosen when the reel was set up; none saved = an older reel, "classic"
+    design = (_load_setup(short_id).get("design") if _setup_path(short_id).exists() else None) or "classic"
     plan = motion_timeline.build_plan(script, clocks, audio=f"audio/{audio.name}", cast=_cast(script),
-                                      tags=tags, intro=intro, characters=config.MOTION_CHARACTERS,
-                                      character=config.MOTION_CHARACTER_PRESET)
+                                      tags=tags, intro=intro, characters=characters,
+                                      character=character, design=design,
+                                      host_character=host_character)
     if plan.characters:
         shown = sum(s.characters for s in plan.shots)
         print("  characters: " + ", ".join(
@@ -929,6 +1047,7 @@ def _run(doc_path: str, topic_short_id: str | None, from_stage: str | None,
         if short_id is None:
             short_id = _next_free_motion_id(state["topic"]["id"])
         ctx["short_id"] = short_id
+        state["design"] = config.MOTION_DESIGN
         _save_setup(short_id, state)
         print(f"\n=== setup complete: short_id={short_id} ===")
 
@@ -1057,6 +1176,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="the character preset that plays the reel's language, for this reel only "
                         "(a language id, or an extra such as riya — shorts/motion_character_"
                         "presets.yaml); implies --characters")
+    p.add_argument("--design", choices=config.MOTION_DESIGNS, default=None,
+                   help="the look of a NEW reel, saved when it is set up (default: "
+                        "MOTION_DESIGN, midnight_lab); a reel keeps the look it was set up with")
     p.add_argument("--check-models", action="store_true",
                    help="make ONE tiny call per model in shorts/motion_models.yaml with its "
                         "reasoning setting, and report OK or the exact error with its cost "
@@ -1087,14 +1209,17 @@ def main(argv: list[str] | None = None) -> int:
                   f"{', '.join(motion_character_presets.ids())}")
             return 2
     default, default_preset = config.MOTION_CHARACTERS, config.MOTION_CHARACTER_PRESET
+    default_design = config.MOTION_DESIGN
     config.MOTION_CHARACTERS = default or args.characters or bool(args.character)
     config.MOTION_CHARACTER_PRESET = args.character or default_preset
+    config.MOTION_DESIGN = args.design or default_design
     try:
         return run(args.markdown_path, args.topic_short_id, args.from_stage,
                    args.force_stage, args.yes, args.template, args.theme, args.language,
                    estimate_only=args.estimate, section=args.section)
     finally:
         config.MOTION_CHARACTERS, config.MOTION_CHARACTER_PRESET = default, default_preset
+        config.MOTION_DESIGN = default_design
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@
 
 import type { ReactNode } from "react";
 import { At, Icon, Overlay } from "../Stage";
-import { C, FONT, H, W, theme, type FieldName, type Theme } from "../tokens";
+import { C, FONT, H, SAFE, W, theme, type FieldName, type Theme } from "../tokens";
 import { clamp, ease, lerp, pathD, pointAt, pulse, seg, type Pt } from "../time";
 
 export type Tone = "bad" | "ok" | "info" | "warn" | "special" | "plain";
@@ -34,7 +34,10 @@ export function popStyle(p: number) {
   return { opacity: clamp(p * 1.6), transform: `translateY(${(1 - q) * 30}px) scale(${lerp(0.94, 1, q)})` };
 }
 
-const shadow = (th: Theme) => (th.dark ? "0 30px 60px rgba(0,0,0,0.35)" : "0 30px 60px rgba(21,25,54,0.13)");
+// Midnight Lab's cards are glass: a deep shadow, a lit 2-unit edge, a top highlight
+const shadow = (th: Theme) => (th.field === "lab" || th.field === "lab_violet"
+  ? "0 40px 90px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.14), inset 0 2px 0 rgba(255,255,255,0.2)"
+  : th.dark ? "0 30px 60px rgba(0,0,0,0.35)" : "0 30px 60px rgba(21,25,54,0.13)");
 
 /** The dotted canvas behind reference-style shots. */
 export function DotGrid({ field }: { field: FieldName }) {
@@ -62,18 +65,18 @@ export function StatusPill({ x, y, text, tone, icon, field, p = 1, size = 33 }: 
   );
 }
 
-export function TriggerChip({ x, y, label, field, p = 1, firing = 0 }: {
-  x: number; y: number; label: string; field: FieldName; p?: number; firing?: number;
+export function TriggerChip({ x, y, label, field, p = 1, firing = 0, size = 33 }: {
+  x: number; y: number; label: string; field: FieldName; p?: number; firing?: number; size?: number;
 }) {
   const th = theme(field);
   const { bg, fg } = toneColors("warn", th);
   return (
     <At x={x} y={y} center style={popStyle(p)}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, background: bg, color: fg,
-                    padding: "16px 28px", borderRadius: 999, fontFamily: FONT.mono, fontWeight: 700,
-                    fontSize: 33, transform: `scale(${1 + 0.12 * firing})`,
+                    padding: `${size * 0.48}px ${size * 0.85}px`, borderRadius: 999, fontFamily: FONT.mono, fontWeight: 700,
+                    fontSize: size, transform: `scale(${1 + 0.12 * firing})`,
                     boxShadow: firing ? `0 0 0 ${10 * firing}px rgba(255,181,36,${0.25 * firing})` : "none" }}>
-        <Icon name="bolt" size={38} color={fg} stroke={2.4} />{label}
+        <Icon name="bolt" size={size * 1.15} color={fg} stroke={2.4} />{label}
       </div>
     </At>
   );
@@ -311,7 +314,7 @@ export function TitleCard({ series, title, promise, icons, t }: {
   series: string; title: string; promise: string; icons: { name: string; label: string }[]; t: number;
 }) {
   return (
-    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, #5B4BF5, #4234D6)", color: C.white }}>
+    <div style={{ position: "absolute", inset: 0, background: "var(--motion-card-bg, linear-gradient(to bottom, #5B4BF5, #4234D6))", color: C.white }}>
       <div style={{ position: "absolute", left: 900, top: 570, width: 720, height: 720, borderRadius: "50%", background: "rgba(255,255,255,0.05)", transform: "translate(-50%,-50%)" }} />
       <At x={W / 2} y={708} center style={popStyle(seg(t, 0, 0.5))}>
         <div style={{ padding: "16px 36px", borderRadius: 999, background: "rgba(255,255,255,0.14)", fontWeight: 700, fontSize: 33, whiteSpace: "nowrap" }}>{series}</div>
@@ -345,26 +348,42 @@ export function CodeMapCard({ line1, line2, parts, active, t, field }: {
 }) {
   const th = theme(field);
   const cw = 32.4;
+  // the part rows end above the caption band: three rows move the code up
+  // and shorten the rows (three ran into the caption)
+  const rowsEnd = SAFE.captionTop - 40;
+  const codeY = parts.length >= 3 ? 300 : 528;
+  const rowsTop = codeY + 348 + (parts.length >= 3 ? 54 : 78);
+  const rowH = Math.min(192, (rowsEnd - rowsTop - 24 * Math.max(0, parts.length - 1)) / Math.max(1, parts.length));
+  const hot = active >= 0 ? parts[active] : undefined;
   return (
     <>
-      <At x={60} y={528} style={popStyle(seg(t, 0, 0.5))}>
+      <At x={60} y={codeY} style={popStyle(seg(t, 0, 0.5))}>
         <div style={{ width: 960, height: 348, borderRadius: 54, background: C.code, boxShadow: shadow(th), position: "relative" }}>
           {active >= 0 && parts[active] && (
             <div style={{ position: "absolute", top: 66 + (parts[active].row ?? 0) * 114, height: 90, borderRadius: 21, background: C.amber,
                           left: 60 + parts[active].at[0] * cw - 12, width: parts[active].at[1] * cw + 24 }} />
           )}
-          {[line1, line2].map((line, i) => (
-            <div key={i} style={{ position: "absolute", left: 60, top: 78 + i * 114, fontFamily: FONT.mono, fontSize: 54, whiteSpace: "pre" }}>
-              {line.map((tk, j) => <span key={j} style={{ color: tk.color ?? C.codeText }}>{tk.text}</span>)}
-            </div>
-          ))}
+          {[line1, line2].map((line, i) => {
+            let col = 0;
+            return (
+              <div key={i} style={{ position: "absolute", left: 60, top: 78 + i * 114, fontFamily: FONT.mono, fontSize: 54, whiteSpace: "pre" }}>
+                {line.map((tk, j) => {
+                  const at = col;
+                  col += tk.text.length;
+                  // code under the amber highlight is ink, so it reads on amber
+                  const lit = hot && (hot.row ?? 0) === i && at < hot.at[0] + hot.at[1] && at + tk.text.length > hot.at[0];
+                  return <span key={j} style={{ color: lit ? C.ink : tk.color ?? C.codeText }}>{tk.text}</span>;
+                })}
+              </div>
+            );
+          })}
         </div>
       </At>
       {parts.map((pt, i) => {
         const { bg, fg } = toneColors(pt.tone, th);
         return (
-          <At key={pt.name} x={60} y={954 + i * 240} style={popStyle(i <= active ? 1 : 0)}>
-            <div style={{ width: 960, height: 192, borderRadius: 48, background: th.surface, boxShadow: shadow(th),
+          <At key={pt.name} x={60} y={rowsTop + i * (rowH + 24)} style={popStyle(i <= active ? 1 : 0)}>
+            <div style={{ width: 960, height: rowH, borderRadius: 48, background: th.surface, boxShadow: shadow(th),
                           display: "flex", alignItems: "center", gap: 42, padding: "0 48px", color: th.surfaceInk }}>
               <div style={{ width: 120, height: 120, borderRadius: 34, background: bg, display: "grid", placeItems: "center" }}>
                 <Icon name={pt.icon} size={60} color={fg} />
@@ -415,7 +434,7 @@ export function TakeawayList({ heading, rows, t, field }: {
 /** The end card: "Up next", the next topic, a Follow button, series chips. */
 export function EndCard({ upNext, chips, t }: { upNext: string; chips: { label: string; done: boolean }[]; t: number }) {
   return (
-    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, #5B4BF5, #4234D6)", color: C.white }}>
+    <div style={{ position: "absolute", inset: 0, background: "var(--motion-card-bg, linear-gradient(to bottom, #5B4BF5, #4234D6))", color: C.white }}>
       <At x={W / 2} y={770} center style={popStyle(seg(t, 0, 0.5))}>
         <div style={{ fontSize: 42, fontWeight: 700, color: C.amber }}>Up next</div>
       </At>

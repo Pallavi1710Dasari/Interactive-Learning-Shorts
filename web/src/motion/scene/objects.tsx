@@ -15,14 +15,18 @@ import {
 } from "../objects/reference";
 import {
   BigCounter, Callout, ChapterCard, KineticTitle, LookupTable, RecapGrid, Stamp, TokenRow,
-  type ChipTone,
+  rowWidth, type ChipTone,
 } from "../objects/editorial";
 import type { PlanAction, PlanObject, PlanShot } from "./types";
+import { AppScreen, Compare, Cycle, Flow, MemoryBox } from "../objects/action";
 import { IdentityTitle, type IdentitySpec } from "../identity/Identity";
 import library from "../library.json";
 
 const KINETIC = (library as { kinetic: { size: number; line_height: number } }).kinetic;
 export const ENTER_DUR = 0.45;
+/** How large the small objects draw in a 1080x1920 frame. Their heights in
+ * library.json reserve the room, so the Python layout keeps them apart. */
+export const SIZES = { pill: 44, chip: 42, token: 46, counter: 280, callout: 1.25 } as const;
 
 /** What an object's actions have done to it by time t. */
 export interface ObjState {
@@ -38,6 +42,14 @@ export interface ObjState {
   countT: number | null;   // when "count" started
   scrambleAge: number;     // seconds since the latest scramble (99 = none)
   stampT: number | null;
+  // action objects (objects/action.tsx)
+  prevValue?: string;      // the value before the latest "state"
+  valueT: number;          // when the latest "state" happened (-99 = never)
+  tapT: number;            // the next or latest "tap" (a finger arrives 0.6 s before it)
+  travelT: number;         // when "travel" started (99 = never)
+  resetT: number;          // when the latest "reset" happened (99 = never)
+  revealT: number;         // when "reveal" happened (99 = never)
+  hasReveal: boolean;
 }
 
 export function objectState(obj: PlanObject, shot: PlanShot, t: number): ObjState {
@@ -50,12 +62,20 @@ export function objectState(obj: PlanObject, shot: PlanShot, t: number): ObjStat
     enterT, p: ease.outCubic(seg(t, enterT, ENTER_DUR)) * fade, local: t - enterT,
     tone: obj.props.tone, value: obj.props.value, highlight: 0, highlightAge: 99, pulseAge: 99,
     typeT: null, countT: null, scrambleAge: 99, stampT: null,
+    valueT: -99, tapT: 99, travelT: 99, resetT: 99, revealT: 99, hasReveal: mine.some((a) => a.do === "reveal"),
   };
+  // a tap is drawn from 0.6 s before it (the finger coming in): the next
+  // tap within that window counts as the current one
+  const taps = mine.filter((a) => a.do === "tap").map((a) => a.t);
+  const upcoming = taps.find((x) => x >= t && x - t <= 0.6);
+  const past = taps.filter((x) => x <= t);
+  s.tapT = upcoming ?? (past.length ? past[past.length - 1] : 99);
   for (const a of mine) {
     if (a.t > t) continue;
     if (a.do === "state") {
       if (a.tone) s.tone = a.tone;
-      if (a.value != null) s.value = a.value;
+      if (a.value != null) { s.prevValue = s.value; s.value = a.value; }
+      s.valueT = a.t;
     } else if (a.do === "highlight") {
       s.highlight = Number(a.value) || 1;
       s.highlightAge = t - a.t;
@@ -64,6 +84,9 @@ export function objectState(obj: PlanObject, shot: PlanShot, t: number): ObjStat
     else if (a.do === "count") s.countT = a.t;
     else if (a.do === "scramble") s.scrambleAge = t - a.t;
     else if (a.do === "stamp") s.stampT = a.t;
+    else if (a.do === "travel") s.travelT = a.t;
+    else if (a.do === "reset") s.resetT = a.t;
+    else if (a.do === "reveal") s.revealT = a.t;
   }
   if (!enter && mine.length === 0) s.p = ease.outCubic(seg(t, shot.start, ENTER_DUR));
   return s;
@@ -151,17 +174,21 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
                           glow={s.pulseAge < 0.8 ? 1 - s.pulseAge / 0.8 : 0} />;
     case "status_pill":
       return <StatusPill x={cx} y={b.y + b.h / 2} text={s.value ?? p.text} tone={(s.tone as Tone) ?? "plain"}
-                         icon={p.icon} field={field} p={s.p} />;
+                         icon={p.icon} field={field} p={s.p} size={SIZES.pill} />;
     case "trigger_chip":
       return <TriggerChip x={cx} y={b.y + b.h / 2} label={p.label} field={field} p={s.p}
-                          firing={pulseOf(s.pulseAge, 0, 0.5)} />;
+                          firing={pulseOf(s.pulseAge, 0, 0.5)} size={SIZES.chip} />;
     case "token_row": {
       const tones = s.value && /^[a-z,]+$/.test(s.value) ? s.value.split(",") : (p.tones ?? []);
       const items = (p.items as string[]).map((text, i) => ({
         text, tone: highlightOn(s) && s.highlight === i + 1 ? "key" as ChipTone : chipTone(tones[i]),
       }));
+      // as large as fits the content width: a short row reads from across the room
+      const texts = items.map((it) => it.text);
+      let size: number = SIZES.token;
+      while (size > 26 && rowWidth(texts, size) > b.w) size -= 2;
       return <div style={{ opacity: s.p, transform: `translateY(${(1 - s.p) * 24}px)` }}>
-        <TokenRow items={items} x={cx} y={b.y + 4} field={field} center />
+        <TokenRow items={items} x={cx} y={b.y + 4} field={field} center size={size} />
       </div>;
     }
     case "big_counter": {
@@ -169,11 +196,13 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       if (s.countT !== null && /^\d+$/.test(value)) {
         value = String(Math.round(Number(value) * ease.outCubic(seg(t, s.countT, 1.2))));
       }
-      return <BigCounter value={value} label={p.label} x={cx} y={b.y + b.h / 2} size={220} field={field} p={s.p} />;
+      // a long value ("1 → 7") is set smaller so it stays inside the frame
+      const fit = Math.min(SIZES.counter, Math.floor(880 / Math.max(1, String(p.value).length * 0.62)));
+      return <BigCounter value={value} label={p.label} x={cx} y={b.y + b.h / 2} size={fit} field={field} p={s.p} />;
     }
     case "callout":
       return <Callout x={b.x + 60} y={b.y} w={b.w - 120} label={p.label} text={p.text}
-                      px={b.x + 90} py={b.y + b.h} field={field} p={s.p} />;
+                      px={b.x + 90} py={b.y + b.h} field={field} p={s.p} scale={SIZES.callout} />;
     case "icon_row": {
       const icons = p.icons as { name: string; label?: string; tone?: string }[];
       const gap = Math.min(300, b.w / icons.length);
@@ -200,14 +229,39 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
                      visible={Math.min(5, rows.length)} highlight={s.highlight ? 1 : 0} />
       </div>;
     }
-    case "stamp":
-      return s.stampT === null ? null : <Stamp text={p.text} x={b.x} y={b.y} p={seg(t, s.stampT, 0.35)} t={t} />;
+    case "stamp": {
+      if (s.stampT === null) return null;
+      // a long verdict ("THROWN AWAY") is set smaller and kept inside the
+      // card's right side, so it never covers the card's value and unit
+      const len = String(p.text ?? "").length;
+      const size = Math.min(84, 360 / Math.max(1, len * 0.5));
+      const half = (len * size * 0.5 + 86) / 2;
+      return <Stamp text={p.text} x={Math.min(b.x, W - 80 - half)} y={b.y} p={seg(t, s.stampT, 0.35)} t={t} size={size} />;
+    }
     case "connector": {
       const pts = p.points as [number, number][] | undefined;
       if (!pts) return null;
       return <Connector points={pts} tone={(s.tone as Tone) ?? (p.tone as Tone) ?? "info"} broken={!!p.broken && s.tone !== "ok"}
                         pulse={s.pulseAge < 0.8 ? s.pulseAge / 0.8 : -1} draw={seg(t, s.enterT, 0.4)} field={field} />;
     }
+    // ------------------------------------------------------- action objects
+    case "app_screen":
+      return <AppScreen x={b.x} y={b.y} w={b.w} h={b.h} title={p.title} button={p.button} label={p.label}
+                        value={s.value ?? p.value} prev={s.prevValue} tone={s.tone} valueAge={t - s.valueT}
+                        tapAge={t - s.tapT} p={s.p} field={field} />;
+    case "memory_box":
+      return <MemoryBox x={b.x} y={b.y} w={b.w} h={b.h} name={p.name} value={s.value ?? p.value} prev={s.prevValue}
+                        tone={s.tone} valueAge={t - s.valueT} resetAge={t - s.resetT} start={p.value} p={s.p} field={field} />;
+    case "flow":
+      return <Flow x={b.x} y={b.y} w={b.w} h={b.h} steps={p.steps} packet={p.packet} travelAge={t - s.travelT}
+                   highlight={highlightOn(s) ? s.highlight : 0} p={s.p} field={field} />;
+    case "compare":
+      return <Compare x={b.x} y={b.y} w={b.w} h={b.h} left={p.left} right={p.right} leftIcon={p.left_icon ?? "x"}
+                      rightIcon={p.right_icon ?? "check"} leftNote={p.left_note} rightNote={p.right_note}
+                      revealAge={t - s.revealT} hasReveal={s.hasReveal} glow={pulseOf(s.pulseAge, 0, 0.6)} p={s.p} field={field} />;
+    case "cycle":
+      return <Cycle x={b.x} y={b.y} w={b.w} h={b.h} steps={p.steps} travelAge={t - s.travelT}
+                    highlight={highlightOn(s) ? s.highlight : 0} p={s.p} field={field} />;
     // ------------------------------------------------------- full frame
     case "title_card": {
       const icons = (p.icons ?? []) as { name: string; label: string }[];

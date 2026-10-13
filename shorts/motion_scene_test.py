@@ -137,16 +137,22 @@ def test_default_scenes_are_built_from_the_scripts_own_words():
         corpus = re.sub(r"<\/?b>", "", corpus)
         stock = {"key takeaways", "it works", "it updates", "follow for more", "the setup",
                  "why it fails", "and also", "the fix", "how it works", "remember", "the code",
-                 "how it maps", "follow one example", "items"}
+                 "how it maps", "follow one example", "items",
+                 # an app screen's own chrome (the action objects, 2026-10-13)
+                 "app", "tap", "value"}
         for s in script.shots:
             for o in s.scene.objects:
-                for key in ("text", "label", "title", "promise", "status"):
+                for key in ("text", "label", "title", "promise", "status", "button", "name", "left", "right"):
                     v = o.props.get(key)
                     if isinstance(v, str) and v.lower() not in stock:
                         for word in re.findall(r"[a-z0-9']+", v.lower()):
                             assert word in corpus, (name, s.id, o.kind, key, v, word)
                 for item in o.props.get("items", []):
                     assert item.lower() in corpus, (name, s.id, item)
+                for step in o.props.get("steps", []):          # flow / cycle labels
+                    label = step.get("label", "") if isinstance(step, dict) else step
+                    for word in re.findall(r"[a-z0-9']+", str(label).lower()):
+                        assert word in corpus, (name, s.id, o.kind, step)
 
 
 def test_two_speaker_scenes_fit_above_the_chat():
@@ -163,17 +169,23 @@ def test_two_speaker_scenes_fit_above_the_chat():
                     assert o.box.y + o.box.h <= f["duo"]["bottom"], (name, s.id, o.kind)
 
 
-def test_every_hook_opens_with_the_language_mark():
+def test_every_hook_acts_out_its_problem():
+    """The hook SHOWS the failure happening (2026-10-13): an action object
+    whose value goes wrong (tone bad). The language mark is optional (the
+    corner badge names the language) and never appears after the hook."""
     for name in ALL:
         script = _scened(name)
-        assert [o.kind for o in script.shots[0].scene.objects][0] == "identity_title", name
+        hook = script.shots[0].scene
+        acting = [o.id for o in hook.objects if o.kind in checks.MOTION_ACTION_KINDS]
+        assert acting, (name, [o.kind for o in hook.objects])
+        assert any(a.do == "state" and a.tone == "bad" and a.target in acting for a in hook.actions), name
         assert all(o.kind != "identity_title" for s in script.shots[1:] for o in s.scene.objects), name
     base = _scened("usestate_golden")
     hook = base.shots[0].scene
     bare = hook.model_copy(update={"objects": [o for o in hook.objects if o.kind != "identity_title"],
                                    "actions": [a for a in hook.actions if a.target != "o1"]})
     r = checks.check_motion_scene_valid(_with_scene(base, 0, bare))
-    assert not r.passed and "shows no identity_title" in r.reason, r.reason
+    assert r.passed, r.reason              # the mark is optional on the hook
     extra = base.shots[3].scene.model_copy(update={"objects": base.shots[3].scene.objects
                                                    + [MotionSceneObject(id="o9", kind="identity_title")]})
     r = checks.check_motion_scene_valid(_with_scene(base, 3, extra))
@@ -257,12 +269,14 @@ def test_transition_rules():
 def test_payoff_must_mirror_the_hook():
     base = _scened("usestate_golden")
     pay = base.shots[8].scene
-    no_ok = pay.model_copy(update={"objects": [o.model_copy(update={"props": {**o.props, "tone": "plain"}})
-                                               if o.kind == "status_pill" else o for o in pay.objects]})
+    # the payoff's picture never turns into a success (no ok state)
+    no_ok = pay.model_copy(update={"actions": [a for a in pay.actions if a.tone != "ok"]})
     r = checks.check_motion_payoff_mirrors_hook(_with_scene(base, 8, no_ok))
     assert not r.passed and "must show success" in r.reason, r.reason
-    other = pay.model_copy(update={"objects": [o for o in pay.objects if o.kind != "status_pill"],
-                                   "actions": [a for a in pay.actions if a.target != "o2"]})
+    # the payoff without the hook's acting picture
+    acting = next(o.id for o in pay.objects if o.kind in checks.MOTION_ACTION_KINDS)
+    other = pay.model_copy(update={"objects": [o for o in pay.objects if o.id != acting],
+                                   "actions": [a for a in pay.actions if a.target != acting]})
     r = checks.check_motion_payoff_mirrors_hook(_with_scene(base, 8, other))
     assert not r.passed and "mirror the hook" in r.reason, r.reason
 

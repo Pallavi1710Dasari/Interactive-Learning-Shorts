@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 // The motion-reel design tokens — REFERENCE_STYLE_ADDENDUM.md section 4.1-4.2.
 // Every component in web/src/motion draws in DESIGN UNITS: a 1080 x 1920
 // frame, the size of the MP4. <Fit> scales the whole frame for any screen, so
@@ -17,9 +19,17 @@ export const FIELDS = {
   blue: "#283EE6",
   paper: "#ECF0F7",
   yellow: "#FDD13E",
+  // Midnight Lab (designs.ts): the night base and its violet variant. The
+  // solid colour is what text contrast is measured on; the player draws the
+  // design's glowing background over it.
+  lab: "#0A0F2C",
+  lab_violet: "#14123A",
 } as const;
 export type FieldName = keyof typeof FIELDS;
 export const FIELD_NAMES = Object.keys(FIELDS) as FieldName[];
+
+/** Midnight Lab's own colours (designs.ts). */
+export const LAB = { cyan: "#42E2FF", violet: "#8C7BFF", amber: "#FFB547", dim: "#8A92C4" } as const;
 
 export const C = {
   ink: "#151936",
@@ -65,6 +75,15 @@ export interface Theme {
 
 export function theme(field: FieldName): Theme {
   const bg = FIELDS[field];
+  if (field === "lab" || field === "lab_violet") {
+    // glass: cards are a light veil over the night, lit edges, cyan accent
+    return {
+      field, bg, dark: true,
+      ink: "#F2F4FF", dim: "rgba(242,244,255,0.35)", accent: LAB.cyan,
+      surface: "rgba(255,255,255,0.08)", surfaceInk: "#F2F4FF", surfaceLine: "rgba(255,255,255,0.16)",
+      surfaceDim: "rgba(242,244,255,0.62)",
+    };
+  }
   if (field === "navy" || field === "blue") {
     return {
       field, bg, dark: true,
@@ -96,6 +115,19 @@ export const FONT = {
   mono: "'JetBrains Mono', ui-monospace, Menlo, monospace",
   display: "var(--motion-display, 'Anton'), Impact, sans-serif",
 } as const;
+
+/** Display text: the face, weight, case, tracking and size come from the
+ * reel's design (CSS variables set on the frame — designs.ts), so a classic
+ * reel stays Anton caps and a Midnight Lab reel is heavy Manrope in sentence
+ * case, scaled so a line takes about the same width. */
+export function display(size: number): CSSProperties {
+  return {
+    fontFamily: FONT.display, fontSize: `calc(${size}px * var(--motion-display-scale, 1))`,
+    fontWeight: "var(--motion-display-weight, 400)" as unknown as number,
+    textTransform: "var(--motion-case, uppercase)" as CSSProperties["textTransform"],
+    letterSpacing: "var(--motion-display-tracking, normal)",
+  };
+}
 
 export const DISPLAY_FONTS = {
   anton: "'Anton'",

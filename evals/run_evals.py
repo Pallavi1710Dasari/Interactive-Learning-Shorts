@@ -263,7 +263,7 @@ def run_motion_case(case: dict, sections) -> tuple[bool, str]:
         reason = ("; ".join(str(r) for r in results if not r.passed)
                   or f"all {len(results)} motion graders pass")
     elif case["grader"] == "main_source":
-        result = checks.check_walkthrough_main_source(script, main_text)
+        result = checks.check_walkthrough_main_source(script, main_text, source)
         passed, reason = result.passed, result.reason
     else:
         result = MOTION_GRADERS[case["grader"]](script, source)

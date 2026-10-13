@@ -3254,6 +3254,10 @@ class MotionThemeDraft(BaseModel):
     theme: str
     reason: str = ""
     concept_tags: list[str] = Field(default_factory=list)
+    #: whether animated avatars (one per speaker) help this reel, and why
+    #: (the Characters step shows it as the recommendation, 2026-10-13)
+    show_avatars: bool = True
+    avatar_reason: str = ""
 
 
 class ThemeRejection(BaseModel):
@@ -3293,6 +3297,9 @@ class MotionThemeChoice(BaseModel):
     #: Every theme that passed requirements, compatibility, template and
     #: variety before the pick — what the LLM chose from.
     eligible: list[str] = Field(default_factory=list)
+    #: the theme call's advice for the Characters step: avatars on or off, why
+    show_avatars: bool = True
+    avatar_reason: str = ""
 
 
 class MotionTags(BaseModel):
@@ -3441,6 +3448,9 @@ class MotionPlan(BaseModel):
     short_id: str
     template: str
     theme: Optional[str] = None
+    #: The look the player draws the reel in (config.MOTION_DESIGNS); a plan
+    #: written before designs existed has none and is "classic".
+    design: str = "classic"
     series: str = ""
     concept_name: str = ""
     duration: float

@@ -116,9 +116,9 @@ def _whisper(wav: Path, text: str) -> list[tuple[float, float]] | None:
 
 def align_clip(wav: Path, spoken: str, duration: float) -> tuple[list[tuple[float, float]] | None, str]:
     """Each SPOKEN word's (start, end) in `wav`, and the source. None times
-    (and "even") under SHORTS_STUB=1 or when both aligners fail."""
+    (and "even") for silent clips (MOTION_VOICE=silent) or when both aligners fail."""
     words = spoken.split()
-    if config.STUB or not words:
+    if config.MOTION_SILENT or not words:
         return None, "even"
     times = _WORKER.align(wav, words)
     if times is not None and len(times) == len(words):

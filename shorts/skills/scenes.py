@@ -43,6 +43,32 @@ The script is final: what is said, and the captions, are fixed. You decide what 
 ONLY the object kinds in the LIBRARY below. Every scene is checked by code; a scene that breaks a
 rule is rejected, so follow the rules exactly.
 
+SHOW IT, DON'T WRITE IT — THE MOST IMPORTANT RULE
+The viewer is a beginner with zero knowledge, and may watch WITH THE SOUND OFF. They must
+understand what is happening from the picture alone: show the idea HAPPENING, by the right
+action, never by putting the sentence on screen.
+- Every shot acts something out: at least one tap, state (a value changes), travel (something
+  moves from step to step), reset (a box wiped back), reveal (the fix appears), type or count.
+  Things only appearing is not enough.
+- At least half the shots use an ACTION OBJECT:
+    app_screen  what the USER sees — a tiny app: a finger taps its button, the number on it
+                changes (or stays and shakes: tone bad). Clicks, buttons, forms, screens, carts.
+    memory_box  what the COMPUTER keeps — a labelled box with a value: a new value drops in
+                (state), or the box is wiped back to its start (reset). Variables, state, cache.
+    flow        a PROCESS — 2-4 steps in a row, something travels through them, each lights up.
+                Requests, pipelines, cause -> effect, input -> output.
+    compare     WRONG vs RIGHT side by side (✗ / ✓); reveal the right side on the word that
+                names the fix. A mistake and its fix, before and after.
+    cycle       something that REPEATS — 3-4 steps on a loop, a dot goes round. Re-renders,
+                loops, lifecycles.
+  Pick the one whose MOTION matches the sentence: a click is a tap, "it resets" is a reset,
+  "then it sends it to" is a travel, "instead of X, use Y" is a compare reveal.
+- Words on screen are LABELS: 1-3 words each, at most 12 words in a whole shot (code aside).
+  The captions already carry the sentence; never repeat it on screen as text.
+- code_window and code_map ONLY on a shot whose script has code. Material without code never
+  gets a code picture.
+- Labels use the shot's own words (its highlights, its code names, the thing it names).
+
 A SCENE is:
   field       the background colour: navy (hook, drama, closing), blue (big ideas, chapter
               openers), paper (detail and diagrams — the default), yellow (one emphasis
@@ -57,11 +83,9 @@ A SCENE is:
   actions     the timeline: {"at": cue, "do": action, "target": object id, "value"?, "tone"?}.
 
 THE FRAME — objects stack TOP TO BOTTOM, one column, centred, each full width
-- There is NO side-by-side layout, no columns, no positions, and no phone, device, browser,
-  screenshot, image or person. When a brief asks for two things side by side (before/after,
-  two phones, two counters), STACK them: two entity_cards — the failing one first (tone bad),
-  the working one second (tone ok) — or ONE token_row / lookup_table that compares them.
-  Never invent a kind or a prop; translate the brief into the library.
+- There is NO free layout, no columns, no positions, no images and no people. Two things
+  side by side are ONE compare object; a screen is ONE app_screen. Never invent a kind or a
+  prop; translate the brief into the library.
 - The objects must FIT their region (gaps included; heights below):
 __REGIONS__
   Add the heights before you add an object. At most __MAX_PLACED__ placed objects.
@@ -70,8 +94,9 @@ __REGIONS__
 - A connector joins two NEIGHBOURING placed objects (adjacent in your list) by id.
 
 THE HOOK AND THE PAYOFF
-- The hook's FIRST object is identity_title (no props): the language mark. ONLY the hook has
-  one. It is 270 tall, so plan the rest of the hook in what is left.
+- The hook ACTS OUT the problem (an app_screen tap that changes nothing, a memory_box whose
+  value is wrong...). It may open with identity_title (no props, 270 tall: the language mark)
+  if that still fits; the corner badge names the language anyway. ONLY the hook may have one.
 - The hook shows the failure in coral (tone "bad"). The payoff MIRRORS it: the SAME object
   kinds as the hook (identity_title aside), on the SAME field, the failure now a success
   (tone "ok", and no coral anywhere in the payoff). (walkthrough: the result shot shows the
@@ -86,6 +111,15 @@ CUES
   karaoke caption progress does not count. Each shot below says how many changes it needs:
   enter, state, pulse, highlight, type, count actions — each on the word being spoken.
 
+VARIETY AND MATCH
+- Never give two shots in a row the same main objects (status_pill, connector and stamp
+  aside): if one shot is an entity_card, the next is something else.
+- No object kind may be the main object of more than 3 shots. Use the WHOLE library — the
+  action objects first (app_screen, memory_box, flow, compare, cycle), then big_counter,
+  lookup_table, system_panel, token_row, code_window — pick what best SHOWS this sentence.
+- Each shot shows what its narration says: the words on its objects come from that shot's
+  own captions (its highlights, its code, its numbers). One clear focus per shot.
+
 COLOUR MEANINGS ARE FIXED
 - tone "bad" (coral) only where something FAILS: __FAIL__.
 - tone "ok" (mint) only where something WORKS: __OK__.
@@ -96,27 +130,35 @@ TEXT
   titles. Never invent a fact, a number or a name.
 - Keep every string within its "max"; kinetic_title wraps at about 18 characters a line,
   at most 3 lines; code_window at most 3 lines of 30 characters.
+- Write kinetic_title text in normal sentence case ("Why does useState
+  remember?"), never in capitals: the player sets the case for the reel's design.
 
 LIBRARY (kind [layout] height: props — "?" optional, (max N) characters; actions it accepts):
 __LIBRARY__
 
-EXAMPLE (a solo fix_story hook and its payoff; a two-speaker reel would use less height):
+EXAMPLE (a solo fix_story hook, a fix and its payoff; a two-speaker reel has 600 of height):
 {"shots": [
  {"id": "s01", "scene": {"field": "navy", "transition": "cut", "label": "",
-   "objects": [{"id": "o1", "kind": "identity_title", "props": {}},
-               {"id": "o2", "kind": "entity_card", "props": {"label": "Plain variable", "value": "0", "tone": "bad"}},
-               {"id": "o3", "kind": "status_pill", "props": {"text": "Stuck at zero", "tone": "bad", "icon": "alert"}}],
+   "objects": [{"id": "o1", "kind": "kinetic_title", "props": {"text": "Why does your like button stay stuck?"}},
+               {"id": "o2", "kind": "app_screen", "props": {"title": "App", "button": "Like", "label": "Likes", "value": "0"}}],
    "actions": [{"at": "start", "do": "enter", "target": "o1"},
-               {"at": "click", "do": "enter", "target": "o2"},
-               {"at": "stuck at zero", "do": "enter", "target": "o3"}]}},
- {"id": "s09", "scene": {"field": "navy", "transition": "iris", "label": "",
-   "objects": [{"id": "o1", "kind": "entity_card", "props": {"label": "State", "value": "0", "tone": "ok"}},
-               {"id": "o2", "kind": "status_pill", "props": {"text": "Climbs", "tone": "ok", "icon": "check"}}],
+               {"at": "start", "do": "enter", "target": "o2"},
+               {"at": "click", "do": "tap", "target": "o2"},
+               {"at": "stuck at zero", "do": "state", "target": "o2", "value": "0", "tone": "bad"}]}},
+ {"id": "s06", "scene": {"field": "blue", "transition": "iris", "label": "THE FIX",
+   "objects": [{"id": "o1", "kind": "compare", "props": {"left": "Plain variable", "right": "useState",
+                                                          "left_icon": "x", "right_icon": "memory"}}],
    "actions": [{"at": "start", "do": "enter", "target": "o1"},
-               {"at": "climbs", "do": "state", "target": "o1", "value": "3", "tone": "ok"},
-               {"at": "climbs", "do": "enter", "target": "o2"}]}}]}
-(In the hook, identity_title 270 + gap 48 + entity_card 330 + gap 48 + status_pill 80 = 776,
-which fits the solo region's 1000.)
+               {"at": "useState", "do": "reveal", "target": "o1"}]}},
+ {"id": "s09", "scene": {"field": "navy", "transition": "bar_wipe", "label": "",
+   "objects": [{"id": "o1", "kind": "kinetic_title", "props": {"text": "Now every tap counts"}},
+               {"id": "o2", "kind": "app_screen", "props": {"title": "App", "button": "Like", "label": "Likes", "value": "0"}}],
+   "actions": [{"at": "start", "do": "enter", "target": "o1"},
+               {"at": "start", "do": "enter", "target": "o2"},
+               {"at": "tap", "do": "tap", "target": "o2"},
+               {"at": "climbs", "do": "state", "target": "o2", "value": "1", "tone": "ok"}]}}]}
+(In the hook, kinetic_title 2 lines 213 + gap 60 + app_screen 560 = 833, which fits the solo
+region's 1000.)
 
 Return JSON: {"shots": [{"id": "s01", "scene": {"field": "...", "transition": "...",
 "label": "...", "objects": [{"id": "o1", "kind": "...", "props": {...}}],
@@ -148,7 +190,8 @@ def _library_block() -> str:
         props = ", ".join(f"{k}: {v}" + (f" (max {spec['max'][k]})" if k in spec.get("max", {}) else "")
                           for k, v in spec["props"].items()) or "no props"
         lines.append(f"  {kind} [{spec['layout']}] {_height_text(kind, spec)}: {props}; "
-                     f"actions {', '.join(spec['actions'])}")
+                     f"actions {', '.join(spec['actions'])}"
+                     + (f"\n      — {spec['_use']}" if spec.get("_use") else ""))
     lines.append("  types: tone = " + " | ".join(lib.tones()) + "; icon = one of "
                  + ", ".join(sorted(lib.icon_names())) + "; rows = [{icon, line, sub}]; "
                  "icons = [{name, label, tone}]; parts = [{code, icon, label}]; "
@@ -191,7 +234,7 @@ def _budget(script: MotionScript) -> dict[str, str]:
                  else "coral (bad) allowed, no mint" if s.beat in FAILURE_BEATS
                  else "mint (ok) allowed, no coral" if s.beat in SUCCESS_BEATS
                  else "neither coral nor mint")
-        extra = "; FIRST object identity_title" if s.beat == "hook" else ""
+        extra = "; act the problem out (an action object going wrong)" if s.beat == "hook" else ""
         extra += "; mirror the hook's kinds and field, now ok" if s.beat == "payoff" else ""
         out[s.id] = (f"~{secs:.1f}s, needs >= {changes} visible changes; placed objects fit "
                      f"{height} ({'two-speaker' if duo else 'one-narrator'} region); "
@@ -309,12 +352,18 @@ def fall_back(script: MotionScript, failing: list[str], log=print) -> tuple[Moti
 
 
 def write_motion_scenes(script: MotionScript, log=print,
-                        attempts: list | None = None) -> tuple[MotionScript, list]:
+                        attempts: list | None = None, note: str = "") -> tuple[MotionScript, list]:
     """Every shot's scene, graded. Returns (the script with scenes, the scene
     grader results). Never returns a shot without a drawable scene, and a
     fallback never leaves a grader failing. `attempts` (a list) receives every
-    attempt's scenes, per-shot reasons and fallbacks."""
-    draft = ask_json(system_prompt(), _script_block(script), MotionScenesDraft,
+    attempt's scenes, per-shot reasons and fallbacks. `note`: the reviewer's
+    words when the scenes are redrawn from the reels feed ("redraw")."""
+    block = _script_block(script)
+    if note.strip():
+        # first, before the script (whatever reads the script reads to the end)
+        block = ("REVIEWER'S NOTE — the scenes are being redrawn because of this; answer it "
+                 "while keeping every rule:\n" + note.strip() + "\n\n" + block)
+    draft = ask_json(system_prompt(), block, MotionScenesDraft,
                      max_tokens=12000, label="motion_scenes")
     out = _apply(script, draft)
     results = checks.run_motion_scene_graders(out)

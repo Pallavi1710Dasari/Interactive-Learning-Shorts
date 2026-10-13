@@ -3,7 +3,7 @@
 // tracked-caps section labels above diagrams.
 
 import { At } from "./Stage";
-import { C, FONT, W, theme, type FieldName } from "./tokens";
+import { C, FONT, W, display, theme, type FieldName } from "./tokens";
 import { clamp } from "./time";
 
 /** Where the step chip's number sits — the chapter card's number flies here
@@ -22,7 +22,7 @@ export function StepChip({ n, of, field, p = 1, hideNumber = false, color }: {
                   transform: `translateY(${(1 - q) * -12}px)`, color: th.ink }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
         <span style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: 24, letterSpacing: 3 }}>STEP</span>
-        <span style={{ fontFamily: FONT.display, fontSize: STEP_CHIP.numberSize, lineHeight: 1,
+        <span style={{ ...display(STEP_CHIP.numberSize), lineHeight: 1,
                        opacity: hideNumber ? 0 : 1, width: 76 }}>
           {String(n).padStart(2, "0")}
         </span>

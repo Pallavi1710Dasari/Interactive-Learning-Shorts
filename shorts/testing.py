@@ -61,6 +61,8 @@ def isolate_output(name: str = "shorts_test", seed: tuple[str, ...] = ()) -> Pat
         elif src.is_file():
             shutil.copy2(src, out / rel)
     os.environ["SHORTS_OUTPUT_DIR"] = str(out)
+    # tests never record voices: Chatterbox takes minutes (config.MOTION_VOICE)
+    os.environ.setdefault("MOTION_VOICE", "silent")
     os.environ["SHORTS_CAST_ASSETS_DIR"] = str(cast)
     atexit.register(shutil.rmtree, root, True)
     return out

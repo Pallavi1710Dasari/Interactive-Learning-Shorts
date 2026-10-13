@@ -1,0 +1,308 @@
+{
+ "_comment": "A walkthrough script shaped like the Opus drafts plain_variable_no_rerender__motion's run rejected on 2026-10-12 (4 attempts, step_by_step_walkthrough). The drafts were not saved, so this is rebuilt from the grader messages: the hook 'Why doesn't your counter change when you change the number?', chapter cards captioned as one 'Step one. Counter runs.', the running example 'let count = 0, inside Counter' said as 'let count equals zero', and chapter titles using 'you', 'notices' and 'resets'. Source: content/react_usestate_basics.md, main 7.2 + 7.4 (the reel's pool), supporting 7.1 + 7.3. Every motion grader must pass it: shorts/motion_walkthrough_agreement_test.py.",
+ "reel_style": "motion",
+ "template": "walkthrough",
+ "theme": "step_by_step_walkthrough",
+ "language": "react",
+ "short_id": "plain_variable_no_rerender__motion",
+ "source_section_id": "7.2",
+ "topic": "Why does reassigning a plain local variable inside a component not change what the screen shows?",
+ "hook_question": "Why doesn't your counter change when you change the number?",
+ "concept_name": "re-render",
+ "promise": "Why the screen stays at 0",
+ "icon_vocabulary": [],
+ "takeaways": [],
+ "running_example": {
+  "text": "let count = 0, inside Counter",
+  "items": [
+   "count: 0",
+   "screen: 0"
+  ]
+ },
+ "chapters": [
+  {
+   "n": 1,
+   "title": "Counter runs",
+   "example_in": [
+    "count: 0",
+    "screen: 0"
+   ],
+   "example_out": [
+    "count: 0",
+    "screen: 0"
+   ]
+  },
+  {
+   "n": 2,
+   "title": "You click, count goes up",
+   "example_in": [
+    "count: 0",
+    "screen: 0"
+   ],
+   "example_out": [
+    "count: 1",
+    "screen: 0"
+   ]
+  },
+  {
+   "n": 3,
+   "title": "Nobody notices the change",
+   "example_in": [
+    "count: 1",
+    "screen: 0"
+   ],
+   "example_out": [
+    "count: 1",
+    "screen: 0"
+   ]
+  },
+  {
+   "n": 4,
+   "title": "The next render resets it",
+   "example_in": [
+    "count: 1",
+    "screen: 0"
+   ],
+   "example_out": [
+    "count: 0",
+    "screen: 0"
+   ]
+  }
+ ],
+ "shots": [
+  {
+   "id": "s01",
+   "beat": "hook",
+   "speech": "Why doesn't your counter change when you change the number? Nothing ever asks React to look.",
+   "captions": [
+    {
+     "text": "Why doesn't your <b>counter</b> change when you change the number?"
+    },
+    {
+     "text": "Nothing ever asks <b>React</b> to look."
+    }
+   ],
+   "visual": "Navy field. KineticTitle 'WHY DOESN'T IT CHANGE?' builds word by word; a big counter sits at 0."
+  },
+  {
+   "id": "s02",
+   "beat": "name_it",
+   "speech": "The missing step is called a re-render.",
+   "captions": [
+    {
+     "text": "The missing step is called a <b>re-render</b>."
+    }
+   ],
+   "visual": "Iris into the blue field. Kinetic title 'RE-RENDER' stamps in."
+  },
+  {
+   "id": "s03",
+   "beat": "example",
+   "speech": "Let's follow one counter. Inside Counter, you write let count equals zero.",
+   "captions": [
+    {
+     "text": "Let's follow one <b>counter</b>."
+    },
+    {
+     "text": "Inside <b>Counter</b>, you write `let count = 0`."
+    }
+   ],
+   "example": [
+    "count: 0",
+    "screen: 0"
+   ],
+   "visual": "Blue field, label 'FOLLOW ONE COUNTER'. Two chips: count 0 and screen 0."
+  },
+  {
+   "id": "s04",
+   "beat": "chapter_card",
+   "chapter": 1,
+   "speech": "Step one. Counter runs.",
+   "captions": [
+    {
+     "text": "Step <b>one</b>. Counter runs."
+    }
+   ],
+   "visual": "Bar wipe into the paper field. ChapterCard 'STEP 1 OF 4', 'Counter runs'."
+  },
+  {
+   "id": "s05",
+   "beat": "chapter",
+   "chapter": 1,
+   "speech": "React runs Counter from the top. A brand new count is made, and the screen shows zero.",
+   "captions": [
+    {
+     "text": "React runs <b>Counter</b> from the top."
+    },
+    {
+     "text": "A brand new <b>count</b> is made, and the screen shows zero."
+    }
+   ],
+   "example": [
+    "count: 0",
+    "screen: 0"
+   ],
+   "code": [
+    "function Counter() {",
+    "  let count = 0;",
+    "}"
+   ],
+   "visual": "Paper field, step chip 01. Code window with the two lines; the count chip and the screen chip both read 0."
+  },
+  {
+   "id": "s06",
+   "beat": "chapter_card",
+   "chapter": 2,
+   "speech": "Step two. You click.",
+   "captions": [
+    {
+     "text": "Step <b>two</b>. You click."
+    }
+   ],
+   "visual": "Iris into the navy field. ChapterCard 'STEP 2 OF 4', 'You click, count goes up'."
+  },
+  {
+   "id": "s07",
+   "beat": "chapter",
+   "chapter": 2,
+   "speech": "Your click handler runs count equals count plus one. In memory, count really is one now.",
+   "captions": [
+    {
+     "text": "Your click handler runs `count = count + 1`."
+    },
+    {
+     "text": "In memory, <b>count</b> really is one now."
+    }
+   ],
+   "example": [
+    "count: 1",
+    "screen: 0"
+   ],
+   "visual": "Navy field. The count chip flips from 0 to 1; the screen chip stays at 0."
+  },
+  {
+   "id": "s08",
+   "beat": "chapter_card",
+   "chapter": 3,
+   "speech": "Step three. Nobody notices.",
+   "captions": [
+    {
+     "text": "Step <b>three</b>. Nobody notices."
+    }
+   ],
+   "visual": "Stack rise into the blue field. ChapterCard 'STEP 3 OF 4', 'Nobody notices the change'."
+  },
+  {
+   "id": "s09",
+   "beat": "chapter",
+   "chapter": 3,
+   "speech": "Nothing observes that change. Nothing tells React a re-render is needed, so the screen still shows zero.",
+   "captions": [
+    {
+     "text": "Nothing <b>observes</b> that change."
+    },
+    {
+     "text": "Nothing tells React a <b>re-render</b> is needed, so the screen still shows zero."
+    }
+   ],
+   "example": [
+    "count: 1",
+    "screen: 0"
+   ],
+   "visual": "Blue field. A NO tag over React; the screen chip stays at 0 while count reads 1."
+  },
+  {
+   "id": "s10",
+   "beat": "chapter_card",
+   "chapter": 4,
+   "speech": "Step four. Next render.",
+   "captions": [
+    {
+     "text": "Step <b>four</b>. Next render."
+    }
+   ],
+   "visual": "Diagonal stripes into the yellow field. ChapterCard 'STEP 4 OF 4', 'The next render resets it'."
+  },
+  {
+   "id": "s11",
+   "beat": "chapter",
+   "chapter": 4,
+   "speech": "Even if React ran Counter again, it would throw the old count away. It starts back at zero.",
+   "captions": [
+    {
+     "text": "Even if React ran <b>Counter</b> again, it would throw the old count away."
+    },
+    {
+     "text": "It starts back at <b>zero</b>."
+    }
+   ],
+   "example": [
+    "count: 0",
+    "screen: 0"
+   ],
+   "visual": "Yellow field. The count chip crumbles; a new count chip drops in at 0."
+  },
+  {
+   "id": "s12",
+   "beat": "result",
+   "speech": "So count went up for a moment. The screen stayed at zero the whole time.",
+   "captions": [
+    {
+     "text": "So count went up for a <b>moment</b>."
+    },
+    {
+     "text": "The screen stayed at <b>zero</b> the whole time."
+    }
+   ],
+   "example": [
+    "count: 0",
+    "screen: 0"
+   ],
+   "visual": "Blue field. Big counter shows 0; a ghost 1 fades beside it."
+  },
+  {
+   "id": "s13",
+   "beat": "takeaway",
+   "speech": "So a changed value is not a re-render. Something has to tell React to run again.",
+   "captions": [
+    {
+     "text": "So a changed value is not a <b>re-render</b>."
+    },
+    {
+     "text": "Something has to tell <b>React</b> to run again."
+    }
+   ],
+   "visual": "Blue field. KineticTitle 'A CHANGED VALUE IS NOT A RE-RENDER'."
+  },
+  {
+   "id": "s14",
+   "beat": "recap",
+   "speech": "Re-render in four steps: Counter runs, you click, nobody notices, the next render resets.",
+   "captions": [
+    {
+     "text": "<b>Re-render</b> in four steps: Counter runs, you click, nobody notices, the next render resets."
+    }
+   ],
+   "example": [
+    "count: 0",
+    "screen: 0"
+   ],
+   "visual": "Stack rise into the navy field. RecapGrid with the four steps."
+  },
+  {
+   "id": "s15",
+   "beat": "cta",
+   "speech": "Follow for more, one idea at a time.",
+   "captions": [
+    {
+     "text": "Follow for more, one idea at a time."
+    }
+   ],
+   "visual": "Navy field. End card: Up next, Follow button."
+  }
+ ],
+ "series": "@learnthesimpleway",
+ "next_topic": "",
+ "tts_provider": null,
+ "voice_ref": null
+}

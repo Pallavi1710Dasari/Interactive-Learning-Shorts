@@ -10,7 +10,7 @@
 import type { ReactNode } from "react";
 import { At, Icon, Overlay } from "../Stage";
 import { STEP_CHIP } from "../chrome";
-import { C, FONT, H, MONO_ADVANCE, W, theme, type FieldName } from "../tokens";
+import { C, FONT, H, MONO_ADVANCE, W, display, theme, type FieldName } from "../tokens";
 import { clamp, ease, hash3, lerp, seg } from "../time";
 
 // ------------------------------------------------------------------ chips
@@ -121,7 +121,7 @@ export function KineticTitle({ lines, x, y, size, t, start = 0, gap = 0.12, fiel
   let i = 0;
   return (
     <At x={x} y={y}>
-      <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight, textTransform: "uppercase", color: th.ink }}>
+      <div style={{ ...display(size), lineHeight, color: th.ink }}>
         {lines.map((line, li) => (
           <div key={li} style={{ whiteSpace: "nowrap" }}>
             {line.map((w, wi) => {
@@ -129,7 +129,8 @@ export function KineticTitle({ lines, x, y, size, t, start = 0, gap = 0.12, fiel
               return (
                 <span key={wi} style={{ display: "inline-block", marginRight: size * 0.22, opacity: p,
                                         transform: `translateY(${(1 - p) * size * 0.35}px)`,
-                                        color: w.color ?? (w.accent ? th.accent : undefined) }}>
+                                        color: w.color ?? (w.accent ? th.accent : undefined),
+                                        textShadow: w.accent ? "var(--motion-glow, none)" : undefined }}>
                   {w.text}
                 </span>
               );
@@ -181,7 +182,7 @@ export function ChapterCard({ n, of, title, field, t, exitAt = CHAPTER_CARD.exit
       {!done && (
         <At x={nx} y={ny} style={{ opacity: lerp(0.2, 1, inP),
                                    transform: `scale(${fly > 0 ? 1 : lerp(0.92, 1, inP)})`, transformOrigin: "0 0" }}>
-          <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight: 1, color: th.accent }}>
+          <div style={{ ...display(size), lineHeight: 1, color: th.accent }}>
             {String(n).padStart(2, "0")}
           </div>
         </At>
@@ -200,18 +201,21 @@ export function ChapterCard({ n, of, title, field, t, exitAt = CHAPTER_CARD.exit
 
 /** One strong verdict per reel ("NOT ON THE SHELF"). `p` 0..1 is the slam:
  * from 1.7x down past 1 (overshoot) and a small shake once it lands. */
-export function Stamp({ text, x, y, rotate = -8, p, t = 0 }: {
-  text: string; x: number; y: number; rotate?: number; p: number; t?: number;
+export function Stamp({ text, x, y, rotate = -8, p, t = 0, size = 84 }: {
+  text: string; x: number; y: number; rotate?: number; p: number; t?: number; size?: number;
 }) {
   const q = clamp(p);
   const scale = q < 0.6 ? lerp(1.7, 0.94, ease.inCubic(q / 0.6)) : lerp(0.94, 1, ease.outCubic((q - 0.6) / 0.4));
   const shake = q >= 0.6 && q < 1 ? Math.sin(t * 90) * 6 * (1 - q) : 0;
   return (
+    // At centres it (and composes this transform after its own centring): a
+    // second translate(-50%,-50%) here put every stamp half its size up and
+    // left of its anchor — onto the card text it was meant to sit beside
     <At x={x} y={y} center style={{ opacity: clamp(q * 3),
-                                    transform: `translate(-50%,-50%) translateX(${shake}px) rotate(${rotate}deg) scale(${scale})` }}>
+                                    transform: `translateX(${shake}px) rotate(${rotate}deg) scale(${scale})` }}>
       <div style={{ padding: "14px 36px", border: `7px solid ${C.coral}`, borderRadius: 18, color: C.coral,
-                    fontFamily: FONT.display, fontSize: 84, lineHeight: 1, whiteSpace: "nowrap",
-                    background: "rgba(242,85,90,0.12)", textTransform: "uppercase" }}>
+                    ...display(size), lineHeight: 1, whiteSpace: "nowrap",
+                    background: "rgba(242,85,90,0.12)" }}>
         {text}
       </div>
     </At>
@@ -354,8 +358,8 @@ export function MatrixGrid({ cells, x, y, cell = 78, gap = 10, field, rowLabels,
   const bx = bracket ? 30 : 0;
   return (
     <At x={x} y={y}>
-      {label && <div style={{ position: "absolute", left: lx + bx, top: -60, fontFamily: FONT.display, fontSize: 40,
-                             color: th.dark ? C.yellow : FIELDS_BLUE, textTransform: "uppercase",
+      {label && <div style={{ position: "absolute", left: lx + bx, top: -60, ...display(40),
+                             color: th.dark ? C.yellow : FIELDS_BLUE,
                              whiteSpace: "nowrap" }}>{label}</div>}
       {rowLabels?.map((l, r) => (
         <div key={l} style={{ position: "absolute", left: 0, top: r * (cell + gap) + cell / 2 - 14, fontFamily: FONT.mono,
@@ -404,13 +408,14 @@ export function BigCounter({ value, label, x, y, size = 300, field, accent = tru
   const th = theme(field);
   const q = ease.outBack(clamp(p), 1.6);
   return (
-    <At x={x} y={y} center={center} style={{ opacity: clamp(p * 2),
-                                             transform: `${center ? "translate(-50%,-50%) " : ""}scale(${lerp(0.7, 1, q)})` }}>
+    // At centres it already: a second translate(-50%,-50%) here put the
+    // counter half its size up and left — "1 → 7" ran off the frame
+    <At x={x} y={y} center={center} style={{ opacity: clamp(p * 2), transform: `scale(${lerp(0.7, 1, q)})` }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
                     padding: framed ? "24px 54px 30px" : 0, borderRadius: 36,
                     border: framed ? `4px solid ${th.dark ? "rgba(253,209,62,0.55)" : "rgba(21,25,54,0.25)"}` : "none",
                     background: framed ? (th.dark ? "rgba(9,16,37,0.85)" : "rgba(255,255,255,0.85)") : "transparent" }}>
-        <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight: 1, color: accent ? th.accent : th.ink,
+        <div style={{ ...display(size), lineHeight: 1, color: accent ? th.accent : th.ink,
                       whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{value}</div>
         {label && <div style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: Math.max(22, size * 0.09), letterSpacing: 4,
                                color: th.ink, marginTop: 8, textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>}
@@ -439,25 +444,30 @@ export function Bracket({ x, y, w, label, field, p = 1, below = true }: {
 }
 
 /** A speech-bubble callout with a small label and a pointer down to (px, py). */
-export function Callout({ x, y, w, label, text, px, py, field, p = 1, tag }: {
+export function Callout({ x, y, w, label, text, px, py, field, p = 1, tag, scale = 1 }: {
   x: number; y: number; w: number; label: string; text: string; px: number; py: number;
-  field: FieldName; p?: number; tag?: { text: string; tone: "ok" | "bad" };
+  field: FieldName; p?: number; tag?: { text: string; tone: "ok" | "bad" }; scale?: number;
 }) {
   const q = ease.outBack(clamp(p), 1.3);
+  // Midnight Lab: a glass bubble with a lit edge instead of the paper one
+  const th = theme(field);
+  const lab = field === "lab" || field === "lab_violet";
+  // (solid, not see-through: the pointer line runs behind the bubble)
+  const box = lab ? { background: field === "lab" ? "#1A2152" : "#221D57", border: "3px solid rgba(255,255,255,0.22)", color: th.surfaceInk, sub: th.surfaceDim }
+                  : { background: C.surf, border: `4px solid ${C.ink}`, color: C.ink, sub: C.sub };
   return (
     <>
       <Overlay>
-        <line x1={x + 60} y1={y + 120} x2={px} y2={py} stroke={theme(field).dark ? C.white : C.ink} strokeWidth={4}
+        <line x1={x + 60} y1={y + 120} x2={px} y2={py} stroke={th.dark ? C.white : C.ink} strokeWidth={4}
               opacity={clamp(p)} />
       </Overlay>
       <At x={x} y={y} style={{ opacity: clamp(p * 2), transform: `scale(${lerp(0.85, 1, q)})`, transformOrigin: "0 100%" }}>
-        <div style={{ width: w, padding: "20px 30px", borderRadius: 24, background: C.surf, border: `4px solid ${C.ink}`, color: C.ink }}>
-          <div style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: 20, letterSpacing: 3, color: C.sub }}>{label}</div>
-          <div style={{ fontWeight: 700, fontSize: 36 }}>{text}</div>
+        <div style={{ width: w, padding: "20px 30px", borderRadius: 24, background: box.background, border: box.border, color: box.color }}>
+          <div style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: 20 * scale, letterSpacing: 3, color: box.sub }}>{label}</div>
+          <div style={{ fontWeight: 700, fontSize: 36 * scale, lineHeight: 1.25 }}>{text}</div>
         </div>
         {tag && <div style={{ position: "absolute", right: -24, bottom: -24, padding: "6px 18px", borderRadius: 12,
-                              background: tag.tone === "ok" ? C.mint : C.coral, color: C.white, fontFamily: FONT.display,
-                              fontSize: 36, transform: "rotate(-6deg)" }}>{tag.text}</div>}
+                              background: tag.tone === "ok" ? C.mint : C.coral, color: C.white, ...display(36), transform: "rotate(-6deg)" }}>{tag.text}</div>}
       </At>
     </>
   );
@@ -476,7 +486,7 @@ export function RecapGrid({ concept, steps, final, field, t }: {
     <>
       <At x={W / 2} y={560} center style={{ opacity: ease.outCubic(seg(t, 0, 0.4)) }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontFamily: FONT.display, fontSize: 132, lineHeight: 1, color: th.ink, textTransform: "uppercase",
+          <div style={{ ...display(132), lineHeight: 1, color: th.ink,
                         whiteSpace: "nowrap" }}>{concept}</div>
           <div style={{ fontWeight: 800, fontSize: 44, color: th.accent, marginTop: 16 }}>in {steps.length} steps</div>
         </div>
@@ -489,7 +499,7 @@ export function RecapGrid({ concept, steps, final, field, t }: {
             <div style={{ width: colW, height: 96, borderRadius: 18, border: `3px solid ${th.dark ? "rgba(255,255,255,0.3)" : C.ink}`,
                           display: "flex", alignItems: "center", gap: 18, padding: "0 24px", boxSizing: "border-box",
                           background: th.dark ? th.surface : C.surf, color: th.surfaceInk }}>
-              <span style={{ fontFamily: FONT.display, fontSize: 48, color: th.accent }}>{i + 1}</span>
+              <span style={{ ...display(48), color: th.accent }}>{i + 1}</span>
               <span style={{ fontWeight: 700, fontSize: 32, whiteSpace: "nowrap", overflow: "hidden" }}>{s}</span>
             </div>
           </At>

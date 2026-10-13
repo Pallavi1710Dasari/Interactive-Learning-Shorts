@@ -26,8 +26,13 @@ export interface PlanShot {
 }
 export type PlanCast = CastMember;
 export interface MotionPlan {
+  /** The look it is drawn in (designs.ts); absent = "classic". */
+  design?: string;
   short_id: string; template: string; theme: string | null; series: string; concept_name: string;
   duration: number; audio: string | null; audio_url?: string; timing_source: string;
+  /** "stub": the narration is stub silence (SHORTS_STUB=1); "recorded": a real
+   *  voice; "none": no audio. Set by GET /api/motion/<id>/plan. */
+  voice?: "stub" | "recorded" | "none";
   identity: IdentitySpec | null; theme_label: string; tags: string[]; intro: number;
   cast: PlanCast[]; shots: PlanShot[];
   /** the optional animated characters (shorts/motion_characters.py); empty = off */

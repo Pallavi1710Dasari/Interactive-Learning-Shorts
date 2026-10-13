@@ -272,6 +272,10 @@ kbd {
 .feed {
   flex: 1; overflow-y: scroll; scroll-snap-type: y mandatory; scroll-behavior: smooth;
   min-height: 0; scrollbar-width: none;
+  /* the motion reels arrive a moment after the explainer reels and go on top;
+     scroll anchoring then kept the old first reel on screen, so the feed
+     opened on reel 2 instead of the newest */
+  overflow-anchor: none;
 }
 .feed::-webkit-scrollbar { display: none; }
 .slot { height: 100%; scroll-snap-align: start; display: grid; place-items: center; padding: 14px; }
@@ -1384,3 +1388,174 @@ button.rec::before {
    invisible — darken it there instead of leaving it unreadable. */
 .story-card ~ .story-watermark,
 .story-stage:has(.story-card) .story-watermark { color: #171512; opacity: 0.22; text-shadow: none; }
+
+/* ------------------------------------------------------------------ motion flow
+   StepMotion.tsx — a motion reel's eight steps on one screen, in this file's
+   own look (cards, pills, the sticky bar). Only what the old screens lacked:
+   a step header, done / current / next cards, larger main buttons. */
+.mhead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.mhead h1 { margin: 0; }
+.mstepno { color: var(--teal-hi); font-weight: 800; font-size: 14px; }
+.mstep { margin-bottom: 12px; }
+.mstep.next { opacity: 0.55; padding-top: 14px; padding-bottom: 14px; }
+.mstep.now { border-color: rgba(47, 211, 155, 0.55); box-shadow: 0 0 0 1px rgba(47, 211, 155, 0.2); }
+.mstep .mtitle { display: flex; align-items: center; gap: 10px; font-size: 15.5px; font-weight: 700; }
+.mstep .mnum { width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center;
+  font-size: 12px; font-weight: 800; background: rgba(255, 255, 255, 0.07); color: var(--muted); flex: none; }
+.mstep.done .mnum { background: var(--teal); color: #04110c; }
+.mstep.now .mnum { background: var(--teal-hi); color: #04110c; }
+.mstep .mvalue { font-size: 15px; margin: 8px 0 0 34px; line-height: 1.45; }
+.mstep .mdetail { color: var(--muted); font-size: 12.5px; margin: 3px 0 0 34px; }
+.mstep .mbody { margin: 14px 0 0 34px; }
+.mwhat { font-size: 14px; line-height: 1.6; color: var(--cream); margin: 6px 0 0 34px; }
+.mwhat b { color: var(--teal-hi); }
+.mchoices { display: grid; gap: 8px; }
+.mchoice { text-align: left; width: 100%; padding: 13px 15px; border-radius: 12px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); color: var(--cream); font: inherit; }
+.mchoice:hover { background: rgba(255, 255, 255, 0.06); }
+.mchoice.on { border-color: var(--teal-hi); background: rgba(29, 158, 117, 0.1); }
+.mchoice .t { font-size: 15px; font-weight: 650; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mchoice .d { color: var(--muted); font-size: 12.5px; margin-top: 4px; line-height: 1.5; }
+.mchoice .r { color: var(--cream); font-size: 12.5px; margin-top: 5px; }
+.mchoice .r b { color: var(--teal-hi); }
+.mrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.primary.big { font-size: 16px; padding: 14px 26px; border-radius: 12px; }
+.ghost.big { font-size: 14px; padding: 11px 18px; }
+.mbar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.07); overflow: hidden; margin-top: 12px; }
+.mbar i { display: block; height: 8px; background: var(--teal-hi); border-radius: 4px; transition: width 0.4s; }
+.mbar.moving i { width: 30%; animation: mslide 1.3s ease-in-out infinite; }
+@keyframes mslide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.mproblem { border: 1px solid rgba(255, 107, 107, 0.45); background: rgba(255, 90, 90, 0.06); border-radius: 12px;
+  padding: 14px 16px; }
+.mproblem h3 { margin: 0 0 8px; color: #ff8a8a; font-size: 15px; }
+.mproblem dl { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; margin: 0; font-size: 13.5px; }
+.mproblem dt { color: var(--muted); font-weight: 700; }
+.mproblem dd { margin: 0; }
+.mcost { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+.mcost b { color: var(--cream); }
+.mshot { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line);
+  font-size: 13.5px; line-height: 1.5; }
+.mshot:first-child { border-top: none; }
+.mshot .who { color: var(--teal-hi); font-weight: 700; margin-right: 6px; }
+.mshot .vis { color: var(--muted); font-size: 11.5px; }
+.mshot pre { margin: 6px 0 0; font-size: 12px; background: rgba(255, 255, 255, 0.04); padding: 8px 10px; border-radius: 8px; }
+.mscenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.mscene { background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; }
+.mstyle { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.mstyle .mchoice { flex: 1 1 260px; }
+/* a motion reel in the reels feed */
+.mreel { width: min(420px, 92vw); aspect-ratio: 9 / 16; max-height: calc(100% - 10px); border-radius: 22px;
+  overflow: hidden; position: relative; box-shadow: var(--shadow); background: #0e1224; }
+.mreel .poster { position: absolute; inset: 0; display: grid; place-items: center; }
+.mreel .shade { position: absolute; inset: auto 0 0 0; padding: 70px 20px 22px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.88)); }
+.mreel .title { font-size: 17px; font-weight: 750; line-height: 1.35; margin: 8px 0 14px; }
+.mbadge { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 99px; background: #FDD13E; color: #1a1500; margin-right: 6px; }
+.mbadge.stub { background: rgba(255, 255, 255, 0.14); color: var(--cream); }
+a.primary, a.ghost { text-decoration: none; display: inline-block; }
+/* the motion steps in the top bar: nine crumbs, kept on one line */
+.topbar .brand, .topbar button, .topbar .hintline { white-space: nowrap; }
+.steps.msteps { overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; }
+.steps.msteps .crumb { padding-left: 8px; padding-right: 10px; font-size: 12px; }
+
+/* A motion reel in the feed (MotionFeedItem.MotionReel): the explainer
+   reel's card, its rail and tap button, with the motion frame filling it. */
+/* The frame is full 9:16 and the rail has its own dark column beside it, so
+   the rail never sits on the reel's captions or objects. */
+.mreel2 { background: #070b14; aspect-ratio: auto; width: auto; max-width: 100%;
+  height: min(736px, calc(100% - 28px)); max-height: none; display: flex; }
+.mreel2 .mframe { position: relative; height: 100%; aspect-ratio: 9 / 16; z-index: 1; cursor: pointer;
+  overflow: hidden; flex: none; }
+.mreel2 .rail { position: relative; right: auto; bottom: auto; align-self: flex-end; margin: 0 5px 18px;
+  background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.mreel2 .mloading { position: absolute; inset: 0; display: grid; place-items: center; padding: 30px;
+  text-align: center; color: var(--muted); font-weight: 700; }
+.stubtag { position: absolute; z-index: 6; top: 5.4%; left: 4%; padding: 4px 10px; border-radius: 99px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em; color: #1b1300; background: #ffd166;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+.stubtag.warn { top: auto; bottom: 22%; left: 4%; right: 60px; border-radius: 12px; background: #ff9f7a; }
+.railstate.cost b { font-size: 10px; font-weight: 800; color: var(--cream); line-height: 1.1; }
+.railstate.cost em { font-size: 7.5px; text-transform: none; letter-spacing: 0; }
+
+/* Making a motion reel, one step at a time (StepMotion, 2026-10-13). */
+.mwizard { max-width: 760px; margin: 0 auto; }
+.mprogress { display: flex; gap: 4px; margin: 4px 0 18px; }
+.mdot { flex: 1; display: grid; justify-items: center; gap: 4px; color: var(--muted); font-size: 11px; text-align: center; }
+.mdot span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+.mdot em { font-style: normal; }
+.mdot.done span { background: var(--teal); color: #04110c; border-color: transparent; }
+.mdot.now span { background: var(--cream); color: #06110c; box-shadow: 0 0 0 4px rgba(47,211,155,.25); }
+.mdot.now em { color: var(--cream); font-weight: 700; }
+.mstepcard { padding: 22px 24px; }
+.mstepcard h1 { font-size: 24px; margin: 4px 0 6px; }
+.mstepcard .mstepno { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.mstepcard .mbody { margin: 14px 0 6px; }
+.mactions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+.mfoot { margin-top: 14px; color: var(--muted); font-size: 12.5px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.linkbtn { margin-left: auto; background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 12.5px; }
+.mlines { margin: 10px 0; padding-left: 22px; display: grid; gap: 6px; font-size: 15px; line-height: 1.45; }
+.mlines .who { display: inline-block; margin-right: 8px; font-size: 11px; font-weight: 800; color: var(--teal-hi); text-transform: uppercase; letter-spacing: .05em; }
+.mbuild { list-style: none; padding: 0; margin: 4px 0 14px; display: grid; gap: 10px; font-size: 15px; }
+.mbuild li { display: flex; gap: 10px; align-items: center; color: var(--muted); }
+.mbuild li .dot { width: 22px; text-align: center; font-weight: 800; }
+.mbuild li.done { color: var(--cream); }
+.mbuild li.done .dot { color: var(--teal-hi); }
+.mbuild li.now { color: var(--cream); font-weight: 700; }
+.mbuild li.now .dot { color: #ffd166; }
+
+.mfails { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.45; }
+
+/* steps beside "Your choices" (StepMotion) */
+.mwizard { max-width: 1080px; }
+.mlayout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .mlayout { grid-template-columns: 1fr; } }
+.mside { position: sticky; top: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px; padding: 14px 16px; }
+.mchoiceRow { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 0; border-top: 1px solid rgba(255,255,255,.06); }
+.mchoiceRow .n { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); grid-column: 1; }
+.mchoiceRow .v { font-size: 13.5px; color: var(--cream); grid-column: 1; line-height: 1.35; }
+.mchoiceRow .linkbtn { grid-column: 2; grid-row: 1 / span 2; align-self: center; margin: 0; }
+.mspeaker { margin-bottom: 16px; }
+.mavatars { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0 10px; }
+.mavatar { display: grid; justify-items: center; gap: 4px; padding: 8px; border-radius: 14px; cursor: pointer;
+  background: rgba(255,255,255,.04); border: 2px solid transparent; color: var(--cream); font-size: 12.5px; font-weight: 700; }
+.mavatar.on { border-color: var(--teal); background: rgba(47,211,155,.1); }
+.mavatar span { display: flex; gap: 6px; align-items: center; }
+.mvoices { display: flex; flex-wrap: wrap; gap: 8px; }
+.mvoice { display: inline-flex; border-radius: 999px; overflow: hidden; border: 2px solid rgba(255,255,255,.12); }
+.mvoice.on { border-color: var(--teal); }
+.mvoice button { background: rgba(255,255,255,.04); color: var(--cream); border: 0; padding: 7px 12px; cursor: pointer; font-weight: 700; display: flex; gap: 6px; align-items: center; }
+.mvoice.on button:first-child { background: rgba(47,211,155,.12); }
+.mvoice .play { border-left: 1px solid rgba(255,255,255,.12); }
+
+/* "Your reel so far" (StepMotion.Choices2) */
+.mside { position: sticky; top: 12px; background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+  border: 1px solid rgba(255,255,255,.09); border-radius: 18px; padding: 16px 14px 12px; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
+.mside-title { font-size: 13px; font-weight: 800; letter-spacing: .04em; color: var(--cream); margin: 0 4px 10px; }
+.mside-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mside-row { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 9px 8px;
+  border-radius: 12px; }
+.mside-row.now { background: rgba(47,211,155,.09); box-shadow: inset 0 0 0 1px rgba(47,211,155,.35); }
+.mside-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800;
+  background: rgba(255,255,255,.07); color: var(--muted); }
+.mside-row.done .mside-dot { background: var(--teal); color: #04110c; }
+.mside-row.now .mside-dot { background: var(--cream); color: #06110c; }
+.mside-name { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.mside-value { font-size: 13.5px; color: var(--cream); line-height: 1.35; margin-top: 2px; overflow-wrap: anywhere; }
+.mside-row.next .mside-value { color: rgba(255,255,255,.3); }
+.mside-row.now .mside-value { color: var(--teal-hi); font-style: italic; }
+.mside-change { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: var(--cream);
+  border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.mside-change:hover:not(:disabled) { background: rgba(47,211,155,.15); border-color: var(--teal); }
+.mside-foot { margin: 10px 6px 2px; font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+.mchoices.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+@media (max-width: 700px) { .mchoices.two { grid-template-columns: 1fr; } }
+.mspeakerhead { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 4px; }
+.mspeakerhead b { font-size: 15px; }
+.mvoices { align-items: center; }
+.mvoicehelp { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; padding: 10px 12px;
+  border-radius: 12px; background: rgba(255,255,255,.04); font-size: 13px; color: var(--muted); }
+.mavatar { position: relative; }
+.mavatar .pilltag { position: absolute; top: 4px; right: 4px; }

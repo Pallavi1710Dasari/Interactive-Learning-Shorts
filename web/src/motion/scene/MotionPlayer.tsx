@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MotionStage, shotIndexAt } from "./MotionStage";
+import { findOverlaps } from "../overlap";
 import type { MotionPlan } from "./types";
 
 declare global {
@@ -64,6 +65,14 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
 }) {
   const [t, setT] = useState(initialT);
   const [playing, setPlaying] = useState(false);
+  // SOUND: a volume and a mute that are always on screen and remembered, and
+  // a play() the browser refused is said out loud instead of swallowed —
+  // "I can't hear anything" must never be a mystery.
+  const [volume, setVolume] = useState(() => {
+    try { const v = Number(localStorage.getItem("motion_volume")); return Number.isFinite(v) && localStorage.getItem("motion_volume") !== null ? v : 1; } catch { return 1; }
+  });
+  const [muted, setMuted] = useState(() => { try { return localStorage.getItem("motion_muted") === "1"; } catch { return false; } });
+  const [soundProblem, setSoundProblem] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   const raf = useRef<number | null>(null);
   const started = useRef<{ wall: number; t: number } | null>(null);
@@ -72,6 +81,11 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
     window.__capture = {
       duration: plan.duration,
       seek: (to: number) => new Promise((done) => { setT(to); requestAnimationFrame(() => requestAnimationFrame(() => done())); }),
+    };
+    // the overlap audit (overlap.ts) on the frame on screen
+    (window as unknown as Record<string, unknown>).__motionOverlaps = () => {
+      const el = document.querySelector("[data-frame]");
+      return el ? findOverlaps(el as HTMLElement) : [];
     };
   }, [plan]);
 
@@ -93,6 +107,12 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
     return () => { if (raf.current) cancelAnimationFrame(raf.current); started.current = null; };
   }, [playing, plan]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const a = audio.current;
+    if (a) { a.volume = volume; a.muted = muted; }
+    try { localStorage.setItem("motion_volume", String(volume)); localStorage.setItem("motion_muted", muted ? "1" : "0"); } catch { /* private window */ }
+  }, [volume, muted, plan.audio_url]);
+
   if (bare) return <MotionStage plan={plan} t={t} width={1080} />;
 
   const toggle = () => {
@@ -100,7 +120,13 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
     if (playing) { a?.pause(); setPlaying(false); return; }
     const from = t >= plan.duration - 0.05 ? 0 : t;
     setT(from);
-    if (a && plan.audio_url) { a.currentTime = from; a.play().catch(() => undefined); }
+    if (a && plan.audio_url) {
+      a.currentTime = from;
+      setSoundProblem(null);
+      a.play().catch((e: Error) => setSoundProblem(e?.name === "NotAllowedError"
+        ? "Your browser blocked the sound. Press Play again to allow it."
+        : "The narration could not be played. Reload the page and press Play again."));
+    }
     setPlaying(true);
   };
   const seek = (to: number) => {
@@ -127,6 +153,29 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
           </button>
           <span style={{ fontVariantNumeric: "tabular-nums" }}>{t.toFixed(2)}s / {plan.duration.toFixed(2)}s</span>
         </div>
+        {plan.voice === "stub" ? (
+          <div data-testid="stub-voice" style={{ background: "rgba(253,209,62,0.12)", color: "#FFE28A", borderRadius: 10,
+                                                   padding: "8px 12px", fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+            Stub reel: no voice. It was made in stub mode, so the narration is silent on purpose — the sound is not broken.
+          </div>
+        ) : plan.audio_url ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }} data-testid="sound">
+            <button onClick={() => setMuted((m) => !m)} aria-pressed={muted}
+                    style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid #3B4478", background: muted ? "#3A2030" : "#232A4D",
+                             color: "#E9EBF7", fontWeight: 800, cursor: "pointer", fontSize: 14 }}>
+              {muted ? "🔇 Unmute" : "🔊 Mute"}
+            </button>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+              Volume
+              <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} aria-label="Volume"
+                     onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }} />
+              <span style={{ width: 40, fontVariantNumeric: "tabular-nums" }}>{muted ? "0" : Math.round(volume * 100)}%</span>
+            </label>
+          </div>
+        ) : (
+          <div style={{ color: "#9AA0C0", fontSize: 14, marginBottom: 10 }}>This reel has no narration yet.</div>
+        )}
+        {soundProblem && <div role="alert" style={{ color: "#FFB524", fontSize: 14, marginBottom: 10 }}>{soundProblem}</div>}
         <input type="range" min={0} max={plan.duration} step={1 / 30} value={t} aria-label="Scrub the reel"
                onChange={(e) => seek(Number(e.target.value))} style={{ width: "100%" }} />
         <div style={{ display: "flex", gap: 4, margin: "6px 0 18px" }}>

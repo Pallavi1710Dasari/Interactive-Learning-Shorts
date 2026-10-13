@@ -185,7 +185,8 @@ def test_walkthrough_stub_script_passes_every_grader_at_no_cost():
     script, results = script_mod.write_motion_script(
         topic, section, short_id="t__motion", source_text=source, template="walkthrough")
     assert script is not None, [str(r) for r in results if not r.passed]
-    assert checks.all_passed(results) and len(results) == 19
+    # 19 graders, plus reading level and terms explained (simple language, 2026-10-12)
+    assert checks.all_passed(results) and len(results) == 21, [r for r in results if not r.passed]
     assert script.template == "walkthrough" and len(script.chapters) == 4
     assert script.running_example is not None
     assert script.estimated_seconds <= checks.MOTION_MAX_SECONDS
@@ -236,16 +237,16 @@ def test_unknown_template_is_refused_before_any_call():
     assert calls == []
 
 
-def test_stub_names_the_missing_fixture_for_a_template():
+def test_stub_writes_the_template_asked_for_when_no_golden_fits():
+    """useState material has no walkthrough golden. The stub used to raise
+    (a stub run on any other material stopped at the shot list); it now
+    writes a walkthrough from the material — never a golden of another
+    template — and it passes the walkthrough graders."""
     topic, section, source = _react_inputs()
-    try:
-        script_mod.write_motion_script(topic, section, short_id="t__motion",
-                                       source_text=source, template="walkthrough")
-    except NotImplementedError as e:
-        assert "no walkthrough motion stub fixture" in str(e)
-        assert "usestate_golden.json (fix_story)" in str(e)
-    else:
-        raise AssertionError("the stub handed back a script for the wrong template")
+    script, results = script_mod.write_motion_script(topic, section, short_id="t__motion",
+                                                     source_text=source, template="walkthrough")
+    assert script is not None, [r for r in results if not r.passed]
+    assert script.template == "walkthrough" and script.chapters
 
 
 def test_default_template_follows_the_teaching_approach():

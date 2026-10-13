@@ -4,7 +4,7 @@
     "w": 1080,
     "h": 1920,
     "content_w": 960,
-    "gap": 48,
+    "gap": 60,
     "connector_gap": 120,
     "solo": {
       "top": 300,
@@ -285,7 +285,7 @@
     },
     "status_pill": {
       "layout": "placed",
-      "height": 80,
+      "height": 104,
       "props": {
         "text": "str",
         "tone": "tone",
@@ -302,7 +302,7 @@
     },
     "trigger_chip": {
       "layout": "placed",
-      "height": 84,
+      "height": 110,
       "props": {
         "label": "str"
       },
@@ -317,7 +317,7 @@
     },
     "token_row": {
       "layout": "placed",
-      "height": 76,
+      "height": 96,
       "props": {
         "items": "str[]",
         "tones": "tone[]?"
@@ -334,7 +334,7 @@
     },
     "big_counter": {
       "layout": "placed",
-      "height": 300,
+      "height": 360,
       "props": {
         "value": "str",
         "label": "str?"
@@ -352,7 +352,7 @@
     },
     "callout": {
       "layout": "placed",
-      "height": 150,
+      "height": 200,
       "props": {
         "label": "str",
         "text": "str"
@@ -415,19 +415,130 @@
         "pulse",
         "state"
       ]
+    },
+    "app_screen": {
+      "layout": "placed",
+      "height": 560,
+      "props": {
+        "title": "str",
+        "button": "str",
+        "label": "str",
+        "value": "str",
+        "tone": "tone?"
+      },
+      "max": {
+        "title": 16,
+        "button": 16,
+        "label": 16,
+        "value": 8
+      },
+      "actions": [
+        "enter",
+        "tap",
+        "state",
+        "pulse",
+        "exit"
+      ],
+      "_use": "WHAT THE USER SEES: a tiny app screen. tap = a finger presses its button; state = the number on screen changes (value), or stays and shakes (same value, tone bad). Use it for anything a user clicks, types or watches."
+    },
+    "memory_box": {
+      "layout": "placed",
+      "height": 250,
+      "props": {
+        "name": "str",
+        "value": "str",
+        "tone": "tone?"
+      },
+      "max": {
+        "name": 16,
+        "value": 10
+      },
+      "actions": [
+        "enter",
+        "state",
+        "reset",
+        "pulse",
+        "exit"
+      ],
+      "_use": "WHAT THE COMPUTER REMEMBERS: a labelled box with a value. state = a new value drops in; reset = the box is wiped back to its starting value. Use it for variables, state, caches, memory."
+    },
+    "flow": {
+      "layout": "placed",
+      "height": 300,
+      "props": {
+        "steps": "icons",
+        "packet": "str?"
+      },
+      "max": {
+        "steps": 56,
+        "packet": 10
+      },
+      "actions": [
+        "enter",
+        "travel",
+        "highlight",
+        "exit"
+      ],
+      "_use": "A PROCESS: 2-4 steps in a row ({name: icon, label}); travel = something (packet) moves from step to step and each lights up as it arrives. Use it for requests, pipelines, cause and effect, input -> process -> output."
+    },
+    "compare": {
+      "layout": "placed",
+      "height": 420,
+      "props": {
+        "left": "str",
+        "right": "str",
+        "left_icon": "icon?",
+        "right_icon": "icon?",
+        "left_note": "str?",
+        "right_note": "str?"
+      },
+      "max": {
+        "left": 18,
+        "right": 18,
+        "left_note": 26,
+        "right_note": 26
+      },
+      "actions": [
+        "enter",
+        "reveal",
+        "pulse",
+        "exit"
+      ],
+      "_use": "WRONG vs RIGHT side by side, the left marked ✗ and the right ✓. reveal = the right side appears (on the word that names the fix). Use it for a mistake and its fix, before and after."
+    },
+    "cycle": {
+      "layout": "placed",
+      "height": 560,
+      "props": {
+        "steps": "icons"
+      },
+      "max": {
+        "steps": 56
+      },
+      "actions": [
+        "enter",
+        "travel",
+        "highlight",
+        "exit"
+      ],
+      "_use": "SOMETHING THAT REPEATS: 3-4 steps on a loop; travel = a dot goes round and round, lighting each step. Use it for re-renders, loops, event loops, lifecycles."
     }
   },
   "actions": {
     "enter": "the object appears (its kind's own entrance)",
     "exit": "the object fades out",
-    "state": "tone and/or value change: entity_card value+tone, system_panel status+tone(+slot_value), status_pill text+tone, token_row item tones (value = comma-separated tones), big_counter value, connector tone/broken",
+    "state": "tone and/or value change: entity_card value+tone, system_panel status+tone(+slot_value), status_pill text+tone, token_row item tones (value = comma-separated tones), big_counter value, app_screen value (+tone: ok = it changed, bad = it is stuck), memory_box value, connector tone/broken",
     "pulse": "a pulse travels / the object glows (connector, trigger_chip, system_panel, entity_card)",
-    "highlight": "one part lights up: value = 1-based word (kinetic_title), line (code_window), chip (token_row), row (lookup_table), part (code_map), icon (icon_row)",
+    "highlight": "one part lights up: value = 1-based word (kinetic_title), line (code_window), chip (token_row), row (lookup_table), part (code_map), icon (icon_row), step (flow, cycle)",
     "type": "code_window types its lines in, one by one",
     "count": "big_counter counts up from 0 to its value",
     "scramble": "kinetic_title's words settle from random characters",
     "stagger": "takeaway_list rows appear one by one",
-    "stamp": "the stamp slams in (at most one per reel; coral, so failure beats only)"
+    "stamp": "the stamp slams in (at most one per reel; coral, so failure beats only)",
+    "tap": "app_screen: a finger comes in and presses the button (it arrives 0.6 s before the cue word)",
+    "travel": "flow / cycle: something moves from step to step, each lights as it is reached",
+    "reset": "memory_box: the box is wiped back to its starting value",
+    "reveal": "compare: the right (correct) side appears"
   },
   "identity": {
     "_comment": "Identity symbols are drawn on a 100 x 100 grid from these shapes (shorts/motion_identities.yaml); the player draws them in the identity's field tone.",

@@ -1,0 +1,148 @@
+{
+  "topic": {
+    "id": "plain_variable_no_rerender",
+    "topic": "Why does reassigning a plain local variable inside a component not change what the screen shows?",
+    "why_it_matters": "This is the core reason React needs state: the screen only changes when React re-runs the component, and assigning a plain variable never asks it to.",
+    "source_section_id": "7.2",
+    "difficulty": "medium",
+    "answer_quote": "nothing observes the assignment, and nothing tells React a re-render is needed, so the function never runs again and the number on screen never changes.",
+    "importance": 5,
+    "concept": "plain variables versus triggering a re-render",
+    "is_foundational": true,
+    "foundational_note": "There is no other candidate in this material. This idea is the premise that any later explanation of state would rest on."
+  },
+  "section_id": "7.2",
+  "understanding": {
+    "section_id": "7.2",
+    "core_idea": "Reassigning a plain local variable inside a component does not update the screen because nothing tells React to re-run the component, and any re-run would recreate the variable from its initial value anyway.",
+    "hook_plan": null,
+    "key_points": [
+      "A local variable inside a component function is recreated from scratch every time the function runs",
+      "Assigning to it changes a value that lives only for the current render, and nothing observes that assignment",
+      "Nothing asks React to re-render, so the function never runs again and the screen keeps showing 0",
+      "The missing piece is React re-running the component, not the click"
+    ],
+    "teaching_sequence": [],
+    "concrete_examples": [
+      "let count = 0",
+      "Counter",
+      "count = count + 1",
+      "The button's label would freeze at 0 forever"
+    ],
+    "example_plan": {
+      "need": "required",
+      "example": "`let count = 0` and `count = count + 1`",
+      "supports_step": 2,
+      "learner_takeaway": "The learner sees a specific counter whose variable really increments while its label stays at 0, which makes the gap between memory and screen concrete."
+    },
+    "common_confusions": [
+      "Thinking that clicking the button is what updates the screen",
+      "Thinking that because the variable really changed, the displayed value must change too"
+    ],
+    "confusion_plan": {
+      "need": "required",
+      "confusion": "I clicked and the variable went up, so the screen should show the new number.",
+      "relates_to_step": 4,
+      "correct_understanding": "The variable is briefly incremented in memory, but the screen only changes when React re-runs the component, and assigning a plain variable never asks React to do that.",
+      "learner_takeaway": "A changed value is not a re-render. Something has to tell React to run the component again."
+    },
+    "cannot_answer": [
+      "What should be used instead of a plain variable to make the counter update?",
+      "How does React decide when to re-render a component?",
+      "What does React do internally when it re-renders?",
+      "Would a variable declared outside the component function behave differently?"
+    ],
+    "source_evidence": [
+      "A plain local variable declared inside a component function is recreated from\nscratch every time that function runs, and reassigning it has no effect outside\nthat one function call.",
+      "nothing observes the\nassignment, and nothing tells React a re-render is needed, so the function never\nruns again and the number on screen never changes.",
+      "The very next render throws\nthe old variable away and creates a brand-new `count` initialized back to 0.",
+      "Clicking is not the missing\npiece \u2014 React re-running the component is, and nothing about assigning a plain\nvariable asks React to do that."
+    ]
+  },
+  "workflow": {
+    "selection": {
+      "topic": {
+        "id": "plain_variable_no_rerender",
+        "topic": "Why does reassigning a plain local variable inside a component not change what the screen shows?",
+        "why_it_matters": "This is the core reason React needs state: the screen only changes when React re-runs the component, and assigning a plain variable never asks it to.",
+        "source_section_id": "7.2",
+        "difficulty": "medium",
+        "answer_quote": "nothing observes the assignment, and nothing tells React a re-render is needed, so the function never runs again and the number on screen never changes.",
+        "importance": 5,
+        "concept": "plain variables versus triggering a re-render",
+        "is_foundational": true,
+        "foundational_note": "There is no other candidate in this material. This idea is the premise that any later explanation of state would rest on."
+      },
+      "source_title": "Why changing a plain JavaScript variable does not update the screen",
+      "reasons": [
+        {
+          "category": "importance",
+          "explanation": "Scored 5/5 on the selection rubric \u2014 the rubric's top tier \u2014 the central idea of the material, or a definition the rest of the material depends on. Missing it means not knowing the topic at all."
+        },
+        {
+          "category": "concrete_and_answerable",
+          "explanation": "The section states the answer directly: \"nothing observes the assignment, and nothing tells React a re-render is needed, so the function never runs again and the number on screen n\u2026\""
+        },
+        {
+          "category": "foundational",
+          "explanation": "Selection compared this concept against every other candidate in the material and judged it a prerequisite for at least one of them: There is no other candidate in this material. This idea is the premise that any later explanation of state would rest on. (This is the selection model's own cross-candidate comparison, not a validated per-section reading.)"
+        },
+        {
+          "category": "distinct_angle",
+          "explanation": "No other selected question covers \"plain variables versus triggering a re-render\" \u2014 duplicates and near-duplicates on this concept were already dropped. (This is about deck coverage, not a claim that the concept is inherently more important or more confusable than others.)"
+        }
+      ]
+    },
+    "question_approval": {
+      "status": "approved",
+      "note": null,
+      "edited_question": null,
+      "regenerated_question": null,
+      "regeneration_history": []
+    },
+    "framing": {
+      "source_question": "Why does reassigning a plain local variable inside a component not change what the screen shows?",
+      "teaching_question": "Why does reassigning a plain local variable inside a component not change what the screen shows?",
+      "framing_rationale": "The approved question already asks for a mechanism that unfolds in beats: the variable is recreated on each run, the assignment changes only the current render's value and nothing asks React to re-run the component, so the screen stays at 0. Rewording it would add nothing, so it is kept exactly as approved.",
+      "role": "primary"
+    },
+    "teaching_approach": {
+      "primary": "process_demonstration",
+      "combined_with": [
+        "conceptual_visual"
+      ],
+      "alternatives": [
+        "direct_explanation"
+      ],
+      "rationale": "(a) The concept is a sequence of events. Counter runs, `let count = 0` is created, a click runs `count = count + 1`, nothing asks React to re-run the function, so the label stays at 0. Any later run would throw that variable away and start a brand-new `count` at 0 again. The 'why' only appears when those events are followed in order, so walking the steps is the device. (b) The question asks why the screen does not change. That is answered by showing the step that never happens: React re-running the component. The walk can stop exactly where the learner expects an update and show that no re-run follows. That is where the misconception gets corrected, in the same breath as the truth: the click happened and the value changed, but no re-render came after it. (c) The section supplies every step explicitly, in order: recreated each run, the assignment lives only for the current render, nothing observes it, the function never runs again, the next render resets to 0, the label freezes at 0. It also names the concrete lines `let count = 0` and `count = count + 1` to anchor step 2. A conceptual_visual is combined because the section's key contrast is a state gap that the steps alone do not show: the variable is genuinely incremented in memory while the label still reads 0. A picture of the memory value against the screen label at each step makes that divergence visible. Code is not primary. The two lines are the required example inside the walk, but the concept is about render behaviour, not syntax. Direct_explanation was close, because the section states the answer plainly."
+    },
+    "teaching_approach_approval": {
+      "status": "approved",
+      "note": null,
+      "override": null,
+      "regenerated_approach": null,
+      "regeneration_history": []
+    },
+    "script": null,
+    "visual_strategy": null,
+    "visual_plan_approval": {
+      "status": "pending",
+      "note": null,
+      "override": null,
+      "regenerated_strategy": null,
+      "regeneration_history": []
+    },
+    "version": 3
+  },
+  "template": "walkthrough",
+  "template_source": "reviewer",
+  "pool_ids": [
+    "7.2",
+    "7.4"
+  ],
+  "support_ids": [
+    "7.1",
+    "7.3"
+  ],
+  "next_topic": ""
+}

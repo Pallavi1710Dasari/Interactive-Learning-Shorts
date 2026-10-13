@@ -340,6 +340,8 @@ export type Judge = {
 };
 
 export type Unit = {
+  /** when the short was written (epoch seconds) — the feed sorts newest first */
+  created?: number;
   short_id: string;
   question: string;
   section: string;

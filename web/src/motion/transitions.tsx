@@ -13,7 +13,7 @@
 
 import type { ReactNode } from "react";
 import { Layer } from "./Stage";
-import { C, FIELDS, FONT, H, W, theme, type FieldName } from "./tokens";
+import { C, FIELDS, H, W, display, theme, type FieldName } from "./tokens";
 import { clamp, ease, hash3, lerp, seg, type Pt } from "./time";
 import type { TitleWord } from "./objects/editorial";
 
@@ -161,8 +161,8 @@ export function TypeScatter({ question, answer, t, field, x = 54, y = 300, size 
   let wi = 0;
   return (
     <>
-      <div style={{ position: "absolute", left: x, top: y, fontFamily: FONT.display, fontSize: size, lineHeight: 0.92,
-                    textTransform: "uppercase", color: th.ink }}>
+      <div style={{ position: "absolute", left: x, top: y, ...display(size), lineHeight: 0.92,
+ color: th.ink }}>
         {question.map((line, li) => (
           <div key={li} style={{ whiteSpace: "nowrap" }}>
             {line.map((w, i) => {
@@ -179,8 +179,8 @@ export function TypeScatter({ question, answer, t, field, x = 54, y = 300, size 
           </div>
         ))}
       </div>
-      <div style={{ position: "absolute", left: x, top: answerY, fontFamily: FONT.display, fontSize: size * 0.95,
-                    lineHeight: 1, color: answerColor, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+      <div style={{ position: "absolute", left: x, top: answerY, ...display(size * 0.95),
+                    lineHeight: 1, color: answerColor, whiteSpace: "nowrap" }}>
         <span style={{ display: "inline-block", opacity: clamp(p1 * 2), transform: `scale(${lerp(1.4, 1, clamp(p1))})`,
                        transformOrigin: "0 100%", marginRight: size * 0.2 }}>{first}</span>
         <span style={{ display: "inline-block", opacity: clamp(p2 * 2), transform: `scale(${lerp(1.5, 1, clamp(p2))})`,

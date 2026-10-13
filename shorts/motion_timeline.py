@@ -142,6 +142,44 @@ def shot_timings(script: MotionScript, caption_seconds: dict[str, list[float]] |
     return clocks
 
 
+#: Silence kept around a clip's speech when it is trimmed (trim_to_speech):
+#: a breath before the first word, a short settle after the last.
+TRIM_PAD_IN = 0.06
+TRIM_PAD_OUT = 0.15
+
+
+def trim_to_speech(seconds: dict[str, list[float]], word_times: dict[str, list],
+                   sources: dict[str, list[str]]) -> tuple[dict, dict, dict]:
+    """Every aligned clip cut to its speech: a TTS clip carries 0.2-0.4 s of
+    silence before its first word and after its last, which the timeline
+    then adds to its own gaps — 0.75 s of dead air between sentences and
+    1.5 s between shots (12.7 s of plain_variable_no_rerender__motion's
+    93 s). Uses the word times the alignment already found; a clip timed by
+    an even split (no alignment) is left whole. Returns (seconds, word_times,
+    trims) with trims: shot id -> per clip (cut_from, cut_to) in clip seconds,
+    for motion_voice.mix."""
+    out_s: dict = {}
+    out_t: dict = {}
+    trims: dict = {}
+    for sid, secs in seconds.items():
+        times = word_times.get(sid) or [None] * len(secs)
+        srcs = sources.get(sid) or ["even"] * len(secs)
+        out_s[sid], out_t[sid], trims[sid] = [], [], []
+        for dur, wt, src in zip(secs, times, srcs):
+            if not wt or src == "even":
+                out_s[sid].append(dur); out_t[sid].append(wt); trims[sid].append((0.0, dur))
+                continue
+            a = max(0.0, wt[0][0] - TRIM_PAD_IN)
+            b = min(dur, wt[-1][1] + TRIM_PAD_OUT)
+            if b - a < 0.3:                       # a clip the aligner could not place
+                out_s[sid].append(dur); out_t[sid].append(wt); trims[sid].append((0.0, dur))
+                continue
+            out_s[sid].append(round(b - a, 3))
+            out_t[sid].append([(round(s - a, 3), round(e - a, 3)) for s, e in wt])
+            trims[sid].append((round(a, 3), round(b, 3)))
+    return out_s, out_t, trims
+
+
 def total_seconds(clocks: list[ShotClock]) -> float:
     return clocks[-1].end if clocks else 0.0
 
@@ -152,7 +190,8 @@ _SOURCE_RANK = {"forced_alignment": 2, "whisper": 1, "even": 0}
 def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None = None,
                cast: list[MotionCastMember] | None = None, tags: list[str] | None = None,
                intro: float = 0.0, characters: bool = False,
-               character: str | None = None) -> MotionPlan:
+               character: str | None = None, design: str = "classic",
+               host_character: str | None = None) -> MotionPlan:
     """The player's input: every shot's scene laid out, every cue resolved to
     seconds, every caption and word on the reel's clock.
 
@@ -160,10 +199,10 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
     config.MOTION_CHARACTERS): one character per speaker — two on a
     two-speaker reel, one narrator on a one-narrator reel.
     `character` names the preset that plays the reel's language (default:
-    the language's own). The characters show on every shot that is not a
-    full-frame card; on a one-narrator reel, only where the shot's objects fit
-    the upper region (the same one a two-speaker reel uses), which is then
-    where they are laid out."""
+    the language's own). The characters show on a shot that is not a
+    full-frame card and whose objects fit the upper region (where they are
+    then laid out) — on a two-speaker reel too: drawing them under objects
+    that do not fit put a panel on top of both characters."""
     from . import motion_library as lib
     from .motion_scenes import layout_scene, resolve_actions, stack_height
     from . import motion_characters
@@ -182,12 +221,8 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
         if shot.scene is None:
             raise ValueError(f"{shot.id} has no scene — run the scenes stage first")
         full = any(o.kind in full_kinds for o in shot.scene.objects)
-        if cast_mode == "duo":
-            shown = not full
-        elif cast_mode == "narrator":
-            shown = not full and stack_height(shot.scene) <= upper["bottom"] - upper["top"]
-        else:
-            shown = False
+        fits = stack_height(shot.scene) <= upper["bottom"] - upper["top"]
+        shown = bool(cast_mode) and not full and fits
         actions = [MotionActionTiming(t=t, do=a.do, target=a.target, value=a.value,
                                       tone=a.tone, cue=a.at)
                    for a, t in resolve_actions(shot, clock)]
@@ -206,10 +241,11 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
     ident = (MotionIdentitySpec(**identity(script.language).spec())
              if script.language in languages() else None)
     captions = [c for s in shots for c in s.captions]
-    tracks = (motion_characters.direct(cast or [], captions, script.language, character) if cast_mode == "duo"
+    tracks = (motion_characters.direct(cast or [], captions, script.language, character, host_character)
+              if cast_mode == "duo"
               else motion_characters.direct_narrator(captions, script.language, character)
               if cast_mode == "narrator" else [])
-    return MotionPlan(short_id=script.short_id, template=script.template, theme=script.theme,
+    return MotionPlan(short_id=script.short_id, template=script.template, theme=script.theme, design=design,
                       series=script.series, concept_name=script.concept_name,
                       duration=total_seconds(clocks), audio=audio,
                       timing_source=weakest if shots else "even",

@@ -50,10 +50,18 @@ TERMS (CONCEPT TERMS below lists them). Never a variable or function name the
 example happens to use ("setcount", "likes"), never a filler word. Not the language,
 not the theme.
 
+Also say whether ANIMATED AVATARS (a small character for each speaker, standing below the
+visuals and talking with the voice) help THIS reel. Usually yes: a face makes a dialogue or
+a story easier to follow for a beginner. Say no when the visuals need the whole screen —
+long code, a big table, a detailed diagram — or when a character would distract from them.
+Give the reason in one plain sentence a beginner would understand.
+
 Return JSON:
 {"theme": "<an id from ELIGIBLE THEMES>",
  "reason": "one or two sentences: why this format fits this section and approach",
- "concept_tags": ["...", "..."]}"""
+ "concept_tags": ["...", "..."],
+ "show_avatars": true,
+ "avatar_reason": "one sentence: why the avatars help, or why they would get in the way"}"""
 
 
 def _theme_line(spec: mt.ThemeSpec) -> str:
@@ -121,13 +129,19 @@ def choose_theme(section: Section, *, source_text: str, approach: TeachingApproa
                                  template=template_pin, history=history, language=language)
 
     def done(theme_id: str, reason: str, source: str, fit: ThemeFitCheck,
-             concepts: list[str], eligible: list[str]) -> MotionThemeChoice:
+             concepts: list[str], eligible: list[str], avatars: bool | None = None,
+             avatar_reason: str = "") -> MotionThemeChoice:
         spec = reg.themes[theme_id]
+        if avatars is None:          # no call made: a face helps unless the section is mostly code
+            avatars = not (has_code and spec.needs_code)
+            avatar_reason = (f"A {'speaker' if not spec.two_speaker else 'face for each speaker'} makes "
+                             f"the reel easier to follow." if avatars else
+                             "The code needs the whole screen, so the avatars stay off.")
         return MotionThemeChoice(
             theme=theme_id, reason=reason, source=source, fit_check=fit,
             tags=mt.build_tags(language, spec, concepts or candidates),
             template=spec.template, language=language, teaching_approach=kind,
-            eligible=eligible)
+            eligible=eligible, show_avatars=avatars, avatar_reason=avatar_reason)
 
     eligible = mt.eligible_themes(approach=kind, has_code=has_code, template=template_pin,
                                   history=history, language=language)
@@ -175,7 +189,9 @@ def choose_theme(section: Section, *, source_text: str, approach: TeachingApproa
                 log(f"  theme: concept tag dropped — {d}")
             fit = ThemeFitCheck(passed=True, attempts=attempt, rejected=rejected)
             return done(draft.theme, draft.reason.strip() or "(no reason given)", "llm",
-                        fit, kept, eligible)
+                        fit, kept, eligible, draft.show_avatars,
+                        draft.avatar_reason.strip() or ("Avatars make the reel easier to follow."
+                                                        if draft.show_avatars else ""))
         rejected.append(ThemeRejection(theme=draft.theme, attempt=attempt, problems=found))
         log(f"  theme: pick {attempt} {draft.theme!r} rejected — {'; '.join(found)}")
         user = (base + f"\n\nYOUR PREVIOUS PICK {draft.theme!r} WAS REJECTED: "

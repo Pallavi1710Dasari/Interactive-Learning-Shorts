@@ -16,8 +16,9 @@ student clip (Chatterbox's own voice settings) — and every fallback is
 logged and recorded in the manifest, so a reel never silently speaks in a
 voice nobody chose.
 
-Under SHORTS_STUB=1 every clip is silence of the estimated length: no model
-is loaded and nothing is spent.
+Every clip is recorded with the local Chatterbox voice — free, so a stub-mode
+test reel speaks too. Only with MOTION_VOICE=silent (the automated tests) is
+each clip silence of the estimated length.
 
 The clips are then laid on the reel's clock (motion_timeline.shot_timings,
 with each caption's MEASURED length) and mixed to one track,
@@ -50,6 +51,28 @@ def speaker_slots(script: MotionScript) -> dict[str | None, str]:
     for sp in script.speakers:
         slots[sp.role] = sp.voice_slot
     return slots
+
+
+#: The voices a reviewer can pick per speaker (the Characters step): the
+#: project's recordings in voices/ (interviewer, student) and any
+#: voices/motion/<name>.wav. id -> (path, label).
+AUDIO_SUFFIXES = (".wav", ".ogg", ".webm", ".mp3", ".m4a", ".flac")
+
+
+def available_voices() -> dict[str, tuple[str, str]]:
+    """Every voice clip a speaker can use: voices/interviewer.* and
+    voices/student.* (what the "your voice" panel records or keeps, in any
+    audio format) and voices/motion/<name>.*. id -> (path, label)."""
+    root = SLOT_DIR.parent
+    out: dict[str, tuple[str, str]] = {}
+    names = {"interviewer": "Voice 1 · interviewer clip", "student": "Voice 2 · student clip"}
+    files = [f for d in (root, SLOT_DIR) for f in sorted(d.glob("*")) if f.suffix.lower() in AUDIO_SUFFIXES]
+    # the newest file wins when the panel kept a new recording in another format
+    for f in sorted(files, key=lambda f: f.stat().st_mtime, reverse=True):
+        vid = f.stem
+        if vid not in out:
+            out[vid] = (str(f), names.get(vid, vid.replace("_", " ").title()))
+    return dict(sorted(out.items()))
 
 
 def slot_reference(slot: str) -> tuple[str | None, str]:
@@ -233,8 +256,8 @@ def _cache_key(text: str, ref: str | None) -> str:
 
 def synth(text: str, ref: str | None, speaker: str) -> bytes:
     """One caption's audio: Chatterbox from `ref` (cached by content), or —
-    under SHORTS_STUB=1 — silence of the estimated length."""
-    if config.STUB:
+    with MOTION_VOICE=silent (the tests) — silence of the estimated length."""
+    if config.MOTION_SILENT:
         return _silent(max(0.6, len(text.split()) / MOTION_WORDS_PER_SECOND))
     key = _cache_key(text, ref)
     path = CACHE_DIR / f"{key}.wav"
@@ -281,22 +304,32 @@ def manifest_path(short_id: str) -> Path:
     return config.OUTPUT_DIR / short_id / "audio" / "manifest.json"
 
 
-def voice_script(script: MotionScript, shots: list[str] | None = None, log=print) -> dict:
+def voice_script(script: MotionScript, shots: list[str] | None = None, log=print,
+                 progress=None, voices: dict[str, str] | None = None) -> dict:
     """Synthesize every caption (or only those of `shots`), write each clip to
     output/<id>/audio/<shot>_<n>.wav, and return the manifest: per shot, per
     caption, the file, its measured seconds, the spoken text, the speaker,
-    the voice slot and the reference clip it was cloned from."""
+    the voice slot and the reference clip it was cloned from. `progress(done,
+    total)` is told after every clip (the web UI's "clip X of N")."""
     slots = speaker_slots(script)
     used = {slots.get(c.speaker, slots[None]) for s in script.shots for c in s.captions}
     refs = {slot: slot_reference(slot) for slot in used}
+    # the reviewer's pick per speaker ("narrator" for a one-narrator reel)
+    have = available_voices()
+    for role, vid in (voices or {}).items():
+        slot = slots.get(None if role == "narrator" else role)
+        if slot in refs and vid in have:
+            refs[slot] = (have[vid][0], f"chosen: {have[vid][1]}")
     for slot, (ref, how) in sorted(refs.items()):
         if how != "slot":
             log(f"  voice: slot {slot} has no voices/motion/{slot}.wav yet — {how}"
                 + (f" ({Path(ref).name})" if ref else ""))
     out_dir = audio_dir(script.short_id)
-    manifest: dict = {"short_id": script.short_id, "engine": "stub" if config.STUB else "chatterbox",
+    manifest: dict = {"short_id": script.short_id, "engine": "stub" if config.MOTION_SILENT else "chatterbox",
                       "slots": {s: {"ref": r, "source": h} for s, (r, h) in refs.items()},
                       "shots": {}}
+    total = sum(len(s.captions) for s in script.shots if not shots or s.id in shots)
+    done = 0
     for shot in script.shots:
         if shots and shot.id not in shots:
             continue
@@ -309,6 +342,9 @@ def voice_script(script: MotionScript, shots: list[str] | None = None, log=print
             path.write_bytes(data)
             rows.append({"file": path.name, "seconds": round(wav_seconds(data), 3), "text": said,
                          "speaker": cap.speaker, "voice_slot": slot, "ref": ref})
+            done += 1
+            if progress is not None:
+                progress(done, total)
         manifest["shots"][shot.id] = rows
     manifest_path(script.short_id).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
@@ -320,17 +356,24 @@ def load_manifest(short_id: str) -> dict:
 
 # ===================================================================== mix
 
-def mix(script: MotionScript, manifest: dict, clocks) -> Path:
+def mix(script: MotionScript, manifest: dict, clocks, trims: dict | None = None) -> Path:
     """Lay every caption clip at its caption's start on the reel's clock and
     write output/<id>/audio/reel.wav (16-bit mono, 24 kHz), loudness-
-    normalised to -14 LUFS when ffmpeg is available (skipped for silence)."""
+    normalised to -14 LUFS when ffmpeg is available (skipped for silence).
+    `trims` (motion_timeline.trim_to_speech): shot id -> per clip, the
+    (from, to) seconds of it to use — its speech, without the clip's own
+    leading and trailing silence."""
     total = clocks[-1].end if clocks else 0.0
     track = np.zeros(int(total * SAMPLE_RATE) + SAMPLE_RATE // 10, dtype=np.float32)
     d = audio_dir(script.short_id)
     for shot, clock in zip(script.shots, clocks):
-        for row, cap in zip(manifest["shots"].get(shot.id, []), clock.captions):
+        cuts = (trims or {}).get(shot.id) or []
+        for k, (row, cap) in enumerate(zip(manifest["shots"].get(shot.id, []), clock.captions)):
             x, rate = _read_wav((d / row["file"]).read_bytes())
             x = _resample(x, rate)
+            if k < len(cuts):
+                a, b = cuts[k]
+                x = x[int(a * SAMPLE_RATE):int(b * SAMPLE_RATE)]
             at = int(cap.start * SAMPLE_RATE)
             end = min(len(track), at + len(x))
             track[at:end] += x[:end - at]
@@ -344,7 +387,7 @@ def mix(script: MotionScript, manifest: dict, clocks) -> Path:
     final = d / "reel.wav"
     from .tts import ffmpeg_exe
     exe = ffmpeg_exe()
-    if exe and not config.STUB and np.abs(track).max() > 0:
+    if exe and not config.MOTION_SILENT and np.abs(track).max() > 0:
         r = subprocess.run([exe, "-y", "-i", str(raw), "-af",
                             f"loudnorm=I={TARGET_LUFS}:TP=-1.5:LRA=11", "-ar", str(SAMPLE_RATE),
                             "-ac", "1", str(final)], capture_output=True)

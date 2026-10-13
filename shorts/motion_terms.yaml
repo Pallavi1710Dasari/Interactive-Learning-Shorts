@@ -1,0 +1,110 @@
+# Technical terms a beginner may not know (motion reels, simple-language rule
+# 2026-10-12). The viewer has no programming background: the first time the
+# narration says one of these, the same sentence (or the one right before or
+# after it) must explain it in plain words.
+#
+#   words    the forms the term takes in speech (lowercase, whole words)
+#   meaning  the plain explanation the script writer is given to use
+#   cues     words that show the explanation is there (any one, any form);
+#            a definer ("is a", "means", "called", ...) also counts
+#   language optional: only for reels in these course languages
+#
+# checks.check_motion_terms_explained enforces it; the script prompt lists
+# the meanings of the terms the material uses.
+terms:
+  render:
+    words: [render, renders, rendered, rendering, re-render, re-renders, rerender, rerenders, re-rendered]
+    meaning: "React running your component again to draw the screen again"
+    cues: [again, draw, draws, redraw, screen, runs, run]
+  state:
+    words: [state]
+    meaning: "a value React remembers for your component, even after it runs again"
+    cues: [remember, remembers, keeps, keep, memory, value]
+  component:
+    words: [component, components]
+    meaning: "a piece of the page, written as a function"
+    cues: [piece, part, function, block, button]
+  prop:
+    words: [prop, props]
+    meaning: "a value one component hands to another, like an input"
+    cues: [hands, passes, input, gives, value]
+  hook:
+    words: [hook, hooks]
+    meaning: "a special React function whose name starts with use"
+    cues: [function, use, special]
+  setter:
+    words: [setter, setters]
+    meaning: "the function you call to change a value"
+    cues: [function, call, change, changes, update, updates]
+  variable:
+    words: [variable, variables]
+    meaning: "a name that holds a value"
+    cues: [name, holds, box, value, label, stores]
+  function:
+    words: [function, functions]
+    meaning: "a named set of steps the computer runs"
+    cues: [steps, runs, run, instructions, set]
+  jsx:
+    words: [jsx]
+    meaning: "HTML-like code written inside JavaScript"
+    cues: [html, looks, like, markup]
+  dom:
+    words: [dom]
+    meaning: "the browser's model of the page on screen"
+    cues: [page, browser, screen, model]
+  array:
+    words: [array, arrays]
+    meaning: "an ordered list of values"
+    cues: [list, order, values, items]
+  callback:
+    words: [callback, callbacks]
+    meaning: "a function you hand over to be called later"
+    cues: [later, hand, called, pass]
+  event handler:
+    words: [handler, handlers]
+    meaning: "the function that runs when something happens, like a click"
+    cues: [click, clicks, happens, runs, when]
+  api:
+    words: [api, apis]
+    meaning: "a set of commands one program offers another"
+    cues: [commands, offers, ask, request]
+  cache:
+    words: [cache, caches, cached]
+    meaning: "a small, fast store of recent answers"
+    cues: [fast, quick, recent, store, keeps, copy]
+  token:
+    words: [token, tokens]
+    meaning: "a small piece of text the model reads"
+    cues: [piece, pieces, chunk, part, word]
+  tokenizer:
+    words: [tokenizer, tokenizers]
+    meaning: "the tool that cuts text into pieces"
+    cues: [cuts, splits, pieces, tool]
+  vocabulary:
+    words: [vocabulary]
+    meaning: "the fixed list of pieces a model knows"
+    cues: [list, knows, pieces, shelf]
+  page table:
+    words: [page table, page tables]
+    meaning: "the list that maps program addresses to real memory"
+    cues: [list, maps, map, addresses, memory]
+  tlb:
+    words: [tlb]
+    meaning: "a small fast memory of recent address lookups"
+    cues: [fast, recent, small, memory, lookups, remembers]
+  virtual memory:
+    words: [virtual memory]
+    meaning: "the pretend memory each program sees, mapped onto real memory"
+    cues: [pretend, maps, mapped, real, each, program]
+  selector:
+    words: [selector, selectors]
+    meaning: "the part of a style rule that picks which elements it styles"
+    cues: [picks, choose, chooses, which, targets, matches]
+  specificity:
+    words: [specificity]
+    meaning: "the score that decides which style rule wins"
+    cues: [score, wins, decides, stronger]
+  reference:
+    words: [reference, references]
+    meaning: "the address of a value in memory, not the value itself"
+    cues: [address, memory, points, where, same]

@@ -56,11 +56,18 @@ def caption_words(text: str) -> list[tuple[str, bool]]:
         glue = not piece[-1].isspace()
     merged: list[tuple[str, bool]] = []
     for w, h in out:
-        if merged and not re.search(r"\w", w):
+        # only sentence punctuation the tags split off ("<b>x</b>.") joins the
+        # word before; a symbol of code ("`=`", "`[`") is a word of its own —
+        # glued on, "The `=` sign" was shown as "The= sign"
+        if merged and _TRAILING_PUNCT.fullmatch(w):
             merged[-1] = (merged[-1][0] + w, merged[-1][1])
         else:
             merged.append((w, h))
     return merged
+
+
+#: What caption_words joins to the word before: closing punctuation, never code.
+_TRAILING_PUNCT = re.compile(r"[.,!?;:…)\]}\"'”’»—–-]+")
 
 
 def estimated_caption_seconds(shot: MotionShot) -> list[float]:

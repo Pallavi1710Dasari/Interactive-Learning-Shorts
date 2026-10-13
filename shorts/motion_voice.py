@@ -28,6 +28,7 @@ import hashlib
 import io
 import json
 import subprocess
+import re
 import wave
 from pathlib import Path
 
@@ -108,11 +109,17 @@ def caption_speech(shot: MotionShot) -> list[str]:
     keys = [_motion_key(w) for w in spoken]
     out: list[str] = []
     i = 0
-    for c in shot.captions:
+    toks = [(n, tok) for n, c in enumerate(shot.captions) for tok in _motion_words(c.text)]
+    pos = 0
+    for n, c in enumerate(shot.captions):
         start = i
-        for tok in _motion_words(c.text):
+        while pos < len(toks) and toks[pos][0] == n:
+            tok = toks[pos][1]
+            pos += 1
             key = _motion_key(tok)
             if not key:
+                if _names_symbol(tok, keys, i, _next_key(toks[pos:])):
+                    i += 1
                 continue
             code = _is_code_token(tok)
             acc = ""
@@ -131,6 +138,27 @@ def caption_speech(shot: MotionShot) -> list[str]:
     return out
 
 
+def _is_symbol(tok: str) -> bool:
+    """A shown word that is only code symbols ("`[`", "]`", "`=>`")."""
+    from .checks import _motion_key
+    return not _motion_key(tok) and bool(re.search(r"[\[\](){}<>=+*/%&|!^~:-]", tok))
+
+
+def _next_key(rest) -> str:
+    """The key of the next shown word that has one ("" at the end)."""
+    from .checks import _motion_key
+    return next((k for _, w in rest if (k := _motion_key(w))), "")
+
+
+def _names_symbol(tok: str, keys: list[str], i: int, next_key: str) -> bool:
+    """Does the spoken word at i NAME the symbol `tok` ("brackets" for
+    "`[ ]`")? It does when it is a word and is not where the next shown word
+    starts — the narration said something the caption shows as a symbol."""
+    if not _is_symbol(tok) or i >= len(keys) or not keys[i]:
+        return False
+    return not (next_key and next_key.startswith(keys[i]))
+
+
 def shown_to_spoken(shot: MotionShot) -> list[list[tuple[int, int]]]:
     """Per caption: for each SHOWN word (motion_timeline.caption_words), the
     range [a, b) of that caption's spoken words it stands for. How a word's
@@ -143,9 +171,16 @@ def shown_to_spoken(shot: MotionShot) -> list[list[tuple[int, int]]]:
         keys = [_motion_key(w) for w in spoken]
         ranges = []
         i = 0
-        for tok, _hl in caption_words(cap.text):
+        shown = caption_words(cap.text)
+        for j, (tok, _hl) in enumerate(shown):
             key = _motion_key(tok)
             a = i
+            if not key:
+                if _names_symbol(tok, keys, i, _next_key([(0, w) for w, _ in shown[j + 1:]])):
+                    i += 1                        # "`[`" <- "brackets": the symbol has its spoken word
+                elif ranges and _is_symbol(shown[j - 1][0]):
+                    ranges.append(ranges[-1])     # "`]`" after "`[`": one spoken word for the pair
+                    continue
             if key:
                 code = _is_code_token(tok)
                 acc = ""

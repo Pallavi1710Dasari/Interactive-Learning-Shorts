@@ -12,6 +12,9 @@ web/.ssr/
 # The 23 MB reference video stays local; its extracted frames are committed.
 docs/reference/tokenization-reel.mp4
 
+# Rendered reels kept beside the review notes are local only; stills are committed.
+docs/reference/**/*.mp4
+
 # Earlier UI review screenshots stay local (about 60 MB); review notes for
 # later rounds live in their own docs/reference/<phase> folders.
 docs/reference/ui-motion-*/

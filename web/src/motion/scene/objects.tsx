@@ -20,7 +20,7 @@ import {
 import type { PlanAction, PlanObject, PlanShot } from "./types";
 import { AppScreen, Compare, Cycle, Flow, MemoryBox } from "../objects/action";
 import { IdentityTitle, type IdentitySpec } from "../identity/Identity";
-import { EndCardCued } from "../objects/annotated";
+import { CodeAnnotated, EndCardCued, LanguageChip, PointerBox, PointerSlot, locatePart } from "../objects/annotated";
 import library from "../library.json";
 
 const KINETIC = (library as { kinetic: { size: number; line_height: number } }).kinetic;
@@ -174,7 +174,10 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       return <SystemPanel x={b.x} y={b.y} w={b.w} h={b.h} title={p.title} status={s.value ?? p.status}
                           statusTone={(s.tone as Tone) ?? "plain"} p={s.p} field={field}
                           slot={p.slot_name ? { name: p.slot_name, value: p.slot_value ?? "", pulse: pulseOf(s.pulseAge, 0, 0.45) } : null}
-                          glow={s.pulseAge < 0.8 ? 1 - s.pulseAge / 0.8 : 0} />;
+                          glow={s.pulseAge < 0.8 ? 1 - s.pulseAge / 0.8 : 0}
+                          pointer={rev >= 2 && p.slot_name && p.slot_value
+                            ? <PointerSlot name={p.slot_name} value={String(p.slot_value)} pulse={pulseOf(s.pulseAge, 0, 0.45)} field={field} />
+                            : undefined} />;
     case "status_pill":
       return <StatusPill x={cx} y={b.y + b.h / 2} text={s.value ?? p.text} tone={(s.tone as Tone) ?? "plain"}
                          icon={p.icon} field={field} p={s.p} size={SIZES.pill} />;
@@ -253,6 +256,15 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
                         value={s.value ?? p.value} prev={s.prevValue} tone={s.tone} valueAge={t - s.valueT}
                         tapAge={t - s.tapT} p={s.p} field={field} />;
     case "memory_box":
+      if (p.points_to) {
+        // the name pointing at its value (motion_tidy._resolve): the arrow draws
+        // on the state that resolves it (tone ok), else the first state change
+        const states = shot.actions.filter((a) => a.target === obj.id && a.do === "state");
+        const first = states.find((a) => a.tone === "ok") ?? states[0];
+        return <PointerBox x={b.x} y={b.y} w={b.w} h={b.h} name={p.name} value={String(p.points_to)} p={s.p}
+                           arrowAge={first ? t - first.t : -1} tone={s.tone} toneAge={t - s.valueT}
+                           pulse={pulseOf(s.pulseAge, 0, 0.45)} field={field} />;
+      }
       return <MemoryBox x={b.x} y={b.y} w={b.w} h={b.h} name={p.name} value={s.value ?? p.value} prev={s.prevValue}
                         tone={s.tone} valueAge={t - s.valueT} resetAge={t - s.resetT} start={p.value} p={s.p} field={field} />;
     case "flow":
@@ -261,7 +273,8 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
     case "compare":
       return <Compare x={b.x} y={b.y} w={b.w} h={b.h} left={p.left} right={p.right} leftIcon={p.left_icon ?? "x"}
                       rightIcon={p.right_icon ?? "check"} leftNote={p.left_note} rightNote={p.right_note}
-                      revealAge={t - s.revealT} hasReveal={s.hasReveal} glow={pulseOf(s.pulseAge, 0, 0.6)} p={s.p} field={field} />;
+                      revealAge={t - s.revealT} hasReveal={s.hasReveal} glow={pulseOf(s.pulseAge, 0, 0.6)} p={s.p} field={field}
+                      slideIn={rev >= 2} />;
     case "cycle":
       return <Cycle x={b.x} y={b.y} w={b.w} h={b.h} steps={p.steps} travelAge={t - s.travelT}
                     highlight={highlightOn(s) ? s.highlight : 0} p={s.p} field={field} />;
@@ -269,7 +282,8 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
     case "title_card": {
       const icons = (p.icons ?? []) as { name: string; label: string }[];
       return <>
-        <TitleCard series={series} title={p.title} promise={p.promise} icons={icons} t={s.local} />
+        <TitleCard series={series} title={p.title} promise={p.promise} icons={icons} t={s.local}
+                   chip={rev >= 2 ? (identity ? <LanguageChip spec={identity} /> : null) : undefined} />
         {highlightOn(s) && s.highlight <= icons.length && (
           <Overlay><circle cx={270 + (s.highlight - 1) * 270} cy={1230} r={110 + 30 * clamp(s.highlightAge / 0.5)}
                            fill="none" stroke={C.amber} strokeWidth={8} opacity={1 - clamp(s.highlightAge / 0.9)} /></Overlay>
@@ -313,11 +327,23 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       return <ChapterCard n={p.n} of={p.of} title={p.title} field={field} t={s.local} />;
     case "code_map": {
       const lines = p.lines as string[];
+      if (rev >= 2) {
+        const parts = (p.parts as { code: string; icon: string; label: string }[]).map((part) => ({
+          ...part, at: locatePart(lines, part.code) }));
+        // the part being talked about stays lit until the next one; every part
+        // reached so far keeps its callout (the narration may go back to one)
+        const hits = shot.actions.filter((a) => a.target === obj.id && a.do === "highlight" && a.t <= t);
+        const reached = Math.max(0, ...hits.map((a) => Number(a.value) || 0));
+        // a callout animates in the first time its part is reached, never again
+        const firstAges = parts.map((_, i) => { const a = hits.find((h) => Number(h.value) === i + 1); return a ? t - a.t : -1; });
+        return <CodeAnnotated lines={lines.map(codeLine)} parts={parts} active={s.highlight ? s.highlight - 1 : -1}
+                              reached={reached - 1} firstAges={firstAges} activeAge={s.highlightAge} t={s.local} field={field} />;
+      }
       const parts = (p.parts as { code: string; icon: string; label: string }[]).map((part) => {
-        const row = lines[0].includes(part.code) || !(lines[1] ?? "").includes(part.code) ? 0 : 1;
-        const col = Math.max(0, (lines[row] ?? "").indexOf(part.code));
-        return { at: [col, part.code.length] as [number, number], icon: part.icon, tone: "info" as Tone,
-                 name: part.code, desc: part.label, row };
+        // the token's real place (a part the code does not contain gets no highlight)
+        const at = locatePart(lines.slice(0, 2), part.code);
+        return { at: at ? [at.col, at.len] as [number, number] : null, icon: part.icon, tone: "info" as Tone,
+                 name: part.code, desc: part.label, row: at?.row ?? 0 };
       });
       return <CodeMapCard line1={codeLine(lines[0])} line2={codeLine(lines[1] ?? "")} parts={parts}
                           active={s.highlight ? s.highlight - 1 : -1} t={s.local} field={field} />;

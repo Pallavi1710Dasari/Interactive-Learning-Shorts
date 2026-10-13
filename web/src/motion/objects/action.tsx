@@ -201,17 +201,25 @@ export function Flow({ x, y, w, h, steps, packet, travelAge, highlight, p, field
 
 // ------------------------------------------------------------- compare
 
-export function Compare({ x, y, w, h, left, right, leftIcon, rightIcon, leftNote, rightNote, revealAge, hasReveal, glow = 0, p, field }: {
+export function Compare({ x, y, w, h, left, right, leftIcon, rightIcon, leftNote, rightNote, revealAge, hasReveal, glow = 0, p, field, slideIn = false }: {
   x: number; y: number; w: number; h: number; left: string; right: string; leftIcon: string; rightIcon: string;
   leftNote?: string; rightNote?: string; revealAge: number; hasReveal: boolean; glow?: number; p: number; field: FieldName;
+  /** rev 2: the revealed side slides in solid from the right — no half-faded
+   *  card that reads as an empty placeholder */
+  slideIn?: boolean;
 }) {
   const th = theme(field);
   const cw = (w - 40) / 2, ch = h - 20;
   const rightP = hasReveal ? ease.outBack(clamp(seg(revealAge, 0, 0.5)), 1.4) : clamp(p * 1.5 - 0.35);
+  const slid = (q: number) => {
+    if (q <= 0) return { opacity: 0 };
+    const k = ease.outCubic(clamp(revealAge / 0.45));
+    return { opacity: clamp(revealAge / 0.06), transform: `translateX(${(1 - k) * 220}px) scale(${0.96 + 0.04 * k})` };
+  };
   const side = (title: string, icon: string, note: string | undefined, good: boolean, q: number, dx: number) => {
     const { bg, fg } = toneColors(good ? "ok" : "bad", th);
     return (
-      <At x={x + dx} y={y + 10} style={popStyle(q)}>
+      <At x={x + dx} y={y + 10} style={slideIn && good && hasReveal ? slid(q) : popStyle(q)}>
         <div style={{ position: "relative", width: cw, height: ch, borderRadius: 40, ...card(th), border: `4px solid ${fg}`,
                       ...(good && glow > 0 ? { boxShadow: `0 0 ${60 * glow}px ${C.mint}88` } : {}),
                       display: "flex", flexDirection: "column", alignItems: "center", padding: "36px 24px 24px", boxSizing: "border-box", gap: 18 }}>

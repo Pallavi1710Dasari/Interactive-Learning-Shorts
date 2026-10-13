@@ -207,7 +207,8 @@ export function ShotContent({ plan, index, t }: { plan: MotionPlan; index: numbe
         <StepChip n={shot.chapter} of={chapters} field={field} color={tone} p={seg(local, CHAPTER_CARD.exitAt, 0.2)}
                   hideNumber={local < CHAPTER_CARD.exitAt + CHAPTER_CARD.fly} />
       )}
-      {!full && plan.series && <div data-part="corner"><CornerMark text={plan.series} field={field} /></div>}
+      {/* rev 2: the handle is shown once, on the end card */}
+      {!full && plan.series && rev(plan) < 2 && <div data-part="corner"><CornerMark text={plan.series} field={field} /></div>}
     </Layer>
   );
 }
@@ -223,6 +224,14 @@ function SpeakerTag({ plan, shot, t }: { plan: MotionPlan; shot: PlanShot; t: nu
   const member = plan.cast.find((m) => m.role === cap.speaker);
   if (!member) return null;
   const active = t <= cap.end + 0.05;
+  if (rev(plan) >= 2 && plan.characters?.length) {
+    // the drawn character is the face: the role label is the one indicator
+    return (
+      <div style={{ position: "absolute", left: SAFE.side, top: SAFE.captionBottom + 22, fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 700, fontSize: 22, letterSpacing: 3, color: textToneOn(member.identity, shot.field),
+                    textTransform: "uppercase" }}>{member.label}</div>
+    );
+  }
   return (
     // under the caption, not above it: above, it sat on a full-frame card's last row
     <div style={{ position: "absolute", left: SAFE.side, top: SAFE.captionBottom + 22, display: "flex", alignItems: "center", gap: 16 }}>
@@ -250,7 +259,9 @@ export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
   const zoom = design.transition === "zoom_through";
   const transitioning = prev && kind && into < (zoom ? ZOOM_DUR : TRANSITION_DUR);
   const full = shot.objects.some((o) => FULL_KINDS.has(o.kind));
-  const cardCaption = !shot.objects.some((o) => o.kind === "title_card" || o.kind === "end_card");
+  // rev 2: a recap's cards carry its words, so the caption does not repeat them
+  const cardCaption = !shot.objects.some((o) => o.kind === "title_card" || o.kind === "end_card"
+    || (rev(plan) >= 2 && (o.kind === "takeaway_list" || o.kind === "recap_grid")));
   const chat = shot.layout === "duo" && !full;
   return (
     <Frame field={shot.field} style={vars}>
@@ -272,7 +283,8 @@ export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
         <div data-part="speakertag"><SpeakerTag plan={plan} shot={shot} t={t} /></div>
         <div data-part="caption"><KaraokeCaption sentences={sentences(shot)} t={t} field={shot.field} /></div>
       </>}
-      {plan.identity && <LanguageBadge spec={plan.identity} field={shot.field} right={1080 - FRAME.badge.x} top={FRAME.badge.y}
+      {/* rev 2: the language is named once, on the title card (and in the tags) */}
+      {plan.identity && rev(plan) < 2 && <LanguageBadge spec={plan.identity} field={shot.field} right={1080 - FRAME.badge.x} top={FRAME.badge.y}
                                        p={clamp((t - plan.intro) / 0.3)} />}
     </Frame>
   );

@@ -66,7 +66,10 @@ action, never by putting the sentence on screen.
 - Words on screen are LABELS: 1-3 words each, at most 12 words in a whole shot (code aside).
   The captions already carry the sentence; never repeat it on screen as text.
 - code_window and code_map ONLY on a shot whose script has code. Material without code never
-  gets a code picture.
+  gets a code picture. Their lines are REAL code only: never a comment used as a label
+  ("# cart: the variable") — a code_map's parts already point a callout at each token.
+- A system_panel slot reads name -> value: slot_name is the NAME in the code ("cart"), slot_value
+  is what it holds or points to ('["milk", "bread"]'); never a role word like "tag" as the name.
 - Labels use the shot's own words (its highlights, its code names, the thing it names).
 
 A SCENE is:
@@ -99,7 +102,9 @@ THE HOOK AND THE PAYOFF
   if that still fits; the corner badge names the language anyway. ONLY the hook may have one.
 - The hook shows the failure in coral (tone "bad"). The payoff MIRRORS it: the SAME object
   kinds as the hook (identity_title aside), on the SAME field, the failure now a success
-  (tone "ok", and no coral anywhere in the payoff). (walkthrough: the result shot shows the
+  (tone "ok", and no coral anywhere in the payoff). The payoff must SHOW the fix working —
+  a tap that now counts, a reset, a reveal, a travel — not the hook's object with a new
+  label: a shot that only relabels an earlier object is dropped from the reel. (walkthrough: the result shot shows the
   running example's final state in a token_row.)
 
 CUES

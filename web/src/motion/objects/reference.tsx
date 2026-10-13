@@ -194,9 +194,11 @@ export function EntityCard({ x, y, w = 900, h = 528, label, value, valueTone = "
 }
 
 /** The system panel — the thing that remembers or decides ("React"). */
-export function SystemPanel({ x, y, w = 840, h = 318, title, status, statusTone = "plain", slot, glow = 0, p = 1, field }: {
+export function SystemPanel({ x, y, w = 840, h = 318, title, status, statusTone = "plain", slot, glow = 0, p = 1, field, pointer }: {
   x: number; y: number; w?: number; h?: number; title: string; status: string; statusTone?: Tone;
   slot?: { name: string; value: string | number; pulse?: number } | null; glow?: number; p?: number; field: FieldName;
+  /** rev 2: the slot drawn as name -> value (annotated.tsx PointerSlot) */
+  pointer?: ReactNode;
 }) {
   const th = theme(field);
   const st = toneColors(statusTone, th);
@@ -216,7 +218,11 @@ export function SystemPanel({ x, y, w = 840, h = 318, title, status, statusTone 
           <span style={{ width: 21, height: 21, borderRadius: 11, background: statusTone === "plain" ? C.grey : st.fg }} />
           {status}
         </div>
-        {slot ? (
+        {slot && pointer ? (
+          <div style={{ position: "absolute", left: 42, right: 42, top: 150, bottom: 30, display: "flex", alignItems: "center" }}>
+            {pointer}
+          </div>
+        ) : slot ? (
           <div style={{ position: "absolute", left: 42, right: 42, top: 156, bottom: 42, borderRadius: 36,
                         background: th.dark ? "rgba(255,255,255,0.06)" : "#F3F4F9", display: "flex",
                         alignItems: "center", justifyContent: "space-between", padding: "0 30px 0 42px" }}>
@@ -310,14 +316,17 @@ export function CodeWindow({ x, y, w = 948, file, lines, shown = Infinity, highl
 
 /** The title card: series pill, the concept in display weight, the promise,
  * and the icon vocabulary popping in one by one. */
-export function TitleCard({ series, title, promise, icons, t }: {
+export function TitleCard({ series, title, promise, icons, t, chip }: {
   series: string; title: string; promise: string; icons: { name: string; label: string }[]; t: number;
+  /** drawn in the series pill's place (rev 2: the language chip) */
+  chip?: ReactNode;
 }) {
   return (
     <div style={{ position: "absolute", inset: 0, background: "var(--motion-card-bg, linear-gradient(to bottom, #5B4BF5, #4234D6))", color: C.white }}>
       <div style={{ position: "absolute", left: 900, top: 570, width: 720, height: 720, borderRadius: "50%", background: "rgba(255,255,255,0.05)", transform: "translate(-50%,-50%)" }} />
       <At x={W / 2} y={708} center style={popStyle(seg(t, 0, 0.5))}>
-        <div style={{ padding: "16px 36px", borderRadius: 999, background: "rgba(255,255,255,0.14)", fontWeight: 700, fontSize: 33, whiteSpace: "nowrap" }}>{series}</div>
+        {chip !== undefined ? chip
+          : <div style={{ padding: "16px 36px", borderRadius: 999, background: "rgba(255,255,255,0.14)", fontWeight: 700, fontSize: 33, whiteSpace: "nowrap" }}>{series}</div>}
       </At>
       <At x={W / 2} y={880} center style={popStyle(seg(t, 0.12, 0.5))}>
         <div style={{ fontSize: 162, fontWeight: 800, letterSpacing: -4.5, whiteSpace: "nowrap" }}>{title}</div>
@@ -343,7 +352,7 @@ export function TitleCard({ series, title, promise, icons, t }: {
  * controls. `active` moves the amber highlight from part to part. */
 export function CodeMapCard({ line1, line2, parts, active, t, field }: {
   line1: CodeLine; line2: CodeLine;
-  parts: { at: [number, number]; icon: string; tone: Tone; name: string; desc: string; row?: number }[];
+  parts: { at: [number, number] | null; icon: string; tone: Tone; name: string; desc: string; row?: number }[];
   active: number; t: number; field: FieldName;
 }) {
   const th = theme(field);
@@ -354,14 +363,16 @@ export function CodeMapCard({ line1, line2, parts, active, t, field }: {
   const codeY = parts.length >= 3 ? 300 : 528;
   const rowsTop = codeY + 348 + (parts.length >= 3 ? 54 : 78);
   const rowH = Math.min(192, (rowsEnd - rowsTop - 24 * Math.max(0, parts.length - 1)) / Math.max(1, parts.length));
-  const hot = active >= 0 ? parts[active] : undefined;
+  // a part the code does not contain has no place to highlight
+  const hot = active >= 0 && parts[active]?.at ? parts[active] : undefined;
+  const hotAt = hot?.at ?? [0, 0];
   return (
     <>
       <At x={60} y={codeY} style={popStyle(seg(t, 0, 0.5))}>
         <div style={{ width: 960, height: 348, borderRadius: 54, background: C.code, boxShadow: shadow(th), position: "relative" }}>
-          {active >= 0 && parts[active] && (
-            <div style={{ position: "absolute", top: 66 + (parts[active].row ?? 0) * 114, height: 90, borderRadius: 21, background: C.amber,
-                          left: 60 + parts[active].at[0] * cw - 12, width: parts[active].at[1] * cw + 24 }} />
+          {hot && (
+            <div style={{ position: "absolute", top: 66 + (hot.row ?? 0) * 114, height: 90, borderRadius: 21, background: C.amber,
+                          left: 60 + hotAt[0] * cw - 12, width: hotAt[1] * cw + 24 }} />
           )}
           {[line1, line2].map((line, i) => {
             let col = 0;
@@ -371,7 +382,7 @@ export function CodeMapCard({ line1, line2, parts, active, t, field }: {
                   const at = col;
                   col += tk.text.length;
                   // code under the amber highlight is ink, so it reads on amber
-                  const lit = hot && (hot.row ?? 0) === i && at < hot.at[0] + hot.at[1] && at + tk.text.length > hot.at[0];
+                  const lit = hot && (hot.row ?? 0) === i && at < hotAt[0] + hotAt[1] && at + tk.text.length > hotAt[0];
                   return <span key={j} style={{ color: lit ? C.ink : tk.color ?? C.codeText }}>{tk.text}</span>;
                 })}
               </div>

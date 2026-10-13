@@ -826,7 +826,9 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
     if tags_path(short_id).exists():
         tags = json.loads(tags_path(short_id).read_text(encoding="utf-8")).get("tags", [])
     # the scenes' deterministic clean-ups (shorts/motion_tidy.py): no model call
+    before = {s.id for s in script.shots}
     script, notes = motion_tidy.tidy(script, n_tags=min(4, len(tags)))
+    dropped = sorted(before - {s.id for s in script.shots})
     for n in notes:
         print(f"  tidy: {n}")
     total_clips = sum(len(manifest["shots"].get(s.id, [])) for s in script.shots)
@@ -867,7 +869,7 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
                                       tags=tags, intro=intro, characters=characters,
                                       character=character, design=design,
                                       host_character=host_character)
-    results = checks.run_motion_scene_graders(script, clocks) + [
+    results = checks.run_motion_scene_graders(script, clocks, dropped=dropped) + [
         checks.check_motion_duration_cap(script, measured_seconds=motion_timeline.total_seconds(clocks)),
         *motion_plan_checks.run(plan)]
     for r in results:

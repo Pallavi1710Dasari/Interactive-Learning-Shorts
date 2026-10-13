@@ -9189,7 +9189,7 @@ def check_motion_scene_valid(script) -> GraderResult:
                         f"{len(script.shots)} drawable scenes, transitions in rotation")
 
 
-def check_motion_payoff_mirrors_hook(script) -> GraderResult:
+def check_motion_payoff_mirrors_hook(script, dropped=()) -> GraderResult:
     """The payoff is the hook's picture, now working (spec: "mirror the
     hook"). fix_story: the payoff shows every kind of object the hook showed,
     on the same field; the hook shows a failure (coral) and the payoff a
@@ -9209,6 +9209,10 @@ def check_motion_payoff_mirrors_hook(script) -> GraderResult:
         return GraderResult("motion_payoff_mirrors_hook", True,
                             "the result shows the running example's final state")
     hook, pay = by_beat.get("hook"), by_beat.get("payoff")
+    if hook is not None and pay is None and dropped:
+        # the timing stage dropped it as low value (motion_tidy.low_value_shots)
+        return GraderResult("motion_payoff_mirrors_hook", True,
+                            f"no payoff shot: dropped as low value ({', '.join(dropped)})")
     if not hook or not pay or hook.scene is None or pay.scene is None:
         return GraderResult("motion_payoff_mirrors_hook", False, "hook or payoff has no scene")
     problems: list[str] = []
@@ -9491,12 +9495,12 @@ def check_motion_scene_code_only_with_code(script) -> GraderResult:
     return GraderResult("motion_scene_code_only_with_code", True, "code appears only where the script has code")
 
 
-def run_motion_scene_graders(script, clocks=None) -> list[GraderResult]:
+def run_motion_scene_graders(script, clocks=None, dropped=()) -> list[GraderResult]:
     """The phase 3 scene graders. `clocks`: the real timings, when audio
-    exists."""
+    exists. `dropped`: shot ids the timing stage dropped as low value."""
     return [
         check_motion_scene_valid(script),
-        check_motion_payoff_mirrors_hook(script),
+        check_motion_payoff_mirrors_hook(script, dropped),
         check_motion_change_cadence(script, clocks),
         check_motion_color_semantics(script),
         check_motion_scene_variety(script),

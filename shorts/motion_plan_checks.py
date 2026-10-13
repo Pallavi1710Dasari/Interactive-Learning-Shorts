@@ -9,6 +9,10 @@ drawn page beside them.
   motion_caption_layout       the caption / chat bubble stays in its zone: never
                               over a character, the visual or another overlay,
                               inside the safe zone, at most 70 % of the frame wide
+  motion_redundant_overlays   one thing is not shown twice on a frame (a caption
+                              repeating a card's words)
+  motion_decorative_elements  every object on screen carries meaning: it shows
+                              words, or an action makes it do something
 
 Plans written before rev 2 are drawn by the old rules and are not checked.
 """
@@ -26,6 +30,9 @@ CAPTION_TOP, CAPTION_BOTTOM = round(H * 0.70), round(H * 0.80)
 CHROME = {"progress": (54, 52, 1026, 70), "label": (SAFE_SIDE, 180, W - SAFE_SIDE, 222)}
 #: kinds whose own words the player shows instead of a caption (rev 2)
 CAPTIONLESS = frozenset({"takeaway_list", "recap_grid"})
+_CODE = frozenset({"code_window", "code_map"})
+_STOP = frozenset("a an the and or but so to of in on at it its is are was be by for with as "
+                  "that this then than your you i my me we our just only not no".split())
 
 
 def _frame() -> dict:
@@ -124,5 +131,73 @@ def check_caption_layout(plan) -> GraderResult:
                                     "the visual and the chrome")
 
 
+def _content(text: str) -> list[str]:
+    return [w for w in re.findall(r"[a-z0-9']+", plain(text).lower()) if w not in _STOP]
+
+
+def _object_texts(o) -> list[str]:
+    """Every string an object shows (rows' lines and subs one by one)."""
+    out: list[str] = []
+
+    def walk(v):
+        if isinstance(v, str):
+            out.append(v)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        elif isinstance(v, dict):
+            for k, x in v.items():
+                if k not in ("icon", "tone", "tones", "name") or o.kind in ("memory_box", "flow", "cycle"):
+                    walk(x)
+    walk(o.props)
+    return [t for t in out if t.strip()]
+
+
+def check_redundant_overlays(plan) -> GraderResult:
+    """The same words twice on one frame: a caption that repeats the text of
+    an object shown with it."""
+    name = "motion_redundant_overlays"
+    if getattr(plan, "rev", 1) < 2:
+        return GraderResult(name, True, "plan drawn by the rev 1 rules — not checked")
+    problems: list[str] = []
+    off: list[str] = []
+    for shot in plan.shots:
+        if caption_zone(plan, shot) is None:
+            continue
+        # code is read aloud on purpose: saying a line while it is shown is how it is taught
+        texts = [(o.id, t) for o in shot.objects if o.kind not in _CODE for t in _object_texts(o)]
+        for c in shot.captions:
+            cw = _content(c.text)
+            for oid, t in texts:
+                ow = _content(t)
+                if len(ow) >= 3 and len(set(ow) & set(cw)) / len(set(ow)) >= 0.8:
+                    off.append(shot.id)
+                    problems.append(f"{shot.id}: the caption {plain(c.text)[:40]!r} repeats {oid}'s {t!r}")
+    if problems:
+        return GraderResult(name, False, "; ".join(problems), {"shots": sorted(set(off))})
+    return GraderResult(name, True, "no frame shows the same words twice")
+
+
+def check_decorative_elements(plan) -> GraderResult:
+    """Decoration: a placed object that says nothing (no words on it) and
+    that no action makes do anything — it fills space without meaning. A
+    connector counts when it is drawn between two objects (it shows a link)."""
+    name = "motion_decorative_elements"
+    if getattr(plan, "rev", 1) < 2:
+        return GraderResult(name, True, "plan drawn by the rev 1 rules — not checked")
+    problems: list[str] = []
+    for shot in plan.shots:
+        for o in shot.objects:
+            if o.box is None or o.kind == "connector":
+                continue
+            acted = any(a.target == o.id and a.do != "enter" for a in shot.actions)
+            words = [w for t in _object_texts(o) for w in re.findall(r"[A-Za-z0-9]+", t)]
+            if not acted and not words:
+                problems.append(f"{shot.id}.{o.id} ({o.kind}) shows no words and nothing acts on it")
+    if problems:
+        return GraderResult(name, False, "; ".join(problems))
+    return GraderResult(name, True, "every object carries words or does something")
+
+
 def run(plan) -> list[GraderResult]:
-    return [check_caption_layout(plan)]
+    return [check_caption_layout(plan), check_redundant_overlays(plan), check_decorative_elements(plan)]

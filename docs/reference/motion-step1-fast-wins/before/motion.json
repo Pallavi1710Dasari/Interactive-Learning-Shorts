@@ -1,0 +1,1071 @@
+{
+  "reel_style": "motion",
+  "template": "fix_story",
+  "short_id": "variable_points_to_value__motion",
+  "source_section_id": "1.1",
+  "topic": "What does a variable in Python actually hold when you assign a list to it?",
+  "hook_question": "Why doesn't cart actually hold my milk and bread?",
+  "concept_name": "variable",
+  "promise": "Names point, they don't hold",
+  "icon_vocabulary": [
+    {
+      "name": "box",
+      "label": "The box"
+    },
+    {
+      "name": "link",
+      "label": "The tie"
+    },
+    {
+      "name": "memory",
+      "label": "Memory"
+    }
+  ],
+  "takeaways": [
+    {
+      "icon": "box",
+      "line": "Tag, not box",
+      "sub": "A variable is a name"
+    },
+    {
+      "icon": "link",
+      "line": "Equals ties names",
+      "sub": "Make value, then tie"
+    },
+    {
+      "icon": "memory",
+      "line": "Points, not holds",
+      "sub": "Tag finds the box"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s01",
+      "beat": "hook",
+      "speech": "Why doesn't cart actually hold my milk and bread?",
+      "captions": [
+        {
+          "text": "Why doesn't <b>cart</b> actually hold my milk and bread?",
+          "speaker": "STUDENT"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "A terminal mock shows a cart box with a status pill reading 'not inside?'",
+      "code": [],
+      "scene": {
+        "field": "navy",
+        "transition": "cut",
+        "label": "",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "memory_box",
+            "props": {
+              "name": "cart",
+              "value": "milk,bread"
+            }
+          },
+          {
+            "id": "o2",
+            "kind": "status_pill",
+            "props": {
+              "text": "not inside?",
+              "tone": "bad",
+              "icon": "alert"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "cart",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "actually hold",
+            "do": "state",
+            "target": "o1",
+            "value": "?",
+            "tone": "bad"
+          },
+          {
+            "at": "milk and bread",
+            "do": "enter",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          }
+        ]
+      },
+      "estimated_seconds": 3.46
+    },
+    {
+      "id": "s02",
+      "beat": "title",
+      "speech": "A variable is a name tied to a box.",
+      "captions": [
+        {
+          "text": "A <b>variable</b> is a name tied to a box.",
+          "speaker": "MENTOR"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "The title card shows the box, link and memory icons.",
+      "code": [],
+      "scene": {
+        "field": "blue",
+        "transition": "iris",
+        "label": "",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "title_card",
+            "props": {
+              "title": "Variable",
+              "promise": "Names point, they don't hold",
+              "icons": [
+                {
+                  "name": "box",
+                  "label": "The box",
+                  "tone": "plain"
+                },
+                {
+                  "name": "link",
+                  "label": "The tie",
+                  "tone": "plain"
+                },
+                {
+                  "name": "memory",
+                  "label": "Memory",
+                  "tone": "plain"
+                }
+              ]
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "variable",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "tied",
+            "do": "highlight",
+            "target": "o1",
+            "value": "2",
+            "tone": null
+          }
+        ]
+      },
+      "estimated_seconds": 3.46
+    },
+    {
+      "id": "s03",
+      "beat": "setup",
+      "speech": "Show me the line you wrote. Cart equals a list of milk and bread, like filling a box.",
+      "captions": [
+        {
+          "text": "Show me the line you wrote.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "`cart` equals a list of milk and bread, like filling a box.",
+          "speaker": "STUDENT"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "A code window shows the single line that builds the cart list.",
+      "code": [
+        "cart = [\"milk\", \"bread\"]"
+      ],
+      "scene": {
+        "field": "paper",
+        "transition": "bar_wipe",
+        "label": "THE SETUP",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "code_window",
+            "props": {
+              "file": "cart.py",
+              "lines": [
+                "cart = [\"milk\", \"bread\"]"
+              ]
+            }
+          },
+          {
+            "id": "o2",
+            "kind": "status_pill",
+            "props": {
+              "text": "milk, bread",
+              "tone": "info",
+              "icon": "list"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "line you wrote",
+            "do": "type",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "cart equals",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "milk and bread",
+            "do": "enter",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "filling a box",
+            "do": "state",
+            "target": "o2",
+            "value": "filling a box?",
+            "tone": "bad"
+          }
+        ]
+      },
+      "estimated_seconds": 6.92
+    },
+    {
+      "id": "s04",
+      "beat": "break_1",
+      "speech": "That line looks like filling a box, but it isn't. The list is the box, sitting in memory, the computer's storage space. Cart is just a tag on it.",
+      "captions": [
+        {
+          "text": "That line looks like filling a box, but it isn't.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "The list is the box, sitting in <b>memory</b>, the computer's storage space.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "`cart` is just a <b>tag</b> on it.",
+          "speaker": "MENTOR"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "A system panel labeled memory holds a list box, while a separate entity card labeled cart floats outside it.",
+      "code": [],
+      "scene": {
+        "field": "paper",
+        "transition": "cut",
+        "label": "WHY IT FAILS",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "status_pill",
+            "props": {
+              "text": "filling a box",
+              "tone": "bad",
+              "icon": "box"
+            }
+          },
+          {
+            "id": "o2",
+            "kind": "system_panel",
+            "props": {
+              "title": "Memory",
+              "status": "the list",
+              "tone": "plain",
+              "slot_name": "tag",
+              "slot_value": "cart"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "filling a box",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "it isn't",
+            "do": "state",
+            "target": "o1",
+            "value": "not a box",
+            "tone": "bad"
+          },
+          {
+            "at": "The list",
+            "do": "pulse",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "is the box",
+            "do": "state",
+            "target": "o2",
+            "value": "the box",
+            "tone": "plain"
+          },
+          {
+            "at": "sitting in",
+            "do": "pulse",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "memory",
+            "do": "state",
+            "target": "o2",
+            "value": "in memory",
+            "tone": "plain"
+          },
+          {
+            "at": "storage space",
+            "do": "pulse",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "cart is just",
+            "do": "pulse",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "tag",
+            "do": "state",
+            "target": "o1",
+            "value": "just a tag",
+            "tone": "bad"
+          }
+        ]
+      },
+      "estimated_seconds": 11.15
+    },
+    {
+      "id": "s05",
+      "beat": "fix_idea",
+      "speech": "Picture a name tag tied to a box. The variable cart is the tag. The tag only tells Python where the box is.",
+      "captions": [
+        {
+          "text": "Picture a name tag tied to a box.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "The <b>variable</b> `cart` is the tag.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "The tag only tells Python <b>where</b> the box is.",
+          "speaker": "MENTOR"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "An entity card shaped like a name tag joins the list box by a connector with a pulse.",
+      "code": [],
+      "scene": {
+        "field": "paper",
+        "transition": "cut",
+        "label": "THE IDEA",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "compare",
+            "props": {
+              "left": "Box",
+              "right": "Name tag",
+              "left_icon": "box",
+              "right_icon": "link"
+            }
+          },
+          {
+            "id": "o2",
+            "kind": "status_pill",
+            "props": {
+              "text": "where",
+              "tone": "info",
+              "icon": "search"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "name tag",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "a box",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "variable",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "the tag",
+            "do": "reveal",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "tells Python",
+            "do": "enter",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "box is",
+            "do": "state",
+            "target": "o2",
+            "value": "where the box is",
+            "tone": "ok"
+          }
+        ]
+      },
+      "estimated_seconds": 8.85
+    },
+    {
+      "id": "s06",
+      "beat": "fix_flow",
+      "speech": "Python does two things. First, it makes a list of 2 items in memory. Then it ties the variable cart to it. So the variable just points to it.",
+      "captions": [
+        {
+          "text": "Python does <b>two things</b>.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "First, it makes a list of 2 items in memory.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "Then it ties the <b>variable</b> `cart` to it.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "So the variable just <b>points</b> to it.",
+          "speaker": "STUDENT"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "A trigger chip reading 'run line' fires, a list box appears in the memory panel, then a connector pulses from the cart tag to it.",
+      "code": [],
+      "scene": {
+        "field": "paper",
+        "transition": "cut",
+        "label": "TWO THINGS",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "trigger_chip",
+            "props": {
+              "label": "run line"
+            }
+          },
+          {
+            "id": "o2",
+            "kind": "flow",
+            "props": {
+              "steps": [
+                {
+                  "name": "code",
+                  "label": "Run line",
+                  "tone": "plain"
+                },
+                {
+                  "name": "box",
+                  "label": "Make list",
+                  "tone": "plain"
+                },
+                {
+                  "name": "link",
+                  "label": "Tie cart",
+                  "tone": "ok"
+                }
+              ],
+              "packet": "2 items"
+            }
+          },
+          {
+            "id": "o3",
+            "kind": "connector",
+            "props": {
+              "from": "o1",
+              "to": "o2"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "two things",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "two things",
+            "do": "enter",
+            "target": "o3",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "First",
+            "do": "highlight",
+            "target": "o2",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "makes a list",
+            "do": "travel",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "2 items",
+            "do": "highlight",
+            "target": "o2",
+            "value": "2",
+            "tone": null
+          },
+          {
+            "at": "ties the",
+            "do": "highlight",
+            "target": "o2",
+            "value": "3",
+            "tone": null
+          },
+          {
+            "at": "variable cart",
+            "do": "pulse",
+            "target": "o3",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "So the",
+            "do": "highlight",
+            "target": "o2",
+            "value": "3",
+            "tone": null
+          },
+          {
+            "at": "points",
+            "do": "state",
+            "target": "o3",
+            "value": null,
+            "tone": "ok"
+          }
+        ]
+      },
+      "estimated_seconds": 11.15
+    },
+    {
+      "id": "s07",
+      "beat": "code_map",
+      "speech": "Cart, on the left, is the variable, the tag. The equals sign ties the tag to the box. The brackets on the right build the list, the box.",
+      "captions": [
+        {
+          "text": "`cart`, on the left, is the <b>variable</b>, the tag.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "The `=` sign <b>ties</b> the tag to the box.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "The `[ ]` on the right build the <b>list</b>, the box.",
+          "speaker": "MENTOR"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "The code map card links cart to a tag, the equals sign to a connector, and the brackets to a box.",
+      "code": [
+        "# cart: the variable",
+        "cart = [\"milk\", \"bread\"]"
+      ],
+      "scene": {
+        "field": "paper",
+        "transition": "cut",
+        "label": "",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "code_map",
+            "props": {
+              "lines": [
+                "# cart: the variable",
+                "cart = [\"milk\", \"bread\"]"
+              ],
+              "parts": [
+                {
+                  "code": "cart",
+                  "icon": "arrow_right",
+                  "label": "The tag"
+                },
+                {
+                  "code": "=",
+                  "icon": "link",
+                  "label": "Ties"
+                },
+                {
+                  "code": "[ ]",
+                  "icon": "box",
+                  "label": "The box"
+                }
+              ]
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "cart",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "variable",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "the tag",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "ties",
+            "do": "highlight",
+            "target": "o1",
+            "value": "2",
+            "tone": null
+          },
+          {
+            "at": "the tag",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "the box",
+            "do": "highlight",
+            "target": "o1",
+            "value": "3",
+            "tone": null
+          },
+          {
+            "at": "right",
+            "do": "highlight",
+            "target": "o1",
+            "value": "3",
+            "tone": null
+          },
+          {
+            "at": "list",
+            "do": "highlight",
+            "target": "o1",
+            "value": "3",
+            "tone": null
+          },
+          {
+            "at": "the box",
+            "do": "highlight",
+            "target": "o1",
+            "value": "3",
+            "tone": null
+          }
+        ]
+      },
+      "estimated_seconds": 10.77
+    },
+    {
+      "id": "s08",
+      "beat": "payoff",
+      "speech": "Now I get it. Cart doesn't hold my milk and bread. It points to the list that does.",
+      "captions": [
+        {
+          "text": "Now I get it.",
+          "speaker": "STUDENT"
+        },
+        {
+          "text": "`cart` doesn't hold my milk and bread.",
+          "speaker": "STUDENT"
+        },
+        {
+          "text": "It <b>points</b> to the list that does.",
+          "speaker": "STUDENT"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "The same terminal mock, now showing the cart tag linked to the list box, with a green status pill reading 'points to list'.",
+      "code": [],
+      "scene": {
+        "field": "navy",
+        "transition": "diagonal_stripes",
+        "label": "",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "memory_box",
+            "props": {
+              "name": "cart",
+              "value": "milk,bread"
+            }
+          },
+          {
+            "id": "o2",
+            "kind": "status_pill",
+            "props": {
+              "text": "points to list",
+              "tone": "ok",
+              "icon": "check"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "get it",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "doesn't hold",
+            "do": "state",
+            "target": "o1",
+            "value": "→ list",
+            "tone": null
+          },
+          {
+            "at": "bread",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "points",
+            "do": "enter",
+            "target": "o2",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "list that does",
+            "do": "state",
+            "target": "o1",
+            "value": "→ list",
+            "tone": "ok"
+          }
+        ]
+      },
+      "estimated_seconds": 6.92
+    },
+    {
+      "id": "s09",
+      "beat": "recap",
+      "speech": "A variable is a name tag, not a box. Writing equals makes the value, then ties the name. The tag only points to the value.",
+      "captions": [
+        {
+          "text": "A <b>variable</b> is a name tag, not a box.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "Writing equals makes the value, then <b>ties</b> the name.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "The tag only <b>points</b> to the value.",
+          "speaker": "MENTOR"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "The takeaway list shows three rows with the box, link and memory icons.",
+      "code": [],
+      "scene": {
+        "field": "blue",
+        "transition": "stack_rise",
+        "label": "RECAP",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "takeaway_list",
+            "props": {
+              "heading": "Variable",
+              "rows": [
+                {
+                  "icon": "box",
+                  "line": "Tag, not box",
+                  "sub": "A variable is a name"
+                },
+                {
+                  "icon": "link",
+                  "line": "Equals ties names",
+                  "sub": "Make value, then tie"
+                },
+                {
+                  "icon": "memory",
+                  "line": "Points, not holds",
+                  "sub": "Tag finds the box"
+                }
+              ]
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "variable",
+            "do": "stagger",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "name tag",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "not a box",
+            "do": "highlight",
+            "target": "o1",
+            "value": "1",
+            "tone": null
+          },
+          {
+            "at": "Writing equals",
+            "do": "highlight",
+            "target": "o1",
+            "value": "2",
+            "tone": null
+          },
+          {
+            "at": "the value",
+            "do": "highlight",
+            "target": "o1",
+            "value": "2",
+            "tone": null
+          },
+          {
+            "at": "ties",
+            "do": "highlight",
+            "target": "o1",
+            "value": "2",
+            "tone": null
+          },
+          {
+            "at": "The tag",
+            "do": "highlight",
+            "target": "o1",
+            "value": "3",
+            "tone": null
+          },
+          {
+            "at": "points",
+            "do": "highlight",
+            "target": "o1",
+            "value": "3",
+            "tone": null
+          },
+          {
+            "at": "the value",
+            "do": "highlight",
+            "target": "o1",
+            "value": "3",
+            "tone": null
+          }
+        ]
+      },
+      "estimated_seconds": 9.62
+    },
+    {
+      "id": "s10",
+      "beat": "cta",
+      "speech": "Follow for more. Next: what happens in memory.",
+      "captions": [
+        {
+          "text": "Follow for more.",
+          "speaker": "MENTOR"
+        },
+        {
+          "text": "Next: what happens in <b>memory</b>.",
+          "speaker": "MENTOR"
+        }
+      ],
+      "chapter": null,
+      "example": [],
+      "visual": "The end card shows the series handle and the next topic title.",
+      "code": [],
+      "scene": {
+        "field": "navy",
+        "transition": "iris",
+        "label": "",
+        "objects": [
+          {
+            "id": "o1",
+            "kind": "end_card",
+            "props": {
+              "up_next": "Step by step: what happens in memory"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "at": "start",
+            "do": "enter",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          },
+          {
+            "at": "Next",
+            "do": "pulse",
+            "target": "o1",
+            "value": null,
+            "tone": null
+          }
+        ]
+      },
+      "estimated_seconds": 3.08
+    }
+  ],
+  "chapters": [],
+  "running_example": null,
+  "series": "@learnthesimpleway",
+  "next_topic": "Step by step: what happens in memory",
+  "tts_provider": null,
+  "voice_ref": null,
+  "theme": "mentor_student",
+  "language": "python",
+  "speakers": [
+    {
+      "role": "STUDENT",
+      "identity": "host",
+      "label": "Student",
+      "voice_slot": "motion_host"
+    },
+    {
+      "role": "MENTOR",
+      "identity": "python",
+      "label": "Mentor",
+      "voice_slot": "motion_char_1"
+    }
+  ],
+  "estimated_seconds": 75.38
+}

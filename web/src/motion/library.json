@@ -287,7 +287,7 @@
         "title": 16,
         "status": 14,
         "slot_name": 14,
-        "slot_value": 6
+        "slot_value": 18
       },
       "actions": [
         "enter",
@@ -460,11 +460,13 @@
       "props": {
         "name": "str",
         "value": "str",
-        "tone": "tone?"
+        "tone": "tone?",
+        "points_to": "str?"
       },
       "max": {
         "name": 16,
-        "value": 10
+        "value": 10,
+        "points_to": 18
       },
       "actions": [
         "enter",

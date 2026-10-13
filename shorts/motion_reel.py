@@ -820,10 +820,13 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
     --characters / --character)."""
     characters = config.MOTION_CHARACTERS if characters is None else characters
     character = config.MOTION_CHARACTER_PRESET if character is None else character
+    from . import motion_align, motion_plan_checks, motion_timeline, motion_voice
+    print(f"\n=== timing: {short_id} ===")
+    tags = []
+    if tags_path(short_id).exists():
+        tags = json.loads(tags_path(short_id).read_text(encoding="utf-8")).get("tags", [])
     total_clips = sum(len(manifest["shots"].get(s.id, [])) for s in script.shots)
     aligned = 0
-    from . import motion_align, motion_timeline, motion_voice
-    print(f"\n=== timing: {short_id} ===")
     seconds: dict[str, list[float]] = {}
     times: dict[str, list] = {}
     sources: dict[str, list[str]] = {}
@@ -850,20 +853,19 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
         for cap in c.captions:
             counts[cap.source] = counts.get(cap.source, 0) + 1
     print("  caption timing: " + ", ".join(f"{n} {k}" for k, n in sorted(counts.items())))
-    results = checks.run_motion_scene_graders(script, clocks) + [
-        checks.check_motion_duration_cap(script, measured_seconds=motion_timeline.total_seconds(clocks))]
-    for r in results:
-        print(f"  {r}")
-    audio = motion_voice.mix(script, manifest, clocks, trims)
-    tags = []
-    if tags_path(short_id).exists():
-        tags = json.loads(tags_path(short_id).read_text(encoding="utf-8")).get("tags", [])
     # the look chosen when the reel was set up; none saved = an older reel, "classic"
     design = (_load_setup(short_id).get("design") if _setup_path(short_id).exists() else None) or "classic"
-    plan = motion_timeline.build_plan(script, clocks, audio=f"audio/{audio.name}", cast=_cast(script),
+    plan = motion_timeline.build_plan(script, clocks, audio=None, cast=_cast(script),
                                       tags=tags, intro=intro, characters=characters,
                                       character=character, design=design,
                                       host_character=host_character)
+    results = checks.run_motion_scene_graders(script, clocks) + [
+        checks.check_motion_duration_cap(script, measured_seconds=motion_timeline.total_seconds(clocks)),
+        *motion_plan_checks.run(plan)]
+    for r in results:
+        print(f"  {r}")
+    audio = motion_voice.mix(script, manifest, clocks, trims)
+    plan = plan.model_copy(update={"audio": f"audio/{audio.name}"})
     if plan.characters:
         shown = sum(s.characters for s in plan.shots)
         print("  characters: " + ", ".join(

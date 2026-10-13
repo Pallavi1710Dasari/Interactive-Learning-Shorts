@@ -28,6 +28,8 @@ export type PlanCast = CastMember;
 export interface MotionPlan {
   /** The look it is drawn in (designs.ts); absent = "classic". */
   design?: string;
+  /** The layout rules it is drawn by (shorts/schema.py MotionPlan.rev); absent = 1. */
+  rev?: number;
   short_id: string; template: string; theme: string | null; series: string; concept_name: string;
   duration: number; audio: string | null; audio_url?: string; timing_source: string;
   /** "stub": the narration is stub silence (SHORTS_STUB=1); "recorded": a real

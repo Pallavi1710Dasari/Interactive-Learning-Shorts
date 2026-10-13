@@ -19,6 +19,7 @@ import { C, FONT, display, theme, type FieldName } from "../tokens";
 import { plainWord } from "../KaraokeCaption";
 import { clamp, ease, hash3, seg } from "../time";
 import { bubbleColours, textToneOn } from "./contrast";
+import library from "../library.json";
 
 export interface IdentityShape {
   rect?: number[]; circle?: number[]; path?: string; r?: number; stroke?: number; tone?: "main" | "soft";
@@ -240,6 +241,57 @@ export function ChatRow({ member, field, words, active, t, y, fade = 1 }: {
           })}
           {!text && <span>&nbsp;</span>}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** The chat bubble beside the drawn characters (library.json frame.chat.bubble):
+ * pushed to its speaker's side at a fixed margin, at most 70 % of the frame
+ * wide, with the role label as the ONE speaker indicator — the character on
+ * screen is the face, so there is no badge and no waveform. */
+export const SIDE_BUBBLE = (library as unknown as {
+  frame: { chat: { bubble: { side: number; max_w: number; avatar_gap: number; safe_bottom: number; label_h: number;
+                             pad_x: number; pad_y: number; line_h: number; chars: number; gap: number } } }
+}).frame.chat.bubble;
+
+export function sideBubbleHeight(text: string): number {
+  const b = SIDE_BUBBLE;
+  return b.label_h + b.pad_y * 2 + bubbleLines(text, b.chars) * b.line_h;
+}
+
+export function SideBubble({ member, field, words, t, y, fade = 1 }: {
+  member: CastMember; field: FieldName; t: number; y: number; fade?: number;
+  words: { text: string; start: number; end: number; hl: boolean }[];
+}) {
+  const b = SIDE_BUBBLE;
+  const th = theme(field);
+  const left = member.side === "left";
+  const tone = toneOn(member.identity, field);
+  const host = member.identity.id === "host";
+  const colours = bubbleColours(host, field);
+  const older = fade < 1;
+  const border = host ? (th.dark ? "rgba(255,255,255,0.16)" : C.line) : tone;
+  const rise = 1 - ease.outCubic(clamp((t - (words[0]?.start ?? 0) + 0.25) / 0.3));
+  const side = left ? { left: b.side } : { right: b.side };
+  return (
+    <div data-part={`chat:${member.role}:${y}`} style={{ position: "absolute", ...side, top: y, maxWidth: b.max_w,
+                  display: "flex", flexDirection: "column", alignItems: left ? "flex-start" : "flex-end",
+                  transform: `translateY(${rise * 30}px)` }}>
+      <div style={{ height: b.label_h, display: "flex", alignItems: "center", opacity: older ? 0.7 : 1,
+                    fontFamily: FONT.mono, fontWeight: 700, fontSize: 20, letterSpacing: 3, textTransform: "uppercase",
+                    color: textToneOn(member.identity, field) }}>{member.label}</div>
+      <div data-bubble="" style={{ background: colours.bg, border: `3px solid ${border}`, borderColor: older ? "transparent" : undefined,
+                    borderRadius: 30, borderTopLeftRadius: left ? 8 : 30, borderTopRightRadius: left ? 30 : 8,
+                    padding: `${b.pad_y}px ${b.pad_x}px`, maxWidth: b.max_w, boxSizing: "border-box",
+                    fontFamily: FONT.body, fontWeight: 750, fontSize: BUBBLE.font, lineHeight: `${b.line_h}px`,
+                    color: colours.ink, letterSpacing: -0.3 }}>
+        {words.map((w, i) => {
+          const lit = !older && t >= w.start + Math.min(0.08, (w.end - w.start) / 3);
+          return <span key={i} style={{ color: !lit ? colours.dim : w.hl ? colours.accent : colours.ink }}>
+            {plainWord(w.text)}{i < words.length - 1 ? " " : ""}</span>;
+        })}
+        {!words.length && <span>&nbsp;</span>}
       </div>
     </div>
   );

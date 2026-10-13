@@ -1,0 +1,2997 @@
+{
+  "short_id": "variable_points_to_value__motion",
+  "template": "fix_story",
+  "theme": "mentor_student",
+  "design": "midnight_lab",
+  "series": "@learnthesimpleway",
+  "concept_name": "variable",
+  "duration": 70.262,
+  "audio": "audio/reel.wav",
+  "timing_source": "forced_alignment",
+  "identity": {
+    "id": "python",
+    "name": "Python",
+    "colour": "#2268C3",
+    "on_dark": "#7CABE8",
+    "on_light": "#2268C3",
+    "text_on_dark": "#B5CFF2",
+    "text_on_light": "#1E5CAD",
+    "file": "main.py",
+    "symbol": [
+      {
+        "rect": [
+          12.0,
+          16.0,
+          58.0,
+          15.0
+        ],
+        "r": 7.5,
+        "tone": "main"
+      },
+      {
+        "rect": [
+          30.0,
+          42.0,
+          56.0,
+          15.0
+        ],
+        "r": 7.5,
+        "tone": "main"
+      },
+      {
+        "rect": [
+          30.0,
+          68.0,
+          38.0,
+          15.0
+        ],
+        "r": 7.5,
+        "tone": "soft"
+      }
+    ]
+  },
+  "theme_label": "Mentor & student",
+  "tags": [
+    "#python",
+    "#mentor",
+    "#variable",
+    "#alias"
+  ],
+  "intro": 0.0,
+  "cast": [
+    {
+      "role": "STUDENT",
+      "side": "left",
+      "label": "Student",
+      "voice_slot": "motion_host",
+      "identity": {
+        "id": "host",
+        "name": "Host",
+        "colour": "#6C6F7A",
+        "on_dark": "#A6A8B0",
+        "on_light": "#6C6F7A",
+        "text_on_dark": "#CCCDD2",
+        "text_on_light": "#595B64",
+        "file": "",
+        "symbol": [
+          {
+            "rect": [
+              36.0,
+              12.0,
+              28.0,
+              46.0
+            ],
+            "r": 14.0,
+            "tone": "main"
+          },
+          {
+            "path": "M24 44 C24 66 76 66 76 44",
+            "r": 0,
+            "stroke": 8.0,
+            "tone": "main"
+          },
+          {
+            "rect": [
+              46.0,
+              64.0,
+              8.0,
+              18.0
+            ],
+            "r": 3.0,
+            "tone": "main"
+          },
+          {
+            "rect": [
+              32.0,
+              80.0,
+              36.0,
+              8.0
+            ],
+            "r": 4.0,
+            "tone": "main"
+          }
+        ]
+      }
+    },
+    {
+      "role": "MENTOR",
+      "side": "right",
+      "label": "Mentor",
+      "voice_slot": "motion_char_1",
+      "identity": {
+        "id": "python",
+        "name": "Python",
+        "colour": "#2268C3",
+        "on_dark": "#7CABE8",
+        "on_light": "#2268C3",
+        "text_on_dark": "#B5CFF2",
+        "text_on_light": "#1E5CAD",
+        "file": "main.py",
+        "symbol": [
+          {
+            "rect": [
+              12.0,
+              16.0,
+              58.0,
+              15.0
+            ],
+            "r": 7.5,
+            "tone": "main"
+          },
+          {
+            "rect": [
+              30.0,
+              42.0,
+              56.0,
+              15.0
+            ],
+            "r": 7.5,
+            "tone": "main"
+          },
+          {
+            "rect": [
+              30.0,
+              68.0,
+              38.0,
+              15.0
+            ],
+            "r": 7.5,
+            "tone": "soft"
+          }
+        ]
+      }
+    }
+  ],
+  "characters": [
+    {
+      "role": "STUDENT",
+      "preset": "host",
+      "config": {
+        "name": "Arjun",
+        "gender": "male",
+        "art": "soft",
+        "shading": "flat",
+        "skinTone": "#F8C9A8",
+        "hair": {
+          "style": "quiff",
+          "color": "#151515"
+        },
+        "face": {
+          "jaw": "square",
+          "brows": "medium",
+          "eyes": "oval",
+          "mouth": "full"
+        },
+        "outfit": {
+          "top": "shirtTie",
+          "topColor": "#FFFFFF",
+          "bottom": "trousers",
+          "bottomColor": "#1B2238",
+          "shoeColor": "#2A2F45",
+          "accentColor": "#6C6F7A"
+        },
+        "accessories": {
+          "belt": true
+        },
+        "build": {
+          "height": 1.0,
+          "shoulders": 1.0
+        }
+      },
+      "side": "left",
+      "seed": 303,
+      "cues": [
+        {
+          "t": 0.0,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": ""
+        },
+        {
+          "t": 0.21,
+          "kind": "gesture",
+          "name": "shrug",
+          "side": null,
+          "cue": "Why"
+        },
+        {
+          "t": 0.31,
+          "kind": "expression",
+          "name": "confused",
+          "side": null,
+          "cue": "Why"
+        },
+        {
+          "t": 3.576,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": "A"
+        },
+        {
+          "t": 5.319,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "box."
+        },
+        {
+          "t": 8.044,
+          "kind": "gesture",
+          "name": "handsSpread",
+          "side": null,
+          "cue": "`cart`"
+        },
+        {
+          "t": 8.144,
+          "kind": "expression",
+          "name": "neutral",
+          "side": null,
+          "cue": "`cart`"
+        },
+        {
+          "t": 12.751,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": "That"
+        },
+        {
+          "t": 19.073,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "space."
+        },
+        {
+          "t": 24.076,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "box."
+        },
+        {
+          "t": 29.588,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "is."
+        },
+        {
+          "t": 34.569,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "memory."
+        },
+        {
+          "t": 37.707,
+          "kind": "expression",
+          "name": "neutral",
+          "side": null,
+          "cue": "So"
+        },
+        {
+          "t": 38.578,
+          "kind": "gesture",
+          "name": "point",
+          "side": null,
+          "cue": "points"
+        },
+        {
+          "t": 40.253,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": "`cart`,"
+        },
+        {
+          "t": 46.035,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "box."
+        },
+        {
+          "t": 50.834,
+          "kind": "expression",
+          "name": "neutral",
+          "side": null,
+          "cue": "Now"
+        },
+        {
+          "t": 52.168,
+          "kind": "gesture",
+          "name": "pointUp",
+          "side": null,
+          "cue": "`cart`"
+        },
+        {
+          "t": 54.605,
+          "kind": "gesture",
+          "name": "okSign",
+          "side": null,
+          "cue": "points"
+        },
+        {
+          "t": 57.39,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": "A"
+        },
+        {
+          "t": 63.252,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "name."
+        },
+        {
+          "t": 67.121,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "more."
+        }
+      ]
+    },
+    {
+      "role": "MENTOR",
+      "preset": "cs",
+      "config": {
+        "name": "CS",
+        "gender": "female",
+        "art": "line",
+        "skinTone": "dusky",
+        "hair": {
+          "style": "bob",
+          "color": "black"
+        },
+        "face": {
+          "jaw": "oval",
+          "brows": "thin",
+          "eyes": "dot",
+          "mouth": "line"
+        },
+        "outfit": {
+          "top": "blouse",
+          "topColor": "#A82454",
+          "bottom": "skirt",
+          "bottomColor": "#171A3B",
+          "shoeColor": "#1A1F3D"
+        },
+        "accessories": {
+          "flower": true
+        },
+        "build": {
+          "height": 1.0,
+          "shoulders": 1.0
+        }
+      },
+      "side": "right",
+      "seed": 73,
+      "cues": [
+        {
+          "t": 0.0,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": ""
+        },
+        {
+          "t": 0.41,
+          "kind": "expression",
+          "name": "thinking",
+          "side": null,
+          "cue": "Why"
+        },
+        {
+          "t": 3.456,
+          "kind": "gesture",
+          "name": "handsSpread",
+          "side": null,
+          "cue": "variable"
+        },
+        {
+          "t": 3.476,
+          "kind": "expression",
+          "name": "happy",
+          "side": null,
+          "cue": "A"
+        },
+        {
+          "t": 8.244,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": "`cart`"
+        },
+        {
+          "t": 11.51,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "box."
+        },
+        {
+          "t": 12.651,
+          "kind": "expression",
+          "name": "happy",
+          "side": null,
+          "cue": "That"
+        },
+        {
+          "t": 17.135,
+          "kind": "gesture",
+          "name": "point",
+          "side": "R",
+          "cue": "memory,"
+        },
+        {
+          "t": 20.495,
+          "kind": "gesture",
+          "name": "pointUp",
+          "side": "R",
+          "cue": "tag"
+        },
+        {
+          "t": 24.608,
+          "kind": "gesture",
+          "name": "okSign",
+          "side": "R",
+          "cue": "variable"
+        },
+        {
+          "t": 28.533,
+          "kind": "gesture",
+          "name": "presentLeft",
+          "side": null,
+          "cue": "where"
+        },
+        {
+          "t": 31.297,
+          "kind": "gesture",
+          "name": "handsSpread",
+          "side": null,
+          "cue": "two"
+        },
+        {
+          "t": 35.948,
+          "kind": "gesture",
+          "name": "point",
+          "side": "R",
+          "cue": "variable"
+        },
+        {
+          "t": 37.807,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": "So"
+        },
+        {
+          "t": 39.153,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "it."
+        },
+        {
+          "t": 40.153,
+          "kind": "expression",
+          "name": "happy",
+          "side": null,
+          "cue": "`cart`,"
+        },
+        {
+          "t": 41.622,
+          "kind": "gesture",
+          "name": "pointUp",
+          "side": "R",
+          "cue": "variable,"
+        },
+        {
+          "t": 44.678,
+          "kind": "gesture",
+          "name": "okSign",
+          "side": "R",
+          "cue": "ties"
+        },
+        {
+          "t": 48.216,
+          "kind": "gesture",
+          "name": "presentLeft",
+          "side": null,
+          "cue": "list,"
+        },
+        {
+          "t": 50.934,
+          "kind": "expression",
+          "name": "listening",
+          "side": null,
+          "cue": "Now"
+        },
+        {
+          "t": 51.816,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "it."
+        },
+        {
+          "t": 56.007,
+          "kind": "gesture",
+          "name": "nod",
+          "side": null,
+          "cue": "does."
+        },
+        {
+          "t": 57.29,
+          "kind": "expression",
+          "name": "happy",
+          "side": null,
+          "cue": "A"
+        },
+        {
+          "t": 62.739,
+          "kind": "gesture",
+          "name": "handsSpread",
+          "side": null,
+          "cue": "ties"
+        },
+        {
+          "t": 69.139,
+          "kind": "gesture",
+          "name": "thumbsUp",
+          "side": "R",
+          "cue": "memory."
+        },
+        {
+          "t": 69.339,
+          "kind": "expression",
+          "name": "grin",
+          "side": null,
+          "cue": "memory."
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "s01",
+      "beat": "hook",
+      "chapter": null,
+      "start": 0.0,
+      "end": 3.166,
+      "field": "navy",
+      "transition": "cut",
+      "label": "",
+      "layout": "duo",
+      "characters": true,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "memory_box",
+          "props": {
+            "name": "cart",
+            "value": "milk,bread"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 333.0,
+            "w": 960.0,
+            "h": 250.0
+          }
+        },
+        {
+          "id": "o2",
+          "kind": "status_pill",
+          "props": {
+            "text": "not inside?",
+            "tone": "bad",
+            "icon": "alert"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 643.0,
+            "w": 960.0,
+            "h": 104.0
+          }
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.0,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 0.934,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "cart"
+        },
+        {
+          "t": 1.256,
+          "do": "state",
+          "target": "o1",
+          "value": "?",
+          "tone": "bad",
+          "cue": "actually hold"
+        },
+        {
+          "t": 1.982,
+          "do": "enter",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "milk and bread"
+        }
+      ],
+      "captions": [
+        {
+          "text": "Why doesn't <b>cart</b> actually hold my milk and bread?",
+          "speaker": "STUDENT",
+          "start": 0.35,
+          "end": 2.716,
+          "words": [
+            {
+              "text": "Why",
+              "start": 0.41,
+              "end": 0.511,
+              "hl": false
+            },
+            {
+              "text": "doesn't",
+              "start": 0.612,
+              "end": 0.854,
+              "hl": false
+            },
+            {
+              "text": "cart",
+              "start": 0.934,
+              "end": 1.115,
+              "hl": true
+            },
+            {
+              "text": "actually",
+              "start": 1.256,
+              "end": 1.559,
+              "hl": false
+            },
+            {
+              "text": "hold",
+              "start": 1.599,
+              "end": 1.76,
+              "hl": false
+            },
+            {
+              "text": "my",
+              "start": 1.821,
+              "end": 1.901,
+              "hl": false
+            },
+            {
+              "text": "milk",
+              "start": 1.982,
+              "end": 2.143,
+              "hl": false
+            },
+            {
+              "text": "and",
+              "start": 2.244,
+              "end": 2.324,
+              "hl": false
+            },
+            {
+              "text": "bread?",
+              "start": 2.385,
+              "end": 2.566,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s02",
+      "beat": "title",
+      "chapter": null,
+      "start": 3.166,
+      "end": 6.151,
+      "field": "blue",
+      "transition": "iris",
+      "label": "",
+      "layout": "duo",
+      "characters": false,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "title_card",
+          "props": {
+            "title": "Variable",
+            "promise": "Names point, they don't hold",
+            "icons": [
+              {
+                "name": "box",
+                "label": "The box",
+                "tone": "plain"
+              },
+              {
+                "name": "link",
+                "label": "The tie",
+                "tone": "plain"
+              },
+              {
+                "name": "memory",
+                "label": "Memory",
+                "tone": "plain"
+              }
+            ]
+          },
+          "box": null
+        }
+      ],
+      "actions": [
+        {
+          "t": 3.166,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 3.656,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "variable"
+        },
+        {
+          "t": 4.805,
+          "do": "highlight",
+          "target": "o1",
+          "value": "2",
+          "tone": null,
+          "cue": "tied"
+        }
+      ],
+      "captions": [
+        {
+          "text": "A <b>variable</b> is a name tied to a box.",
+          "speaker": "MENTOR",
+          "start": 3.516,
+          "end": 5.701,
+          "words": [
+            {
+              "text": "A",
+              "start": 3.576,
+              "end": 3.596,
+              "hl": false
+            },
+            {
+              "text": "variable",
+              "start": 3.656,
+              "end": 4.1,
+              "hl": true
+            },
+            {
+              "text": "is",
+              "start": 4.241,
+              "end": 4.301,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 4.362,
+              "end": 4.382,
+              "hl": false
+            },
+            {
+              "text": "name",
+              "start": 4.462,
+              "end": 4.664,
+              "hl": false
+            },
+            {
+              "text": "tied",
+              "start": 4.805,
+              "end": 5.027,
+              "hl": false
+            },
+            {
+              "text": "to",
+              "start": 5.087,
+              "end": 5.168,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 5.269,
+              "end": 5.289,
+              "hl": false
+            },
+            {
+              "text": "box.",
+              "start": 5.369,
+              "end": 5.551,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s03",
+      "beat": "setup",
+      "chapter": null,
+      "start": 6.151,
+      "end": 12.341,
+      "field": "paper",
+      "transition": "bar_wipe",
+      "label": "THE SETUP",
+      "layout": "duo",
+      "characters": true,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "code_window",
+          "props": {
+            "file": "cart.py",
+            "lines": [
+              "cart = [\"milk\", \"bread\"]"
+            ]
+          },
+          "box": {
+            "x": 60.0,
+            "y": 311.0,
+            "w": 960.0,
+            "h": 294.0
+          }
+        },
+        {
+          "id": "o2",
+          "kind": "status_pill",
+          "props": {
+            "text": "milk, bread",
+            "tone": "info",
+            "icon": "list"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 665.0,
+            "w": 960.0,
+            "h": 104.0
+          }
+        }
+      ],
+      "actions": [
+        {
+          "t": 6.151,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 7.026,
+          "do": "type",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "line you wrote"
+        },
+        {
+          "t": 8.244,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "cart equals"
+        },
+        {
+          "t": 9.771,
+          "do": "enter",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "milk and bread"
+        },
+        {
+          "t": 11.118,
+          "do": "state",
+          "target": "o2",
+          "value": "filling a box?",
+          "tone": "bad",
+          "cue": "filling a box"
+        }
+      ],
+      "captions": [
+        {
+          "text": "Show me the line you wrote.",
+          "speaker": "MENTOR",
+          "start": 6.501,
+          "end": 7.884,
+          "words": [
+            {
+              "text": "Show",
+              "start": 6.561,
+              "end": 6.723,
+              "hl": false
+            },
+            {
+              "text": "me",
+              "start": 6.804,
+              "end": 6.844,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 6.925,
+              "end": 6.986,
+              "hl": false
+            },
+            {
+              "text": "line",
+              "start": 7.026,
+              "end": 7.208,
+              "hl": false
+            },
+            {
+              "text": "you",
+              "start": 7.269,
+              "end": 7.37,
+              "hl": false
+            },
+            {
+              "text": "wrote.",
+              "start": 7.431,
+              "end": 7.734,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "`cart` equals a list of milk and bread, like filling a box.",
+          "speaker": "STUDENT",
+          "start": 8.184,
+          "end": 11.891,
+          "words": [
+            {
+              "text": "`cart`",
+              "start": 8.244,
+              "end": 8.485,
+              "hl": false
+            },
+            {
+              "text": "equals",
+              "start": 8.726,
+              "end": 9.028,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 9.108,
+              "end": 9.128,
+              "hl": false
+            },
+            {
+              "text": "list",
+              "start": 9.208,
+              "end": 9.409,
+              "hl": false
+            },
+            {
+              "text": "of",
+              "start": 9.51,
+              "end": 9.55,
+              "hl": false
+            },
+            {
+              "text": "milk",
+              "start": 9.771,
+              "end": 9.972,
+              "hl": false
+            },
+            {
+              "text": "and",
+              "start": 10.073,
+              "end": 10.153,
+              "hl": false
+            },
+            {
+              "text": "bread,",
+              "start": 10.253,
+              "end": 10.495,
+              "hl": false
+            },
+            {
+              "text": "like",
+              "start": 10.876,
+              "end": 11.037,
+              "hl": false
+            },
+            {
+              "text": "filling",
+              "start": 11.118,
+              "end": 11.399,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 11.479,
+              "end": 11.499,
+              "hl": false
+            },
+            {
+              "text": "box.",
+              "start": 11.56,
+              "end": 11.741,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s04",
+      "beat": "break_1",
+      "chapter": null,
+      "start": 12.341,
+      "end": 21.841,
+      "field": "paper",
+      "transition": "cut",
+      "label": "WHY IT FAILS",
+      "layout": "duo",
+      "characters": true,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "status_pill",
+          "props": {
+            "text": "filling a box",
+            "tone": "bad",
+            "icon": "box"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 308.0,
+            "w": 960.0,
+            "h": 104.0
+          }
+        },
+        {
+          "id": "o2",
+          "kind": "system_panel",
+          "props": {
+            "title": "Memory",
+            "status": "the list",
+            "tone": "plain",
+            "slot_name": "tag",
+            "slot_value": "cart"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 472.0,
+            "w": 960.0,
+            "h": 300.0
+          }
+        }
+      ],
+      "actions": [
+        {
+          "t": 12.341,
+          "do": "enter",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 13.697,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "filling a box"
+        },
+        {
+          "t": 14.784,
+          "do": "state",
+          "target": "o1",
+          "value": "not a box",
+          "tone": "bad",
+          "cue": "it isn't"
+        },
+        {
+          "t": 15.467,
+          "do": "pulse",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "The list"
+        },
+        {
+          "t": 15.989,
+          "do": "state",
+          "target": "o2",
+          "value": "the box",
+          "tone": "plain",
+          "cue": "is the box"
+        },
+        {
+          "t": 16.833,
+          "do": "pulse",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "sitting in"
+        },
+        {
+          "t": 17.335,
+          "do": "state",
+          "target": "o2",
+          "value": "in memory",
+          "tone": "plain",
+          "cue": "memory"
+        },
+        {
+          "t": 18.661,
+          "do": "pulse",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "storage space"
+        },
+        {
+          "t": 19.805,
+          "do": "pulse",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "cart is just"
+        },
+        {
+          "t": 20.695,
+          "do": "state",
+          "target": "o1",
+          "value": "just a tag",
+          "tone": "bad",
+          "cue": "tag"
+        }
+      ],
+      "captions": [
+        {
+          "text": "That line looks like filling a box, but it isn't.",
+          "speaker": "MENTOR",
+          "start": 12.691,
+          "end": 15.257,
+          "words": [
+            {
+              "text": "That",
+              "start": 12.751,
+              "end": 12.892,
+              "hl": false
+            },
+            {
+              "text": "line",
+              "start": 12.972,
+              "end": 13.173,
+              "hl": false
+            },
+            {
+              "text": "looks",
+              "start": 13.234,
+              "end": 13.415,
+              "hl": false
+            },
+            {
+              "text": "like",
+              "start": 13.476,
+              "end": 13.637,
+              "hl": false
+            },
+            {
+              "text": "filling",
+              "start": 13.697,
+              "end": 13.939,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 13.999,
+              "end": 14.019,
+              "hl": false
+            },
+            {
+              "text": "box,",
+              "start": 14.1,
+              "end": 14.261,
+              "hl": false
+            },
+            {
+              "text": "but",
+              "start": 14.623,
+              "end": 14.724,
+              "hl": false
+            },
+            {
+              "text": "it",
+              "start": 14.784,
+              "end": 14.825,
+              "hl": false
+            },
+            {
+              "text": "isn't.",
+              "start": 14.905,
+              "end": 15.107,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "The list is the box, sitting in <b>memory</b>, the computer's storage space.",
+          "speaker": "MENTOR",
+          "start": 15.407,
+          "end": 19.595,
+          "words": [
+            {
+              "text": "The",
+              "start": 15.467,
+              "end": 15.527,
+              "hl": false
+            },
+            {
+              "text": "list",
+              "start": 15.588,
+              "end": 15.809,
+              "hl": false
+            },
+            {
+              "text": "is",
+              "start": 15.989,
+              "end": 16.05,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 16.11,
+              "end": 16.19,
+              "hl": false
+            },
+            {
+              "text": "box,",
+              "start": 16.251,
+              "end": 16.431,
+              "hl": false
+            },
+            {
+              "text": "sitting",
+              "start": 16.833,
+              "end": 17.134,
+              "hl": false
+            },
+            {
+              "text": "in",
+              "start": 17.195,
+              "end": 17.235,
+              "hl": false
+            },
+            {
+              "text": "memory,",
+              "start": 17.335,
+              "end": 17.717,
+              "hl": true
+            },
+            {
+              "text": "the",
+              "start": 17.918,
+              "end": 17.998,
+              "hl": false
+            },
+            {
+              "text": "computer's",
+              "start": 18.059,
+              "end": 18.601,
+              "hl": false
+            },
+            {
+              "text": "storage",
+              "start": 18.661,
+              "end": 19.063,
+              "hl": false
+            },
+            {
+              "text": "space.",
+              "start": 19.123,
+              "end": 19.445,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "`cart` is just a <b>tag</b> on it.",
+          "speaker": "MENTOR",
+          "start": 19.745,
+          "end": 21.391,
+          "words": [
+            {
+              "text": "`cart`",
+              "start": 19.805,
+              "end": 20.048,
+              "hl": false
+            },
+            {
+              "text": "is",
+              "start": 20.23,
+              "end": 20.291,
+              "hl": false
+            },
+            {
+              "text": "just",
+              "start": 20.351,
+              "end": 20.513,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 20.594,
+              "end": 20.614,
+              "hl": false
+            },
+            {
+              "text": "tag",
+              "start": 20.695,
+              "end": 20.938,
+              "hl": true
+            },
+            {
+              "text": "on",
+              "start": 21.059,
+              "end": 21.1,
+              "hl": false
+            },
+            {
+              "text": "it.",
+              "start": 21.201,
+              "end": 21.241,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s05",
+      "beat": "fix_idea",
+      "chapter": null,
+      "start": 21.841,
+      "end": 30.278,
+      "field": "paper",
+      "transition": "cut",
+      "label": "THE IDEA",
+      "layout": "duo",
+      "characters": true,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "compare",
+          "props": {
+            "left": "Box",
+            "right": "Name tag",
+            "left_icon": "box",
+            "right_icon": "link"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 248.0,
+            "w": 960.0,
+            "h": 420.0
+          }
+        },
+        {
+          "id": "o2",
+          "kind": "status_pill",
+          "props": {
+            "text": "where",
+            "tone": "info",
+            "icon": "search"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 728.0,
+            "w": 960.0,
+            "h": 104.0
+          }
+        }
+      ],
+      "actions": [
+        {
+          "t": 21.841,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 22.755,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "name tag"
+        },
+        {
+          "t": 24.025,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "a box"
+        },
+        {
+          "t": 24.808,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "variable"
+        },
+        {
+          "t": 25.957,
+          "do": "reveal",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "the tag"
+        },
+        {
+          "t": 27.586,
+          "do": "enter",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "tells Python"
+        },
+        {
+          "t": 29.175,
+          "do": "state",
+          "target": "o2",
+          "value": "where the box is",
+          "tone": "ok",
+          "cue": "box is"
+        }
+      ],
+      "captions": [
+        {
+          "text": "Picture a name tag tied to a box.",
+          "speaker": "MENTOR",
+          "start": 22.191,
+          "end": 24.457,
+          "words": [
+            {
+              "text": "Picture",
+              "start": 22.251,
+              "end": 22.574,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 22.654,
+              "end": 22.675,
+              "hl": false
+            },
+            {
+              "text": "name",
+              "start": 22.755,
+              "end": 22.957,
+              "hl": false
+            },
+            {
+              "text": "tag",
+              "start": 23.037,
+              "end": 23.279,
+              "hl": false
+            },
+            {
+              "text": "tied",
+              "start": 23.561,
+              "end": 23.783,
+              "hl": false
+            },
+            {
+              "text": "to",
+              "start": 23.844,
+              "end": 23.924,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 24.025,
+              "end": 24.045,
+              "hl": false
+            },
+            {
+              "text": "box.",
+              "start": 24.126,
+              "end": 24.307,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "The <b>variable</b> `cart` is the tag.",
+          "speaker": "MENTOR",
+          "start": 24.607,
+          "end": 26.511,
+          "words": [
+            {
+              "text": "The",
+              "start": 24.667,
+              "end": 24.767,
+              "hl": false
+            },
+            {
+              "text": "variable",
+              "start": 24.808,
+              "end": 25.171,
+              "hl": true
+            },
+            {
+              "text": "`cart`",
+              "start": 25.231,
+              "end": 25.514,
+              "hl": false
+            },
+            {
+              "text": "is",
+              "start": 25.836,
+              "end": 25.877,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 25.957,
+              "end": 26.038,
+              "hl": false
+            },
+            {
+              "text": "tag.",
+              "start": 26.098,
+              "end": 26.361,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "The tag only tells Python <b>where</b> the box is.",
+          "speaker": "MENTOR",
+          "start": 26.661,
+          "end": 29.828,
+          "words": [
+            {
+              "text": "The",
+              "start": 26.721,
+              "end": 26.802,
+              "hl": false
+            },
+            {
+              "text": "tag",
+              "start": 26.882,
+              "end": 27.144,
+              "hl": false
+            },
+            {
+              "text": "only",
+              "start": 27.345,
+              "end": 27.506,
+              "hl": false
+            },
+            {
+              "text": "tells",
+              "start": 27.586,
+              "end": 27.787,
+              "hl": false
+            },
+            {
+              "text": "Python",
+              "start": 27.888,
+              "end": 28.23,
+              "hl": false
+            },
+            {
+              "text": "where",
+              "start": 28.733,
+              "end": 28.974,
+              "hl": true
+            },
+            {
+              "text": "the",
+              "start": 29.034,
+              "end": 29.115,
+              "hl": false
+            },
+            {
+              "text": "box",
+              "start": 29.175,
+              "end": 29.336,
+              "hl": false
+            },
+            {
+              "text": "is.",
+              "start": 29.638,
+              "end": 29.678,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s06",
+      "beat": "fix_flow",
+      "chapter": null,
+      "start": 30.278,
+      "end": 39.843,
+      "field": "paper",
+      "transition": "cut",
+      "label": "TWO THINGS",
+      "layout": "duo",
+      "characters": true,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "trigger_chip",
+          "props": {
+            "label": "run line"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 275.0,
+            "w": 960.0,
+            "h": 110.0
+          }
+        },
+        {
+          "id": "o2",
+          "kind": "flow",
+          "props": {
+            "steps": [
+              {
+                "name": "code",
+                "label": "Run line",
+                "tone": "plain"
+              },
+              {
+                "name": "box",
+                "label": "Make list",
+                "tone": "plain"
+              },
+              {
+                "name": "link",
+                "label": "Tie cart",
+                "tone": "ok"
+              }
+            ],
+            "packet": "2 items"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 505.0,
+            "w": 960.0,
+            "h": 300.0
+          }
+        },
+        {
+          "id": "o3",
+          "kind": "connector",
+          "props": {
+            "from": "o1",
+            "to": "o2",
+            "points": [
+              [
+                540.0,
+                395.0
+              ],
+              [
+                540.0,
+                495.0
+              ]
+            ]
+          },
+          "box": null
+        }
+      ],
+      "actions": [
+        {
+          "t": 30.278,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 30.278,
+          "do": "enter",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 31.497,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "two things"
+        },
+        {
+          "t": 31.497,
+          "do": "enter",
+          "target": "o3",
+          "value": null,
+          "tone": null,
+          "cue": "two things"
+        },
+        {
+          "t": 32.423,
+          "do": "highlight",
+          "target": "o2",
+          "value": "1",
+          "tone": null,
+          "cue": "First"
+        },
+        {
+          "t": 33.128,
+          "do": "travel",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "makes a list"
+        },
+        {
+          "t": 33.954,
+          "do": "highlight",
+          "target": "o2",
+          "value": "2",
+          "tone": null,
+          "cue": "2 items"
+        },
+        {
+          "t": 35.744,
+          "do": "highlight",
+          "target": "o2",
+          "value": "3",
+          "tone": null,
+          "cue": "ties the"
+        },
+        {
+          "t": 36.148,
+          "do": "pulse",
+          "target": "o3",
+          "value": null,
+          "tone": null,
+          "cue": "variable cart"
+        },
+        {
+          "t": 37.807,
+          "do": "highlight",
+          "target": "o2",
+          "value": "3",
+          "tone": null,
+          "cue": "So the"
+        },
+        {
+          "t": 38.778,
+          "do": "state",
+          "target": "o3",
+          "value": null,
+          "tone": "ok",
+          "cue": "points"
+        }
+      ],
+      "captions": [
+        {
+          "text": "Python does <b>two things</b>.",
+          "speaker": "MENTOR",
+          "start": 30.628,
+          "end": 32.213,
+          "words": [
+            {
+              "text": "Python",
+              "start": 30.688,
+              "end": 31.032,
+              "hl": false
+            },
+            {
+              "text": "does",
+              "start": 31.133,
+              "end": 31.335,
+              "hl": false
+            },
+            {
+              "text": "two",
+              "start": 31.497,
+              "end": 31.618,
+              "hl": true
+            },
+            {
+              "text": "things.",
+              "start": 31.76,
+              "end": 32.063,
+              "hl": true
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "First, it makes a list of 2 items in memory.",
+          "speaker": "MENTOR",
+          "start": 32.363,
+          "end": 35.071,
+          "words": [
+            {
+              "text": "First,",
+              "start": 32.423,
+              "end": 32.746,
+              "hl": false
+            },
+            {
+              "text": "it",
+              "start": 33.007,
+              "end": 33.048,
+              "hl": false
+            },
+            {
+              "text": "makes",
+              "start": 33.128,
+              "end": 33.33,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 33.39,
+              "end": 33.41,
+              "hl": false
+            },
+            {
+              "text": "list",
+              "start": 33.451,
+              "end": 33.652,
+              "hl": false
+            },
+            {
+              "text": "of",
+              "start": 33.793,
+              "end": 33.833,
+              "hl": false
+            },
+            {
+              "text": "2",
+              "start": 33.954,
+              "end": 34.055,
+              "hl": false
+            },
+            {
+              "text": "items",
+              "start": 34.176,
+              "end": 34.458,
+              "hl": false
+            },
+            {
+              "text": "in",
+              "start": 34.518,
+              "end": 34.558,
+              "hl": false
+            },
+            {
+              "text": "memory.",
+              "start": 34.619,
+              "end": 34.921,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "Then it ties the <b>variable</b> `cart` to it.",
+          "speaker": "MENTOR",
+          "start": 35.221,
+          "end": 37.447,
+          "words": [
+            {
+              "text": "Then",
+              "start": 35.281,
+              "end": 35.402,
+              "hl": false
+            },
+            {
+              "text": "it",
+              "start": 35.623,
+              "end": 35.664,
+              "hl": false
+            },
+            {
+              "text": "ties",
+              "start": 35.744,
+              "end": 35.946,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 36.007,
+              "end": 36.087,
+              "hl": false
+            },
+            {
+              "text": "variable",
+              "start": 36.148,
+              "end": 36.511,
+              "hl": true
+            },
+            {
+              "text": "`cart`",
+              "start": 36.571,
+              "end": 36.773,
+              "hl": false
+            },
+            {
+              "text": "to",
+              "start": 36.995,
+              "end": 37.075,
+              "hl": false
+            },
+            {
+              "text": "it.",
+              "start": 37.176,
+              "end": 37.297,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "So the variable just <b>points</b> to it.",
+          "speaker": "STUDENT",
+          "start": 37.747,
+          "end": 39.393,
+          "words": [
+            {
+              "text": "So",
+              "start": 37.807,
+              "end": 37.888,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 37.969,
+              "end": 38.029,
+              "hl": false
+            },
+            {
+              "text": "variable",
+              "start": 38.09,
+              "end": 38.495,
+              "hl": false
+            },
+            {
+              "text": "just",
+              "start": 38.555,
+              "end": 38.697,
+              "hl": false
+            },
+            {
+              "text": "points",
+              "start": 38.778,
+              "end": 38.98,
+              "hl": true
+            },
+            {
+              "text": "to",
+              "start": 39.061,
+              "end": 39.122,
+              "hl": false
+            },
+            {
+              "text": "it.",
+              "start": 39.203,
+              "end": 39.243,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s07",
+      "beat": "code_map",
+      "chapter": null,
+      "start": 39.843,
+      "end": 50.524,
+      "field": "paper",
+      "transition": "cut",
+      "label": "",
+      "layout": "duo",
+      "characters": false,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "code_map",
+          "props": {
+            "lines": [
+              "# cart: the variable",
+              "cart = [\"milk\", \"bread\"]"
+            ],
+            "parts": [
+              {
+                "code": "cart",
+                "icon": "arrow_right",
+                "label": "The tag"
+              },
+              {
+                "code": "=",
+                "icon": "link",
+                "label": "Ties"
+              },
+              {
+                "code": "[ ]",
+                "icon": "box",
+                "label": "The box"
+              }
+            ]
+          },
+          "box": null
+        }
+      ],
+      "actions": [
+        {
+          "t": 39.843,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 40.253,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "cart"
+        },
+        {
+          "t": 41.822,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "variable"
+        },
+        {
+          "t": 43.028,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "the tag"
+        },
+        {
+          "t": 44.878,
+          "do": "highlight",
+          "target": "o1",
+          "value": "2",
+          "tone": null,
+          "cue": "ties"
+        },
+        {
+          "t": 45.2,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "the tag"
+        },
+        {
+          "t": 45.965,
+          "do": "highlight",
+          "target": "o1",
+          "value": "3",
+          "tone": null,
+          "cue": "the box"
+        },
+        {
+          "t": 47.451,
+          "do": "highlight",
+          "target": "o1",
+          "value": "3",
+          "tone": null,
+          "cue": "right"
+        },
+        {
+          "t": 48.416,
+          "do": "highlight",
+          "target": "o1",
+          "value": "3",
+          "tone": null,
+          "cue": "list"
+        },
+        {
+          "t": 49.602,
+          "do": "highlight",
+          "target": "o1",
+          "value": "3",
+          "tone": null,
+          "cue": "the box"
+        }
+      ],
+      "captions": [
+        {
+          "text": "`cart`, on the left, is the <b>variable</b>, the tag.",
+          "speaker": "MENTOR",
+          "start": 40.193,
+          "end": 43.54,
+          "words": [
+            {
+              "text": "`cart`,",
+              "start": 40.253,
+              "end": 40.494,
+              "hl": false
+            },
+            {
+              "text": "on",
+              "start": 40.756,
+              "end": 40.796,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 40.856,
+              "end": 40.937,
+              "hl": false
+            },
+            {
+              "text": "left,",
+              "start": 40.977,
+              "end": 41.198,
+              "hl": false
+            },
+            {
+              "text": "is",
+              "start": 41.6,
+              "end": 41.661,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 41.721,
+              "end": 41.781,
+              "hl": false
+            },
+            {
+              "text": "variable,",
+              "start": 41.822,
+              "end": 42.284,
+              "hl": true
+            },
+            {
+              "text": "the",
+              "start": 43.028,
+              "end": 43.109,
+              "hl": false
+            },
+            {
+              "text": "tag.",
+              "start": 43.169,
+              "end": 43.39,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "The `=` sign <b>ties</b> the tag to the box.",
+          "speaker": "MENTOR",
+          "start": 43.69,
+          "end": 46.417,
+          "words": [
+            {
+              "text": "The`=`",
+              "start": 43.75,
+              "end": 44.314,
+              "hl": false
+            },
+            {
+              "text": "sign",
+              "start": 44.415,
+              "end": 44.656,
+              "hl": false
+            },
+            {
+              "text": "ties",
+              "start": 44.878,
+              "end": 45.119,
+              "hl": true
+            },
+            {
+              "text": "the",
+              "start": 45.2,
+              "end": 45.28,
+              "hl": false
+            },
+            {
+              "text": "tag",
+              "start": 45.341,
+              "end": 45.582,
+              "hl": false
+            },
+            {
+              "text": "to",
+              "start": 45.824,
+              "end": 45.904,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 45.965,
+              "end": 46.025,
+              "hl": false
+            },
+            {
+              "text": "box.",
+              "start": 46.085,
+              "end": 46.267,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "The `[ ]` on the right build the <b>list</b>, the box.",
+          "speaker": "MENTOR",
+          "start": 46.567,
+          "end": 50.074,
+          "words": [
+            {
+              "text": "The`[]`",
+              "start": 46.627,
+              "end": 46.707,
+              "hl": false
+            },
+            {
+              "text": "on",
+              "start": 46.768,
+              "end": 47.149,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 47.21,
+              "end": 47.391,
+              "hl": false
+            },
+            {
+              "text": "right",
+              "start": 47.451,
+              "end": 47.692,
+              "hl": false
+            },
+            {
+              "text": "build",
+              "start": 47.974,
+              "end": 48.195,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 48.315,
+              "end": 48.376,
+              "hl": false
+            },
+            {
+              "text": "list,",
+              "start": 48.416,
+              "end": 48.657,
+              "hl": true
+            },
+            {
+              "text": "the",
+              "start": 49.602,
+              "end": 49.682,
+              "hl": false
+            },
+            {
+              "text": "box.",
+              "start": 49.723,
+              "end": 49.924,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s08",
+      "beat": "payoff",
+      "chapter": null,
+      "start": 50.524,
+      "end": 56.98,
+      "field": "navy",
+      "transition": "diagonal_stripes",
+      "label": "",
+      "layout": "duo",
+      "characters": true,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "memory_box",
+          "props": {
+            "name": "cart",
+            "value": "milk,bread"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 333.0,
+            "w": 960.0,
+            "h": 250.0
+          }
+        },
+        {
+          "id": "o2",
+          "kind": "status_pill",
+          "props": {
+            "text": "points to list",
+            "tone": "ok",
+            "icon": "check"
+          },
+          "box": {
+            "x": 60.0,
+            "y": 643.0,
+            "w": 960.0,
+            "h": 104.0
+          }
+        }
+      ],
+      "actions": [
+        {
+          "t": 50.524,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 51.623,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "get it"
+        },
+        {
+          "t": 52.812,
+          "do": "state",
+          "target": "o1",
+          "value": "→ list",
+          "tone": null,
+          "cue": "doesn't hold"
+        },
+        {
+          "t": 54.001,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "bread"
+        },
+        {
+          "t": 54.805,
+          "do": "enter",
+          "target": "o2",
+          "value": null,
+          "tone": null,
+          "cue": "points"
+        },
+        {
+          "t": 55.39,
+          "do": "state",
+          "target": "o1",
+          "value": "→ list",
+          "tone": "ok",
+          "cue": "list that does"
+        }
+      ],
+      "captions": [
+        {
+          "text": "Now I get it.",
+          "speaker": "STUDENT",
+          "start": 50.874,
+          "end": 52.158,
+          "words": [
+            {
+              "text": "Now",
+              "start": 50.934,
+              "end": 51.096,
+              "hl": false
+            },
+            {
+              "text": "I",
+              "start": 51.481,
+              "end": 51.501,
+              "hl": false
+            },
+            {
+              "text": "get",
+              "start": 51.623,
+              "end": 51.765,
+              "hl": false
+            },
+            {
+              "text": "it.",
+              "start": 51.866,
+              "end": 52.008,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "`cart` doesn't hold my milk and bread.",
+          "speaker": "STUDENT",
+          "start": 52.308,
+          "end": 54.454,
+          "words": [
+            {
+              "text": "`cart`",
+              "start": 52.368,
+              "end": 52.59,
+              "hl": false
+            },
+            {
+              "text": "doesn't",
+              "start": 52.812,
+              "end": 53.074,
+              "hl": false
+            },
+            {
+              "text": "hold",
+              "start": 53.154,
+              "end": 53.356,
+              "hl": false
+            },
+            {
+              "text": "my",
+              "start": 53.437,
+              "end": 53.537,
+              "hl": false
+            },
+            {
+              "text": "milk",
+              "start": 53.598,
+              "end": 53.799,
+              "hl": false
+            },
+            {
+              "text": "and",
+              "start": 53.88,
+              "end": 53.961,
+              "hl": false
+            },
+            {
+              "text": "bread.",
+              "start": 54.001,
+              "end": 54.304,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "It <b>points</b> to the list that does.",
+          "speaker": "STUDENT",
+          "start": 54.604,
+          "end": 56.53,
+          "words": [
+            {
+              "text": "It",
+              "start": 54.664,
+              "end": 54.704,
+              "hl": false
+            },
+            {
+              "text": "points",
+              "start": 54.805,
+              "end": 55.047,
+              "hl": true
+            },
+            {
+              "text": "to",
+              "start": 55.128,
+              "end": 55.189,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 55.249,
+              "end": 55.33,
+              "hl": false
+            },
+            {
+              "text": "list",
+              "start": 55.39,
+              "end": 55.592,
+              "hl": false
+            },
+            {
+              "text": "that",
+              "start": 55.814,
+              "end": 55.935,
+              "hl": false
+            },
+            {
+              "text": "does.",
+              "start": 56.057,
+              "end": 56.38,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s09",
+      "beat": "recap",
+      "chapter": null,
+      "start": 56.98,
+      "end": 66.21,
+      "field": "blue",
+      "transition": "stack_rise",
+      "label": "RECAP",
+      "layout": "duo",
+      "characters": false,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "takeaway_list",
+          "props": {
+            "heading": "Variable",
+            "rows": [
+              {
+                "icon": "box",
+                "line": "Tag, not box",
+                "sub": "A variable is a name"
+              },
+              {
+                "icon": "link",
+                "line": "Equals ties names",
+                "sub": "Make value, then tie"
+              },
+              {
+                "icon": "memory",
+                "line": "Points, not holds",
+                "sub": "Tag finds the box"
+              }
+            ]
+          },
+          "box": null
+        }
+      ],
+      "actions": [
+        {
+          "t": 56.98,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 57.491,
+          "do": "stagger",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "variable"
+        },
+        {
+          "t": 58.617,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "name tag"
+        },
+        {
+          "t": 59.582,
+          "do": "highlight",
+          "target": "o1",
+          "value": "1",
+          "tone": null,
+          "cue": "not a box"
+        },
+        {
+          "t": 60.766,
+          "do": "highlight",
+          "target": "o1",
+          "value": "2",
+          "tone": null,
+          "cue": "Writing equals"
+        },
+        {
+          "t": 61.933,
+          "do": "highlight",
+          "target": "o1",
+          "value": "2",
+          "tone": null,
+          "cue": "the value"
+        },
+        {
+          "t": 62.939,
+          "do": "highlight",
+          "target": "o1",
+          "value": "2",
+          "tone": null,
+          "cue": "ties"
+        },
+        {
+          "t": 63.854,
+          "do": "highlight",
+          "target": "o1",
+          "value": "3",
+          "tone": null,
+          "cue": "The tag"
+        },
+        {
+          "t": 64.662,
+          "do": "highlight",
+          "target": "o1",
+          "value": "3",
+          "tone": null,
+          "cue": "points"
+        },
+        {
+          "t": 65.126,
+          "do": "highlight",
+          "target": "o1",
+          "value": "3",
+          "tone": null,
+          "cue": "the value"
+        }
+      ],
+      "captions": [
+        {
+          "text": "A <b>variable</b> is a name tag, not a box.",
+          "speaker": "MENTOR",
+          "start": 57.33,
+          "end": 60.556,
+          "words": [
+            {
+              "text": "A",
+              "start": 57.39,
+              "end": 57.411,
+              "hl": false
+            },
+            {
+              "text": "variable",
+              "start": 57.491,
+              "end": 58.054,
+              "hl": true
+            },
+            {
+              "text": "is",
+              "start": 58.335,
+              "end": 58.396,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 58.496,
+              "end": 58.516,
+              "hl": false
+            },
+            {
+              "text": "name",
+              "start": 58.617,
+              "end": 58.838,
+              "hl": false
+            },
+            {
+              "text": "tag,",
+              "start": 58.918,
+              "end": 59.16,
+              "hl": false
+            },
+            {
+              "text": "not",
+              "start": 59.582,
+              "end": 59.803,
+              "hl": false
+            },
+            {
+              "text": "a",
+              "start": 60.024,
+              "end": 60.044,
+              "hl": false
+            },
+            {
+              "text": "box.",
+              "start": 60.165,
+              "end": 60.406,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "Writing equals makes the value, then <b>ties</b> the name.",
+          "speaker": "MENTOR",
+          "start": 60.706,
+          "end": 63.644,
+          "words": [
+            {
+              "text": "Writing",
+              "start": 60.766,
+              "end": 61.047,
+              "hl": false
+            },
+            {
+              "text": "equals",
+              "start": 61.128,
+              "end": 61.47,
+              "hl": false
+            },
+            {
+              "text": "makes",
+              "start": 61.691,
+              "end": 61.873,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 61.933,
+              "end": 62.014,
+              "hl": false
+            },
+            {
+              "text": "value,",
+              "start": 62.074,
+              "end": 62.396,
+              "hl": false
+            },
+            {
+              "text": "then",
+              "start": 62.718,
+              "end": 62.839,
+              "hl": false
+            },
+            {
+              "text": "ties",
+              "start": 62.939,
+              "end": 63.121,
+              "hl": true
+            },
+            {
+              "text": "the",
+              "start": 63.201,
+              "end": 63.262,
+              "hl": false
+            },
+            {
+              "text": "name.",
+              "start": 63.302,
+              "end": 63.523,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "The tag only <b>points</b> to the value.",
+          "speaker": "MENTOR",
+          "start": 63.794,
+          "end": 65.76,
+          "words": [
+            {
+              "text": "The",
+              "start": 63.854,
+              "end": 63.914,
+              "hl": false
+            },
+            {
+              "text": "tag",
+              "start": 63.995,
+              "end": 64.197,
+              "hl": false
+            },
+            {
+              "text": "only",
+              "start": 64.379,
+              "end": 64.581,
+              "hl": false
+            },
+            {
+              "text": "points",
+              "start": 64.662,
+              "end": 64.924,
+              "hl": true
+            },
+            {
+              "text": "to",
+              "start": 64.985,
+              "end": 65.065,
+              "hl": false
+            },
+            {
+              "text": "the",
+              "start": 65.126,
+              "end": 65.186,
+              "hl": false
+            },
+            {
+              "text": "value.",
+              "start": 65.247,
+              "end": 65.61,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    },
+    {
+      "id": "s10",
+      "beat": "cta",
+      "chapter": null,
+      "start": 66.21,
+      "end": 70.262,
+      "field": "navy",
+      "transition": "iris",
+      "label": "",
+      "layout": "duo",
+      "characters": false,
+      "objects": [
+        {
+          "id": "o1",
+          "kind": "end_card",
+          "props": {
+            "up_next": "Step by step: what happens in memory"
+          },
+          "box": null
+        }
+      ],
+      "actions": [
+        {
+          "t": 66.21,
+          "do": "enter",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "start"
+        },
+        {
+          "t": 67.707,
+          "do": "pulse",
+          "target": "o1",
+          "value": null,
+          "tone": null,
+          "cue": "Next"
+        }
+      ],
+      "captions": [
+        {
+          "text": "Follow for more.",
+          "speaker": "MENTOR",
+          "start": 66.56,
+          "end": 67.497,
+          "words": [
+            {
+              "text": "Follow",
+              "start": 66.62,
+              "end": 66.926,
+              "hl": false
+            },
+            {
+              "text": "for",
+              "start": 66.987,
+              "end": 67.11,
+              "hl": false
+            },
+            {
+              "text": "more.",
+              "start": 67.171,
+              "end": 67.375,
+              "hl": false
+            }
+          ],
+          "source": "forced_alignment"
+        },
+        {
+          "text": "Next: what happens in <b>memory</b>.",
+          "speaker": "MENTOR",
+          "start": 67.647,
+          "end": 69.812,
+          "words": [
+            {
+              "text": "Next:",
+              "start": 67.707,
+              "end": 67.989,
+              "hl": false
+            },
+            {
+              "text": "what",
+              "start": 68.332,
+              "end": 68.473,
+              "hl": false
+            },
+            {
+              "text": "happens",
+              "start": 68.553,
+              "end": 68.977,
+              "hl": false
+            },
+            {
+              "text": "in",
+              "start": 69.198,
+              "end": 69.238,
+              "hl": false
+            },
+            {
+              "text": "memory.",
+              "start": 69.339,
+              "end": 69.662,
+              "hl": true
+            }
+          ],
+          "source": "forced_alignment"
+        }
+      ]
+    }
+  ]
+}

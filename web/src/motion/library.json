@@ -18,7 +18,19 @@
       "top": 880,
       "bottom": 1560,
       "badge": 112,
-      "side": 54
+      "side": 54,
+      "bubble": {
+        "side": 65,
+        "max_w": 756,
+        "avatar_gap": 48,
+        "safe_bottom": 1574,
+        "label_h": 34,
+        "pad_x": 30,
+        "pad_y": 22,
+        "line_h": 54,
+        "chars": 31,
+        "gap": 26
+      }
     },
     "badge": {
       "x": 1026,

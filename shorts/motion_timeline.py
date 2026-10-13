@@ -186,6 +186,9 @@ def total_seconds(clocks: list[ShotClock]) -> float:
 
 _SOURCE_RANK = {"forced_alignment": 2, "whisper": 1, "even": 0}
 
+#: The layout rules a new plan is drawn by (MotionPlan.rev).
+PLAN_REV = 2
+
 
 def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None = None,
                cast: list[MotionCastMember] | None = None, tags: list[str] | None = None,
@@ -246,6 +249,7 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
               else motion_characters.direct_narrator(captions, script.language, character)
               if cast_mode == "narrator" else [])
     return MotionPlan(short_id=script.short_id, template=script.template, theme=script.theme, design=design,
+                      rev=PLAN_REV,
                       series=script.series, concept_name=script.concept_name,
                       duration=total_seconds(clocks), audio=audio,
                       timing_source=weakest if shots else "even",

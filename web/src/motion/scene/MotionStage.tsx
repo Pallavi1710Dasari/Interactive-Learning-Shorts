@@ -29,7 +29,8 @@ import { FieldTransition, TRANSITION_DUR, type TransitionKind } from "../transit
 import { CHAPTER_CARD } from "../objects/editorial";
 import { FIELDS, SAFE } from "../tokens";
 import { clamp, seg } from "../time";
-import { BUBBLE, ChatRow, IdentitySting, LanguageBadge, SpeakerBadge, bubbleHeight, rowHeight, toneOn } from "../identity/Identity";
+import { BUBBLE, ChatRow, IdentitySting, LanguageBadge, SIDE_BUBBLE, SideBubble, SpeakerBadge, bubbleHeight, rowHeight,
+         sideBubbleHeight, toneOn } from "../identity/Identity";
 import { FULL_KINDS, SceneObject } from "./objects";
 import { textToneOn } from "../identity/contrast";
 import { ReelCharacters, STAGE, charactersOn } from "../cast/ReelCharacters";
@@ -94,6 +95,7 @@ function Chat({ plan, index, t }: { plan: MotionPlan; index: number; t: number }
   const shot = plan.shots[index];
   const rows = chatAt(plan, index, t);
   const cast = plan.characters?.length > 0;
+  if (rev(plan) >= 2 && cast && charactersOn(plan, shot)) return <SideChat plan={plan} index={index} t={t} rows={rows} />;
   // the chat starts below the shot's lowest object: a stack taller than its
   // region (an entity wired to a panel) ran into the oldest bubble
   const objectsBottom = Math.max(0, ...shot.objects
@@ -132,6 +134,46 @@ function Chat({ plan, index, t }: { plan: MotionPlan; index: number; t: number }
   return (
     // the clip reaches CHAT_RISE below the region: a row entering rises that far into place
     <div data-part="chat" style={{ position: "absolute", left: 0, top, width: 1080, height: room + CHAT_RISE, overflow: "hidden" }}>{body}</div>
+  );
+}
+
+/** The plan's layout rules (MotionPlan.rev): absent = 1, the old look. */
+export function rev(plan: MotionPlan): number {
+  return plan.rev ?? 1;
+}
+
+/** Rev 2 chat beside the drawn characters: its own zone, a clear gap below
+ * the characters (frame.chat.bubble.avatar_gap), down to the safe line. Each
+ * bubble is pushed to its speaker's side; the newest at the bottom, and only
+ * whole bubbles that fit. */
+export function sideChatZone(): { top: number; bottom: number } {
+  return { top: STAGE.bottom + SIDE_BUBBLE.avatar_gap, bottom: SIDE_BUBBLE.safe_bottom };
+}
+
+function SideChat({ plan, index, t, rows }: { plan: MotionPlan; index: number; t: number; rows: PlanCaption[] }) {
+  const shot = plan.shots[index];
+  const { top, bottom } = sideChatZone();
+  const room = bottom - top;
+  const shown: { c: PlanCaption; h: number }[] = [];
+  let used = 0;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const h = sideBubbleHeight(rows[i].words.map((w) => w.text).join(" "));
+    if (used + h > room && shown.length) break;
+    shown.unshift({ c: rows[i], h });
+    used += h + SIDE_BUBBLE.gap;
+  }
+  let y = room - (used - SIDE_BUBBLE.gap);
+  return (
+    <div data-part="chat" style={{ position: "absolute", left: 0, top, width: 1080, height: room, overflow: "hidden" }}>
+      {shown.map(({ c, h }, i) => {
+        const member = plan.cast.find((m) => m.role === c.speaker) ?? plan.cast[0];
+        const at = y;
+        y += h + SIDE_BUBBLE.gap;
+        const latest = i === shown.length - 1;
+        return <SideBubble key={`${c.start}`} member={member} field={shot.field} words={c.words} t={t} y={at}
+                           fade={latest ? 1 : 0.6} />;
+      })}
+    </div>
   );
 }
 

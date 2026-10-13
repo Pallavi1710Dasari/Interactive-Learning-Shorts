@@ -3451,6 +3451,11 @@ class MotionPlan(BaseModel):
     #: The look the player draws the reel in (config.MOTION_DESIGNS); a plan
     #: written before designs existed has none and is "classic".
     design: str = "classic"
+    #: Which layout rules the player draws it by: a plan written before rev 2
+    #: has none and keeps the rev 1 look (badges, corner handle, centred chat).
+    #: Rev 2: side-anchored chat bubbles, the handle and language shown once,
+    #: the recap without a repeated caption, the CTA cued on its words.
+    rev: int = 1
     series: str = ""
     concept_name: str = ""
     duration: float

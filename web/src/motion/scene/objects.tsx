@@ -20,6 +20,7 @@ import {
 import type { PlanAction, PlanObject, PlanShot } from "./types";
 import { AppScreen, Compare, Cycle, Flow, MemoryBox } from "../objects/action";
 import { IdentityTitle, type IdentitySpec } from "../identity/Identity";
+import { EndCardCued } from "../objects/annotated";
 import library from "../library.json";
 
 const KINETIC = (library as { kinetic: { size: number; line_height: number } }).kinetic;
@@ -125,9 +126,11 @@ function scrambled(text: string, age: number, seed: number): string {
 const highlightOn = (s: ObjState) => s.highlight > 0 && s.highlightAge < 0.9;
 
 /** One scene object at time t. */
-export function SceneObject({ obj, shot, t, field, series, identity, themeLabel = "", tags = [] }: {
+export function SceneObject({ obj, shot, t, field, series, identity, themeLabel = "", tags = [], rev = 1 }: {
   obj: PlanObject; shot: PlanShot; t: number; field: FieldName; series: string;
   identity?: IdentitySpec | null; themeLabel?: string; tags?: string[];
+  /** the plan's layout rules (MotionPlan.rev): 2 draws the annotated.tsx objects */
+  rev?: number;
 }): ReactNode {
   const s = objectState(obj, shot, t);
   const p = obj.props;
@@ -274,6 +277,17 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       </>;
     }
     case "end_card":
+      if (rev >= 2) {
+        const mine = shot.actions.filter((a) => a.target === obj.id);
+        const age = (pred: (a: PlanAction) => boolean) => { const a = mine.find(pred); return a ? t - a.t : -1; };
+        const settle = mine.filter((a) => a.do === "pulse").pop();
+        const cued = tags.map((_, i) => age((a) => a.do === "highlight" && Number(a.value) === i + 1));
+        // a tag no word was left for pops in with the final settle
+        const tagAges = cued.map((v, i) => (v >= 0 || !settle ? v : t - settle.t - i * 0.08));
+        return <EndCardCued series={series} upNext={p.up_next || "More soon"} tags={tags} local={s.local}
+                            tapAge={age((a) => a.do === "tap")} revealAge={age((a) => a.do === "reveal")}
+                            tagAges={tagAges} settleAge={settle ? t - settle.t : -1} identity={identity} />;
+      }
       return <>
         <EndCard upNext={p.up_next || "Follow for more"} chips={tags.map((label) => ({ label, done: false }))} t={s.local} />
         {s.pulseAge < 0.9 && <Overlay><rect x={cx - 230 - 30 * s.pulseAge} y={1050 - 20 * s.pulseAge} width={460 + 60 * s.pulseAge}

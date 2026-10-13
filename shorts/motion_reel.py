@@ -820,11 +820,15 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
     --characters / --character)."""
     characters = config.MOTION_CHARACTERS if characters is None else characters
     character = config.MOTION_CHARACTER_PRESET if character is None else character
-    from . import motion_align, motion_plan_checks, motion_timeline, motion_voice
+    from . import motion_align, motion_plan_checks, motion_tidy, motion_timeline, motion_voice
     print(f"\n=== timing: {short_id} ===")
     tags = []
     if tags_path(short_id).exists():
         tags = json.loads(tags_path(short_id).read_text(encoding="utf-8")).get("tags", [])
+    # the scenes' deterministic clean-ups (shorts/motion_tidy.py): no model call
+    script, notes = motion_tidy.tidy(script, n_tags=min(4, len(tags)))
+    for n in notes:
+        print(f"  tidy: {n}")
     total_clips = sum(len(manifest["shots"].get(s.id, [])) for s in script.shots)
     aligned = 0
     seconds: dict[str, list[float]] = {}
@@ -853,6 +857,10 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
         for cap in c.captions:
             counts[cap.source] = counts.get(cap.source, 0) + 1
     print("  caption timing: " + ", ".join(f"{n} {k}" for k, n in sorted(counts.items())))
+    # on the real clock: no stretch holds still past the cadence limit
+    script, notes = motion_tidy.fill_cadence(script, clocks)
+    for n in notes:
+        print(f"  tidy: {n}")
     # the look chosen when the reel was set up; none saved = an older reel, "classic"
     design = (_load_setup(short_id).get("design") if _setup_path(short_id).exists() else None) or "classic"
     plan = motion_timeline.build_plan(script, clocks, audio=None, cast=_cast(script),

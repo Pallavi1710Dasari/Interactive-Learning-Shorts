@@ -191,7 +191,7 @@ export function ShotContent({ plan, index, t }: { plan: MotionPlan; index: numbe
   // data-part: what the overlap audit (shorts/motion_overlap) calls each drawn part
   const objects = shot.objects.map((o) => <div key={o.id} data-part={`obj:${o.id}:${o.kind}`}>
     <SceneObject obj={o} shot={shot} t={t} field={field} series={plan.series}
-                 identity={plan.identity} themeLabel={plan.theme_label} tags={plan.tags} /></div>);
+                 identity={plan.identity} themeLabel={plan.theme_label} tags={plan.tags} rev={rev(plan)} /></div>);
   return (
     <Layer style={{ background: design.background === "lab" ? undefined : FIELDS[field] }}>
       {design.background === "lab" && <LabBackground field={field} t={t} />}

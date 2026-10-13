@@ -341,10 +341,20 @@ def change_events(shot: MotionShot, clock) -> list[float]:
     kinds = lib.object_kinds()
     times = [clock.start]
     entered: dict[str, float] = {}
+    objs = {o.id: o for o in shot.scene.objects}
     for a, t in resolve_actions(shot, clock):
         times.append(t)
         if a.do in ("enter", "stamp"):
             entered.setdefault(a.target, t)
+        # an action that keeps moving the frame for a while (the player's own
+        # durations): its end is a change too
+        o = objs.get(a.target)
+        if a.do == "count":
+            times.append(t + 1.2)                                  # objects.tsx count-up
+        elif a.do == "travel" and o is not None:
+            times.append(t + 0.7 * max(0, len(o.props.get("steps") or []) - 1))   # action.tsx STEP_DUR
+        elif a.do == "type" and o is not None:
+            times.append(t + 0.45 * max(0, len(o.props.get("lines") or []) - 1))  # one line per 0.45 s
     for o in shot.scene.objects:
         spec = kinds.get(o.kind, {})
         t0 = entered.get(o.id, clock.start)
@@ -497,15 +507,32 @@ _WEAK_CUES = frozenset("a an the and or but so to of in on at it its is are was 
                        "as that this then than your you".split())
 
 
-def _fill_cadence(b: _Builder, shot: MotionShot, primary: str, nudge: str, script) -> None:
+def fill_cadence_on_clock(shot: MotionShot, clock) -> MotionShot:
+    """`shot` with actions added wherever its REAL timing (`clock`, from the
+    recorded audio) would hold the frame still past the cadence limit — the
+    timing stage's repair, for any template and any object kind."""
+    if shot.scene is None or not shot.scene.objects:
+        return shot
+    b = _Builder(shot)
+    b.objects = list(shot.scene.objects)
+    b.actions = list(shot.scene.actions)
+    primary = next((o.id for o in b.objects if o.kind not in ("status_pill", "connector", "stamp")),
+                   b.objects[0].id)
+    _fill_cadence(b, shot, primary, "", None, clock=clock)
+    return shot.model_copy(update={"scene": shot.scene.model_copy(update={"actions": b.actions})})
+
+
+def _fill_cadence(b: _Builder, shot: MotionShot, primary: str, nudge: str, script, clock=None) -> None:
     """Add small actions wherever the estimated timing would leave the frame
     still for more than about 2 s — each cued on a content word spoken at
     that moment, so it still moves WITH the narration. The action goes to an
     object that is already on screen by then: chips and rows light up, a
-    chip or connector pulses, and only failing those does a title re-scramble."""
+    chip or connector pulses, and only failing those does a title re-scramble.
+    `clock`: the shot's real timing (the timing stage); omitted, estimated."""
     from .motion_timeline import shot_timings
     if not b.objects:
         return
+    fixed_clock = clock
     kinds = lib.object_kinds()
 
     def nudge_of(o: MotionSceneObject) -> str | None:
@@ -519,6 +546,9 @@ def _fill_cadence(b: _Builder, shot: MotionShot, primary: str, nudge: str, scrip
     ranked = sorted(b.objects, key=lambda o: (nudge_of(o) in (None, "scramble"), o.id != primary))
 
     def clock_for(actions):
+        if fixed_clock is not None:
+            scene = shot.scene.model_copy(update={"objects": b.objects, "actions": actions})
+            return shot.model_copy(update={"scene": scene}), fixed_clock
         probe = shot.model_copy(update={"scene": MotionScene(objects=b.objects, actions=actions)})
         return probe, shot_timings(script.model_copy(update={"shots": [probe]}))[0]
 
@@ -563,6 +593,10 @@ def _fill_cadence(b: _Builder, shot: MotionShot, primary: str, nudge: str, scrip
         placed = False
         content = [i for i, w in enumerate(words) if w.start > at + 0.6 and w.start < at + gap - 0.4
                    and len(keys[i]) >= 3 and keys[i] not in _WEAK_CUES]
+        if fixed_clock is not None and not content:
+            # on the real clock a still stretch must be broken even when only
+            # small words are spoken in it: any word, still on the speech
+            content = [i for i, w in enumerate(words) if at + 0.25 < w.start < at + gap - 0.15 and keys[i]]
         for idx in sorted(content, key=lambda i: abs(words[i].start - target_t))[:5]:
             target = next((o for o in ranked if nudge_of(o)
                            and entered.get(o.id, -1 if not any(x.target == o.id and x.do == "enter"
@@ -573,7 +607,12 @@ def _fill_cadence(b: _Builder, shot: MotionShot, primary: str, nudge: str, scrip
             do = nudge_of(target)
             pos = next((j for j, k in enumerate(order) if k is not None and k > idx), len(order))
             value = None
-            if do == "highlight":
+            if do == "highlight" and fixed_clock is not None:
+                # flash the item being talked about again: moving the highlight
+                # to the next item would point at something not being said
+                cur = [x.value for x in b.actions[:pos] if x.do == "highlight" and x.target == target.id and x.value]
+                value = cur[-1] if cur else "1"
+            elif do == "highlight":
                 n = sum(1 for x in b.actions[:pos] if x.do == "highlight" and x.target == target.id)
                 value = str(n % _highlight_count(b, target.id) + 1)
             for n in (1, 2, 3):

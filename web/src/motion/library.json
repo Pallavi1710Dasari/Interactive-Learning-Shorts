@@ -129,16 +129,17 @@
       },
       "actions": [
         "enter",
+        "tap",
+        "reveal",
+        "highlight",
         "pulse"
       ],
       "builtin": [
         0,
         0.12,
-        0.26,
-        1.0,
-        1.12,
-        1.24
-      ]
+        0.26
+      ],
+      "_use": "The CTA. Its steps are cued on the CTA's words by the timing stage (shorts/motion_tidy.cta_actions): tap = Follow pressed, reveal = the Up next card slides in, highlight N = hashtag N pops in, pulse = the final settle."
     },
     "takeaway_list": {
       "layout": "full",

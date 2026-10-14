@@ -73,6 +73,13 @@ APPROACHES = {
     "process_demonstration": "Walk through what happens, step by step, in order.",
     "comparison": "Set two things side by side; the concept is the difference.",
     "direct_explanation": "Say it plainly, one clear idea after another.",
+    "predict_then_reveal": "Ask the viewer to guess first, then show what really happens.",
+    "misconception_repair": "Name the wrong idea, show where it breaks, replace it with the right one.",
+    "build_from_zero": "Build it up from nothing, one piece at a time.",
+    "worked_example_then_try": "Solve one example fully, then give the viewer one to try.",
+    "socratic_questions": "Lead the learner there with a chain of questions.",
+    "big_picture_then_zoom": "Show the whole system first, then zoom into this one part.",
+    "step_by_step_trace": "Run the code line by line and track how the values change.",
 }
 TEMPLATES = {
     "fix_story": "A problem story: the symptom, why it happens, and the fix working.",

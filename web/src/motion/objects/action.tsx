@@ -18,14 +18,14 @@
 // is only short labels.
 
 import { At, Icon } from "../Stage";
-import { C, FONT, theme, type FieldName, type Theme } from "../tokens";
+import { C, FONT, theme, type FieldName, type Theme, R, LOOK } from "../tokens";
 import { clamp, ease, lerp, seg } from "../time";
-import { popStyle, toneColors, type Tone } from "./reference";
+import { popStyle, shadow, toneColors, type Tone } from "./reference";
 
 const lab = (th: Theme) => th.field === "lab" || th.field === "lab_violet";
 const card = (th: Theme) => ({
   background: th.surface,
-  boxShadow: lab(th)
+  boxShadow: LOOK.studio ? shadow(th) : lab(th)
     ? "0 40px 90px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.14), inset 0 2px 0 rgba(255,255,255,0.2)"
     : th.dark ? "0 30px 60px rgba(0,0,0,0.35)" : "0 30px 60px rgba(21,25,54,0.13)",
 });
@@ -70,17 +70,19 @@ export function AppScreen({ x, y, w, h, title, button, label, value, prev, tone,
   const { bg: btnBg, fg: btnFg } = toneColors("info", th);
   return (
     <At x={left} y={y + 10} style={popStyle(p)}>
-      <div style={{ position: "relative", width: cw, height: ch, borderRadius: 56, ...card(th), overflow: "hidden" }}>
+      <div style={{ position: "relative", width: cw, height: ch, borderRadius: R(56), ...card(th), overflow: "hidden" }}>
         <div style={{ height: 86, display: "flex", alignItems: "center", gap: 14, padding: "0 36px",
                       borderBottom: `2px solid ${th.surfaceLine}`, color: th.surfaceDim, fontWeight: 800, fontSize: 30 }}>
-          {[C.coral, C.amber, C.mint].map((c) => <span key={c} style={{ width: 18, height: 18, borderRadius: 9, background: c, opacity: 0.85 }} />)}
+          {LOOK.studio
+            ? <span style={{ width: 14, height: 14, borderRadius: 7, background: th.accent }} />
+            : [C.coral, C.amber, C.mint].map((c) => <span key={c} style={{ width: 18, height: 18, borderRadius: R(9), background: c, opacity: 0.85 }} />)}
           <span style={{ marginLeft: 10 }}>{title}</span>
         </div>
         <div style={{ position: "absolute", left: 0, right: 0, top: 104, textAlign: "center", color: th.surfaceDim, fontWeight: 700, fontSize: 34 }}>{label}</div>
         <div style={{ position: "absolute", left: 0, right: 0, top: 150, transform: `translateX(${stuck ? shake(valueAge) : 0}px)` }}>
           <Rolling value={value} prev={prev} age={valueAge} size={150} color={toneInk(tone, th)} />
         </div>
-        <div style={{ position: "absolute", left: cw / 2 - 210, top: btnY, width: 420, height: 104, borderRadius: 52,
+        <div style={{ position: "absolute", left: cw / 2 - 210, top: btnY, width: 420, height: 104, borderRadius: R(52),
                       background: btnBg, color: btnFg, display: "grid", placeItems: "center", fontWeight: 800, fontSize: 40,
                       transform: `scale(${1 - 0.07 * press})`, whiteSpace: "nowrap", overflow: "hidden" }}>
           {ripple > 0 && ripple < 1 && <span style={{ position: "absolute", width: 420 * ripple * 1.4, height: 420 * ripple * 1.4,
@@ -160,8 +162,8 @@ export function Flow({ x, y, w, h, steps, packet, travelAge, highlight, p, field
         const fill = clamp(at - i);
         return (
           <At key={`a${i}`} x={a} y={cy - 4} style={{ opacity: clamp(p * 1.5 - i * 0.2) }}>
-            <div style={{ position: "relative", width: b - a, height: 8, borderRadius: 4, background: th.surfaceLine }}>
-              <div style={{ width: `${fill * 100}%`, height: "100%", borderRadius: 4, background: th.accent }} />
+            <div style={{ position: "relative", width: b - a, height: 8, borderRadius: R(4), background: th.surfaceLine }}>
+              <div style={{ width: `${fill * 100}%`, height: "100%", borderRadius: R(4), background: th.accent }} />
               <div style={{ position: "absolute", right: -6, top: -11, width: 0, height: 0, borderTop: "15px solid transparent",
                             borderBottom: "15px solid transparent", borderLeft: `20px solid ${fill >= 1 ? th.accent : th.surfaceLine}` }} />
             </div>
@@ -176,8 +178,9 @@ export function Flow({ x, y, w, h, steps, packet, travelAge, highlight, p, field
         return (
           <div key={i}>
             <At x={xs[i]} y={cy} center style={{ ...popStyle(q), transform: `${popStyle(q).transform} scale(${1 + 0.12 * pop})` }}>
-              <div style={{ width: tile, height: tile, borderRadius: tile * 0.3, background: bg, display: "grid", placeItems: "center",
-                            boxShadow: on ? `0 0 ${30 + 30 * pop}px ${C.mint}55` : undefined }}>
+              <div style={{ width: tile, height: tile, borderRadius: LOOK.studio ? tile / 2 : tile * 0.3, display: "grid", placeItems: "center",
+                            ...(LOOK.studio ? { background: th.surface, border: `5px solid ${fg}` } : { background: bg }),
+                            boxShadow: on && !LOOK.studio ? `0 0 ${30 + 30 * pop}px ${C.mint}55` : undefined }}>
                 <Icon name={s.name} size={tile * 0.5} color={fg} stroke={2.2} />
               </div>
             </At>
@@ -190,7 +193,7 @@ export function Flow({ x, y, w, h, steps, packet, travelAge, highlight, p, field
       {at >= 0 && at < n - 1 + 0.6 && (
         <At x={px} y={cy - tile / 2 - 44} center>
           <div style={{ padding: packet ? "8px 20px" : 0, width: packet ? undefined : 34, height: packet ? undefined : 34,
-                        borderRadius: 999, background: th.accent, color: th.dark ? C.ink : C.white,
+                        borderRadius: R(999), background: th.accent, color: th.dark ? C.ink : C.white,
                         fontFamily: FONT.mono, fontWeight: 700, fontSize: 30, whiteSpace: "nowrap",
                         boxShadow: `0 0 26px ${th.accent}` }}>{packet ?? ""}</div>
         </At>
@@ -220,15 +223,15 @@ export function Compare({ x, y, w, h, left, right, leftIcon, rightIcon, leftNote
     const { bg, fg } = toneColors(good ? "ok" : "bad", th);
     return (
       <At x={x + dx} y={y + 10} style={slideIn && good && hasReveal ? slid(q) : popStyle(q)}>
-        <div style={{ position: "relative", width: cw, height: ch, borderRadius: 40, ...card(th), border: `4px solid ${fg}`,
+        <div style={{ position: "relative", width: cw, height: ch, borderRadius: R(40), ...card(th), border: `4px solid ${fg}`,
                       ...(good && glow > 0 ? { boxShadow: `0 0 ${60 * glow}px ${C.mint}88` } : {}),
                       display: "flex", flexDirection: "column", alignItems: "center", padding: "36px 24px 24px", boxSizing: "border-box", gap: 18 }}>
-          <div style={{ width: 130, height: 130, borderRadius: 38, background: bg, display: "grid", placeItems: "center" }}>
-            <Icon name={icon} size={70} color={fg} stroke={2.2} />
+          <div style={{ width: 130, height: 130, borderRadius: R(38), background: LOOK.studio ? "transparent" : bg, display: "grid", placeItems: "center" }}>
+            <Icon name={icon} size={LOOK.studio ? 86 : 70} color={fg} stroke={2.2} />
           </div>
           <div style={{ fontWeight: 800, fontSize: 40, color: th.surfaceInk, textAlign: "center", lineHeight: 1.15 }}>{title}</div>
           {note && <div style={{ fontWeight: 600, fontSize: 28, color: th.surfaceDim, textAlign: "center", lineHeight: 1.25 }}>{note}</div>}
-          <div style={{ position: "absolute", top: -26, right: -18, width: 64, height: 64, borderRadius: 32, background: fg,
+          <div style={{ position: "absolute", top: -26, right: -18, width: 64, height: 64, borderRadius: R(32), background: fg,
                         display: "grid", placeItems: "center", transform: `scale(${q})` }}>
             <Icon name={good ? "check" : "x"} size={38} color={C.white} stroke={3.2} />
           </div>
@@ -274,12 +277,13 @@ export function Cycle({ x, y, w, h, steps, travelAge, highlight, p, field }: {
         return (
           <At key={i} x={sx} y={sy} center style={{ ...popStyle(q), transform: `${popStyle(q).transform} scale(${1 + 0.15 * glow})` }}>
             <div style={{ display: "grid", justifyItems: "center", gap: 8 }}>
-              <div style={{ width: 128, height: 128, borderRadius: 40, background: bg, display: "grid", placeItems: "center",
-                            boxShadow: glow > 0.3 ? `0 0 40px ${C.mint}66` : undefined }}>
+              <div style={{ width: 128, height: 128, borderRadius: LOOK.studio ? 64 : R(40), display: "grid", placeItems: "center",
+                            ...(LOOK.studio ? { background: th.surface, border: `5px solid ${fg}` } : { background: bg }),
+                            boxShadow: glow > 0.3 && !LOOK.studio ? `0 0 40px ${C.mint}66` : undefined }}>
                 <Icon name={s.name} size={64} color={fg} stroke={2.2} />
               </div>
               {s.label && <div style={{ fontWeight: 800, fontSize: 30, color: th.ink, whiteSpace: "nowrap",
-                                        background: th.dark ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.7)", padding: "2px 12px", borderRadius: 12 }}>{s.label}</div>}
+                                        background: th.dark ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.7)", padding: "2px 12px", borderRadius: R(12) }}>{s.label}</div>}
             </div>
           </At>
         );

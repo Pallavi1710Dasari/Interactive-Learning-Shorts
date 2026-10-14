@@ -3,7 +3,10 @@
  "template": "fix_story",
  "theme": "classic_explainer",
  "design": "midnight_lab",
- "rev": 2,
+ "rev": 3,
+ "stage": null,
+ "palette": "midnight",
+ "avatars": null,
  "series": "@learnthesimpleway",
  "concept_name": "useState",
  "duration": 127.823,
@@ -233,7 +236,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s02",
@@ -263,7 +269,7 @@
      "box": {
       "x": 60.0,
       "y": 693.6,
-      "w": 960.0,
+      "w": 820.0,
       "h": 212.8
      }
     }
@@ -366,7 +372,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s03",
@@ -407,7 +416,7 @@
      "box": {
       "x": 60.0,
       "y": 985.0,
-      "w": 960.0,
+      "w": 620.0,
       "h": 104.0
      }
     }
@@ -537,7 +546,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "offset",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s04",
@@ -568,8 +580,8 @@
      },
      "box": {
       "x": 60.0,
-      "y": 670.0,
-      "w": 960.0,
+      "y": 752.0,
+      "w": 450.0,
       "h": 96.0
      }
     },
@@ -581,9 +593,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
-      "y": 826.0,
-      "w": 960.0,
+      "x": 570.0,
+      "y": 748.0,
+      "w": 450.0,
       "h": 104.0
      }
     }
@@ -692,7 +704,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "split",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s05",
@@ -715,9 +730,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 553.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 330.0
      }
     },
@@ -729,9 +744,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 943.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 104.0
      }
     },
@@ -742,7 +757,7 @@
       "text": "BUG"
      },
      "box": {
-      "x": 751.2,
+      "x": 790.4,
       "y": 718.0,
       "w": 0.0,
       "h": 0.0
@@ -856,7 +871,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s06",
@@ -1038,7 +1056,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s07",
@@ -1061,7 +1082,7 @@
      "box": {
       "x": 60.0,
       "y": 663.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 110.0
      }
     },
@@ -1076,7 +1097,7 @@
      "box": {
       "x": 60.0,
       "y": 833.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 104.0
      }
     }
@@ -1179,7 +1200,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s08",
@@ -1213,9 +1237,9 @@
       ]
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 685.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 230.0
      }
     }
@@ -1330,7 +1354,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s09",
@@ -1460,7 +1487,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s10",
@@ -1487,7 +1517,7 @@
      "box": {
       "x": 60.0,
       "y": 622.0,
-      "w": 960.0,
+      "w": 620.0,
       "h": 96.0
      }
     },
@@ -1616,7 +1646,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "offset",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s11",
@@ -1664,7 +1697,7 @@
      "box": {
       "x": 60.0,
       "y": 554.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 492.0
      }
     }
@@ -1794,7 +1827,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s12",
@@ -1818,9 +1854,9 @@
       "value": "0"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 520.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 560.0
      }
     }
@@ -1928,7 +1964,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s13",
@@ -2078,7 +2117,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s14",
@@ -2115,7 +2157,7 @@
      "box": {
       "x": 60.0,
       "y": 650.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 300.0
      }
     }
@@ -2215,7 +2257,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s15",
@@ -2241,9 +2286,9 @@
       "right_note": "remembers"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 590.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 420.0
      }
     }
@@ -2319,7 +2364,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s16",
@@ -2467,7 +2515,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s17",
@@ -2591,7 +2642,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "cover",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s18",
@@ -2757,7 +2811,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "code",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s19",
@@ -2882,7 +2939,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "notes",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s20",
@@ -2957,7 +3017,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "chapter",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s21",
@@ -3077,7 +3140,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "grid",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s22",
@@ -3168,7 +3234,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "end",
+   "camera": [],
+   "cursor": []
   }
  ]
 }

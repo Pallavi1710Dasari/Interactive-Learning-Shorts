@@ -7,7 +7,7 @@
 // spreads a sentence's words over its span, the same approximation
 // story_audio._even_words falls back to.
 
-import { FONT, SAFE, W, theme, type FieldName } from "./tokens";
+import { FONT, SAFE, W, theme, type FieldName, LOOK, C } from "./tokens";
 import { clamp } from "./time";
 
 export interface CaptionWord { text: string; start: number; end: number; hl: boolean }
@@ -71,8 +71,13 @@ export function KaraokeCaption({ sentences, t, field, size = 56 }: {
           // A word lights the moment it starts and fully by a third of its span.
           const lit = clamp((t - w.start) / Math.max(0.05, (w.end - w.start) / 3));
           const color = w.hl ? th.accent : th.ink;
+          // the studio marks a key word with a highlighter stroke that sweeps under it as it is said
+          const marker = LOOK.studio && w.hl
+            ? { color: th.ink, backgroundImage: `linear-gradient(transparent 52%, ${C.yellow}${th.dark ? "66" : "99"} 52%, ${C.yellow}${th.dark ? "66" : "99"} 92%, transparent 92%)`,
+                backgroundSize: `${lit * 100}% 100%`, backgroundRepeat: "no-repeat" }
+            : {};
           return (
-            <span key={i} style={{ color, opacity: 0.35 + 0.65 * lit, textShadow: w.hl ? "var(--motion-glow, none)" : undefined }}>
+            <span key={i} style={{ color, opacity: 0.35 + 0.65 * lit, textShadow: w.hl && !LOOK.studio ? "var(--motion-glow, none)" : undefined, ...marker }}>
               {plainWord(w.text)}{i < s.words.length - 1 ? " " : ""}
             </span>
           );

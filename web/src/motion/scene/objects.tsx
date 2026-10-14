@@ -7,7 +7,7 @@
 
 import type { ReactNode } from "react";
 import { At, Overlay } from "../Stage";
-import { C, W, theme, type FieldName } from "../tokens";
+import { C, LOOK, W, theme, type FieldName } from "../tokens";
 import { clamp, ease, hash3, pulse as pulseOf, seg } from "../time";
 import {
   CodeMapCard, CodeWindow, Connector, EndCard, EntityCard, IconTile, StatusPill, SystemPanel,
@@ -21,6 +21,8 @@ import type { PlanAction, PlanObject, PlanShot } from "./types";
 import { AppScreen, Compare, Cycle, Flow, MemoryBox } from "../objects/action";
 import { IdentityTitle, type IdentitySpec } from "../identity/Identity";
 import { CodeAnnotated, EndCardCued, LanguageChip, PointerBox, PointerSlot, locatePart } from "../objects/annotated";
+import { typedChars } from "../camera";
+import { BOARD } from "../cast/teach";
 import library from "../library.json";
 
 const KINETIC = (library as { kinetic: { size: number; line_height: number } }).kinetic;
@@ -126,11 +128,13 @@ function scrambled(text: string, age: number, seed: number): string {
 const highlightOn = (s: ObjState) => s.highlight > 0 && s.highlightAge < 0.9;
 
 /** One scene object at time t. */
-export function SceneObject({ obj, shot, t, field, series, identity, themeLabel = "", tags = [], rev = 1 }: {
+export function SceneObject({ obj, shot, t, field, series, identity, themeLabel = "", tags = [], rev = 1, board = false }: {
   obj: PlanObject; shot: PlanShot; t: number; field: FieldName; series: string;
   identity?: IdentitySpec | null; themeLabel?: string; tags?: string[];
   /** the plan's layout rules (MotionPlan.rev): 2 draws the annotated.tsx objects */
   rev?: number;
+  /** drawn on the board stage, beside a presenter (cast/teach.ts) */
+  board?: boolean;
 }): ReactNode {
   const s = objectState(obj, shot, t);
   const p = obj.props;
@@ -161,6 +165,17 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       </div>;
     }
     case "code_window": {
+      // typed by the virtual cursor (camera.tsx): character by character behind a caret
+      const typing = shot.cursor?.find((c) => c.do === "type" && c.target === obj.id);
+      if (typing && t >= typing.t - 0.6) {
+        const n = t < typing.t ? 0 : typedChars(typing, t);
+        const text = (typing.text ?? "").slice(0, n);
+        const blink = t > (typing.t_end ?? typing.t) + 0.2 && Math.floor(t * 2.2) % 2 === 1;
+        const rows = text.split("\n").map(codeLine);
+        if (!blink) rows[rows.length - 1] = [...rows[rows.length - 1], { text: "\u258F", color: C.amber }];
+        return <CodeWindow x={b.x} y={b.y} w={b.w} file={p.file ?? ""} lines={rows}
+                           highlight={s.highlight ? s.highlight - 1 : -1} p={s.p} field={field} />;
+      }
       const lines = (p.lines as string[]).map(codeLine);
       const shown = s.typeT === null ? Infinity : Math.max(0, (t - s.typeT) / 0.45);
       return <CodeWindow x={b.x} y={b.y} w={b.w} file={p.file ?? ""} lines={lines} shown={shown}
@@ -179,10 +194,10 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
                             ? <PointerSlot name={p.slot_name} value={String(p.slot_value)} pulse={pulseOf(s.pulseAge, 0, 0.45)} field={field} />
                             : undefined} />;
     case "status_pill":
-      return <StatusPill x={cx} y={b.y + b.h / 2} text={s.value ?? p.text} tone={(s.tone as Tone) ?? "plain"}
+      return <StatusPill x={b.w ? b.x + b.w / 2 : cx} y={b.y + b.h / 2} text={s.value ?? p.text} tone={(s.tone as Tone) ?? "plain"}
                          icon={p.icon} field={field} p={s.p} size={SIZES.pill} />;
     case "trigger_chip":
-      return <TriggerChip x={cx} y={b.y + b.h / 2} label={p.label} field={field} p={s.p}
+      return <TriggerChip x={b.w ? b.x + b.w / 2 : cx} y={b.y + b.h / 2} label={p.label} field={field} p={s.p}
                           firing={pulseOf(s.pulseAge, 0, 0.5)} size={SIZES.chip} />;
     case "token_row": {
       const tones = s.value && /^[a-z,]+$/.test(s.value) ? s.value.split(",") : (p.tones ?? []);
@@ -194,7 +209,7 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       let size: number = SIZES.token;
       while (size > 26 && rowWidth(texts, size) > b.w) size -= 2;
       return <div style={{ opacity: s.p, transform: `translateY(${(1 - s.p) * 24}px)` }}>
-        <TokenRow items={items} x={cx} y={b.y + 4} field={field} center size={size} />
+        <TokenRow items={items} x={b.w ? b.x + b.w / 2 : cx} y={b.y + 4} field={field} center size={size} />
       </div>;
     }
     case "big_counter": {
@@ -204,7 +219,7 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       }
       // a long value ("1 → 7") is set smaller so it stays inside the frame
       const fit = Math.min(SIZES.counter, Math.floor(880 / Math.max(1, String(p.value).length * 0.62)));
-      return <BigCounter value={value} label={p.label} x={cx} y={b.y + b.h / 2} size={fit} field={field} p={s.p} />;
+      return <BigCounter value={value} label={p.label} x={b.w ? b.x + b.w / 2 : cx} y={b.y + b.h / 2} size={fit} field={field} p={s.p} />;
     }
     case "callout":
       return <Callout x={b.x + 60} y={b.y} w={b.w - 120} label={p.label} text={p.text}
@@ -284,7 +299,7 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       return <>
         <TitleCard series={series} title={p.title} promise={p.promise} icons={icons} t={s.local}
                    chip={rev >= 2 ? (identity ? <LanguageChip spec={identity} /> : null) : undefined} />
-        {highlightOn(s) && s.highlight <= icons.length && (
+        {highlightOn(s) && s.highlight <= icons.length && !LOOK.studio && (
           <Overlay><circle cx={270 + (s.highlight - 1) * 270} cy={1230} r={110 + 30 * clamp(s.highlightAge / 0.5)}
                            fill="none" stroke={C.amber} strokeWidth={8} opacity={1 - clamp(s.highlightAge / 0.9)} /></Overlay>
         )}
@@ -313,8 +328,8 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
         icon: r.icon, line: r.line, sub: r.sub ?? "", tone: ((r.tone as Tone) ?? "info"),
       }));
       return <>
-        <TakeawayList heading={p.heading ?? "Key takeaways"} rows={rows} t={s.local} field={field} />
-        {highlightOn(s) && s.highlight <= rows.length && (
+        <TakeawayList heading={p.heading ?? "Key takeaways"} rows={rows} t={s.local} field={field} lit={s.highlight} />
+        {highlightOn(s) && s.highlight <= rows.length && !LOOK.studio && (
           <Overlay><rect x={54} y={648 + (s.highlight - 1) * 252} width={972} height={216} rx={58} fill="none"
                          stroke={th.dark ? C.yellow : C.indigo} strokeWidth={7} opacity={1 - clamp(s.highlightAge / 0.9)} /></Overlay>
         )}
@@ -337,7 +352,8 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
         // a callout animates in the first time its part is reached, never again
         const firstAges = parts.map((_, i) => { const a = hits.find((h) => Number(h.value) === i + 1); return a ? t - a.t : -1; });
         return <CodeAnnotated lines={lines.map(codeLine)} parts={parts} active={s.highlight ? s.highlight - 1 : -1}
-                              reached={reached - 1} firstAges={firstAges} activeAge={s.highlightAge} t={s.local} field={field} />;
+                              reached={reached - 1} firstAges={firstAges} activeAge={s.highlightAge} t={s.local} field={field}
+                              rightEdge={board ? BOARD.callout_right : undefined} />;
       }
       const parts = (p.parts as { code: string; icon: string; label: string }[]).map((part) => {
         // the token's real place (a part the code does not contain gets no highlight)

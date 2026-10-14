@@ -560,6 +560,13 @@ _STUB_APPROACH_SHAPE = {
     "conceptual_visual": ("hierarchy", "nested_levels"),
     "code": ("structure", "not_applicable"),
     "direct_explanation": ("structure", "single_object"),
+    "predict_then_reveal": ("comparison", "two_sides"),
+    "misconception_repair": ("comparison", "two_sides"),
+    "build_from_zero": ("process", "single_container"),
+    "worked_example_then_try": ("process", "single_container"),
+    "socratic_questions": ("structure", "single_object"),
+    "big_picture_then_zoom": ("hierarchy", "nested_levels"),
+    "step_by_step_trace": ("process", "single_container"),
 }
 
 

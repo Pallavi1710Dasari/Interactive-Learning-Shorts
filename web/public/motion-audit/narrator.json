@@ -3,7 +3,10 @@
  "template": "fix_story",
  "theme": "classic_explainer",
  "design": "classic",
- "rev": 2,
+ "rev": 3,
+ "stage": null,
+ "palette": null,
+ "avatars": null,
  "series": "@learnthesimpleway",
  "concept_name": "useState",
  "duration": 97.508,
@@ -69,6 +72,7 @@
     "name": "React",
     "gender": "male",
     "art": "soft",
+    "shading": "lit",
     "skinTone": "wheatish",
     "hair": {
      "style": "curly",
@@ -101,156 +105,246 @@
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": ""
+     "cue": "",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 0.15,
      "kind": "gesture",
      "name": "shrug",
      "side": null,
-     "cue": "Why"
+     "cue": "Why",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 0.25,
      "kind": "expression",
      "name": "confused",
      "side": null,
-     "cue": "Why"
+     "cue": "Why",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 3.477,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "You"
+     "cue": "You",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 3.762,
      "kind": "gesture",
      "name": "handsSpread",
      "side": null,
-     "cue": "click"
+     "cue": "click",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 9.712,
      "kind": "gesture",
      "name": "pointUp",
      "side": null,
-     "cue": "plain"
+     "cue": "plain",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 15.512,
      "kind": "gesture",
      "name": "countOne",
      "side": null,
-     "cue": "first."
+     "cue": "first.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 19.923,
      "kind": "gesture",
      "name": "presentRight",
      "side": null,
-     "cue": "Each"
+     "cue": "Each",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 22.765,
      "kind": "gesture",
      "name": "okSign",
      "side": null,
-     "cue": "Nothing"
+     "cue": "Nothing",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 29.485,
      "kind": "gesture",
      "name": "point",
      "side": null,
-     "cue": "bug"
+     "cue": "bug",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 32.208,
      "kind": "gesture",
      "name": "presentLeft",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 35.435,
      "kind": "gesture",
      "name": "handsSpread",
      "side": null,
-     "cue": "When"
+     "cue": "When",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 41.769,
      "kind": "gesture",
      "name": "pointUp",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 47.719,
      "kind": "gesture",
      "name": "presentRight",
      "side": null,
-     "cue": "Keep"
+     "cue": "Keep",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 57.931,
      "kind": "gesture",
      "name": "okSign",
      "side": null,
-     "cue": "two"
+     "cue": "two",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 60.388,
      "kind": "gesture",
      "name": "point",
      "side": null,
-     "cue": "They"
+     "cue": "They",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 64.265,
      "kind": "gesture",
      "name": "presentLeft",
      "side": null,
-     "cue": "Every"
+     "cue": "Every",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 68.262,
      "kind": "gesture",
      "name": "handsSpread",
      "side": null,
-     "cue": "model"
+     "cue": "model",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 76.935,
      "kind": "gesture",
      "name": "pointUp",
      "side": null,
-     "cue": "box"
+     "cue": "box",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 79.392,
      "kind": "gesture",
      "name": "presentRight",
      "side": null,
-     "cue": "Then"
+     "cue": "Then",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 96.473,
      "kind": "gesture",
      "name": "thumbsUp",
      "side": null,
-     "cue": "value."
+     "cue": "value.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 96.673,
      "kind": "expression",
      "name": "grin",
      "side": null,
-     "cue": "value."
+     "cue": "value.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     }
-   ]
+   ],
+   "env": null,
+   "vrm": null
   }
  ],
  "shots": [
@@ -424,7 +518,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s02",
@@ -454,7 +551,7 @@
      "box": {
       "x": 60.0,
       "y": 433.6,
-      "w": 960.0,
+      "w": 820.0,
       "h": 212.8
      }
     }
@@ -557,7 +654,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s03",
@@ -598,7 +698,7 @@
      "box": {
       "x": 60.0,
       "y": 725.0,
-      "w": 960.0,
+      "w": 620.0,
       "h": 104.0
      }
     }
@@ -728,7 +828,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "offset",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s04",
@@ -759,8 +862,8 @@
      },
      "box": {
       "x": 60.0,
-      "y": 410.0,
-      "w": 960.0,
+      "y": 492.0,
+      "w": 450.0,
       "h": 96.0
      }
     },
@@ -772,9 +875,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
-      "y": 566.0,
-      "w": 960.0,
+      "x": 570.0,
+      "y": 488.0,
+      "w": 450.0,
       "h": 104.0
      }
     }
@@ -883,7 +986,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "split",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s05",
@@ -906,9 +1012,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 293.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 330.0
      }
     },
@@ -920,9 +1026,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 683.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 104.0
      }
     },
@@ -933,7 +1039,7 @@
       "text": "BUG"
      },
      "box": {
-      "x": 751.2,
+      "x": 790.4,
       "y": 458.0,
       "w": 0.0,
       "h": 0.0
@@ -1047,7 +1153,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s06",
@@ -1229,7 +1338,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s07",
@@ -1252,7 +1364,7 @@
      "box": {
       "x": 60.0,
       "y": 403.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 110.0
      }
     },
@@ -1267,7 +1379,7 @@
      "box": {
       "x": 60.0,
       "y": 573.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 104.0
      }
     }
@@ -1370,7 +1482,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s08",
@@ -1404,9 +1519,9 @@
       ]
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 425.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 230.0
      }
     }
@@ -1521,7 +1636,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s09",
@@ -1651,7 +1769,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s10",
@@ -1678,7 +1799,7 @@
      "box": {
       "x": 60.0,
       "y": 362.0,
-      "w": 960.0,
+      "w": 620.0,
       "h": 96.0
      }
     },
@@ -1807,7 +1928,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "offset",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s11",
@@ -1855,7 +1979,7 @@
      "box": {
       "x": 60.0,
       "y": 294.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 492.0
      }
     }
@@ -1985,7 +2109,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s12",
@@ -2009,9 +2136,9 @@
       "value": "0"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 260.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 560.0
      }
     }
@@ -2119,7 +2246,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s13",
@@ -2269,7 +2399,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s14",
@@ -2306,7 +2439,7 @@
      "box": {
       "x": 60.0,
       "y": 390.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 300.0
      }
     }
@@ -2406,7 +2539,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s15",
@@ -2432,9 +2568,9 @@
       "right_note": "remembers"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 330.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 420.0
      }
     }
@@ -2510,7 +2646,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s16",
@@ -2658,7 +2797,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   }
  ]
 }

@@ -726,16 +726,26 @@ MOTION_CHARACTER_PRESET = os.getenv("MOTION_CHARACTER_PRESET") or None
 #: type, camera, transitions — web/src/motion/designs.ts). Chosen when a reel
 #: is set up and saved in its setup.json, so a reel keeps its look; a reel set
 #: up before designs existed has none saved and stays "classic". New reels get
-#: "midnight_lab" (picked 2026-10-12); MOTION_DESIGN=classic switches back.
-MOTION_DESIGNS = ("classic", "midnight_lab")
+#: "studio" (2026-10-13: our own look, a palette per theme, replacing what was
+#: copied from the reference reels); MOTION_DESIGN=midnight_lab or classic
+#: switches back.
+MOTION_DESIGNS = ("classic", "midnight_lab", "studio")
 #: Motion reel VOICES. "chatterbox" (the default): every line is recorded with
 #: the local Chatterbox voice — free and offline, so even a stub-mode test reel
 #: speaks (2026-10-13: "voice not coming for newly created reels"). "silent":
 #: silence of the estimated length — what the automated tests use
 #: (shorts.testing sets it), because recording takes minutes.
+#: How the drawn characters share the frame with the visual: "board" (the
+#: visual as a board, the explaining character large beside it, teaching —
+#: shorts/motion_teach.py) or "band" (the earlier strip under the visual).
+MOTION_STAGE = os.getenv("MOTION_STAGE", "board").strip().lower() or "board"
+#: How the characters are drawn: "rig" (the 2D characters) or "vrm" (3D VRM
+#: avatars from assets/avatars/mentor.vrm and student.vrm — web/src/motion/vrm).
+#: Reels made before keep what they were made with.
+MOTION_AVATARS = os.getenv("MOTION_AVATARS", "rig").strip().lower() or "rig"
 MOTION_VOICE = os.getenv("MOTION_VOICE", "chatterbox").strip().lower() or "chatterbox"
 MOTION_SILENT = MOTION_VOICE == "silent"
-MOTION_DESIGN = os.getenv("MOTION_DESIGN", "midnight_lab").strip() or "midnight_lab"
+MOTION_DESIGN = os.getenv("MOTION_DESIGN", "studio").strip() or "studio"
 
 
 # --------------------------------------------------------------- image generation

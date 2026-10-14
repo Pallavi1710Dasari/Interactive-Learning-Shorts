@@ -351,6 +351,40 @@ _VISUAL_APPROACH_GUIDANCE: dict[str, str] = {
         "describes the NARRATION style; it is not a licence for the picture "
         "to stop being a picture."
     ),
+    "predict_then_reveal": (
+        "Prefer relationship=comparison with physical_form=two_sides: the "
+        "options or the expected result on screen first, the real result "
+        "revealed beside it. must_see includes the moment of reveal."
+    ),
+    "misconception_repair": (
+        "Prefer relationship=comparison with physical_form=two_sides: the "
+        "wrong picture and the right picture of the SAME thing; must_see "
+        "shows where the wrong one breaks."
+    ),
+    "build_from_zero": (
+        "Prefer relationship=process with a physical_form that can grow "
+        "(single_container, linked_nodes): each beat's must_see adds one "
+        "visible piece to what is already there."
+    ),
+    "worked_example_then_try": (
+        "Prefer relationship=process: must_see walks the worked example's "
+        "state step by step, then shows the second example's start and, at "
+        "the end, its answer."
+    ),
+    "socratic_questions": (
+        "Each beat's must_see is the picture that ANSWERS that beat's "
+        "question — the structure or state the question leads to — never the "
+        "question written out as text."
+    ),
+    "big_picture_then_zoom": (
+        "Prefer relationship=hierarchy with physical_form=nested_levels: the "
+        "whole system once, then must_see stays on the one part, larger."
+    ),
+    "step_by_step_trace": (
+        "Prefer relationship=process with physical_form=single_container: "
+        "must_see shows the current line and the values after it (a trace "
+        "table), one line per beat."
+    ),
 }
 
 

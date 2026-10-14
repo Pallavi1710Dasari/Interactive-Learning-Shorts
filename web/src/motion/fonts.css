@@ -6,3 +6,8 @@
 @import "@fontsource/jetbrains-mono/700.css";
 @import "@fontsource/anton/400.css";
 @import "@fontsource/archivo-black/400.css";
+/* The studio design (2026-10-13): our own pairing, replacing the references'
+   Manrope — Bricolage Grotesque for display, Lexend (made for reading ease)
+   for captions and body. */
+@import "@fontsource-variable/bricolage-grotesque/index.css";
+@import "@fontsource-variable/lexend/index.css";

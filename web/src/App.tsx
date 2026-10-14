@@ -1,3 +1,4 @@
+import { VrmLab } from "./motion/vrm/VrmLab";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getHealth, getShorts, getStory, getUsage, renderStatus, startRender,
          type MaterialResult, type UsageTotals } from "./api";
@@ -46,6 +47,8 @@ export default function App() {
   // #motion-reel/<short_id> — a motion reel in the full-reel player (phase 3):
   // its plan and narration from the API, or any plan with ?src=<url>.
   if (location.hash.startsWith("#motion-reel")) return <MotionPlayer />;
+  // #motion-vrm-lab — every 3D avatar gesture side by side (a dev page)
+  if (location.hash.startsWith("#motion-vrm-lab")) return <VrmLab />;
   // #motion/job/<id> — a motion reel being made: its steps, in the workspace.
   if (location.hash.startsWith("#motion/job/")) return <Workspace />;
   // #motion — the Motion section: every motion reel with its player, theme,

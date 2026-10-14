@@ -105,12 +105,17 @@ export function findOverlaps(root: HTMLElement, minShare = 0.12): Overlap[] {
     }
   }
   // the drawn characters: their figures, not the whole band they stand in
-  for (const fig of Array.from(root.querySelectorAll("[data-character] svg, [data-character] img"))) {
+  for (const fig of Array.from(root.querySelectorAll("[data-character] svg, [data-character] img, canvas[data-character]"))) {
     if (opacityOf(fig, root) < 0.25) continue;
     const f = clipped(fig.getBoundingClientRect(), fig.parentElement, root);
     if (!f) continue;
-    // the figure's body: the middle 70 % of its box (the box has air around the drawing)
-    const body = new DOMRect(f.left + f.width * 0.15, f.top + f.height * 0.05, f.width * 0.7, f.height * 0.95);
+    // the figure's body: the middle 70 % of its box (the box has air around the
+    // drawing); a 3D avatar's canvas is wider than its body: the body stands at
+    // data-body-x, about 0.4 of the canvas height wide (the rest is room for a gesture)
+    const bx = (fig as HTMLElement).dataset?.bodyX;
+    const body = bx !== undefined
+      ? new DOMRect(f.left + f.width * Number(bx) - f.height * 0.2, f.top + f.height * 0.05, f.height * 0.4, f.height * 0.95)
+      : new DOMRect(f.left + f.width * 0.15, f.top + f.height * 0.05, f.width * 0.7, f.height * 0.95);
     for (const a of runs) {
       const share = inter(a.r, body) / (a.r.width * a.r.height);
       if (share >= minShare) add({ kind: "text-character", a: a.part, b: "character", textA: a.text, textB: "", share: +share.toFixed(2) });

@@ -193,8 +193,22 @@ def total_seconds(clocks: list[ShotClock]) -> float:
 
 _SOURCE_RANK = {"forced_alignment": 2, "whisper": 1, "even": 0}
 
-#: The layout rules a new plan is drawn by (MotionPlan.rev).
-PLAN_REV = 2
+#: The layout rules a new plan is drawn by (MotionPlan.rev). 3: the studio
+#: look (palettes, type, cards, chrome) and the layout arrangements.
+PLAN_REV = 3
+
+
+def palette_for(theme: str | None, design: str) -> str | None:
+    """The studio palette a reel is drawn in (library.json studio): Midnight
+    Lab's own for that style, else its theme's, else the default; none for a
+    classic reel."""
+    if design == "classic":
+        return None
+    if design == "midnight_lab":
+        return "midnight"
+    from . import motion_library as lib
+    st = lib.library()["studio"]
+    return st["palette_for_theme"].get(theme or "", st["palette_default"])
 
 
 def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None = None,
@@ -225,9 +239,11 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
         cast_mode = "narrator"
     upper = lib.library()["frame"]["duo"]
     full_kinds = {k for k, spec in lib.object_kinds().items() if spec["layout"] == "full"}
+    from .motion_scenes import choose_arrangements
+    arrangements = choose_arrangements(script)
     shots: list[MotionShotPlan] = []
     weakest = "forced_alignment"
-    for shot, clock in zip(script.shots, clocks):
+    for shot, clock, arrangement in zip(script.shots, clocks, arrangements):
         if shot.scene is None:
             raise ValueError(f"{shot.id} has no scene — run the scenes stage first")
         full = any(o.kind in full_kinds for o in shot.scene.objects)
@@ -243,7 +259,7 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
             id=shot.id, beat=shot.beat, chapter=shot.chapter, start=clock.start, end=clock.end,
             field=shot.scene.field, transition=shot.scene.transition, label=shot.scene.label,
             layout="duo" if duo else "solo", characters=shown,
-            objects=layout_scene(shot.scene, duo=duo or shown),
+            objects=layout_scene(shot.scene, duo=duo or shown, arrangement=arrangement), arrangement=arrangement,
             actions=actions, captions=clock.captions))
     from .motion_identities import identity, languages
     from .motion_themes import theme_for_script
@@ -256,7 +272,7 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
               else motion_characters.direct_narrator(captions, script.language, character)
               if cast_mode == "narrator" else [])
     return MotionPlan(short_id=script.short_id, template=script.template, theme=script.theme, design=design,
-                      rev=PLAN_REV,
+                      rev=PLAN_REV, palette=palette_for(script.theme, design),
                       series=script.series, concept_name=script.concept_name,
                       duration=total_seconds(clocks), audio=audio,
                       timing_source=weakest if shots else "even",

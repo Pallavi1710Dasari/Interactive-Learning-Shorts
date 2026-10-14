@@ -66,6 +66,44 @@ _APPROACH_KINDS_AND_RULES = """Choose exactly one PRIMARY approach from:
                          beyond stating and reasoning about it. Fits a
                          definition or a plain rule that does not need a
                          demonstration, an analogy or a picture to be clear.
+  predict_then_reveal      the viewer is asked to commit to a guess about what
+                         happens, a beat is held, then the real result is
+                         shown and explained. Fits a result that is SURPRISING
+                         yet PREDICTABLE from what the viewer already knows —
+                         the commitment makes the correction stick. Not for a
+                         fact the viewer has no way to reason about.
+  misconception_repair     the wrong mental model learners hold is named first,
+                         shown exactly where it breaks, then replaced with the
+                         right one. Fits a concept the MATERIAL itself corrects,
+                         or one learners reliably picture wrongly (a variable
+                         as a box). The wrong belief must be real, never one
+                         invented to knock down.
+  build_from_zero          the concept is built from nothing, one piece at a
+                         time, each piece only making sense after the last.
+                         Fits a COMPOSITE thing — a class, a function, a
+                         request, a data structure — whose parts the material
+                         names.
+  worked_example_then_try  one example is solved fully, then a near-identical
+                         one is posed for the viewer and answered at the end.
+                         Fits a PROCEDURAL skill — a calculation, a syntax
+                         pattern, a rule applied to new input — that the
+                         material demonstrates with an example.
+  socratic_questions       a chain of three or four questions, each answer
+                         leading to the next, until the learner arrives at the
+                         idea. Fits a REASONING chain ("why… then why…") the
+                         material lays out step by step; best with two
+                         speakers.
+  big_picture_then_zoom    the whole system is shown first, then the camera
+                         zooms into the one part this reel is about. Fits a
+                         concept that is a PART of a larger system and only
+                         makes sense in place (the TLB within address
+                         translation).
+  step_by_step_trace       the code runs line by line while the values are
+                         tracked in a small trace table. Fits a concept about
+                         HOW STATE CHANGES as code runs — loops, recursion,
+                         aliasing — and ONLY when the material gives concrete
+                         code to trace (CODE IS NOT THE DEFAULT applies: the
+                         concept must be the state change, not the syntax).
 
 THE DECISION IS ABOUT THE CONCEPT AND THE TEACHING QUESTION, NOT ABOUT WHAT
 WOULD LOOK GOOD. Ask what a learner actually needs to SEE or FOLLOW to
@@ -120,7 +158,7 @@ way to explain things" are all rejected. If you cannot say something specific
 to THIS concept, you have not finished deciding."""
 
 _APPROACH_JSON_INSTRUCTION = """Return JSON:
-{"primary":"analogy|real_world_example|code|conceptual_visual|process_demonstration|comparison|direct_explanation",
+{"primary":"analogy|real_world_example|code|conceptual_visual|process_demonstration|comparison|direct_explanation|predict_then_reveal|misconception_repair|build_from_zero|worked_example_then_try|socratic_questions|big_picture_then_zoom|step_by_step_trace",
  "combined_with":["..."],"alternatives":["..."],"rationale":"..."}"""
 
 

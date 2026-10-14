@@ -36,7 +36,9 @@
 #                   opens it), and whether it may ask a question.
 #
 # Teaching approaches: analogy, real_world_example, code, conceptual_visual,
-# process_demonstration, comparison, direct_explanation.
+# process_demonstration, comparison, direct_explanation, predict_then_reveal,
+# misconception_repair, build_from_zero, worked_example_then_try,
+# socratic_questions, big_picture_then_zoom, step_by_step_trace.
 
 variety:
   # A fixed rule, never the LLM's: among earlier motion reels in the same
@@ -64,7 +66,7 @@ themes:
       - {role: NARRATOR}
     needs_code: false
     suits: ["why does X fail / not work", "a fix the learner can apply", "any concept"]
-    works_with: [analogy, real_world_example, code, conceptual_visual, comparison, direct_explanation]
+    works_with: [analogy, real_world_example, code, conceptual_visual, comparison, direct_explanation, misconception_repair, big_picture_then_zoom, build_from_zero]
     incompatible_with: []
     hook:
       style: symptom_question
@@ -116,7 +118,7 @@ themes:
       - {role: CANDIDATE, identity: language}
     needs_code: false
     suits: ["classic interview questions", "why does X fail", "concepts with a crisp correct answer"]
-    works_with: [code, direct_explanation, comparison, conceptual_visual]
+    works_with: [code, direct_explanation, comparison, conceptual_visual, socratic_questions]
     incompatible_with: []
     hook:
       style: question
@@ -180,7 +182,7 @@ themes:
       - {role: PEER_B, identity: language, asks: true}
     needs_code: false
     suits: ["confusing behaviour", "concepts with a common wrong mental model", "anything better talked through"]
-    works_with: [analogy, comparison, conceptual_visual, direct_explanation, code]
+    works_with: [analogy, comparison, conceptual_visual, direct_explanation, code, misconception_repair, socratic_questions, predict_then_reveal]
     incompatible_with: []
     hook:
       style: question
@@ -212,7 +214,7 @@ themes:
       - {role: MENTOR, identity: language, asks: true}
     needs_code: false
     suits: ["foundational concepts", "ideas that need a mental model first", "beginner confusion"]
-    works_with: [analogy, direct_explanation, conceptual_visual, code, real_world_example]
+    works_with: [analogy, direct_explanation, conceptual_visual, code, real_world_example, misconception_repair, socratic_questions, worked_example_then_try]
     incompatible_with: []
     hook:
       style: question
@@ -243,7 +245,7 @@ themes:
       - {role: NARRATOR}
     needs_code: true
     suits: ["a bug a beginner really writes", "code that runs but does the wrong thing"]
-    works_with: [code, process_demonstration, direct_explanation]
+    works_with: [code, process_demonstration, direct_explanation, step_by_step_trace]
     incompatible_with: [analogy]
     hook:
       style: claim
@@ -274,7 +276,7 @@ themes:
       - {role: NARRATOR}
     needs_code: false
     suits: ["a common wrong belief the material corrects", "rules people half-remember"]
-    works_with: [comparison, direct_explanation, conceptual_visual, code]
+    works_with: [comparison, direct_explanation, conceptual_visual, code, misconception_repair]
     incompatible_with: [process_demonstration]
     hook:
       style: claim
@@ -305,7 +307,7 @@ themes:
       - {role: NARRATOR}
     needs_code: false
     suits: ["concepts with typical misuse", "rules with a few classic traps"]
-    works_with: [code, direct_explanation, comparison]
+    works_with: [code, direct_explanation, comparison, misconception_repair]
     incompatible_with: [analogy]
     hook:
       style: claim
@@ -336,7 +338,7 @@ themes:
       - {role: NARRATOR}
     needs_code: true
     suits: ["code whose result surprises beginners", "evaluation order", "state and scope"]
-    works_with: [code, process_demonstration]
+    works_with: [code, process_demonstration, predict_then_reveal, step_by_step_trace]
     incompatible_with: [analogy, real_world_example]
     hook:
       style: question
@@ -367,7 +369,7 @@ themes:
       - {role: NARRATOR}
     needs_code: false
     suits: ["mechanisms behind familiar behaviour", "runtimes, memory, rendering, compilers"]
-    works_with: [conceptual_visual, process_demonstration, direct_explanation, code]
+    works_with: [conceptual_visual, process_demonstration, direct_explanation, code, big_picture_then_zoom, step_by_step_trace]
     incompatible_with: [real_world_example]
     hook:
       style: question
@@ -398,7 +400,7 @@ themes:
       - {role: NARRATOR}
     needs_code: false
     suits: ["how does X work", "a process with ordered steps", "a pipeline or algorithm"]
-    works_with: [process_demonstration, conceptual_visual, code, direct_explanation]
+    works_with: [process_demonstration, conceptual_visual, code, direct_explanation, step_by_step_trace, build_from_zero]
     incompatible_with: []
     hook:
       style: how_question
@@ -468,4 +470,185 @@ themes:
       code_map: {does: "The after's syntax, each part tied to what it controls."}
       payoff:   {does: "Before and after again: now the difference is obvious."}
       recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  # ------------------------------------------------- 2026-10-13: six more themes
+
+  live_code_along:
+    label: Live code-along
+    tag: codealong
+    template: walkthrough
+    description: >-
+      One narrator writes the code live — the cursor types it — runs it, reads
+      the result, changes one thing and runs it again, in 2 to 4 numbered steps.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: true
+    suits: ["syntax learned by writing it", "a loop, function or call whose result you can see", "small programs built step by step"]
+    works_with: [code, build_from_zero, worked_example_then_try, step_by_step_trace, process_demonstration]
+    incompatible_with: [analogy, real_world_example]
+    hook:
+      style: how_question
+      symptom: false
+      brief: How do you write it? One line on what we will build, then we start typing.
+    beats: walkthrough
+
+  doubt_clinic:
+    label: Doubt clinic
+    tag: doubtclinic
+    template: fix_story
+    description: >-
+      A student asks a real doubt in their own words; the mentor repeats it,
+      names the hidden wrong assumption, clears it with one picture, and checks
+      with a quick follow-up the student now answers right.
+    speakers:
+      - {role: STUDENT, identity: host, asks: true}
+      - {role: MENTOR, identity: language, asks: true}
+    needs_code: false
+    suits: ["a question learners actually ask about the concept", "isn't it the same as…", "why does … when …"]
+    works_with: [misconception_repair, socratic_questions, analogy, conceptual_visual, direct_explanation, comparison]
+    incompatible_with: [process_demonstration]
+    hook:
+      style: question
+      openers: ["isn't", "why does", "why do", "why is", "but why", "wait, why", "how come", "is it true that", "what's the difference"]
+      symptom: false
+      brief: The student's doubt, word for word as a learner would ask it.
+    beats:
+      hook:     {speakers: [STUDENT], does: "The student's doubt, in their own words."}
+      title:    {speakers: [MENTOR], does: "The mentor names the concept the doubt is about, in one line."}
+      setup:    {speakers: [MENTOR, STUDENT], does: "The mentor repeats the doubt back; the student says what they think happens."}
+      break_1:  {speakers: [MENTOR], does: "The hidden wrong assumption behind the doubt, and where it breaks."}
+      break_2:  {speakers: [STUDENT, MENTOR], does: "OPTIONAL. The student pushes back once; the mentor answers from the material."}
+      fix_idea: {speakers: [MENTOR], does: "The right picture, in one clear mental model."}
+      fix_flow: {speakers: [MENTOR, STUDENT], does: "The same example under the right picture, step by step."}
+      code_map: {speakers: [MENTOR], does: "Where it shows in real syntax, each part tied to what it does."}
+      payoff:   {speakers: [MENTOR, STUDENT], does: "The mentor's quick check question; the student now answers it right."}
+      recap:    {speakers: [MENTOR], does: "The three takeaways that clear the doubt."}
+      cta:      {speakers: [MENTOR], does: "Follow for more plus the next topic."}
+
+  whiteboard_sketch:
+    label: Whiteboard
+    tag: whiteboard
+    template: fix_story
+    description: >-
+      One narrator draws the idea on a board as it is said — boxes, arrows and
+      labels appearing stroke by stroke — until the whole picture explains it.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["structures: memory, references, trees, networks, layers", "how parts connect", "where something lives"]
+    works_with: [conceptual_visual, big_picture_then_zoom, build_from_zero, analogy, direct_explanation]
+    incompatible_with: [code]
+    hook:
+      style: question
+      openers: ["what really happens", "where does", "what is actually", "how does", "why does", "what does"]
+      symptom: false
+      brief: A question whose answer is a picture of how things connect.
+    beats:
+      hook:     {does: "The question, with the first stroke on the board."}
+      title:    {does: "Name the concept, written on the board."}
+      setup:    {does: "Draw the familiar part everyone already knows."}
+      break_1:  {does: "Draw the picture most people have in mind, and mark where it fails."}
+      break_2:  {does: "OPTIONAL. A second wrong picture, only if the material states one."}
+      fix_idea: {does: "Draw the right structure, part by part."}
+      fix_flow: {does: "Trace what happens across the drawing, arrow by arrow."}
+      code_map: {does: "Where each part of the drawing shows up in real syntax."}
+      payoff:   {does: "The whole drawing, the question answered on it."}
+      recap:    {does: "The three takeaways, pointed at on the drawing."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  pause_and_predict:
+    label: Pause & predict
+    tag: quiz
+    template: fix_story
+    description: >-
+      One narrator asks a multiple-choice question with three options, says
+      "pause now", then reveals the answer and why each wrong option is wrong.
+      Unlike Predict the output, it needs no code.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["an outcome predictable from what was taught but often guessed wrong", "rules with tempting wrong answers", "quick revision"]
+    works_with: [predict_then_reveal, misconception_repair, comparison, direct_explanation]
+    incompatible_with: [process_demonstration, build_from_zero]
+    hook:
+      style: question
+      openers: ["quick quiz", "pause and guess", "which one", "can you guess", "what do you think", "true or false"]
+      symptom: false
+      brief: A short question with three possible answers, and a pause to guess.
+    beats:
+      hook:     {does: "The question and its three options."}
+      title:    {does: "Name the concept the answer depends on, in one line."}
+      setup:    {does: "Pause now: the three options again, and what you need to know to pick.", asks: true}
+      break_1:  {does: "The most tempting wrong option, and why it is wrong."}
+      break_2:  {does: "OPTIONAL. The second wrong option, and why."}
+      fix_idea: {does: "The concept that decides the answer, as a mental model."}
+      fix_flow: {does: "Apply it to the question, step by step, to the right option."}
+      code_map: {does: "Where it shows in real syntax, each part tied to what it controls."}
+      payoff:   {does: "The reveal: the right option, ticked."}
+      recap:    {does: "The three takeaways, read aloud."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  error_decoder:
+    label: Error decoder
+    tag: errordecoded
+    template: fix_story
+    description: >-
+      One narrator reads a real error message part by part — its type, its
+      line, the clue in it — finds the cause, applies the fix, and the error
+      is gone.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: true
+    suits: ["an error message beginners hit", "a traceback or compiler error the material explains"]
+    works_with: [code, step_by_step_trace, direct_explanation, misconception_repair]
+    incompatible_with: [analogy, real_world_example]
+    hook:
+      style: claim
+      openers: ["this error", "you see this", "this red message", "every beginner sees", "when python says", "when you see"]
+      symptom: true
+      brief: The error message itself, and the promise to read it like a pro.
+    beats:
+      hook:     {does: "The error message, exactly as it appears."}
+      title:    {does: "Name the concept the error is about, in one line."}
+      setup:    {does: "The code that produced it."}
+      break_1:  {does: "Read the error: its type and what it means in plain words."}
+      break_2:  {does: "OPTIONAL. The line and the clue the message points at."}
+      fix_idea: {does: "The cause, as a mental model."}
+      fix_flow: {does: "The fix, step by step: the change, the rerun, the result."}
+      code_map: {does: "The fixed syntax, each part tied to what it controls."}
+      payoff:   {does: "The code runs; the error is gone."}
+      recap:    {does: "The three takeaways: what it said, why, the fix."}
+      cta:      {does: "Follow for more plus the next topic."}
+
+  this_or_that:
+    label: This or that
+    tag: thisorthat
+    template: fix_story
+    description: >-
+      One narrator sets two VALID options against each other over three rounds
+      — when each one wins — and ends on a verdict rule. Unlike Before & after,
+      neither option is broken.
+    speakers:
+      - {role: NARRATOR}
+    needs_code: false
+    suits: ["a choice between two valid tools (list vs tuple, let vs const, == vs is)", "when to use which"]
+    works_with: [comparison, real_world_example, direct_explanation, code]
+    incompatible_with: [process_demonstration, build_from_zero]
+    hook:
+      style: question
+      openers: ["which should", "which one", "this or that", "when do you use", "should you use", "which is better"]
+      symptom: false
+      brief: Which of the two should you use? Both work — that is the point.
+    beats:
+      hook:     {does: "The choice: the two options, side by side."}
+      title:    {does: "Name what the choice is about, in one line."}
+      setup:    {does: "Round one: the case where they look the same."}
+      break_1:  {does: "Round two: a case where the first one wins, and why."}
+      break_2:  {does: "OPTIONAL. Round three: a case where the second one wins, and why."}
+      fix_idea: {does: "The one difference that decides every round."}
+      fix_flow: {does: "Apply it: a new case, decided step by step."}
+      code_map: {does: "Where the difference shows in real syntax, each part tied to what it controls."}
+      payoff:   {does: "The verdict rule, applied to the opening choice."}
+      recap:    {does: "The three takeaways: when this, when that, the rule."}
       cta:      {does: "Follow for more plus the next topic."}

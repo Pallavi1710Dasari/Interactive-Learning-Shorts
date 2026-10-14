@@ -203,11 +203,11 @@ def _plan(script=None, characters=True) -> MotionPlan:
 
 def test_a_new_plan_is_rev_2_and_an_old_one_is_not_checked():
     plan = _plan()
-    assert plan.rev == PLAN_REV == 2
+    assert plan.rev == PLAN_REV >= 2
     old = MotionPlan(**OLD_PLAN)
     assert old.rev == 1
     for r in motion_plan_checks.run(old):
-        assert r.passed and "rev 1" in r.reason, r
+        assert r.passed and "not checked" in r.reason, r
 
 
 def test_caption_layout_passes_the_real_reel_and_catches_breakage():

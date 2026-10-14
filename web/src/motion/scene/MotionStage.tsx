@@ -34,7 +34,14 @@ import { BUBBLE, ChatRow, IdentitySting, LanguageBadge, SIDE_BUBBLE, SideBubble,
 import { FULL_KINDS, SceneObject } from "./objects";
 import { textToneOn } from "../identity/contrast";
 import { ReelCharacters, STAGE, charactersOn } from "../cast/ReelCharacters";
-import type { MotionPlan, PlanCaption, PlanShot } from "./types";
+import type { MotionPlan, PlanCaption, PlanShot, Rect } from "./types";
+import { CameraLayer, CursorLayer } from "../camera";
+import { STUDIO_DUR, STUDIO_TRANSITIONS, SectionRibbon, StudioBackground, StudioTransition, TimelineThread } from "../studio";
+import { STUDIO, applyPalette } from "../tokens";
+import { MIDNIGHT_STUDIO_VARS } from "../designs";
+import { BoardCharacters } from "../cast/ReelCharacters";
+import { BOARD, boardMap } from "../cast/teach";
+import { VrmCast } from "../vrm/VrmCast";
 import library from "../library.json";
 import { designOf, designVars } from "../designs";
 import { LabBackground, LabCamera, ZOOM_DUR, ZoomThrough } from "../lab";
@@ -95,7 +102,9 @@ function Chat({ plan, index, t }: { plan: MotionPlan; index: number; t: number }
   const shot = plan.shots[index];
   const rows = chatAt(plan, index, t);
   const cast = plan.characters?.length > 0;
-  if (rev(plan) >= 2 && cast && charactersOn(plan, shot)) return <SideChat plan={plan} index={index} t={t} rows={rows} />;
+  // rev 2: side bubbles whenever the reel has characters (a shot without them
+  // still never brings back the badges the characters replace)
+  if (rev(plan) >= 2 && cast) return <SideChat plan={plan} index={index} t={t} rows={rows} />;
   // the chat starts below the shot's lowest object: a stack taller than its
   // region (an entity wired to a panel) ran into the oldest bubble
   const objectsBottom = Math.max(0, ...shot.objects
@@ -137,6 +146,27 @@ function Chat({ plan, index, t }: { plan: MotionPlan; index: number; t: number }
   );
 }
 
+/** Kinds whose own words are the caption (rev 2): no caption or chat repeats them. */
+const CAPTIONLESS = new Set(["takeaway_list", "recap_grid"]);
+
+/** Drawn in the studio look (rev 3): the studio's palette, type, cards and chrome. */
+export function studio(plan: MotionPlan): boolean {
+  return rev(plan) >= 3;
+}
+
+/** The palette a frame is drawn in: the plan's, Midnight Lab's own on a rev 3
+ * Midnight Lab plan, none (the original colours) before rev 3. */
+export function paletteOf(plan: MotionPlan): string | null {
+  if (!studio(plan)) return null;
+  if (plan.palette) return plan.palette;
+  return designOf(plan.design).id === "midnight_lab" ? "midnight" : STUDIO.palette_default;
+}
+
+/** The section ribbon's number: how many labelled shots up to this one. */
+function labelNumber(plan: MotionPlan, index: number): number {
+  return plan.shots.slice(0, index + 1).filter((s) => s.label).length;
+}
+
 /** The plan's layout rules (MotionPlan.rev): absent = 1, the old look. */
 export function rev(plan: MotionPlan): number {
   return plan.rev ?? 1;
@@ -146,32 +176,61 @@ export function rev(plan: MotionPlan): number {
  * the characters (frame.chat.bubble.avatar_gap), down to the safe line. Each
  * bubble is pushed to its speaker's side; the newest at the bottom, and only
  * whole bubbles that fit. */
-export function sideChatZone(): { top: number; bottom: number } {
+export function sideChatZone(plan?: MotionPlan, shot?: PlanShot): { top: number; bottom: number } {
+  if (plan?.stage === "board") return { top: BOARD.chat.top, bottom: BOARD.chat.bottom };
+  if (plan && shot && !charactersOn(plan, shot)) {
+    // no characters on this shot: the chat starts below the shot's objects
+    const objectsBottom = Math.max(0, ...shot.objects.filter((o) => o.box && o.box.h > 0).map((o) => o.box!.y + o.box!.h));
+    return { top: Math.max(FRAME.chat.top, objectsBottom + 40), bottom: SIDE_BUBBLE.safe_bottom };
+  }
   return { top: STAGE.bottom + SIDE_BUBBLE.avatar_gap, bottom: SIDE_BUBBLE.safe_bottom };
+}
+
+/** Is this shot drawn on the board stage (plan.stage = "board", characters on)? */
+export function onBoard(plan: MotionPlan, shot: PlanShot): boolean {
+  return plan.stage === "board" && charactersOn(plan, shot);
+}
+
+/** The visual drawn onto the board (cast/teach.ts boardMap): its layout region
+ * scaled into the board's place, on a quiet board panel. */
+function BoardLayer({ full, children }: { full: boolean | string; children: React.ReactNode }) {
+  const m = boardMap(full);
+  const [dx, dy, dw, dh] = BOARD.dst;
+  return <>
+    <div data-part="board" style={{ position: "absolute", left: dx - 8, top: dy - 8, width: dw + 16, height: dh + 16, borderRadius: 34,
+                                    background: "rgba(255,255,255,0.035)", boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.07)" }} />
+    <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 1920, transformOrigin: "0 0",
+                  transform: `translate(${m.x - m.src[0] * m.s}px, ${m.y - m.src[1] * m.s}px) scale(${m.s})` }}>
+      <div style={{ position: "absolute", left: m.src[0], top: m.src[1], width: m.src[2], height: m.src[3], overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: -m.src[0], top: -m.src[1], width: 1080, height: 1920 }}>{children}</div>
+      </div>
+    </div>
+  </>;
 }
 
 function SideChat({ plan, index, t, rows }: { plan: MotionPlan; index: number; t: number; rows: PlanCaption[] }) {
   const shot = plan.shots[index];
-  const { top, bottom } = sideChatZone();
+  const { top, bottom } = sideChatZone(plan, shot);
+  const board = plan.stage === "board";
   const room = bottom - top;
   const shown: { c: PlanCaption; h: number }[] = [];
   let used = 0;
   for (let i = rows.length - 1; i >= 0; i--) {
-    const h = sideBubbleHeight(rows[i].words.map((w) => w.text).join(" "));
+    const h = sideBubbleHeight(rows[i].words.map((w) => w.text).join(" "), board ? BOARD.chat : undefined);
     if (used + h > room && shown.length) break;
     shown.unshift({ c: rows[i], h });
-    used += h + SIDE_BUBBLE.gap;
+    used += h + (board ? BOARD.chat.gap : SIDE_BUBBLE.gap);
   }
-  let y = room - (used - SIDE_BUBBLE.gap);
+  let y = room - (used - (board ? BOARD.chat.gap : SIDE_BUBBLE.gap));
   return (
     <div data-part="chat" style={{ position: "absolute", left: 0, top, width: 1080, height: room, overflow: "hidden" }}>
       {shown.map(({ c, h }, i) => {
         const member = plan.cast.find((m) => m.role === c.speaker) ?? plan.cast[0];
         const at = y;
-        y += h + SIDE_BUBBLE.gap;
+        y += h + (board ? BOARD.chat.gap : SIDE_BUBBLE.gap);
         const latest = i === shown.length - 1;
         return <SideBubble key={`${c.start}`} member={member} field={shot.field} words={c.words} t={t} y={at}
-                           fade={latest ? 1 : 0.6} />;
+                           fade={latest ? 1 : 0.6} dims={board ? BOARD.chat : undefined} />;
       })}
     </div>
   );
@@ -191,19 +250,37 @@ export function ShotContent({ plan, index, t }: { plan: MotionPlan; index: numbe
   // data-part: what the overlap audit (shorts/motion_overlap) calls each drawn part
   const objects = shot.objects.map((o) => <div key={o.id} data-part={`obj:${o.id}:${o.kind}`}>
     <SceneObject obj={o} shot={shot} t={t} field={field} series={plan.series}
-                 identity={plan.identity} themeLabel={plan.theme_label} tags={plan.tags} rev={rev(plan)} /></div>);
+                 identity={plan.identity} themeLabel={plan.theme_label} tags={plan.tags} rev={rev(plan)}
+                 board={onBoard(plan, shot)} /></div>);
   return (
-    <Layer style={{ background: design.background === "lab" ? undefined : FIELDS[field] }}>
+    <Layer style={{ background: design.background === "flat" ? FIELDS[field] : undefined }}>
       {design.background === "lab" && <LabBackground field={field} t={t} />}
-      {shot.label && !full && <div data-part="label"><SectionLabel text={design.background === "lab" ? `// ${shot.label}` : shot.label} x={SAFE.side}
+      {design.background === "studio" && <StudioBackground field={field} />}
+      {shot.label && !full && studio(plan) && <SectionRibbon text={shot.label} n={labelNumber(plan, index)} field={field}
+                                                              p={seg(local, 0, 0.4)} y={onBoard(plan, shot) ? 150 : 172} />}
+      {shot.label && !full && !studio(plan) && <div data-part="label"><SectionLabel text={design.background === "lab" ? `// ${shot.label}` : shot.label} x={SAFE.side}
                                             y={shot.layout === "duo" || charactersOn(plan, shot) ? 186 : 226} field={field}
                                             p={seg(local, 0, 0.3)} accent={design.background === "lab"} /></div>}
-      {design.camera ? <LabCamera local={local}>{objects}</LabCamera> : objects}
-      {shot.layout === "duo" && !full && <Chat plan={plan} index={index} t={t} />}
-      {!walk && !full && <ProgressSegments count={plan.shots.length} index={index} color={tone}
+      {(() => {
+        const drawn = design.camera ? <LabCamera local={local}>{objects}</LabCamera> : objects;
+        // the virtual camera and cursor (camera.tsx): only on shots with cues
+        const vp: Rect = shot.camera?.[0]?.viewport ?? [0, 150, 1080, 1150];
+        const shown = !shot.camera?.length && !shot.cursor?.length ? drawn : <>
+          <CameraLayer shot={shot} vp={vp} t={t}>{drawn}</CameraLayer>
+          <CursorLayer shot={shot} vp={vp} t={t} />
+        </>;
+        const fullKind = shot.objects.find((o) => FULL_KINDS.has(o.kind))?.kind;
+        return onBoard(plan, shot) ? <BoardLayer full={fullKind ?? false}>{shown}</BoardLayer> : shown;
+      })()}
+      {/* rev 2: a recap's cards carry its words — no chat repeating them */}
+      {shot.layout === "duo" && (!full || onBoard(plan, shot)) && !(rev(plan) >= 2 && shot.objects.some((o) => CAPTIONLESS.has(o.kind)))
+        && <Chat plan={plan} index={index} t={t} />}
+      {!walk && !full && !studio(plan) && <ProgressSegments count={plan.shots.length} index={index} color={tone}
                                            progress={clamp(local / Math.max(0.1, shot.end - shot.start))} field={field} />}
-      {walk && shot.chapter != null && !full && <div data-part="stepchip"><StepChip n={shot.chapter} of={chapters} field={field} color={tone} /></div>}
-      {walk && cardShot && shot.chapter != null && (
+      {!full && studio(plan) && <TimelineThread count={plan.shots.length} index={index} color={tone}
+                                                progress={clamp(local / Math.max(0.1, shot.end - shot.start))} field={field} />}
+      {walk && shot.chapter != null && !full && !studio(plan) && <div data-part="stepchip"><StepChip n={shot.chapter} of={chapters} field={field} color={tone} /></div>}
+      {walk && cardShot && shot.chapter != null && !studio(plan) && (
         <StepChip n={shot.chapter} of={chapters} field={field} color={tone} p={seg(local, CHAPTER_CARD.exitAt, 0.2)}
                   hideNumber={local < CHAPTER_CARD.exitAt + CHAPTER_CARD.fly} />
       )}
@@ -246,7 +323,9 @@ function SpeakerTag({ plan, shot, t }: { plan: MotionPlan; shot: PlanShot; t: nu
 export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
   const plan = designed(raw);
   const design = designOf(plan.design);
-  const vars = designVars(design);
+  // the palette for this frame (tokens.ts): before anything below draws
+  applyPalette(paletteOf(plan), studio(plan));
+  const vars = studio(plan) && design.id === "midnight_lab" ? MIDNIGHT_STUDIO_VARS as React.CSSProperties : designVars(design);
   if (plan.identity && plan.intro > 0 && t < plan.intro) {
     return <Frame field={design.field("navy")} style={vars}><IdentitySting spec={plan.identity} t={t} /></Frame>;
   }
@@ -257,15 +336,20 @@ export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
   const kind = TRANSITIONS.has(shot.transition) ? shot.transition as TransitionKind
     : shot.transition === "type_scatter" ? "iris" : null;
   const zoom = design.transition === "zoom_through";
-  const transitioning = prev && kind && into < (zoom ? ZOOM_DUR : TRANSITION_DUR);
+  const studioMove = design.transition === "studio" && kind ? STUDIO_TRANSITIONS[shot.transition] : null;
+  const transitioning = prev && kind && into < (zoom ? ZOOM_DUR : studioMove ? STUDIO_DUR : TRANSITION_DUR);
   const full = shot.objects.some((o) => FULL_KINDS.has(o.kind));
   // rev 2: a recap's cards carry its words, so the caption does not repeat them
   const cardCaption = !shot.objects.some((o) => o.kind === "title_card" || o.kind === "end_card"
     || (rev(plan) >= 2 && (o.kind === "takeaway_list" || o.kind === "recap_grid")));
-  const chat = shot.layout === "duo" && !full;
+  const chat = shot.layout === "duo" && (!full || onBoard(plan, shot));
   return (
     <Frame field={shot.field} style={vars}>
-      {transitioning && zoom ? (
+      {transitioning && studioMove ? (
+        <StudioTransition kind={studioMove} to={shot.field} t={into}
+                          outgoing={<ShotContent plan={plan} index={i - 1} t={Math.min(t, prev!.end)} />}
+                          incoming={<ShotContent plan={plan} index={i} t={t} />} />
+      ) : transitioning && zoom ? (
         <ZoomThrough t={into} outgoing={<ShotContent plan={plan} index={i - 1} t={Math.min(t, prev!.end)} />}
                      incoming={<ShotContent plan={plan} index={i} t={t} />} />
       ) : transitioning ? (
@@ -275,7 +359,15 @@ export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
       ) : (
         <ShotContent plan={plan} index={i} t={t} />
       )}
-      {charactersOn(plan, shot) && (
+      {onBoard(plan, shot) && plan.avatars === "vrm" && (
+        <VrmCast plan={plan} t={t}
+                 opacity={transitioning && !charactersOn(plan, prev!) ? clamp(into / (zoom ? ZOOM_DUR : TRANSITION_DUR)) : 1} />
+      )}
+      {onBoard(plan, shot) && plan.avatars !== "vrm" && (
+        <BoardCharacters plan={plan} t={t}
+                         opacity={transitioning && !charactersOn(plan, prev!) ? clamp(into / (zoom ? ZOOM_DUR : TRANSITION_DUR)) : 1} />
+      )}
+      {charactersOn(plan, shot) && !onBoard(plan, shot) && (
         <ReelCharacters plan={plan} t={t} field={shot.field}
                         opacity={transitioning && !charactersOn(plan, prev!) ? clamp(into / (zoom ? ZOOM_DUR : TRANSITION_DUR)) : 1} />
       )}

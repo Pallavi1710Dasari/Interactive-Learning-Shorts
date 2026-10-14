@@ -1829,13 +1829,17 @@ def motion_reel_bundle(short_id: str):
 
 
 @app.get("/api/motion/{short_id}/plan")
-def motion_plan(short_id: str):
+def motion_plan(short_id: str, variant: str | None = None):
     """A motion reel's player plan (RESTYLE_TO_MOTION_REELS.md phase 3):
     output/<short_id>/plan.json, written by the motion runner's timing stage.
-    The player at #motion-reel/<short_id> is a pure function of it."""
+    The player at #motion-reel/<short_id> is a pure function of it.
+    `variant`: a preview plan beside it, output/<short_id>/plan.<variant>.json
+    (a test clip of a feature before it is applied to the reel)."""
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", short_id):
         raise HTTPException(400, "bad short id")
-    path = config.OUTPUT_DIR / short_id / "plan.json"
+    if variant is not None and not re.fullmatch(r"[a-z0-9_]{1,40}", variant):
+        raise HTTPException(400, "bad variant")
+    path = config.OUTPUT_DIR / short_id / (f"plan.{variant}.json" if variant else "plan.json")
     if not path.exists():
         raise HTTPException(404, "no plan for this motion reel — run its timing stage")
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -1850,6 +1854,18 @@ def motion_plan(short_id: str):
         engine = None
     data["voice"] = "stub" if engine == "stub" else ("recorded" if data.get("audio") else "none")
     return data
+
+
+@app.get("/api/motion/avatars/{name}")
+def motion_avatar(name: str):
+    """A 3D avatar model (VRM) from assets/avatars/<name>.vrm, read on every
+    request, so replacing the file changes every reel drawn after it."""
+    if not re.fullmatch(r"[a-z0-9_-]{1,40}", name):
+        raise HTTPException(400, "bad avatar name")
+    path = config.ROOT / "assets" / "avatars" / f"{name}.vrm"
+    if not path.exists():
+        raise HTTPException(404, f"no avatar {name}.vrm in assets/avatars")
+    return FileResponse(path, media_type="model/gltf-binary")
 
 
 class MotionRedrawIn(BaseModel):

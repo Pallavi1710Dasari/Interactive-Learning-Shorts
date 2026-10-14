@@ -7,7 +7,7 @@ further downstream. Design this file first and change it rarely.
 """
 
 import re
-from typing import Literal, Optional, get_args
+from typing import Union, Literal, Optional, get_args
 from pydantic import BaseModel, Field, field_validator, computed_field
 
 # Speech pacing. 150 words/min is a conservative average for clear narration.
@@ -437,6 +437,9 @@ class QuestionFraming(BaseModel):
 TeachingApproachKind = Literal[
     "analogy", "real_world_example", "code", "conceptual_visual",
     "process_demonstration", "comparison", "direct_explanation",
+    # 2026-10-13 (review of job f64077e78448): seven more devices
+    "predict_then_reveal", "misconception_repair", "build_from_zero", "worked_example_then_try",
+    "socratic_questions", "big_picture_then_zoom", "step_by_step_trace",
 ]
 
 
@@ -3388,6 +3391,14 @@ class MotionShotPlan(BaseModel):
     objects: list[MotionPlacedObject]
     actions: list[MotionActionTiming]
     captions: list[MotionCaptionTiming]
+    #: How its placed objects are arranged (motion_scenes.choose_arrangements):
+    #: column / offset / split, or a full-frame card's own layout (cover, code...).
+    arrangement: str = ""
+    #: The virtual camera's framings (shorts/motion_camera.py): each
+    #: {t0, t1, target, part, rect [x, y, w, h], zoom, viewport [x, y, w, h], why}.
+    camera: list[dict] = Field(default_factory=list)
+    #: The virtual cursor: each {t, do: click | type, target, part, rect, text?, t_end?}.
+    cursor: list[dict] = Field(default_factory=list)
 
 
 class MotionIdentitySpec(BaseModel):
@@ -3421,10 +3432,20 @@ class MotionCharacterCue(BaseModel):
     """One gesture or expression of an animated character, landing on a
     spoken word like a scene action (shorts/motion_characters.py)."""
     t: float                                     #: seconds on the reel's clock
-    kind: Literal["gesture", "expression"]
-    name: str                                    #: a name in the rig's ACTIONS / EXPRESSIONS
-    side: Optional[Literal["L", "R"]] = None     #: R mirrors a one-handed gesture
+    #: gesture / expression: a rig action; aim: point an arm at `rect`; gaze:
+    #: look at `rect` or the partner; aha: the lightbulb moment
+    #: count: a held finger count (`name` one / two / three) on arm `side`
+    kind: Literal["gesture", "expression", "aim", "gaze", "aha", "count"]
+    name: str = ""                               #: a name in the rig's ACTIONS / EXPRESSIONS
+    side: Optional[Literal["L", "R"]] = None     #: R mirrors a one-handed gesture; aim: the arm
     cue: str = ""                                #: the spoken word it is cued on
+    until: Optional[float] = None                #: aim / gaze: when it lets go
+    #: aim / gaze: what it is aimed at, [x, y, w, h] where the visual is laid
+    #: out (the player maps it onto the stage); None with target "partner"
+    rect: Optional[list[float]] = None
+    target: Optional[str] = None                 #: an object id, or "partner"
+    #: the rect is on a full-frame card: its kind (the board maps each card's own area)
+    full: Union[bool, str] = False
 
 
 class MotionCharacterTrack(BaseModel):
@@ -3440,6 +3461,12 @@ class MotionCharacterTrack(BaseModel):
     side: Literal["left", "right", "center"]
     seed: int = 1
     cues: list[MotionCharacterCue] = Field(default_factory=list)
+    #: The voice's loudness while this character speaks, for the jaw
+    #: (shorts/motion_teach.envelope): {"t0": s, "fps": 30, "v": [0..1, ...]}.
+    env: Optional[dict] = None
+    #: The 3D model it wears when the plan's avatars are "vrm":
+    #: assets/avatars/<vrm>.vrm ("mentor" for the explainer, "student" for the asker).
+    vrm: Optional[str] = None
 
 
 class MotionPlan(BaseModel):
@@ -3456,6 +3483,15 @@ class MotionPlan(BaseModel):
     #: Rev 2: side-anchored chat bubbles, the handle and language shown once,
     #: the recap without a repeated caption, the CTA cued on its words.
     rev: int = 1
+    #: How the characters and the visual share the frame: None = the characters
+    #: in their band under the visual; "board" = the visual as a board, the
+    #: explaining character large beside it (library.json frame.board).
+    stage: Optional[str] = None
+    #: The studio palette (library.json studio.palettes); None before rev 3.
+    palette: Optional[str] = None
+    #: How the characters are drawn: "vrm" = 3D VRM avatars (web/src/motion/vrm);
+    #: None = the 2D rig (every plan made before, and MOTION_AVATARS=rig).
+    avatars: Optional[str] = None
     series: str = ""
     concept_name: str = ""
     duration: float

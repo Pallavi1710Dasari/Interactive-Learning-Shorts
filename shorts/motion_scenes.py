@@ -154,12 +154,67 @@ def stack_height(scene: MotionScene) -> float:
     return total
 
 
-def layout_scene(scene: MotionScene, duo: bool) -> list[MotionPlacedObject]:
+#: Placed kinds that read as well narrower than the full content width
+#: (they draw centred in their own box), so an arrangement may move them.
+NARROW_KINDS = frozenset({"status_pill", "trigger_chip", "big_counter", "token_row", "icon_row"})
+#: The arrangements a shot of placed objects can take (rev 3 plans).
+ARRANGEMENTS = ("column", "inset_left", "offset", "split", "inset_right")
+#: How wide an inset shot's objects are drawn.
+INSET_W = 820
+#: A full-frame card is its own layout.
+FULL_LAYOUT = {"title_card": "cover", "end_card": "end", "takeaway_list": "notes", "recap_grid": "grid",
+               "chapter_card": "chapter", "code_map": "code"}
+
+
+def _narrow(o: MotionSceneObject) -> bool:
+    return o.kind in NARROW_KINDS or (o.kind == "memory_box" and not o.props.get("points_to"))
+
+
+def arrangements_for(scene: MotionScene) -> list[str]:
+    """The arrangements this scene can take: always a column; offset when
+    some objects can be narrower and none are joined by a connector; split
+    when it is exactly two such objects."""
+    kinds = lib.object_kinds()
+    placed = [o for o in scene.objects if kinds[o.kind]["layout"] == "placed"]
+    linked = any(o.kind == "connector" for o in scene.objects)
+    out = ["column", "inset_left", "inset_right"] if placed else ["column"]
+    if placed and not linked and any(_narrow(o) for o in placed) and len(placed) >= 2:
+        out.append("offset")
+    if len(placed) == 2 and not linked and all(_narrow(o) for o in placed):
+        out.append("split")
+    return out
+
+
+def choose_arrangements(script: MotionScript) -> list[str]:
+    """One layout per shot across the reel, so the reel never shows the same
+    layout shot after shot: full-frame cards keep their own; each other shot
+    takes the arrangement it can use that the reel has used least, never the
+    same as the two shots before it when it has another choice."""
+    out: list[str] = []
+    used: dict[str, int] = {}
+    for sh in script.shots:
+        sc = sh.scene
+        full = next((o.kind for o in sc.objects if o.kind in FULL_LAYOUT), None) if sc else None
+        if full or sc is None:
+            name = FULL_LAYOUT.get(full, "column")
+        else:
+            options = arrangements_for(sc)
+            fresh = [a for a in options if out[-2:] != [a, a]] or options
+            name = min(fresh, key=lambda a: (used.get(a, 0) - (0.5 if out and a != out[-1] else 0), ARRANGEMENTS.index(a)))
+        used[name] = used.get(name, 0) + 1
+        out.append(name)
+    return out
+
+
+def layout_scene(scene: MotionScene, duo: bool, arrangement: str = "column") -> list[MotionPlacedObject]:
     """Where everything goes. Placed objects stack top to bottom in the
     region (solo: the middle of the frame; duo: above the chat),
     centred vertically, each content_w wide. A connector's points run from
     one object's bottom edge to the next one's top edge. A stamp sits on the
-    region's centre. Full-frame objects draw themselves."""
+    region's centre. Full-frame objects draw themselves.
+    `arrangement` (rev 3, choose_arrangements): "offset" pushes the narrow
+    objects alternately left and right; "split" sets two side by side;
+    "inset_left" / "inset_right" draw every object INSET_W wide against one side."""
     f = lib.library()["frame"]
     top, bottom = _region(duo)
     x = (f["w"] - f["content_w"]) / 2
@@ -177,6 +232,24 @@ def layout_scene(scene: MotionScene, duo: bool) -> list[MotionPlacedObject]:
         h = object_height(o)
         boxes[o.id] = MotionBox(x=x, y=round(y, 1), w=f["content_w"], h=round(h, 1))
         y += h
+    if arrangement in ("inset_left", "inset_right"):
+        ix = x if arrangement == "inset_left" else x + f["content_w"] - INSET_W
+        for o in placed:
+            boxes[o.id] = boxes[o.id].model_copy(update={"x": ix, "w": INSET_W})
+    elif arrangement == "offset":
+        narrow_w = 620
+        for i, o in enumerate(o for o in placed if _narrow(o)):
+            b = boxes[o.id]
+            nx = x if i % 2 == 0 else x + f["content_w"] - narrow_w
+            boxes[o.id] = b.model_copy(update={"x": nx, "w": narrow_w})
+    elif arrangement == "split" and len(placed) == 2:
+        half = (f["content_w"] - f["gap"]) / 2
+        hmax = max(boxes[o.id].h for o in placed)
+        ys = top + max(0.0, (bottom - top - hmax) / 2)
+        for i, o in enumerate(placed):
+            b = boxes[o.id]
+            boxes[o.id] = MotionBox(x=round(x + i * (half + f["gap"]), 1), y=round(ys + (hmax - b.h) / 2, 1),
+                                    w=round(half, 1), h=b.h)
     out: list[MotionPlacedObject] = []
     for o in scene.objects:
         props = dict(o.props)
@@ -197,7 +270,7 @@ def layout_scene(scene: MotionScene, duo: bool) -> list[MotionPlacedObject]:
             a, b = boxes.get(str(o.props.get("from"))), boxes.get(str(o.props.get("to")))
             if a and b:
                 upper, lower = (a, b) if a.y <= b.y else (b, a)
-                cx = f["w"] / 2
+                cx = upper.x + upper.w / 2
                 props["points"] = [[cx, round(upper.y + upper.h + 10, 1)],
                                    [cx, round(lower.y - 10, 1)]]
         out.append(MotionPlacedObject(id=o.id, kind=o.kind, props=props, box=box))
@@ -320,7 +393,7 @@ def scene_problems(shot: MotionShot, scene: MotionScene | None = None, duo: bool
         if o is None:
             p.append(f"action {i + 1} ({a.do}) targets {a.target!r}, which is not an object here")
             continue
-        if a.do not in kinds[o.kind]["actions"]:
+        if a.do not in kinds[o.kind]["actions"] and a.do not in lib.camera_actions():
             p.append(f"action {i + 1}: {o.kind} cannot {a.do!r} (it can {kinds[o.kind]['actions']})")
         if a.tone is not None and a.tone not in lib.tones():
             p.append(f"action {i + 1} tone {a.tone!r} is not one of {lib.tones()}")

@@ -53,6 +53,12 @@ def action_kinds() -> frozenset[str]:
     return frozenset(library()["actions"])
 
 
+def camera_actions() -> frozenset[str]:
+    """The actions every object accepts: the virtual camera's and cursor's
+    (shorts/motion_camera.py)."""
+    return frozenset(library().get("camera_actions", []))
+
+
 def transitions() -> tuple[str, ...]:
     return tuple(library()["transitions"])
 

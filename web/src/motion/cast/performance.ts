@@ -25,7 +25,11 @@ import type { Pose } from "../characters/rig/channels";
 import { alignedTalk, type TimedWord } from "./lipsync";
 import type { CharacterConfig } from "../characters/skins/config";
 
-export interface CharacterCue { t: number; kind: "gesture" | "expression"; name: string; side?: "L" | "R" | null; cue: string }
+export interface CharacterCue {
+  t: number; kind: "gesture" | "expression" | "aim" | "gaze" | "aha" | "count"; name: string; side?: "L" | "R" | null; cue: string;
+  /** aim / gaze (cast/teach.ts): when it lets go, what it looks or points at */
+  until?: number | null; rect?: number[] | null; target?: string | null; full?: boolean | string;
+}
 /** One character in a plan (schema.MotionCharacterTrack): its preset id and
  * the rig CharacterConfig it was built with, where it stands, and its cues.
  * role is null for a one-narrator reel's narrator. */

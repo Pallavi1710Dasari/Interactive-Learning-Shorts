@@ -24,6 +24,10 @@ export const FIELDS = {
   // design's glowing background over it.
   lab: "#0A0F2C",
   lab_violet: "#14123A",
+  // the studio design (designs.ts): its palette's base and second base, set
+  // per frame by applyPalette
+  studio: "#F6F1E7",
+  studio_alt: "#EFE6D6",
 } as const;
 export type FieldName = keyof typeof FIELDS;
 export const FIELD_NAMES = Object.keys(FIELDS) as FieldName[];
@@ -75,6 +79,11 @@ export interface Theme {
 
 export function theme(field: FieldName): Theme {
   const bg = FIELDS[field];
+  if ((field === "studio" || field === "studio_alt") && LOOK.palette) {
+    const p = LOOK.palette;
+    return { field, bg, dark: p.dark, ink: p.ink, dim: p.dim, accent: p.accent, surface: p.surface,
+             surfaceInk: p.surface_ink, surfaceLine: p.line, surfaceDim: p.surface_dim };
+  }
   if (field === "lab" || field === "lab_violet") {
     // glass: cards are a light veil over the night, lit edges, cyan accent
     return {
@@ -111,7 +120,8 @@ export function theme(field: FieldName): Theme {
 /** Body and mono are fixed; the display face is a CSS variable so the gallery
  * can show both candidates (section 4.2: "pick the closest and show me"). */
 export const FONT = {
-  body: "'Manrope Variable', Manrope, system-ui, sans-serif",
+  // the design's body face (designs.ts --motion-body); classic plans keep Manrope
+  body: "var(--motion-body, 'Manrope Variable'), Manrope, system-ui, sans-serif",
   mono: "'JetBrains Mono', ui-monospace, Menlo, monospace",
   display: "var(--motion-display, 'Anton'), Impact, sans-serif",
 } as const;
@@ -150,4 +160,67 @@ export const SAFE = {
 export const MONO_ADVANCE = 0.6;   // JetBrains Mono: 0.6 em per character
 export function monoWidth(text: string, size: number): number {
   return text.length * size * MONO_ADVANCE;
+}
+
+
+// ------------------------------------------------------------------ palettes
+//
+// The studio design's palettes (library.json studio.palettes) replace the
+// reference reels' colours. The colour constants above are read directly by
+// every renderer, so a palette is applied to them for the frame being drawn:
+// MotionFrame calls applyPalette(plan's palette) before anything else draws,
+// and applyPalette(null) restores the original values exactly, so a plan
+// without a palette (every reel made before) draws as it always did. React
+// draws a frame top-down in one pass, so the whole frame sees one palette.
+
+import library from "./library.json";
+
+export interface Palette {
+  name: string; dark: boolean; base: string; base_alt: string; ink: string; dim: string; accent: string;
+  surface: string; surface_ink: string; surface_dim: string; line: string;
+  wrong: string; right: string; highlight: string; wrong_soft: string; right_soft: string; highlight_soft: string;
+  info: string; info_soft: string; special: string; special_soft: string;
+  code: string; code_bar: string; code_text: string; code_keyword: string; code_fn: string; code_dim: string;
+  notes: string[]; grain: number;
+}
+export const STUDIO = (library as unknown as {
+  studio: { palette_default: string; palette_for_theme: Record<string, string>; palettes: Record<string, Palette> }
+}).studio;
+
+/** The look the frame is drawn in: which palette, and whether the studio
+ * shapes are on (index-card corners, tags, no icon tiles). */
+export const LOOK: { palette: Palette | null; id: string | null; studio: boolean; radius: number } =
+  { palette: null, id: null, studio: false, radius: Infinity };
+
+const BASE_C = { ...C };
+const BASE_FIELDS = { ...FIELDS };
+
+export function applyPalette(id: string | null | undefined, studio = false): void {
+  const c = C as unknown as Record<string, string>;
+  const f = FIELDS as unknown as Record<string, string>;
+  if (!id || !STUDIO.palettes[id]) {
+    if (LOOK.id === null && !LOOK.studio) return;
+    Object.assign(c, BASE_C);
+    Object.assign(f, BASE_FIELDS);
+    LOOK.palette = null; LOOK.id = null; LOOK.studio = false; LOOK.radius = Infinity;
+    return;
+  }
+  if (LOOK.id === id && LOOK.studio === studio) return;
+  const p = STUDIO.palettes[id];
+  Object.assign(c, BASE_C, {
+    coral: p.wrong, coralSoft: p.wrong_soft, mint: p.right, mintSoft: p.right_soft,
+    amber: p.highlight, amberSoft: p.highlight_soft, amberInk: p.dark ? p.highlight : "#6B5300", yellow: p.highlight,
+    indigo: p.info, indigoSoft: p.info_soft, special: p.special, specialSoft: p.special_soft,
+    code: p.code, codeBar: p.code_bar, codeText: p.code_text, codeKeyword: p.code_keyword, codeFn: p.code_fn, codeDim: p.code_dim,
+    ink: p.dark ? "#16140F" : p.ink, sub: p.dark ? "#6B655A" : p.surface_dim, line: p.dark ? "#E2D8C6" : p.line,
+    surf: p.dark ? "#FFFDF8" : p.surface,
+  });
+  Object.assign(f, BASE_FIELDS, { studio: p.base, studio_alt: p.base_alt });
+  LOOK.palette = p; LOOK.id = id; LOOK.studio = studio; LOOK.radius = studio ? 22 : Infinity;
+}
+
+/** A corner radius in the frame's look: the studio's index cards cap every
+ * corner at 22; other looks keep the radius they were drawn with. */
+export function R(n: number): number {
+  return Math.min(n, LOOK.radius);
 }

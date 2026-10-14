@@ -48,7 +48,9 @@ THEMED = {"interview": "usestate_interview_golden.json",
 EXPECTED_THEMES = [
     "classic_explainer", "narrative", "interview", "interview_rapid_fire", "peer_discussion",
     "mentor_student", "bug_hunt", "myth_vs_fact", "common_mistakes", "predict_the_output",
-    "under_the_hood", "step_by_step_walkthrough", "real_world_scenario", "before_vs_after"]
+    "under_the_hood", "step_by_step_walkthrough", "real_world_scenario", "before_vs_after",
+    # 2026-10-13
+    "live_code_along", "doubt_clinic", "whiteboard_sketch", "pause_and_predict", "error_decoder", "this_or_that"]
 
 
 def _fixture(name: str) -> dict:
@@ -118,7 +120,7 @@ def test_registry_has_the_fourteen_themes():
     assert reg.fallback == {"fix_story": "classic_explainer",
                             "walkthrough": "step_by_step_walkthrough"}
     two = [t.id for t in reg.themes.values() if t.two_speaker]
-    assert two == ["interview", "interview_rapid_fire", "peer_discussion", "mentor_student"]
+    assert two == ["interview", "interview_rapid_fire", "peer_discussion", "mentor_student", "doubt_clinic"]
 
 
 def test_walkthrough_is_one_theme_not_a_copy():
@@ -126,11 +128,15 @@ def test_walkthrough_is_one_theme_not_a_copy():
     uses the template's own beats and prompt — nothing duplicated."""
     reg = mt.registry()
     walk = [t for t in reg.themes.values() if t.template == "walkthrough"]
-    assert [t.id for t in walk] == ["step_by_step_walkthrough"]
+    assert [t.id for t in walk] == ["step_by_step_walkthrough", "live_code_along"]
     assert walk[0].beats == "walkthrough" and walk[0].base
     system, hook_fix = script_mod.motion_system_for("walkthrough", walk[0])
     assert system is script_mod.SYSTEM_MOTION_WALKTHROUGH
     assert hook_fix is script_mod.SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX
+    # another walkthrough theme keeps the walkthrough prompt and adds its own format
+    system, hook_fix = script_mod.motion_system_for("walkthrough", walk[1])
+    assert system.startswith(script_mod.SYSTEM_MOTION_WALKTHROUGH)
+    assert "FORMAT — THEME: live_code_along" in system and "cursor types it" in system
     assert reg.themes["classic_explainer"].beats == "fix_story"
 
 
@@ -171,7 +177,7 @@ def test_a_new_theme_is_only_a_registry_entry():
     data = _registry_data()
     data["themes"]["quiz_show"] = {
         **copy.deepcopy(data["themes"]["myth_vs_fact"]),
-        "tag": "quiz", "description": "A quiz host asks, then answers.",
+        "tag": "quizshow", "description": "A quiz host asks, then answers.",
         "hook": {"style": "question", "openers": ["quiz time", "pop quiz"], "symptom": False,
                  "brief": "A quiz question."},
     }
@@ -182,7 +188,7 @@ def test_a_new_theme_is_only_a_registry_entry():
         system, hook_fix = script_mod.motion_system_for("fix_story", reg.themes["quiz_show"])
         assert "FORMAT — THEME: quiz_show" in system and "Pop quiz..." in system
         assert "quiz_show format" in hook_fix
-        assert mt.tag_problems(["#react", "#quiz", "#state"]) == []
+        assert mt.tag_problems(["#react", "#quizshow", "#state"]) == []
         data = _fixture("usestate_golden.json")
         data["theme"] = "quiz_show"
         r = checks.check_motion_hook_curiosity(MotionScript(**data))
@@ -342,14 +348,17 @@ def test_two_rejected_picks_fall_back_to_classic_explainer_and_log_why():
 
 
 def test_a_pinned_walkthrough_falls_back_to_the_walkthrough():
-    choice, calls = _choose(template_pin="walkthrough", history=["step_by_step_walkthrough"])
+    # analogy rules out the live code-along, the other walkthrough theme
+    choice, calls = _choose(template_pin="walkthrough", history=["step_by_step_walkthrough"],
+                            approach=TeachingApproach(primary="analogy"))
     assert calls == []                                   # nothing eligible: no call
     assert choice.theme == "step_by_step_walkthrough" and choice.source == "fallback"
     assert choice.fit_check.overrides and "previous reel" in choice.fit_check.overrides[0]
 
 
 def test_one_eligible_theme_needs_no_call():
-    choice, calls = _choose(template_pin="walkthrough")
+    # analogy: the walkthrough is the one walkthrough theme left (no code-along)
+    choice, calls = _choose(template_pin="walkthrough", approach=TeachingApproach(primary="analogy"))
     assert calls == [] and choice.source == "only_candidate"
     assert choice.theme == "step_by_step_walkthrough" and choice.template == "walkthrough"
 
@@ -717,3 +726,18 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def test_the_new_themes_are_offered_where_they_fit():
+    """2026-10-13: the six new themes are registry entries the theme step
+    offers like any other — code-along for a pinned walkthrough on material
+    with code, doubt clinic for a misconception repair."""
+    reg = mt.registry()
+    for tid in ("live_code_along", "doubt_clinic", "whiteboard_sketch", "pause_and_predict", "error_decoder", "this_or_that"):
+        assert tid in reg.ids(), tid
+    assert "live_code_along" in mt.eligible_themes(approach="code", has_code=True, template="walkthrough",
+                                                   language="react", history=["step_by_step_walkthrough"])
+    assert "doubt_clinic" in mt.eligible_themes(approach="misconception_repair", has_code=False, template=None,
+                                                language="react", history=[])
+    assert "live_code_along" not in mt.eligible_themes(approach="code", has_code=False, template="walkthrough",
+                                                       language="react", history=[])

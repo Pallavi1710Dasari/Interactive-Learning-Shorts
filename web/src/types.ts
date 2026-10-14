@@ -96,7 +96,9 @@ export type QuestionFraming = {
  *  so there is no sensible placeholder value to default it to here. */
 export type TeachingApproachKind =
   "analogy" | "real_world_example" | "code" | "conceptual_visual" |
-  "process_demonstration" | "comparison" | "direct_explanation";
+  "process_demonstration" | "comparison" | "direct_explanation" |
+  "predict_then_reveal" | "misconception_repair" | "build_from_zero" | "worked_example_then_try" |
+  "socratic_questions" | "big_picture_then_zoom" | "step_by_step_trace";
 
 /** Every fixed device a human can pick directly on the teaching-approach
  *  review screen — see StepTeachingApproach.tsx. Not derived from any one
@@ -106,6 +108,8 @@ export type TeachingApproachKind =
 export const TEACHING_APPROACH_KINDS: TeachingApproachKind[] = [
   "conceptual_visual", "process_demonstration", "comparison", "analogy",
   "real_world_example", "code", "direct_explanation",
+  "predict_then_reveal", "misconception_repair", "build_from_zero", "worked_example_then_try",
+  "socratic_questions", "big_picture_then_zoom", "step_by_step_trace",
 ];
 
 export type TeachingApproach = {

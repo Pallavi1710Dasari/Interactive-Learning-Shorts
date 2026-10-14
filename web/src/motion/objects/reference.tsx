@@ -9,8 +9,9 @@
 
 import type { ReactNode } from "react";
 import { At, Icon, Overlay } from "../Stage";
-import { C, FONT, H, SAFE, W, theme, type FieldName, type Theme } from "../tokens";
+import { C, FONT, H, LOOK, SAFE, W, theme, type FieldName, type Theme, R } from "../tokens";
 import { clamp, ease, lerp, pathD, pointAt, pulse, seg, type Pt } from "../time";
+import { display } from "../tokens";
 
 export type Tone = "bad" | "ok" | "info" | "warn" | "special" | "plain";
 
@@ -34,10 +35,24 @@ export function popStyle(p: number) {
   return { opacity: clamp(p * 1.6), transform: `translateY(${(1 - q) * 30}px) scale(${lerp(0.94, 1, q)})` };
 }
 
-// Midnight Lab's cards are glass: a deep shadow, a lit 2-unit edge, a top highlight
-const shadow = (th: Theme) => (th.field === "lab" || th.field === "lab_violet"
+// Midnight Lab's cards are glass: a deep shadow, a lit 2-unit edge, a top highlight.
+// The studio's are index cards: a short hard shadow under a flat card.
+export const shadow = (th: Theme) => (LOOK.studio
+  ? (th.dark ? "0 6px 0 rgba(0,0,0,0.34), 0 16px 28px rgba(0,0,0,0.22)" : "0 5px 0 rgba(60,45,20,0.14), 0 14px 24px rgba(60,45,20,0.10)")
+  : th.field === "lab" || th.field === "lab_violet"
   ? "0 40px 90px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.14), inset 0 2px 0 rgba(255,255,255,0.2)"
   : th.dark ? "0 30px 60px rgba(0,0,0,0.35)" : "0 30px 60px rgba(21,25,54,0.13)");
+
+/** The studio's tag: a label with a pointed end and a punched hole, drawn
+ * round the content it labels (pills and chips). */
+export function tagStyle(): React.CSSProperties {
+  return LOOK.studio ? { clipPath: "polygon(26px 0, 100% 0, 100% 100%, 26px 100%, 0 50%)", borderRadius: 10, paddingLeft: "1.35em" } : {};
+}
+export function TagHole({ size, color }: { size: number; color: string }) {
+  if (!LOOK.studio) return null;
+  return <span style={{ position: "absolute", left: 22, top: "50%", width: size * 0.26, height: size * 0.26, marginTop: -size * 0.13,
+                        borderRadius: "50%", background: color, opacity: 0.55 }} />;
+}
 
 /** The dotted canvas behind reference-style shots. */
 export function DotGrid({ field }: { field: FieldName }) {
@@ -55,9 +70,10 @@ export function StatusPill({ x, y, text, tone, icon, field, p = 1, size = 33 }: 
   const { bg, fg } = toneColors(tone, th);
   return (
     <At x={x} y={y} center style={popStyle(p)}>
-      <div style={{ display: "flex", alignItems: "center", gap: size * 0.4, background: bg, color: fg,
-                    padding: `${size * 0.42}px ${size * 0.85}px`, borderRadius: 999, whiteSpace: "nowrap",
-                    fontWeight: 800, fontSize: size }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: size * 0.4, background: bg, color: fg,
+                    padding: `${size * 0.42}px ${size * 0.85}px`, borderRadius: R(999), whiteSpace: "nowrap",
+                    fontWeight: 800, fontSize: size, ...tagStyle() }}>
+        <TagHole size={size} color={th.bg} />
         {icon && <Icon name={icon} size={size * 1.15} color={fg} stroke={2.4} />}
         {text}
       </div>
@@ -72,10 +88,12 @@ export function TriggerChip({ x, y, label, field, p = 1, firing = 0, size = 33 }
   const { bg, fg } = toneColors("warn", th);
   return (
     <At x={x} y={y} center style={popStyle(p)}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, background: bg, color: fg,
-                    padding: `${size * 0.48}px ${size * 0.85}px`, borderRadius: 999, fontFamily: FONT.mono, fontWeight: 700,
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 14, background: bg, color: fg,
+                    padding: `${size * 0.48}px ${size * 0.85}px`, borderRadius: R(999), fontFamily: FONT.mono, fontWeight: 700,
                     fontSize: size, transform: `scale(${1 + 0.12 * firing})`,
-                    boxShadow: firing ? `0 0 0 ${10 * firing}px rgba(255,181,36,${0.25 * firing})` : "none" }}>
+                    boxShadow: firing && !LOOK.studio ? `0 0 0 ${10 * firing}px rgba(255,181,36,${0.25 * firing})` : "none",
+                    ...tagStyle() }}>
+        <TagHole size={size} color={th.bg} />
         <Icon name="bolt" size={size * 1.15} color={fg} stroke={2.4} />{label}
       </div>
     </At>
@@ -86,6 +104,14 @@ export function IconTile({ x, y, size, icon, tone, field, p = 1 }: {
   x: number; y: number; size: number; icon: string; tone: Tone; field: FieldName; p?: number;
 }) {
   const { bg, fg } = toneColors(tone, theme(field));
+  // the studio draws the icon itself, at text size, never on a tile
+  if (LOOK.studio) return (
+    <At x={x} y={y} center style={popStyle(p)}>
+      <div style={{ width: size, height: size, display: "grid", placeItems: "center" }}>
+        <Icon name={icon} size={size * 0.62} color={fg} stroke={2.2} />
+      </div>
+    </At>
+  );
   return (
     <At x={x} y={y} center style={popStyle(p)}>
       <div style={{ width: size, height: size, borderRadius: size * 0.28, background: bg,
@@ -112,16 +138,16 @@ export function DeviceMock({ x, y, likes, liked = false, tapAge = 99, failAge = 
   const heart = liked ? C.mint : C.ink;
   return (
     <At x={x - w / 2} y={y} style={popStyle(p)}>
-      <div style={{ width: w, height: h, borderRadius: 96, background: C.ink, padding: 21,
+      <div style={{ width: w, height: h, borderRadius: R(96), background: C.ink, padding: 21,
                     boxShadow: shadow(theme(field)), position: "relative" }}>
-        <div style={{ position: "absolute", left: w / 2 - 78, top: 42, width: 156, height: 42, borderRadius: 21, background: C.ink, zIndex: 2 }} />
-        <div style={{ width: "100%", height: "100%", borderRadius: 75, background: C.surf, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: w / 2 - 78, top: 42, width: 156, height: 42, borderRadius: R(21), background: C.ink, zIndex: 2 }} />
+        <div style={{ width: "100%", height: "100%", borderRadius: R(75), background: C.surf, position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", left: 45, top: 120, fontSize: 45, fontWeight: 800, color: C.ink }}>Feed</div>
-          <div style={{ position: "absolute", left: 45, top: 210, width: 66, height: 66, borderRadius: 33,
+          <div style={{ position: "absolute", left: 45, top: 210, width: 66, height: 66, borderRadius: R(33),
                         background: `linear-gradient(135deg, ${C.indigo}, ${C.amber})` }} />
           <div style={{ position: "absolute", left: 130, top: 212, fontSize: 31, fontWeight: 700, color: C.ink }}>rahul.codes</div>
           <div style={{ position: "absolute", left: 130, top: 250, fontSize: 27, fontWeight: 600, color: C.sub }}>2 min ago</div>
-          <div style={{ position: "absolute", left: 30, top: 300, right: 30, height: 396, borderRadius: 42,
+          <div style={{ position: "absolute", left: 30, top: 300, right: 30, height: 396, borderRadius: R(42),
                         background: "linear-gradient(135deg, #DCD7FF, #FFE7B8)" }} />
           <div style={{ position: "absolute", left: 50, top: 732, width: 72, height: 72 }}>
             <div style={{ position: "absolute", inset: -24, borderRadius: "50%", background: C.indigo,
@@ -135,8 +161,8 @@ export function DeviceMock({ x, y, likes, liked = false, tapAge = 99, failAge = 
                         transform: `translateX(${shake}px)` }}>
             {likes} {likes === 1 ? "like" : "likes"}
           </div>
-          <div style={{ position: "absolute", left: 40, top: 840, width: 336, height: 21, borderRadius: 11, background: C.line }} />
-          <div style={{ position: "absolute", left: 40, top: 882, width: 234, height: 21, borderRadius: 11, background: C.line }} />
+          <div style={{ position: "absolute", left: 40, top: 840, width: 336, height: 21, borderRadius: R(11), background: C.line }} />
+          <div style={{ position: "absolute", left: 40, top: 882, width: 234, height: 21, borderRadius: R(11), background: C.line }} />
         </div>
       </div>
     </At>
@@ -158,14 +184,14 @@ export function EntityCard({ x, y, w = 900, h = 528, label, value, valueTone = "
   const row = toneColors(codeTone, th);
   return (
     <At x={x} y={y} style={popStyle(p)}>
-      <div style={{ width: w, height: h, borderRadius: 54, background: th.surface, boxShadow: shadow(th),
+      <div style={{ width: w, height: h, borderRadius: R(54), background: th.surface, boxShadow: shadow(th),
                     position: "relative", overflow: "hidden", color: th.surfaceInk }}>
-        <div style={{ position: "absolute", left: 36, top: 36, padding: "10px 24px", borderRadius: 999,
+        <div style={{ position: "absolute", left: 36, top: 36, padding: "10px 24px", borderRadius: R(999),
                       background: toneColors("info", th).bg, color: toneColors("info", th).fg,
                       fontFamily: FONT.mono, fontWeight: 700, fontSize: 33 }}>{label}</div>
         <div style={{ position: "absolute", right: 40, top: 48, display: "flex", alignItems: "center", gap: 12,
                       fontSize: 33, fontWeight: 700, color: th.surfaceDim }}>
-          <span style={{ width: 21, height: 21, borderRadius: 11, background: sweeping ? C.indigo : C.mint }} />
+          <span style={{ width: 21, height: 21, borderRadius: R(11), background: sweeping ? C.indigo : C.mint }} />
           Render {renderCount}
         </div>
         <div style={{ position: "absolute", left: 0, right: 0, top: 138, height: 4, background: th.surfaceLine }} />
@@ -176,7 +202,7 @@ export function EntityCard({ x, y, w = 900, h = 528, label, value, valueTone = "
             <span style={{ fontSize: 36, fontWeight: 700, color: th.surfaceDim }}>{unit}</span>
           </div>
           {code !== undefined && (
-            <div style={{ position: "absolute", left: 42, right: 42, bottom: 36, height: 96, borderRadius: 27,
+            <div style={{ position: "absolute", left: 42, right: 42, bottom: 36, height: 96, borderRadius: R(27),
                           background: codeTone === "plain" ? (th.dark ? "rgba(255,255,255,0.06)" : "#F3F4F9") : row.bg,
                           display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 36px" }}>
               <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: 37, color: codeTone === "plain" ? th.surfaceInk : row.fg }}>{code}</span>
@@ -204,18 +230,18 @@ export function SystemPanel({ x, y, w = 840, h = 318, title, status, statusTone 
   const st = toneColors(statusTone, th);
   return (
     <At x={x} y={y} style={popStyle(p)}>
-      <div style={{ width: w, height: h, borderRadius: 54, background: th.surface, boxShadow: shadow(th),
+      <div style={{ width: w, height: h, borderRadius: R(54), background: th.surface, boxShadow: shadow(th),
                     position: "relative", color: th.surfaceInk }}>
-        <div style={{ position: "absolute", left: 42, top: 36, width: 84, height: 84, borderRadius: 24, background: C.indigo,
-                      display: "grid", placeItems: "center" }}>
-          <Icon name="memory" size={48} color={C.white} />
+        <div style={{ position: "absolute", left: 42, top: 36, width: 84, height: 84, borderRadius: R(24),
+                      background: LOOK.studio ? "transparent" : C.indigo, display: "grid", placeItems: "center" }}>
+          <Icon name="memory" size={LOOK.studio ? 56 : 48} color={LOOK.studio ? th.accent : C.white} stroke={LOOK.studio ? 2.2 : 2} />
         </div>
         <div style={{ position: "absolute", left: 156, top: 52, fontSize: 42, fontWeight: 800 }}>{title}</div>
         <div style={{ position: "absolute", right: 42, top: 45, display: "flex", alignItems: "center", gap: 12,
                       background: statusTone === "plain" ? (th.dark ? "rgba(255,255,255,0.08)" : "#F3F4F9") : st.bg,
-                      padding: "12px 26px", borderRadius: 999, fontSize: 31, fontWeight: 700,
+                      padding: "12px 26px", borderRadius: R(999), fontSize: 31, fontWeight: 700,
                       color: statusTone === "plain" ? th.surfaceDim : st.fg }}>
-          <span style={{ width: 21, height: 21, borderRadius: 11, background: statusTone === "plain" ? C.grey : st.fg }} />
+          <span style={{ width: 21, height: 21, borderRadius: R(11), background: statusTone === "plain" ? C.grey : st.fg }} />
           {status}
         </div>
         {slot && pointer ? (
@@ -223,11 +249,11 @@ export function SystemPanel({ x, y, w = 840, h = 318, title, status, statusTone 
             {pointer}
           </div>
         ) : slot ? (
-          <div style={{ position: "absolute", left: 42, right: 42, top: 156, bottom: 42, borderRadius: 36,
+          <div style={{ position: "absolute", left: 42, right: 42, top: 156, bottom: 42, borderRadius: R(36),
                         background: th.dark ? "rgba(255,255,255,0.06)" : "#F3F4F9", display: "flex",
                         alignItems: "center", justifyContent: "space-between", padding: "0 30px 0 42px" }}>
             <span style={{ fontFamily: FONT.mono, fontSize: 42, fontWeight: 600 }}>{slot.name}</span>
-            <span style={{ minWidth: 180, height: 84, borderRadius: 27, background: C.amberSoft, border: `6px solid ${C.amber}`,
+            <span style={{ minWidth: 180, height: 84, borderRadius: R(27), background: C.amberSoft, border: `6px solid ${C.amber}`,
                            display: "grid", placeItems: "center", fontSize: 60, fontWeight: 800, color: C.ink,
                            transform: `scale(${1 + 0.14 * (slot.pulse ?? 0)})`,
                            boxShadow: glow ? `0 0 ${80 * glow}px rgba(255,181,36,${0.6 * glow})` : "none" }}>
@@ -257,8 +283,8 @@ export function Connector({ points, tone = "info", dashed = false, broken = fals
   const dot = pp >= 0 && pp <= 1 ? pointAt(points, ease.inOutQuad(pp)) : null;
   return (
     <Overlay>
-      <path d={pathD(points)} fill="none" stroke={color} strokeWidth={7.5} strokeLinecap="round"
-            opacity={broken ? 1 : 0.45}
+      <path d={pathD(points)} fill="none" stroke={color} strokeWidth={LOOK.studio ? 5 : 7.5} strokeLinecap="round"
+            opacity={broken ? 1 : LOOK.studio ? 0.7 : 0.45}
             strokeDasharray={dashed || broken ? "15 18" : `${L} ${L}`}
             strokeDashoffset={dashed || broken ? 0 : L * (1 - clamp(draw))} />
       {broken && (
@@ -290,12 +316,22 @@ export function CodeWindow({ x, y, w = 948, file, lines, shown = Infinity, highl
   const h = 114 + 60 + lines.length * lh;
   return (
     <At x={x} y={y} style={popStyle(p)}>
-      <div style={{ width: w, height: h, borderRadius: 48, background: C.code, boxShadow: shadow(theme(field)),
+      <div style={{ width: w, height: h, borderRadius: R(48), background: C.code, boxShadow: shadow(theme(field)),
                     position: "relative", overflow: "hidden" }}>
-        <div style={{ height: 114, background: C.codeBar, display: "flex", alignItems: "center", gap: 18, padding: "0 42px" }}>
-          {[C.coral, C.amber, C.mint].map((c) => <span key={c} style={{ width: 27, height: 27, borderRadius: 14, background: c }} />)}
-          <span style={{ marginLeft: 36, fontFamily: FONT.mono, fontSize: 33, fontWeight: 600, color: "#C9CCF0" }}>{file}</span>
-        </div>
+        {LOOK.studio ? (
+          /* the studio's editor card: a file tab, no window buttons */
+          <div style={{ height: 114, background: C.codeBar, display: "flex", alignItems: "flex-end", padding: "0 30px" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 30px", borderRadius: "16px 16px 0 0",
+                           background: C.code, fontFamily: FONT.mono, fontSize: 32, fontWeight: 600, color: C.codeText }}>
+              <span style={{ width: 12, height: 12, borderRadius: 6, background: C.amber }} />{file}
+            </span>
+          </div>
+        ) : (
+          <div style={{ height: 114, background: C.codeBar, display: "flex", alignItems: "center", gap: 18, padding: "0 42px" }}>
+            {[C.coral, C.amber, C.mint].map((c) => <span key={c} style={{ width: 27, height: 27, borderRadius: R(14), background: c }} />)}
+            <span style={{ marginLeft: 36, fontFamily: FONT.mono, fontSize: 33, fontWeight: 600, color: "#C9CCF0" }}>{file}</span>
+          </div>
+        )}
         {lines.map((line, i) => {
           const q = clamp(shown - i);
           return (
@@ -321,12 +357,13 @@ export function TitleCard({ series, title, promise, icons, t, chip }: {
   /** drawn in the series pill's place (rev 2: the language chip) */
   chip?: ReactNode;
 }) {
+  if (LOOK.studio) return <CoverCard title={title} promise={promise} icons={icons} t={t} chip={chip} />;
   return (
     <div style={{ position: "absolute", inset: 0, background: "var(--motion-card-bg, linear-gradient(to bottom, #5B4BF5, #4234D6))", color: C.white }}>
       <div style={{ position: "absolute", left: 900, top: 570, width: 720, height: 720, borderRadius: "50%", background: "rgba(255,255,255,0.05)", transform: "translate(-50%,-50%)" }} />
       <At x={W / 2} y={708} center style={popStyle(seg(t, 0, 0.5))}>
         {chip !== undefined ? chip
-          : <div style={{ padding: "16px 36px", borderRadius: 999, background: "rgba(255,255,255,0.14)", fontWeight: 700, fontSize: 33, whiteSpace: "nowrap" }}>{series}</div>}
+          : <div style={{ padding: "16px 36px", borderRadius: R(999), background: "rgba(255,255,255,0.14)", fontWeight: 700, fontSize: 33, whiteSpace: "nowrap" }}>{series}</div>}
       </At>
       <At x={W / 2} y={880} center style={popStyle(seg(t, 0.12, 0.5))}>
         <div style={{ fontSize: 162, fontWeight: 800, letterSpacing: -4.5, whiteSpace: "nowrap" }}>{title}</div>
@@ -337,7 +374,7 @@ export function TitleCard({ series, title, promise, icons, t, chip }: {
       {icons.map((ic, i) => (
         <At key={ic.name} x={270 + i * 270} y={1230} center style={popStyle(seg(t, 0.7 + i * 0.35, 0.5))}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 30 }}>
-            <div style={{ width: 180, height: 180, borderRadius: 51, background: C.white, display: "grid", placeItems: "center" }}>
+            <div style={{ width: 180, height: 180, borderRadius: R(51), background: C.white, display: "grid", placeItems: "center" }}>
               <Icon name={ic.name} size={84} color={C.indigo} />
             </div>
             <div style={{ fontSize: 36, fontWeight: 700 }}>{ic.label}</div>
@@ -369,9 +406,9 @@ export function CodeMapCard({ line1, line2, parts, active, t, field }: {
   return (
     <>
       <At x={60} y={codeY} style={popStyle(seg(t, 0, 0.5))}>
-        <div style={{ width: 960, height: 348, borderRadius: 54, background: C.code, boxShadow: shadow(th), position: "relative" }}>
+        <div style={{ width: 960, height: 348, borderRadius: R(54), background: C.code, boxShadow: shadow(th), position: "relative" }}>
           {hot && (
-            <div style={{ position: "absolute", top: 66 + (hot.row ?? 0) * 114, height: 90, borderRadius: 21, background: C.amber,
+            <div style={{ position: "absolute", top: 66 + (hot.row ?? 0) * 114, height: 90, borderRadius: R(21), background: C.amber,
                           left: 60 + hotAt[0] * cw - 12, width: hotAt[1] * cw + 24 }} />
           )}
           {[line1, line2].map((line, i) => {
@@ -394,9 +431,9 @@ export function CodeMapCard({ line1, line2, parts, active, t, field }: {
         const { bg, fg } = toneColors(pt.tone, th);
         return (
           <At key={pt.name} x={60} y={rowsTop + i * (rowH + 24)} style={popStyle(i <= active ? 1 : 0)}>
-            <div style={{ width: 960, height: rowH, borderRadius: 48, background: th.surface, boxShadow: shadow(th),
+            <div style={{ width: 960, height: rowH, borderRadius: R(48), background: th.surface, boxShadow: shadow(th),
                           display: "flex", alignItems: "center", gap: 42, padding: "0 48px", color: th.surfaceInk }}>
-              <div style={{ width: 120, height: 120, borderRadius: 34, background: bg, display: "grid", placeItems: "center" }}>
+              <div style={{ width: 120, height: 120, borderRadius: R(34), background: bg, display: "grid", placeItems: "center" }}>
                 <Icon name={pt.icon} size={60} color={fg} />
               </div>
               <div>
@@ -412,9 +449,12 @@ export function CodeMapCard({ line1, line2, parts, active, t, field }: {
 }
 
 /** The fix_story recap: a heading and three icon rows, each popping in. */
-export function TakeawayList({ heading, rows, t, field }: {
+export function TakeawayList({ heading, rows, t, field, lit = 0 }: {
   heading: string; rows: { icon: string; tone: Tone; line: string; sub: string }[]; t: number; field: FieldName;
+  /** studio: the note being said (1-based) gets its marker tick */
+  lit?: number;
 }) {
+  if (LOOK.studio) return <StickyNotes heading={heading} rows={rows} t={t} field={field} lit={lit} />;
   const th = theme(field);
   return (
     <>
@@ -425,9 +465,9 @@ export function TakeawayList({ heading, rows, t, field }: {
         const { bg, fg } = toneColors(r.tone, th);
         return (
           <At key={r.line} x={60} y={654 + i * 252} style={popStyle(seg(t, 0.5 + i * 0.9, 0.5))}>
-            <div style={{ width: 960, height: 204, borderRadius: 54, background: th.surface, boxShadow: shadow(th),
+            <div style={{ width: 960, height: 204, borderRadius: R(54), background: th.surface, boxShadow: shadow(th),
                           display: "flex", alignItems: "center", gap: 48, padding: "0 54px", color: th.surfaceInk }}>
-              <div style={{ width: 126, height: 126, borderRadius: 36, background: bg, display: "grid", placeItems: "center" }}>
+              <div style={{ width: 126, height: 126, borderRadius: R(36), background: bg, display: "grid", placeItems: "center" }}>
                 <Icon name={r.icon} size={63} color={fg} />
               </div>
               <div>
@@ -455,13 +495,13 @@ export function EndCard({ upNext, chips, t }: { upNext: string; chips: { label: 
                       letterSpacing: -3, whiteSpace: "nowrap" }}>{upNext}</div>
       </At>
       <At x={W / 2} y={1098} center style={popStyle(seg(t, 0.26, 0.5))}>
-        <div style={{ padding: "30px 108px", borderRadius: 999, background: C.white, color: C.indigo, fontWeight: 800, fontSize: 48 }}>Follow</div>
+        <div style={{ padding: "30px 108px", borderRadius: R(999), background: C.white, color: C.indigo, fontWeight: 800, fontSize: 48 }}>Follow</div>
       </At>
       {/* chips (the reel's tags) in one centred row that wraps */}
       <div style={{ position: "absolute", left: 60, right: 60, top: 1290, display: "flex", flexWrap: "wrap",
                     justifyContent: "center", gap: 16 }}>
         {chips.map((c, i) => (
-          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 26px", borderRadius: 999,
+          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 26px", borderRadius: R(999),
                                       background: c.done ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.14)",
                                       color: c.done ? C.indigo : C.white, fontFamily: FONT.mono, fontWeight: 700, fontSize: 30,
                                       whiteSpace: "nowrap", ...popStyle(seg(t, 1 + i * 0.12, 0.5)) }}>
@@ -475,3 +515,76 @@ export function EndCard({ upNext, chips, t }: { upNext: string; chips: { label: 
 
 /** Used by the gallery to keep a fixed field when an object has none. */
 export const DEFAULT_H = H;
+
+/** The studio's title: the concept written on an index card pinned to the
+ * board, the promise as a hand-noted line under it, the language chip above,
+ * the reel's icons small along the card's foot. */
+function CoverCard({ title, promise, icons, t, chip }: {
+  title: string; promise: string; icons: { name: string; label: string }[]; t: number; chip?: ReactNode;
+}) {
+  const th = theme("studio");
+  const q = ease.outBack(clamp(t / 0.55), 1.3);
+  const size = Math.min(150, Math.floor(1500 / Math.max(6, title.length)));
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      {chip && <At x={W / 2} y={560} center style={popStyle(seg(t, 0.15, 0.5))}>{chip}</At>}
+      <At x={W / 2} y={820} center style={{ opacity: clamp(t / 0.2), transform: `rotate(${lerp(-6, -1.5, q)}deg) scale(${lerp(0.9, 1, q)})` }}>
+        <div style={{ width: 860, padding: "64px 56px 54px", borderRadius: 22, background: th.surface, boxShadow: shadow(th),
+                      borderTop: `14px solid ${th.accent}`, boxSizing: "border-box", textAlign: "center" }}>
+          <div style={{ ...display(size), color: th.surfaceInk, lineHeight: 1.02 }}>{title}</div>
+          <div style={{ marginTop: 26, fontFamily: FONT.body, fontStyle: "italic", fontWeight: 500, fontSize: 44, color: th.accent,
+                        opacity: clamp((t - 0.35) / 0.3) }}>{promise}</div>
+          <div style={{ marginTop: 34, display: "flex", justifyContent: "center", gap: 46 }}>
+            {icons.map((ic, i) => (
+              <div key={ic.name} style={{ display: "flex", alignItems: "center", gap: 12, color: th.surfaceDim, fontFamily: FONT.body,
+                                         fontWeight: 600, fontSize: 30, ...popStyle(seg(t, 0.7 + i * 0.35, 0.5)) }}>
+                <Icon name={ic.name} size={40} color={th.accent} stroke={2.2} />{ic.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </At>
+    </div>
+  );
+}
+
+/** The studio's recap: sticky notes pinned one by one, a little askew, each
+ * with a strip of tape; the note being said gets a marker tick. */
+function StickyNotes({ heading, rows, t, field, lit }: {
+  heading: string; rows: { icon: string; tone: Tone; line: string; sub: string }[]; t: number; field: FieldName; lit: number;
+}) {
+  const th = theme(field);
+  const notes = LOOK.palette?.notes ?? ["#FFE58A", "#BDE3FF", "#C9F2D2"];
+  const tilt = [-1.6, 1.2, -0.8, 1.4];
+  return (
+    <>
+      <At x={84} y={540} style={popStyle(seg(t, 0, 0.5))}>
+        <div style={{ ...display(66), color: th.ink }}>{heading}</div>
+      </At>
+      {rows.map((r, i) => {
+        const q = seg(t, 0.5 + i * 0.9, 0.5);
+        const on = lit === i + 1;
+        return (
+          <At key={r.line} x={70 + (i % 2) * 20} y={654 + i * 252} style={{ ...popStyle(q), transform: `${popStyle(q).transform} rotate(${tilt[i % 4]}deg)` }}>
+            <div style={{ position: "relative", width: 920, height: 204, borderRadius: 6, background: notes[i % notes.length],
+                          boxShadow: "0 10px 18px rgba(0,0,0,0.22)", display: "flex", alignItems: "center", gap: 36, padding: "0 50px",
+                          boxSizing: "border-box", color: "#1D1B16" }}>
+              <div style={{ position: "absolute", left: 400, top: -16, width: 120, height: 34, background: "rgba(255,255,255,0.55)",
+                            transform: "rotate(-3deg)" }} />
+              <Icon name={r.icon} size={58} color="#1D1B16" stroke={2.2} />
+              <div style={{ flex: 1 }}>
+                <div style={{ ...display(50), lineHeight: 1.1, color: "#1D1B16" }}>{r.line}</div>
+                <div style={{ fontFamily: FONT.body, fontWeight: 500, fontSize: 34, color: "#4A4438" }}>{r.sub}</div>
+              </div>
+              {on && (
+                <svg width={80} height={80} viewBox="0 0 40 40" style={{ flex: "none" }}>
+                  <path d="M6 22 L16 31 L34 9" fill="none" stroke={C.mint} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+          </At>
+        );
+      })}
+    </>
+  );
+}

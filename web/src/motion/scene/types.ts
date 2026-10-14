@@ -23,13 +23,26 @@ export interface PlanShot {
   /** the animated characters show on this shot (absent in older plans) */
   characters?: boolean;
   objects: PlanObject[]; actions: PlanAction[]; captions: PlanCaption[];
+  /** the virtual camera's framings (shorts/motion_camera.py); absent = none */
+  camera?: CameraCue[];
+  /** the virtual cursor's moves (shorts/motion_camera.py); absent = none */
+  cursor?: CursorCue[];
 }
+export type Rect = [number, number, number, number];
+export interface CameraCue { t0: number; t1: number; target: string; part: number | null; rect: Rect; zoom: number; viewport: Rect; why?: string }
+export interface CursorCue { t: number; do: "click" | "type"; target: string; part: number | null; rect: Rect; text?: string; t_end?: number }
 export type PlanCast = CastMember;
 export interface MotionPlan {
   /** The look it is drawn in (designs.ts); absent = "classic". */
   design?: string;
   /** The layout rules it is drawn by (shorts/schema.py MotionPlan.rev); absent = 1. */
   rev?: number;
+  /** "board": the visual as a board, the explaining character large beside it (cast/teach.ts) */
+  stage?: string | null;
+  /** the studio palette it is drawn in (library.json studio.palettes); rev 3 */
+  palette?: string | null;
+  /** "vrm": the characters as 3D VRM avatars (vrm/VrmCast.tsx); absent = the 2D rig */
+  avatars?: string | null;
   short_id: string; template: string; theme: string | null; series: string; concept_name: string;
   duration: number; audio: string | null; audio_url?: string; timing_source: string;
   /** "stub": the narration is stub silence (SHORTS_STUB=1); "recorded": a real

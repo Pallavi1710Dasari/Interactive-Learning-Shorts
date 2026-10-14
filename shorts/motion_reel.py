@@ -210,7 +210,8 @@ def default_template(approach: TeachingApproach | None) -> str:
     """The template a teaching approach implies: a walked sequence of steps is
     a walkthrough ("how does X work"); everything else is a fix_story ("why
     does X fail"). The reviewer can override it — see _decide_template."""
-    if approach is not None and approach.primary == "process_demonstration":
+    # the step-by-step devices follow one example through numbered steps
+    if approach is not None and approach.primary in ("process_demonstration", "step_by_step_trace", "build_from_zero"):
         return "walkthrough"
     return "fix_story"
 
@@ -820,7 +821,8 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
     --characters / --character)."""
     characters = config.MOTION_CHARACTERS if characters is None else characters
     character = config.MOTION_CHARACTER_PRESET if character is None else character
-    from . import motion_align, motion_plan_checks, motion_tidy, motion_timeline, motion_voice
+    from . import (motion_align, motion_camera, motion_plan_checks, motion_teach, motion_tidy,
+                   motion_timeline, motion_voice)
     print(f"\n=== timing: {short_id} ===")
     tags = []
     if tags_path(short_id).exists():
@@ -865,17 +867,24 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
         print(f"  tidy: {n}")
     # the look chosen when the reel was set up; none saved = an older reel, "classic"
     design = (_load_setup(short_id).get("design") if _setup_path(short_id).exists() else None) or "classic"
-    plan = motion_timeline.build_plan(script, clocks, audio=None, cast=_cast(script),
+    audio = motion_voice.mix(script, manifest, clocks, trims)
+    plan = motion_timeline.build_plan(script, clocks, audio=f"audio/{audio.name}", cast=_cast(script),
                                       tags=tags, intro=intro, characters=characters,
                                       character=character, design=design,
                                       host_character=host_character)
+    # characters that teach, beside the visual as at a board (shorts/motion_teach.py);
+    # the voice envelope reads the mix written above
+    if plan.characters and config.MOTION_STAGE == "board":
+        plan = motion_teach.stage_board(plan)
+        if config.MOTION_AVATARS == "vrm":
+            plan = motion_teach.with_vrm(plan)
+    # the virtual camera and cursor, on the words (shorts/motion_camera.py)
+    plan = motion_camera.direct(plan)
     results = checks.run_motion_scene_graders(script, clocks, dropped=dropped) + [
         checks.check_motion_duration_cap(script, measured_seconds=motion_timeline.total_seconds(clocks)),
-        *motion_plan_checks.run(plan)]
+        *motion_plan_checks.run(plan), motion_camera.check_camera(plan)]
     for r in results:
         print(f"  {r}")
-    audio = motion_voice.mix(script, manifest, clocks, trims)
-    plan = plan.model_copy(update={"audio": f"audio/{audio.name}"})
     if plan.characters:
         shown = sum(s.characters for s in plan.shots)
         print("  characters: " + ", ".join(

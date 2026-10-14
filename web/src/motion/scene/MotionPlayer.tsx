@@ -17,13 +17,13 @@ declare global {
   interface Window { __capture?: { seek: (t: number) => Promise<void>; duration: number } }
 }
 
-function parseRoute(): { id: string | null; src: string | null; t: number; bare: boolean } {
+function parseRoute(): { id: string | null; src: string | null; t: number; bare: boolean; variant: string | null } {
   const raw = location.hash.replace(/^#/, "");
   const [path, query = ""] = raw.split("?");
   const q = new URLSearchParams(query);
   const id = path.split("/")[1] || null;
   return { id: id ? decodeURIComponent(id) : null, src: q.get("src"), t: Number(q.get("t") ?? 0) || 0,
-           bare: q.get("bare") === "1" };
+           bare: q.get("bare") === "1", variant: q.get("variant") };
 }
 
 export function MotionPlayer() {
@@ -32,7 +32,9 @@ export function MotionPlayer() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const url = route.src ?? (route.id ? `/api/motion/${encodeURIComponent(route.id)}/plan` : null);
+    // ?variant=<name>: a preview plan beside the reel's (output/<id>/plan.<name>.json)
+    const url = route.src ?? (route.id ? `/api/motion/${encodeURIComponent(route.id)}/plan`
+      + (route.variant ? `?variant=${encodeURIComponent(route.variant)}` : "") : null);
     if (!url) { setError("Open #motion-reel/<short_id>, or #motion-reel?src=<plan url>."); return; }
     loadPlan(url).then(setPlan).catch((e) => setError(`Could not load the plan from ${url}: ${e.message}`));
   }, [route]);
@@ -80,9 +82,20 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
   useEffect(() => {
     window.__capture = {
       duration: plan.duration,
-      seek: (to: number) => new Promise((done) => { setT(to); requestAnimationFrame(() => requestAnimationFrame(() => done())); }),
+      // waits for any 3D model the frame needs (vrm/load.ts) before it counts as drawn
+      seek: (to: number) => new Promise((done) => {
+        setT(to);
+        const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => done()));
+        (window.__motionAssets ? window.__motionAssets() : Promise.resolve()).then(() => requestAnimationFrame(settle));
+      }),
     };
     // the overlap audit (overlap.ts) on the frame on screen
+    // where each pointing fingertip landed on the frame on screen (vrm/VrmCast.tsx)
+    (window as unknown as Record<string, unknown>).__motionAims = () =>
+      Array.from(document.querySelectorAll("canvas[data-aim-miss]")).map((c) => {
+        const d = (c as HTMLElement).dataset;
+        return { who: d.side, target: d.aimTarget, tip: d.aimTip, miss: Number(d.aimMiss) };
+      });
     (window as unknown as Record<string, unknown>).__motionOverlaps = () => {
       const el = document.querySelector("[data-frame]");
       return el ? findOverlaps(el as HTMLElement) : [];

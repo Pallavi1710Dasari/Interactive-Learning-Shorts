@@ -6,7 +6,7 @@ middle, its end, and the middle of every caption. Optionally saves a PNG of
 chosen moments. Local and free; it calls no model.
 
     python -m shorts.motion_sweep <short_id> [--base http://127.0.0.1:8000]
-           [--shots out_dir] [--json report.json]
+           [--shots out_dir] [--json report.json] [--variant name]
 
 The app must be running at --base (it serves the built bundle in web/dist).
 """
@@ -33,9 +33,11 @@ def moments(plan: dict) -> list[tuple[float, str]]:
     return sorted(out)
 
 
-def sweep(short_id: str, base: str, shots_dir: Path | None = None, picks: list[float] | None = None) -> dict:
+def sweep(short_id: str, base: str, shots_dir: Path | None = None, picks: list[float] | None = None,
+          variant: str | None = None) -> dict:
     import urllib.request
-    with urllib.request.urlopen(f"{base}/api/motion/{short_id}/plan", timeout=10) as r:
+    q = f"?variant={variant}" if variant else ""
+    with urllib.request.urlopen(f"{base}/api/motion/{short_id}/plan{q}", timeout=10) as r:
         plan = json.load(r)
     chrome = video._chrome()
     port = video._free_port()
@@ -48,7 +50,7 @@ def sweep(short_id: str, base: str, shots_dir: Path | None = None, picks: list[f
             dev.send("Runtime.enable")
             dev.send("Emulation.setDeviceMetricsOverride",
                      {"width": video.WIDTH, "height": video.HEIGHT, "deviceScaleFactor": 1, "mobile": False})
-            dev.send("Page.navigate", {"url": f"{base}/#motion-reel/{short_id}?bare=1"})
+            dev.send("Page.navigate", {"url": f"{base}/#motion-reel/{short_id}?bare=1" + (f"&variant={variant}" if variant else "")})
             deadline = time.monotonic() + 45
             while not dev.evaluate("!!window.__capture && !!window.__motionOverlaps"):
                 if time.monotonic() > deadline:
@@ -57,10 +59,13 @@ def sweep(short_id: str, base: str, shots_dir: Path | None = None, picks: list[f
             dev.evaluate("document.fonts.ready.then(() => true)")
             found: list[dict] = []
             ms = moments(plan)
+            aims: list[dict] = []
             for t, what in ms:
                 dev.evaluate(f"window.__capture.seek({t:.4f}).then(() => true)")
                 for o in dev.evaluate("window.__motionOverlaps()") or []:
                     found.append({"t": round(t, 2), "moment": what, **o})
+                for a in dev.evaluate("window.__motionAims ? window.__motionAims() : []") or []:
+                    aims.append({"t": round(t, 2), "moment": what, **a})
             saved = []
             if shots_dir is not None:
                 shots_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +76,7 @@ def sweep(short_id: str, base: str, shots_dir: Path | None = None, picks: list[f
                     path.write_bytes(base64.b64decode(png["data"]))
                     saved.append(str(path))
             return {"short_id": short_id, "rev": plan.get("rev", 1), "moments": len(ms),
-                    "overlaps": found, "screenshots": saved}
+                    "overlaps": found, "aims": aims, "screenshots": saved}
         finally:
             if dev:
                 dev.close()
@@ -89,10 +94,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--shots", default=None, help="folder for screenshots of --at moments")
     p.add_argument("--at", default="", help="comma-separated seconds to screenshot")
     p.add_argument("--json", default=None)
+    p.add_argument("--variant", default=None, help="sweep output/<id>/plan.<variant>.json instead")
     a = p.parse_args(argv)
     picks = [float(x) for x in a.at.split(",") if x.strip()]
-    rep = sweep(a.short_id, a.base.rstrip("/"), Path(a.shots) if a.shots else None, picks)
+    rep = sweep(a.short_id, a.base.rstrip("/"), Path(a.shots) if a.shots else None, picks, a.variant)
     print(f"{a.short_id} (rev {rep['rev']}): {rep['moments']} moments, {len(rep['overlaps'])} problem(s)")
+    for aim in rep.get("aims", []):
+        print(f"  {aim['t']:6.2f}s {aim['moment']:<20} fingertip {aim['tip']} -> target {aim['target']}: "
+              f"{aim['miss']} px off the pointing line")
     for o in rep["overlaps"]:
         print(f"  {o['t']:6.2f}s {o['moment']:<20} {o['kind']:<18} {o['a']} / {o['b']}  {o['textA'][:40]!r}")
     if a.json:

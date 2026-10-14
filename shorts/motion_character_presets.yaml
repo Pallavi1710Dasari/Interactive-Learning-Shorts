@@ -22,19 +22,19 @@ host:
   name: Arjun
   gender: male
   art: soft
-  shading: flat
-  skinTone: "#F8C9A8"
-  hair: {style: quiff, color: "#151515"}
+  shading: lit
+  skinTone: medium
+  hair: {style: curly, color: black}
   face: {jaw: square, brows: medium, eyes: oval, mouth: full}
-  outfit: {top: shirtTie, topColor: "#FFFFFF", bottom: trousers, bottomColor: "#1B2238", shoeColor: "#2A2F45", accentColor: "#6C6F7A"}
-  accessories: {belt: true}
+  outfit: {top: hoodie, topColor: "#F08A4B", bottom: jeans, bottomColor: "#2B3A55", shoeColor: "#22263A"}
+  accessories: {}
   build: {height: 1, shoulders: 1}
-
 languages:
   python:
     name: Python
     gender: female
-    art: line
+    art: soft
+    shading: lit
     skinTone: wheatish
     hair: {style: ponytail, color: black}
     face: {jaw: oval, brows: thin, eyes: dot, mouth: line}
@@ -45,6 +45,7 @@ languages:
     name: JavaScript
     gender: male
     art: soft
+    shading: lit
     skinTone: medium
     hair: {style: sidePart, color: darkBrown}
     face: {jaw: square, brows: medium, eyes: oval, mouth: full}
@@ -54,7 +55,8 @@ languages:
   typescript:
     name: TypeScript
     gender: female
-    art: line
+    art: soft
+    shading: lit
     skinTone: fair
     hair: {style: bob, color: darkBrown}
     face: {jaw: oval, brows: thin, eyes: dot, mouth: line}
@@ -65,6 +67,7 @@ languages:
     name: React
     gender: male
     art: soft
+    shading: lit
     skinTone: wheatish
     hair: {style: curly, color: black}
     face: {jaw: round, brows: medium, eyes: oval, mouth: full}
@@ -74,7 +77,8 @@ languages:
   node:
     name: Node
     gender: female
-    art: line
+    art: soft
+    shading: lit
     skinTone: dusky
     hair: {style: braid, color: black}
     face: {jaw: oval, brows: medium, eyes: dot, mouth: line}
@@ -85,6 +89,7 @@ languages:
     name: Django
     gender: male
     art: soft
+    shading: lit
     skinTone: dusky
     hair: {style: short, color: black}
     face: {jaw: square, brows: thick, eyes: oval, mouth: full}
@@ -94,7 +99,8 @@ languages:
   html:
     name: HTML
     gender: female
-    art: line
+    art: soft
+    shading: lit
     skinTone: medium
     hair: {style: long, color: black}
     face: {jaw: oval, brows: thin, eyes: dot, mouth: line}
@@ -105,6 +111,7 @@ languages:
     name: CSS
     gender: male
     art: soft
+    shading: lit
     skinTone: fair
     hair: {style: quiff, color: brown}
     face: {jaw: oval, brows: medium, eyes: oval, mouth: full}
@@ -114,7 +121,8 @@ languages:
   sql:
     name: SQL
     gender: female
-    art: line
+    art: soft
+    shading: lit
     skinTone: deep
     hair: {style: bun, color: black}
     face: {jaw: round, brows: medium, eyes: dot, mouth: line}
@@ -125,6 +133,7 @@ languages:
     name: Java
     gender: male
     art: soft
+    shading: lit
     skinTone: medium
     hair: {style: sidePart, color: black}
     face: {jaw: square, brows: thick, eyes: oval, mouth: full}
@@ -134,7 +143,8 @@ languages:
   c:
     name: C
     gender: female
-    art: line
+    art: soft
+    shading: lit
     skinTone: wheatish
     hair: {style: wavy, color: darkBrown}
     face: {jaw: oval, brows: thin, eyes: dot, mouth: line}
@@ -145,6 +155,7 @@ languages:
     name: C++
     gender: male
     art: soft
+    shading: lit
     skinTone: deep
     hair: {style: buzz, color: black}
     face: {jaw: square, brows: thick, eyes: oval, mouth: full}
@@ -154,7 +165,8 @@ languages:
   docker:
     name: Docker
     gender: female
-    art: line
+    art: soft
+    shading: lit
     skinTone: fair
     hair: {style: ponytail, color: auburn}
     face: {jaw: oval, brows: thin, eyes: dot, mouth: line}
@@ -165,6 +177,7 @@ languages:
     name: OS
     gender: male
     art: soft
+    shading: lit
     skinTone: wheatish
     hair: {style: short, color: darkBrown}
     face: {jaw: round, brows: medium, eyes: oval, mouth: full}
@@ -172,14 +185,15 @@ languages:
     accessories: {glasses: rect, watch: true}
     build: {height: 1, shoulders: 1}
   cs:
-    name: CS
+    name: Meera
     gender: female
-    art: line
-    skinTone: dusky
-    hair: {style: bob, color: black}
-    face: {jaw: oval, brows: thin, eyes: dot, mouth: line}
-    outfit: {top: blouse, topColor: "#A82454", bottom: skirt, bottomColor: "#171A3B", shoeColor: "#1A1F3D"}
-    accessories: {flower: true}
+    art: soft
+    shading: lit
+    skinTone: wheatish
+    hair: {style: bun, color: darkBrown}
+    face: {jaw: oval, brows: medium, eyes: oval, mouth: full}
+    outfit: {top: shirt, topColor: "#A82454", bottom: trousers, bottomColor: "#1E2235", shoeColor: "#22263A"}
+    accessories: {glasses: round, watch: true}
     build: {height: 1, shoulders: 1}
 
 extras:
@@ -187,7 +201,7 @@ extras:
     name: Arjun
     gender: male
     art: soft
-    shading: flat
+    shading: lit
     skinTone: "#F8C9A8"
     hair: {style: quiff, color: "#151515"}
     face: {jaw: square, brows: medium, eyes: oval, mouth: full}
@@ -197,8 +211,8 @@ extras:
   riya:
     name: Riya
     gender: female
-    art: line
-    shading: flat
+    art: soft
+    shading: lit
     skinTone: "#F5A68E"
     hair: {style: bun, color: "#1A1F3D"}
     face: {jaw: oval, brows: thin, eyes: dot, mouth: line}

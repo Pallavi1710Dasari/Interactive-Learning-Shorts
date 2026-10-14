@@ -125,6 +125,14 @@ VARIETY AND MATCH
 - Each shot shows what its narration says: the words on its objects come from that shot's
   own captions (its highlights, its code, its numbers). One clear focus per shot.
 
+CAMERA AND CURSOR (optional — the camera and cursor already follow code, memory slots, app
+screens and the CTA by themselves)
+- "focus" on any object zooms the camera onto it (value: the part — a code_map part, a
+  code_window line) on the cue word and holds while it is talked about. Use it for the ONE
+  thing a sentence is about, at most once per sentence; never on every shot.
+- "click" on any object makes the cursor glide there and click on the cue word (a button, a
+  token, a name). A code_window's "type" is typed by the cursor letter by letter.
+
 COLOUR MEANINGS ARE FIXED
 - tone "bad" (coral) only where something FAILS: __FAIL__.
 - tone "ok" (mint) only where something WORKS: __OK__.

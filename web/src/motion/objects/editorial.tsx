@@ -10,7 +10,7 @@
 import type { ReactNode } from "react";
 import { At, Icon, Overlay } from "../Stage";
 import { STEP_CHIP } from "../chrome";
-import { C, FONT, H, MONO_ADVANCE, W, display, theme, type FieldName } from "../tokens";
+import { C, FONT, H, MONO_ADVANCE, W, display, theme, type FieldName, R } from "../tokens";
 import { clamp, ease, hash3, lerp, seg } from "../time";
 
 // ------------------------------------------------------------------ chips
@@ -58,7 +58,7 @@ export function Chip({ text, tone = "plain", field, size = CHIP.size, style }: {
   const c = chipColors(tone, field);
   return (
     <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", whiteSpace: "pre",
-                  height: chipHeight(size), padding: `0 ${CHIP.padX * k}px`, borderRadius: 14 * k,
+                  height: chipHeight(size), padding: `0 ${CHIP.padX * k}px`, borderRadius: R(14) * k,
                   border: `${CHIP.border}px solid ${c.border}`, background: c.bg, color: c.fg,
                   fontFamily: FONT.mono, fontWeight: 700, fontSize: size, boxSizing: "border-box",
                   width: chipWidth(text, size), ...style }}>
@@ -77,7 +77,7 @@ export function ChipTag({ kind, x, y, p = 1, flip = 0 }: {
   const q = ease.outBack(clamp(p), 2);
   return (
     <At x={x} y={y} center style={{ opacity: clamp(p * 2), transform: `translate(-50%,-50%) scale(${q}, ${q * squash})` }}>
-      <div style={{ padding: "4px 14px", borderRadius: 10, background: yes ? C.mint : C.coral, color: C.white,
+      <div style={{ padding: "4px 14px", borderRadius: R(10), background: yes ? C.mint : C.coral, color: C.white,
                     fontFamily: FONT.mono, fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>
         {yes ? "YES" : "NO"}
       </div>
@@ -213,7 +213,7 @@ export function Stamp({ text, x, y, rotate = -8, p, t = 0, size = 84 }: {
     // left of its anchor — onto the card text it was meant to sit beside
     <At x={x} y={y} center style={{ opacity: clamp(q * 3),
                                     transform: `translateX(${shake}px) rotate(${rotate}deg) scale(${scale})` }}>
-      <div style={{ padding: "14px 36px", border: `7px solid ${C.coral}`, borderRadius: 18, color: C.coral,
+      <div style={{ padding: "14px 36px", border: `7px solid ${C.coral}`, borderRadius: R(18), color: C.coral,
                     ...display(size), lineHeight: 1, whiteSpace: "nowrap",
                     background: "rgba(242,85,90,0.12)" }}>
         {text}
@@ -261,7 +261,7 @@ export function LookupGrid({ cells, cols, x, y, w, cellH = 66, gap = 12, field, 
         return (
           <div key={i} style={{
             position: "absolute", left: col * (cw + gap), top: row * (cellH + gap), width: cw, height: cellH,
-            borderRadius: 12, display: "grid", placeItems: "center", overflow: "hidden",
+            borderRadius: R(12), display: "grid", placeItems: "center", overflow: "hidden",
             background: tone ? c.bg : th.dark ? "rgba(255,255,255,0.06)" : "rgba(21,25,54,0.05)",
             border: `2px solid ${tone ? c.border : th.dark ? "rgba(255,255,255,0.12)" : "rgba(21,25,54,0.1)"}`,
             color: tone ? c.fg : th.ink, fontFamily: FONT.mono, fontWeight: 600,
@@ -292,7 +292,7 @@ export function SearchBar({ query, typed, x, y, w, field, p = 1, found }: {
   const shown = query.slice(0, Math.round(clamp(typed) * query.length));
   return (
     <At x={x} y={y} style={{ opacity: clamp(p), transform: `translateY(${(1 - clamp(p)) * -16}px)` }}>
-      <div style={{ width: w, height: 96, borderRadius: 48, background: C.surf, display: "flex", alignItems: "center",
+      <div style={{ width: w, height: 96, borderRadius: R(48), background: C.surf, display: "flex", alignItems: "center",
                     gap: 24, padding: "0 36px", boxShadow: th.dark ? "0 18px 40px rgba(0,0,0,0.4)" : "0 18px 40px rgba(21,25,54,0.15)",
                     border: found === false ? `4px solid ${C.coral}` : found ? `4px solid ${C.mint}` : "4px solid transparent" }}>
         <Icon name="search" size={42} color={C.ink} stroke={2.6} />
@@ -315,13 +315,13 @@ export function LookupTable({ header, rows, offset, x, y, w, field, visible = 5,
   const winH = visible * rowH;
   return (
     <At x={x} y={y}>
-      <div style={{ width: w, borderRadius: 30, background: th.surface, border: `5px solid ${C.ink}`, padding: "18px 36px 24px",
+      <div style={{ width: w, borderRadius: R(30), background: th.surface, border: `5px solid ${C.ink}`, padding: "18px 36px 24px",
                     color: th.surfaceInk, boxSizing: "border-box" }}>
         <div style={{ display: "flex", fontFamily: FONT.mono, fontSize: 22, letterSpacing: 3, color: th.surfaceDim, marginBottom: 12 }}>
           <span style={{ width: "38%" }}>{header[0]}</span><span>{header[1]}</span>
         </div>
         <div style={{ position: "relative", height: winH, overflow: "hidden" }}>
-          <div style={{ position: "absolute", left: -12, right: -12, top: mid * rowH + 4, height: rowH - 8, borderRadius: 14,
+          <div style={{ position: "absolute", left: -12, right: -12, top: mid * rowH + 4, height: rowH - 8, borderRadius: R(14),
                         border: `4px solid ${FIELDS_BLUE}`, opacity: clamp(highlight), background: "rgba(40,62,230,0.08)" }} />
           {rows.map(([k, v], i) => {
             const top = (i - offset + mid) * rowH;
@@ -374,7 +374,7 @@ export function MatrixGrid({ cells, x, y, cell = 78, gap = 10, field, rowLabels,
         return (
           <div key={`${r}-${ci}`} style={{
             position: "absolute", left: lx + bx + ci * (cell + gap), top: r * (cell + gap), width: cell, height: cell,
-            borderRadius: 14, background: look.bg, border: `4px ${c.tone === "pad" ? "dashed" : "solid"} ${look.border}`,
+            borderRadius: R(14), background: look.bg, border: `4px ${c.tone === "pad" ? "dashed" : "solid"} ${look.border}`,
             color: look.fg, display: "grid", placeItems: "center", fontFamily: FONT.mono, fontWeight: 700,
             fontSize: c.text && c.text.length > 2 ? cell * 0.24 : cell * 0.36, boxSizing: "border-box",
             opacity: ease.outCubic(clamp(p)), transform: `scale(${lerp(0.7, 1, ease.outBack(clamp(p), 1.5))})`,
@@ -412,7 +412,7 @@ export function BigCounter({ value, label, x, y, size = 300, field, accent = tru
     // counter half its size up and left — "1 → 7" ran off the frame
     <At x={x} y={y} center={center} style={{ opacity: clamp(p * 2), transform: `scale(${lerp(0.7, 1, q)})` }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
-                    padding: framed ? "24px 54px 30px" : 0, borderRadius: 36,
+                    padding: framed ? "24px 54px 30px" : 0, borderRadius: R(36),
                     border: framed ? `4px solid ${th.dark ? "rgba(253,209,62,0.55)" : "rgba(21,25,54,0.25)"}` : "none",
                     background: framed ? (th.dark ? "rgba(9,16,37,0.85)" : "rgba(255,255,255,0.85)") : "transparent" }}>
         <div style={{ ...display(size), lineHeight: 1, color: accent ? th.accent : th.ink,
@@ -462,11 +462,11 @@ export function Callout({ x, y, w, label, text, px, py, field, p = 1, tag, scale
               opacity={clamp(p)} />
       </Overlay>
       <At x={x} y={y} style={{ opacity: clamp(p * 2), transform: `scale(${lerp(0.85, 1, q)})`, transformOrigin: "0 100%" }}>
-        <div style={{ width: w, padding: "20px 30px", borderRadius: 24, background: box.background, border: box.border, color: box.color }}>
+        <div style={{ width: w, padding: "20px 30px", borderRadius: R(24), background: box.background, border: box.border, color: box.color }}>
           <div style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: 20 * scale, letterSpacing: 3, color: box.sub }}>{label}</div>
           <div style={{ fontWeight: 700, fontSize: 36 * scale, lineHeight: 1.25 }}>{text}</div>
         </div>
-        {tag && <div style={{ position: "absolute", right: -24, bottom: -24, padding: "6px 18px", borderRadius: 12,
+        {tag && <div style={{ position: "absolute", right: -24, bottom: -24, padding: "6px 18px", borderRadius: R(12),
                               background: tag.tone === "ok" ? C.mint : C.coral, color: C.white, ...display(36), transform: "rotate(-6deg)" }}>{tag.text}</div>}
       </At>
     </>
@@ -496,7 +496,7 @@ export function RecapGrid({ concept, steps, final, field, t }: {
         return (
           <At key={s} x={W / 2 - colW - 12 + (i % 2) * (colW + 24)} y={760 + Math.floor(i / 2) * 120}
               style={{ opacity: p, transform: `translateY(${(1 - p) * 24}px)` }}>
-            <div style={{ width: colW, height: 96, borderRadius: 18, border: `3px solid ${th.dark ? "rgba(255,255,255,0.3)" : C.ink}`,
+            <div style={{ width: colW, height: 96, borderRadius: R(18), border: `3px solid ${th.dark ? "rgba(255,255,255,0.3)" : C.ink}`,
                           display: "flex", alignItems: "center", gap: 18, padding: "0 24px", boxSizing: "border-box",
                           background: th.dark ? th.surface : C.surf, color: th.surfaceInk }}>
               <span style={{ ...display(48), color: th.accent }}>{i + 1}</span>

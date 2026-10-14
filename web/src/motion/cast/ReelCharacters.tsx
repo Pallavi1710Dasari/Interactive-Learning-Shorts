@@ -17,6 +17,7 @@ import library from "../library.json";
 import type { MotionPlan, PlanShot } from "../scene/types";
 import { FULL_KINDS } from "../scene/objects";
 import { theme, type FieldName } from "../tokens";
+import { BOARD, bulbAt, placement, spotOf, teach } from "./teach";
 
 export const STAGE = (library as unknown as {
   frame: { characters: { top: number; bottom: number; chat_top: number; view: { top: number; bottom: number }; cx: number[]; center_x: number } }
@@ -103,6 +104,58 @@ export function ReelCharacters({ plan, t, opacity = 1, field = "navy" }: { plan:
           <div key={`${track.side}:${track.role ?? ""}`} data-character={track.preset} data-side={track.side}
                style={{ position: "absolute", left: centreX(track.side) - CHAR_W / 2, top: -STAGE.view.top * SCALE, width: CHAR_W }}>
             <Character pose={pose} skin={skinFor(configOf(track))} width={CHAR_W} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The board staging (plan.stage = "board", cast/teach.ts): the explaining
+ * character large beside the board, the asking one smaller below it, both
+ * cut softly at the waist, teaching through the aim / gaze / jaw overlays,
+ * a lightbulb on an "aha". No backdrop halo. */
+export function BoardCharacters({ plan, t, opacity = 1 }: { plan: MotionPlan; t: number; opacity?: number }) {
+  if (!plan.characters?.length) return null;
+  const n = plan.characters.length;
+  const spots = plan.characters.map((tr) => placement(spotOf(tr, n)));
+  const heads = spots.map((p) => [p.left + 200 * p.scale, p.top + 120 * p.scale] as [number, number]);
+  return (
+    <div data-part="characters" style={{ position: "absolute", inset: 0, opacity, pointerEvents: "none" }}>
+      <style>{"[data-character] > svg { overflow: visible; }"}</style>
+      {plan.characters.map((track, i) => {
+        const place = spots[i];
+        const skin = skinFor(configOf(track));
+        const base = { ...poseOf(performanceFor(plan, track), t) };
+        const { pose, aha } = teach(base, track, place, skin, t, n > 1 ? heads[1 - i] : null);
+        const visible = (BOARD.view_bottom - 6) * place.scale;
+        const bulb = bulbAt(aha);
+        return (
+          <div key={`${track.side}:${track.role ?? ""}`}>
+            <div data-character={track.preset} data-side={track.side}
+                 style={{ position: "absolute", left: place.left, top: place.top + 6 * place.scale, width: place.w, height: visible,
+                          overflow: "hidden",
+                          WebkitMaskImage: "linear-gradient(to bottom, #000 82%, transparent 100%)",
+                          maskImage: "linear-gradient(to bottom, #000 82%, transparent 100%)" }}>
+              <div style={{ position: "absolute", left: 0, top: -6 * place.scale, width: place.w }}>
+                <Character pose={pose} skin={skin} width={place.w} />
+              </div>
+            </div>
+            {bulb.opacity > 0 && (
+              <svg data-part="aha" width={120} height={150} viewBox="0 0 60 75"
+                   style={{ position: "absolute", left: heads[i][0] - 60 + 70 * place.scale * (track.side === "left" ? 1 : -1),
+                            top: place.top - 30 * place.scale - 40, opacity: bulb.opacity,
+                            transform: `scale(${bulb.scale})`, transformOrigin: "50% 100%", overflow: "visible" }}>
+                {[0, 1, 2, 3, 4].map((k) => {
+                  const a = (-150 + k * 30) * Math.PI / 180;
+                  return <line key={k} x1={30 + Math.cos(a) * 24} y1={26 + Math.sin(a) * 24} x2={30 + Math.cos(a) * (31 + 3 * bulb.glow)}
+                               y2={26 + Math.sin(a) * (31 + 3 * bulb.glow)} stroke="#FFD43B" strokeWidth={3.5} strokeLinecap="round" />;
+                })}
+                <circle cx={30} cy={26} r={17} fill="#FFE066" stroke="#F2B705" strokeWidth={2.5} />
+                <path d="M24 42 h12 v6 h-12 z M25 50 h10" stroke="#5B6178" strokeWidth={3} fill="#9AA0B8" strokeLinecap="round" />
+                <path d="M26 28 q4 -7 8 0" stroke="#F2B705" strokeWidth={2} fill="none" />
+              </svg>
+            )}
           </div>
         );
       })}

@@ -89,7 +89,7 @@ def run(name: str, doc: str, options: dict, topic: str = "recommended", approach
     assert state["template"] == tp and state["template_source"] == "reviewer"
     assert wf.approved_teaching_approach.primary == ap
     assert wf.effective_question == question
-    assert state["design"] == "midnight_lab"
+    assert state["design"] == "studio"
 
     job = _past_preflight(job)
     assert job["stage"] == "theme", job["stage"]
@@ -127,7 +127,7 @@ def run(name: str, doc: str, options: dict, topic: str = "recommended", approach
     assert (job["stage"], job["status"]) == ("done", "done"), (job["stage"], job["status"], job["message"])
 
     plan = json.loads(mr.plan_path(sid).read_text())
-    assert plan["design"] == "midnight_lab" and plan["template"] == tp and plan["theme"] == pick
+    assert plan["design"] == "studio" and plan["template"] == tp and plan["theme"] == pick
     chars = plan["characters"]
     if not options.get("characters", True):
         assert chars == [], "characters were turned off"

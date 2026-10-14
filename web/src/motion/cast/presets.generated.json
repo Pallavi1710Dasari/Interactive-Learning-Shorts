@@ -4,11 +4,11 @@
   "name": "Arjun",
   "gender": "male",
   "art": "soft",
-  "shading": "flat",
-  "skinTone": "#F8C9A8",
+  "shading": "lit",
+  "skinTone": "medium",
   "hair": {
-   "style": "quiff",
-   "color": "#151515"
+   "style": "curly",
+   "color": "black"
   },
   "face": {
    "jaw": "square",
@@ -17,16 +17,13 @@
    "mouth": "full"
   },
   "outfit": {
-   "top": "shirtTie",
-   "topColor": "#FFFFFF",
-   "bottom": "trousers",
-   "bottomColor": "#1B2238",
-   "shoeColor": "#2A2F45",
-   "accentColor": "#6C6F7A"
+   "top": "hoodie",
+   "topColor": "#F08A4B",
+   "bottom": "jeans",
+   "bottomColor": "#2B3A55",
+   "shoeColor": "#22263A"
   },
-  "accessories": {
-   "belt": true
-  },
+  "accessories": {},
   "build": {
    "height": 1.0,
    "shoulders": 1.0
@@ -36,7 +33,8 @@
   "python": {
    "name": "Python",
    "gender": "female",
-   "art": "line",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "wheatish",
    "hair": {
     "style": "ponytail",
@@ -67,6 +65,7 @@
    "name": "JavaScript",
    "gender": "male",
    "art": "soft",
+   "shading": "lit",
    "skinTone": "medium",
    "hair": {
     "style": "sidePart",
@@ -97,7 +96,8 @@
   "typescript": {
    "name": "TypeScript",
    "gender": "female",
-   "art": "line",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "fair",
    "hair": {
     "style": "bob",
@@ -129,6 +129,7 @@
    "name": "React",
    "gender": "male",
    "art": "soft",
+   "shading": "lit",
    "skinTone": "wheatish",
    "hair": {
     "style": "curly",
@@ -156,7 +157,8 @@
   "node": {
    "name": "Node",
    "gender": "female",
-   "art": "line",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "dusky",
    "hair": {
     "style": "braid",
@@ -188,6 +190,7 @@
    "name": "Django",
    "gender": "male",
    "art": "soft",
+   "shading": "lit",
    "skinTone": "dusky",
    "hair": {
     "style": "short",
@@ -218,7 +221,8 @@
   "html": {
    "name": "HTML",
    "gender": "female",
-   "art": "line",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "medium",
    "hair": {
     "style": "long",
@@ -249,6 +253,7 @@
    "name": "CSS",
    "gender": "male",
    "art": "soft",
+   "shading": "lit",
    "skinTone": "fair",
    "hair": {
     "style": "quiff",
@@ -280,7 +285,8 @@
   "sql": {
    "name": "SQL",
    "gender": "female",
-   "art": "line",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "deep",
    "hair": {
     "style": "bun",
@@ -311,6 +317,7 @@
    "name": "Java",
    "gender": "male",
    "art": "soft",
+   "shading": "lit",
    "skinTone": "medium",
    "hair": {
     "style": "sidePart",
@@ -342,7 +349,8 @@
   "c": {
    "name": "C",
    "gender": "female",
-   "art": "line",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "wheatish",
    "hair": {
     "style": "wavy",
@@ -373,6 +381,7 @@
    "name": "C++",
    "gender": "male",
    "art": "soft",
+   "shading": "lit",
    "skinTone": "deep",
    "hair": {
     "style": "buzz",
@@ -402,7 +411,8 @@
   "docker": {
    "name": "Docker",
    "gender": "female",
-   "art": "line",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "fair",
    "hair": {
     "style": "ponytail",
@@ -431,6 +441,7 @@
    "name": "OS",
    "gender": "male",
    "art": "soft",
+   "shading": "lit",
    "skinTone": "wheatish",
    "hair": {
     "style": "short",
@@ -459,29 +470,31 @@
    }
   },
   "cs": {
-   "name": "CS",
+   "name": "Meera",
    "gender": "female",
-   "art": "line",
-   "skinTone": "dusky",
+   "art": "soft",
+   "shading": "lit",
+   "skinTone": "wheatish",
    "hair": {
-    "style": "bob",
-    "color": "black"
+    "style": "bun",
+    "color": "darkBrown"
    },
    "face": {
     "jaw": "oval",
-    "brows": "thin",
-    "eyes": "dot",
-    "mouth": "line"
+    "brows": "medium",
+    "eyes": "oval",
+    "mouth": "full"
    },
    "outfit": {
-    "top": "blouse",
+    "top": "shirt",
     "topColor": "#A82454",
-    "bottom": "skirt",
-    "bottomColor": "#171A3B",
-    "shoeColor": "#1A1F3D"
+    "bottom": "trousers",
+    "bottomColor": "#1E2235",
+    "shoeColor": "#22263A"
    },
    "accessories": {
-    "flower": true
+    "glasses": "round",
+    "watch": true
    },
    "build": {
     "height": 1.0,
@@ -494,7 +507,7 @@
    "name": "Arjun",
    "gender": "male",
    "art": "soft",
-   "shading": "flat",
+   "shading": "lit",
    "skinTone": "#F8C9A8",
    "hair": {
     "style": "quiff",
@@ -524,8 +537,8 @@
   "riya": {
    "name": "Riya",
    "gender": "female",
-   "art": "line",
-   "shading": "flat",
+   "art": "soft",
+   "shading": "lit",
    "skinTone": "#F5A68E",
    "hair": {
     "style": "bun",

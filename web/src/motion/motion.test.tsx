@@ -24,6 +24,11 @@ import { allIdentities, contrastRatio } from "./identity/IdentitySheet";
 import { contrastChecks } from "./identity/contrast";
 import { MotionFrame, chatAt, shotIndexAt, speakerAt } from "./scene/MotionStage";
 import type { MotionPlan } from "./scene/types";
+import { CAMERA, cameraAt, cursorAt, framingOf, project, typedChars } from "./camera";
+import { BOARD, placement, teach, toStage } from "./cast/teach";
+import { buildSkin } from "./characters/skins/config";
+import { CHANNELS, type Pose } from "./characters/rig/channels";
+import { FACE, SHAPES, armPrograms, visemes } from "./vrm/pose3d";
 import demoInterviewJson from "../../public/motion-demo/interview.json";
 import demoClassicJson from "../../public/motion-demo/classic.json";
 import demoWalkJson from "../../public/motion-demo/walkthrough.json";
@@ -305,6 +310,111 @@ const LIB = library as unknown as {
   check(designer.includes('data-action="save"') && designer.includes('data-action="reset"'), "the designer saves and resets");
   for (const id of PRESET_IDS) check(designer.includes(`data-preset="${id}"`), `the designer cannot pick ${id}`);
   console.log(`  characters: ${PRESET_IDS.length} presets, ${variants.length} designer options, ${Object.keys(EXPRESSIONS).length} expressions, ${Object.keys(ACTIONS).length} gestures; one-vs-two, lip-sync, purity and regions checked`);
+}
+
+// ---------------------------------------------------------- camera, cursor, teaching (2026-10-13)
+{
+  // the camera framing is motion_camera.framing: the rect whole, the zoom in range, the layer covering the viewport
+  const vp: [number, number, number, number] = [0, 150, 1080, 1154];
+  for (const [rect, zoom] of [[[110, 442, 150, 90], 1.7], [[60, 455, 779, 102], 1.4], [[10, 160, 1000, 900], 1.8]] as [[number, number, number, number], number][]) {
+    const f = framingOf(rect, zoom, vp);
+    if (f.s === 1) continue;           // too big to zoom on: the camera stays wide (the director drops such a cue)
+    const [x, y] = project(f, vp, rect[0], rect[1]);
+    const [x1, y1] = project(f, vp, rect[0] + rect[2], rect[1] + rect[3]);
+    check(x >= vp[0] + CAMERA.margin - 1 && y >= vp[1] + CAMERA.margin - 1 && x1 <= vp[0] + vp[2] - CAMERA.margin + 1
+          && y1 <= vp[1] + vp[3] - CAMERA.margin + 1, `camera cuts off ${rect} at ${f.s.toFixed(2)}`);
+    check(f.s >= 1 && f.s <= zoom + 1e-9, `camera zoom ${f.s} for ${rect}`);
+    const [cx0, cy0] = project(f, vp, vp[0], vp[1]);
+    const [cx1, cy1] = project(f, vp, vp[0] + vp[2], vp[1] + vp[3]);
+    check(cx0 <= vp[0] + 1e-6 && cy0 <= vp[1] + 1e-6 && cx1 >= vp[0] + vp[2] - 1e-6 && cy1 >= vp[1] + vp[3] - 1e-6,
+          `the zoomed layer leaves an empty edge for ${rect}`);
+  }
+  // same numbers as Python (shorts/motion_camera_test.py pins the same case): the focus is
+  // clamped right of the token so the zoomed layer leaves no empty edge on the left
+  const f = framingOf([110, 442, 150, 90], 1.7, vp);
+  check(Math.abs(f.s - 1.7) < 1e-9 && Math.abs(f.fx - 317.65) < 0.02 && Math.abs(f.fy - 489.41) < 0.02, `framing ${JSON.stringify(f)}`);
+  // a cue eases in, holds, eases out; wide before and after
+  const cue = { t0: 10, t1: 13, target: "o1", part: 1, rect: [110, 442, 150, 90] as [number, number, number, number], zoom: 1.7, viewport: vp };
+  check(cameraAt([cue], vp, 9.9).s === 1 && cameraAt([cue], vp, 14).s === 1, "the camera is wide outside its cue");
+  check(cameraAt([cue], vp, 11.5).s > 1.69, `the camera holds its zoom (${cameraAt([cue], vp, 11.5).s})`);
+  // the cursor: arrives under its target and presses on the cue word; types to the end by t_end
+  const cur = [{ t: 5, do: "click" as const, target: "o1", part: 1, rect: [100, 400, 200, 80] as [number, number, number, number] }];
+  const at = cursorAt(cur, 5)!;
+  check(Math.abs(at.x - (100 + 200 * 0.58)) < 1 && Math.abs(at.y - 486) < 1, `cursor rests at ${at.x},${at.y}`);
+  check(cursorAt(cur, 5.08)!.press > 0 && cursorAt(cur, 5.3)!.ripple > 0, "the cursor presses and ripples");
+  check(cursorAt(cur, 0) === null, "the cursor is hidden before it is needed");
+  const typing = { t: 1, do: "type" as const, target: "o1", part: 1, rect: [0, 0, 10, 10] as [number, number, number, number], text: "cart = 1", t_end: 2 };
+  check(typedChars(typing, 0.9) === 0 && typedChars(typing, 2) === 8 && typedChars(typing, 1.5) === 4, "typing pace");
+
+  // teaching: an aim points the finger at its target; a held count keeps the arm up
+  const track = { role: "MENTOR", preset: "cs", config: defaultPreset("cs"), side: "right" as const, seed: 3, cues: [] as never[] };
+  const place = placement(BOARD.explainer);
+  const skin = buildSkin(defaultPreset("cs"));
+  const base = { ...CHANNELS } as unknown as Pose;
+  const rect = [60, 300, 300, 120];
+  const aimed = teach(base, { ...track, cues: [{ t: 1, kind: "aim", name: "", side: "L", until: 3, rect, target: "o1", full: false, cue: "" }] as never[] },
+                      place, skin, 2, null).pose as unknown as Record<string, number>;
+  const [tx, ty] = toStage(false, rect[0] + rect[2] / 2, rect[1] + rect[3] / 2);
+  const px = place.left + (200 - (skin.shoulderHalf - 6)) * place.scale, py = place.top + 205 * place.scale;
+  // the screen-left arm hangs along +y and turns by the shoulder angle (minus the elbow's share)
+  const ang = ((aimed.shoulderL - aimed.elbowL * 0.55) * Math.PI) / 180;
+  const dir = [-Math.sin(ang), Math.cos(ang)];
+  const want = [tx - px, ty - py];
+  const cos = (dir[0] * want[0] + dir[1] * want[1]) / Math.hypot(want[0], want[1]);
+  check(cos > 0.995, `the aim misses its target (cos ${cos.toFixed(3)})`);
+  const counted = (n: number) => teach(base, { ...track, cues: [
+    { t: 1, kind: "count", name: "two", side: "L", until: 2.2, cue: "" }, { t: 2.05, kind: "count", name: "one", side: "L", until: 3.5, cue: "" }] as never[] },
+    place, skin, n, null).pose as unknown as Record<string, number>;
+  for (const tt of [1.5, 2.0, 2.1, 2.5, 3.0]) check(counted(tt).elbowL < -100, `the counting arm drops between counts at ${tt}s (${counted(tt).elbowL})`);
+  check(counted(1.6).fL2 < 0.2 && counted(3.0).fL2 > 0.8, "the fingers change between counts");
+  const jaw = teach({ ...base, mouthOpen: 0.6 } as Pose, { ...track, env: { t0: 0, fps: 30, v: [0, 0, 1, 1, 0, 0] } } as never, place, skin, 2 / 30, null).pose as unknown as Record<string, number>;
+  const shut = teach({ ...base, mouthOpen: 0.6 } as Pose, { ...track, env: { t0: 0, fps: 30, v: [0, 0, 1, 1, 0, 0] } } as never, place, skin, 4.5 / 30, null).pose as unknown as Record<string, number>;
+  check(jaw.mouthOpen > shut.mouthOpen * 1.5, "the jaw follows the voice's loudness");
+  console.log("  camera framing, cursor, aims, held counts and the voice's jaw checked");
+}
+
+// ---------------------------------------------------------- the studio design (2026-10-13)
+{
+  const classic = demoClassicJson as unknown as MotionPlan;
+  const at = classic.shots[2].start + 1;
+  const before = renderToStaticMarkup(<MotionFrame plan={classic} t={at} />);
+  const coral = C.coral;
+  for (const palette of ["chalkboard", "paper", "terminal_amber", "deep_teal", "plum_gold", "midnight"]) {
+    const studioPlan = { ...classic, rev: 3, design: palette === "midnight" ? "midnight_lab" : "studio", palette } as MotionPlan;
+    const a = renderToStaticMarkup(<MotionFrame plan={studioPlan} t={at} />);
+    const b = renderToStaticMarkup(<MotionFrame plan={studioPlan} t={at} />);
+    check(a === b, `the ${palette} frame is not pure in t`);
+    check(a !== before, `the ${palette} palette changes nothing`);
+    check(!/animation|transition:/.test(a), `the ${palette} frame has a CSS animation or transition`);
+  }
+  const after = renderToStaticMarkup(<MotionFrame plan={classic} t={at} />);
+  check(after === before && C.coral === coral, "a palette leaks into a reel drawn after it (old reels must not change)");
+  console.log("  studio: 6 palettes drawn pure, and an old reel drawn after them is unchanged");
+}
+
+// ---------------------------------------------------------- 3D avatars (vrm/pose3d.ts)
+{
+  const pose = { ...CHANNELS, mouthOpen: 0.8, mouthWide: 0.6, pucker: 0.1 } as unknown as Pose;
+  const shut = visemes(pose, 1, false);
+  check(Object.values(shut).every((v) => v === 0), "a 3D mouth moves while its character is not speaking");
+  const open = visemes(pose, 1, true);
+  check(open.aa > 0.2 && Object.values(open).every((v) => v >= 0 && v <= 1), `3D visemes ${JSON.stringify(open)}`);
+  check(visemes(pose, 0, true).aa < open.aa, "the 3D jaw does not follow the voice's loudness");
+  // professional: never more than a light smile, whatever the director cues
+  for (const name of Object.keys(FACE)) check((FACE[name].happy ?? 0) <= 0.25, `the 3D "${name}" face smiles too much`);
+  const tr = { role: "MENTOR", preset: "cs", config: {} as never, side: "right" as const, seed: 1, cues: [
+    { t: 1, kind: "count", name: "two", side: "L", until: 3, cue: "" },
+    { t: 4, kind: "aim", name: "", side: "L", until: 6, rect: [100, 300, 200, 100], target: "o1", full: false, cue: "" },
+    { t: 7, kind: "gesture", name: "handsSpread", cue: "" },
+    { t: 7.2, kind: "gesture", name: "nod", cue: "" },
+  ] as never[] };
+  const at = (t: number) => armPrograms(tr as never, t, [{ start: 7.5, end: 7.8 }], "right", () => [0, 0]);
+  check(at(2).right.length === 1 && at(2).right[0].shape.fingers.join() === "0,0,1,1", "the held count of two is not on the board-side arm");
+  check(at(5).right.some((p) => p.aim) && at(5).left.length === 0, "the point is not on the board-side arm");
+  check(at(7.6).left.length === 1 && at(7.6).right.length === 1 && at(7.6).left[0].beat > 0, "explaining is not both palms, with a beat on the word");
+  check(at(9.5).left.length === 0 && at(9.5).right.length === 0, "a gesture does not return to rest");
+  check(SHAPES.point.fingers.join() === "0,1,1,1" && SHAPES.point.thumb > 0.8, "the point is not index out, the others curled, thumb tucked");
+  console.log("  3D avatars: mouth, quiet face, held count, point, explain beats and rest checked");
 }
 
 if (failures) {

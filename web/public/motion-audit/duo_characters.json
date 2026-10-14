@@ -3,7 +3,10 @@
  "template": "fix_story",
  "theme": "interview",
  "design": "classic",
- "rev": 2,
+ "rev": 3,
+ "stage": null,
+ "palette": null,
+ "avatars": null,
  "series": "@learnthesimpleway",
  "concept_name": "useState",
  "duration": 99.908,
@@ -175,11 +178,11 @@
     "name": "Arjun",
     "gender": "male",
     "art": "soft",
-    "shading": "flat",
-    "skinTone": "#F8C9A8",
+    "shading": "lit",
+    "skinTone": "medium",
     "hair": {
-     "style": "quiff",
-     "color": "#151515"
+     "style": "curly",
+     "color": "black"
     },
     "face": {
      "jaw": "square",
@@ -188,16 +191,13 @@
      "mouth": "full"
     },
     "outfit": {
-     "top": "shirtTie",
-     "topColor": "#FFFFFF",
-     "bottom": "trousers",
-     "bottomColor": "#1B2238",
-     "shoeColor": "#2A2F45",
-     "accentColor": "#6C6F7A"
+     "top": "hoodie",
+     "topColor": "#F08A4B",
+     "bottom": "jeans",
+     "bottomColor": "#2B3A55",
+     "shoeColor": "#22263A"
     },
-    "accessories": {
-     "belt": true
-    },
+    "accessories": {},
     "build": {
      "height": 1.0,
      "shoulders": 1.0
@@ -211,352 +211,554 @@
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": ""
+     "cue": "",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 0.15,
      "kind": "gesture",
      "name": "shrug",
      "side": null,
-     "cue": "Why"
+     "cue": "Why",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 0.25,
      "kind": "expression",
      "name": "confused",
      "side": null,
-     "cue": "Why"
+     "cue": "Why",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 3.727,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "You"
+     "cue": "You",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 5.985,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "changes."
+     "cue": "changes.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 7.119,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 9.827,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "A"
+     "cue": "A",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 12.085,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "to."
+     "cue": "to.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 13.219,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "Here"
+     "cue": "Here",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 15.812,
      "kind": "gesture",
      "name": "countOne",
      "side": null,
-     "cue": "first."
+     "cue": "first.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 16.696,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "It"
+     "cue": "It",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 19.338,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "updates."
+     "cue": "updates.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 20.473,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "Each"
+     "cue": "Each",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 23.565,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Nothing"
+     "cue": "Nothing",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 25.823,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "again."
+     "cue": "again.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 26.958,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 29.281,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "That"
+     "cue": "That",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 31.923,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "fix."
+     "cue": "fix.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 33.058,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 36.535,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "When"
+     "cue": "When",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 39.177,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "again."
+     "cue": "again.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 40.312,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "Calling"
+     "cue": "Calling",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 43.019,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 45.277,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "redraws."
+     "cue": "redraws.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 46.412,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "There"
+     "cue": "There",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 49.119,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Keep"
+     "cue": "Keep",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 52.146,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "redraw."
+     "cue": "redraw.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 53.281,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "Two"
+     "cue": "Two",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 55.988,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Each"
+     "cue": "Each",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 57.862,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "token."
+     "cue": "token.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 58.996,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 62.088,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "They"
+     "cue": "They",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 64.731,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "before."
+     "cue": "before.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 65.865,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "Every"
+     "cue": "Every",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 69.727,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 71.985,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "numbers."
+     "cue": "numbers.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 73.119,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "You"
+     "cue": "You",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 75.442,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "And"
+     "cue": "And",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 77.315,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "screen."
+     "cue": "screen.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 78.45,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 81.542,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Then"
+     "cue": "Then",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 83.8,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "zero."
+     "cue": "zero.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 84.935,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 87.258,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 89.131,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "value."
+     "cue": "value.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 90.265,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "A"
+     "cue": "A",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 92.204,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "But"
+     "cue": "But",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 92.923,
      "kind": "gesture",
      "name": "nod",
      "side": null,
-     "cue": "remembers."
+     "cue": "remembers.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 94.058,
      "kind": "expression",
      "name": "neutral",
      "side": null,
-     "cue": "Every"
+     "cue": "Every",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 96.765,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "And"
+     "cue": "And",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     }
-   ]
+   ],
+   "env": null,
+   "vrm": null
   },
   {
    "role": "CANDIDATE",
@@ -565,6 +767,7 @@
     "name": "React",
     "gender": "male",
     "art": "soft",
+    "shading": "lit",
     "skinTone": "wheatish",
     "hair": {
      "style": "curly",
@@ -597,324 +800,510 @@
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": ""
+     "cue": "",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 0.35,
      "kind": "expression",
      "name": "thinking",
      "side": null,
-     "cue": "Why"
+     "cue": "Why",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 3.627,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "You"
+     "cue": "You",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 3.912,
      "kind": "gesture",
      "name": "handsSpread",
      "side": null,
-     "cue": "click"
+     "cue": "click",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 7.219,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 9.727,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "A"
+     "cue": "A",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 10.012,
      "kind": "gesture",
      "name": "point",
      "side": "R",
-     "cue": "plain"
+     "cue": "plain",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 13.319,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Here"
+     "cue": "Here",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 16.596,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "It"
+     "cue": "It",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 16.881,
      "kind": "gesture",
      "name": "pointUp",
      "side": "R",
-     "cue": "looks"
+     "cue": "looks",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 20.573,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Each"
+     "cue": "Each",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 23.365,
      "kind": "gesture",
      "name": "okSign",
      "side": "R",
-     "cue": "Nothing"
+     "cue": "Nothing",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 23.465,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "Nothing"
+     "cue": "Nothing",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 27.058,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 29.181,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "That"
+     "cue": "That",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 30.235,
      "kind": "gesture",
      "name": "presentLeft",
      "side": null,
-     "cue": "bug"
+     "cue": "bug",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 33.158,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 36.335,
      "kind": "gesture",
      "name": "handsSpread",
      "side": null,
-     "cue": "When"
+     "cue": "When",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 36.435,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "When"
+     "cue": "When",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 40.412,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Calling"
+     "cue": "Calling",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 42.819,
      "kind": "gesture",
      "name": "point",
      "side": "R",
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 42.919,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 46.512,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "There"
+     "cue": "There",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 48.919,
      "kind": "gesture",
      "name": "pointUp",
      "side": "R",
-     "cue": "Keep"
+     "cue": "Keep",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 49.019,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "Keep"
+     "cue": "Keep",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 53.381,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Two"
+     "cue": "Two",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 55.888,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "Each"
+     "cue": "Each",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 59.096,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 61.888,
      "kind": "gesture",
      "name": "okSign",
      "side": "R",
-     "cue": "They"
+     "cue": "They",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 61.988,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "They"
+     "cue": "They",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 65.965,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Every"
+     "cue": "Every",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 69.627,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 69.912,
      "kind": "gesture",
      "name": "presentLeft",
      "side": null,
-     "cue": "model"
+     "cue": "model",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 73.219,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "You"
+     "cue": "You",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 75.342,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "And"
+     "cue": "And",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 78.55,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 81.342,
      "kind": "gesture",
      "name": "handsSpread",
      "side": null,
-     "cue": "Then"
+     "cue": "Then",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 81.442,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "Then"
+     "cue": "Then",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 85.035,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "The"
+     "cue": "The",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 87.158,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "React"
+     "cue": "React",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 90.365,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "A"
+     "cue": "A",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 92.104,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "But"
+     "cue": "But",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 94.158,
      "kind": "expression",
      "name": "listening",
      "side": null,
-     "cue": "Every"
+     "cue": "Every",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 96.665,
      "kind": "expression",
      "name": "happy",
      "side": null,
-     "cue": "And"
+     "cue": "And",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 98.873,
      "kind": "gesture",
      "name": "thumbsUp",
      "side": "R",
-     "cue": "value."
+     "cue": "value.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     },
     {
      "t": 99.073,
      "kind": "expression",
      "name": "grin",
      "side": null,
-     "cue": "value."
+     "cue": "value.",
+     "until": null,
+     "rect": null,
+     "target": null,
+     "full": false
     }
-   ]
+   ],
+   "env": null,
+   "vrm": null
   }
  ],
  "shots": [
@@ -1088,7 +1477,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s02",
@@ -1118,7 +1510,7 @@
      "box": {
       "x": 60.0,
       "y": 433.6,
-      "w": 960.0,
+      "w": 820.0,
       "h": 212.8
      }
     }
@@ -1221,7 +1613,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s03",
@@ -1262,7 +1657,7 @@
      "box": {
       "x": 60.0,
       "y": 725.0,
-      "w": 960.0,
+      "w": 620.0,
       "h": 104.0
      }
     }
@@ -1392,7 +1787,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "offset",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s04",
@@ -1423,8 +1821,8 @@
      },
      "box": {
       "x": 60.0,
-      "y": 410.0,
-      "w": 960.0,
+      "y": 492.0,
+      "w": 450.0,
       "h": 96.0
      }
     },
@@ -1436,9 +1834,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
-      "y": 566.0,
-      "w": 960.0,
+      "x": 570.0,
+      "y": 488.0,
+      "w": 450.0,
       "h": 104.0
      }
     }
@@ -1547,7 +1945,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "split",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s05",
@@ -1570,9 +1971,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 293.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 330.0
      }
     },
@@ -1584,9 +1985,9 @@
       "tone": "bad"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 683.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 104.0
      }
     },
@@ -1597,7 +1998,7 @@
       "text": "BUG"
      },
      "box": {
-      "x": 751.2,
+      "x": 790.4,
       "y": 458.0,
       "w": 0.0,
       "h": 0.0
@@ -1711,7 +2112,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s06",
@@ -1893,7 +2297,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s07",
@@ -1916,7 +2323,7 @@
      "box": {
       "x": 60.0,
       "y": 403.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 110.0
      }
     },
@@ -1931,7 +2338,7 @@
      "box": {
       "x": 60.0,
       "y": 573.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 104.0
      }
     }
@@ -2034,7 +2441,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s08",
@@ -2068,9 +2478,9 @@
       ]
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 425.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 230.0
      }
     }
@@ -2185,7 +2595,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s09",
@@ -2315,7 +2728,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s10",
@@ -2342,7 +2758,7 @@
      "box": {
       "x": 60.0,
       "y": 362.0,
-      "w": 960.0,
+      "w": 620.0,
       "h": 96.0
      }
     },
@@ -2471,7 +2887,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "offset",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s11",
@@ -2519,7 +2938,7 @@
      "box": {
       "x": 60.0,
       "y": 294.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 492.0
      }
     }
@@ -2649,7 +3068,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s12",
@@ -2673,9 +3095,9 @@
       "value": "0"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 260.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 560.0
      }
     }
@@ -2783,7 +3205,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s13",
@@ -2933,7 +3358,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s14",
@@ -2970,7 +3398,7 @@
      "box": {
       "x": 60.0,
       "y": 390.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 300.0
      }
     }
@@ -3070,7 +3498,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_left",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s15",
@@ -3096,9 +3527,9 @@
       "right_note": "remembers"
      },
      "box": {
-      "x": 60.0,
+      "x": 200.0,
       "y": 330.0,
-      "w": 960.0,
+      "w": 820.0,
       "h": 420.0
      }
     }
@@ -3174,7 +3605,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "inset_right",
+   "camera": [],
+   "cursor": []
   },
   {
    "id": "s16",
@@ -3322,7 +3756,10 @@
      ],
      "source": "even"
     }
-   ]
+   ],
+   "arrangement": "column",
+   "camera": [],
+   "cursor": []
   }
  ]
 }

@@ -255,16 +255,21 @@ export const SIDE_BUBBLE = (library as unknown as {
                              pad_x: number; pad_y: number; line_h: number; chars: number; gap: number } } }
 }).frame.chat.bubble;
 
-export function sideBubbleHeight(text: string): number {
-  const b = SIDE_BUBBLE;
+/** Bubble sizes that differ by staging (library.json frame.board.chat). */
+export interface BubbleDims { font: number; line_h: number; chars: number; label_h: number; pad_y: number }
+
+export function sideBubbleHeight(text: string, dims?: BubbleDims): number {
+  const b = dims ?? SIDE_BUBBLE;
   return b.label_h + b.pad_y * 2 + bubbleLines(text, b.chars) * b.line_h;
 }
 
-export function SideBubble({ member, field, words, t, y, fade = 1 }: {
+export function SideBubble({ member, field, words, t, y, fade = 1, dims }: {
   member: CastMember; field: FieldName; t: number; y: number; fade?: number;
   words: { text: string; start: number; end: number; hl: boolean }[];
+  dims?: BubbleDims;
 }) {
-  const b = SIDE_BUBBLE;
+  const b = { ...SIDE_BUBBLE, ...(dims ?? {}) };
+  const font = dims?.font ?? BUBBLE.font;
   const th = theme(field);
   const left = member.side === "left";
   const tone = toneOn(member.identity, field);
@@ -284,7 +289,7 @@ export function SideBubble({ member, field, words, t, y, fade = 1 }: {
       <div data-bubble="" style={{ background: colours.bg, border: `3px solid ${border}`, borderColor: older ? "transparent" : undefined,
                     borderRadius: 30, borderTopLeftRadius: left ? 8 : 30, borderTopRightRadius: left ? 30 : 8,
                     padding: `${b.pad_y}px ${b.pad_x}px`, maxWidth: b.max_w, boxSizing: "border-box",
-                    fontFamily: FONT.body, fontWeight: 750, fontSize: BUBBLE.font, lineHeight: `${b.line_h}px`,
+                    fontFamily: FONT.body, fontWeight: 750, fontSize: font, lineHeight: `${b.line_h}px`,
                     color: colours.ink, letterSpacing: -0.3 }}>
         {words.map((w, i) => {
           const lit = !older && t >= w.start + Math.min(0.08, (w.end - w.start) / 3);

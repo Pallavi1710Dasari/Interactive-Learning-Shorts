@@ -1,0 +1,129 @@
+{
+ "short_id": "variable_points_to_value__motion",
+ "rev": 3,
+ "moments": 55,
+ "overlaps": [],
+ "aims": [
+  {
+   "t": 7.15,
+   "moment": "s03 settled",
+   "who": "right",
+   "target": "322,431",
+   "tip": "388,532",
+   "miss": 8
+  },
+  {
+   "t": 7.19,
+   "moment": "s03 caption 1",
+   "who": "right",
+   "target": "322,431",
+   "tip": "388,532",
+   "miss": 8
+  },
+  {
+   "t": 17.09,
+   "moment": "s04 middle",
+   "who": "right",
+   "target": "284,560",
+   "tip": "352,628",
+   "miss": 6
+  },
+  {
+   "t": 21.76,
+   "moment": "s04 end",
+   "who": "right",
+   "target": "263,324",
+   "tip": "379,506",
+   "miss": 15
+  },
+  {
+   "t": 22.84,
+   "moment": "s05 settled",
+   "who": "right",
+   "target": "282,396",
+   "tip": "376,532",
+   "miss": 11
+  },
+  {
+   "t": 23.32,
+   "moment": "s05 caption 1",
+   "who": "right",
+   "target": "282,396",
+   "tip": "376,532",
+   "miss": 11
+  },
+  {
+   "t": 25.56,
+   "moment": "s05 caption 2",
+   "who": "right",
+   "target": "282,396",
+   "tip": "374,531",
+   "miss": 11
+  },
+  {
+   "t": 26.06,
+   "moment": "s05 middle",
+   "who": "right",
+   "target": "597,396",
+   "tip": "599,400",
+   "miss": 2
+  },
+  {
+   "t": 30.2,
+   "moment": "s05 end",
+   "who": "right",
+   "target": "439,632",
+   "tip": "443,634",
+   "miss": 2
+  },
+  {
+   "t": 35.06,
+   "moment": "s06 middle",
+   "who": "right",
+   "target": "388,540",
+   "tip": "407,566",
+   "miss": 1
+  },
+  {
+   "t": 40.84,
+   "moment": "s07 settled",
+   "who": "right",
+   "target": "204,496",
+   "tip": "334,620",
+   "miss": 12
+  },
+  {
+   "t": 41.87,
+   "moment": "s07 caption 1",
+   "who": "right",
+   "target": "204,496",
+   "tip": "333,619",
+   "miss": 12
+  },
+  {
+   "t": 45.18,
+   "moment": "s07 middle",
+   "who": "right",
+   "target": "204,496",
+   "tip": "319,649",
+   "miss": 58
+  },
+  {
+   "t": 48.32,
+   "moment": "s07 caption 3",
+   "who": "right",
+   "target": "446,391",
+   "tip": "469,454",
+   "miss": 3
+  },
+  {
+   "t": 50.44,
+   "moment": "s07 end",
+   "who": "right",
+   "target": "446,391",
+   "tip": "468,452",
+   "miss": 3
+  }
+ ],
+ "screenshots": []
+}

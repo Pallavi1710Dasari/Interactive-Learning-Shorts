@@ -1020,6 +1020,49 @@ _APPROACH_GUIDANCE: dict[str, str] = {
         "clear, well-ordered explanation is the complete answer here, not a "
         "placeholder for something more elaborate."
     ),
+    "predict_then_reveal": (
+        "Before the answer, ask the viewer to predict it in one short line, "
+        "and give them the facts they need to reason it out — never a guess "
+        "from nowhere. Hold the question for a beat, then reveal the real "
+        "result and explain WHY it happens, so the surprise turns into the "
+        "rule."
+    ),
+    "misconception_repair": (
+        "Name the wrong mental model in the words learners actually use (the "
+        "material must support that it is a real belief), show the exact "
+        "point where it breaks, then replace it with the right model and "
+        "show the same example working under it. Never leave the wrong model "
+        "as the last thing said."
+    ),
+    "build_from_zero": (
+        "Start from nothing and add one piece per beat, each piece named in "
+        "plain words and justified by what the previous piece could not yet "
+        "do. The finished whole appears only at the end, built from the "
+        "parts the viewer has watched arrive."
+    ),
+    "worked_example_then_try": (
+        "Solve one concrete example from the material fully, step by step. "
+        "Then pose a near-identical one for the viewer in one line, pause, "
+        "and give its answer at the end using the same steps — the second "
+        "example checks the first was understood."
+    ),
+    "socratic_questions": (
+        "Move forward by questions: each beat asks one question whose answer "
+        "is the next step, until the learner reaches the idea themselves. "
+        "With two speakers the asker answers some of them; the questions are "
+        "real reasoning steps from the material, never rhetorical filler."
+    ),
+    "big_picture_then_zoom": (
+        "Open on the whole system in one sentence — every part named, none "
+        "explained — then zoom into the one part this reel is about and stay "
+        "there. Come back out once at the end to show where it sits."
+    ),
+    "step_by_step_trace": (
+        "Run the material's code line by line. At every line say what the "
+        "line does and what changes in the values, in that order, so the "
+        "viewer can follow a small trace table. The concept is the state "
+        "changing, so name the rule the trace shows once it has shown it."
+    ),
 }
 
 
@@ -2572,6 +2615,17 @@ def _theme_format_block(theme) -> str:
     return "\n".join(lines)
 
 
+def _walkthrough_theme_block(theme) -> str:
+    """The format a walkthrough theme adds on top of the walkthrough prompt:
+    what the reel is, its hook, and its one narrator."""
+    return "\n".join([
+        f"FORMAT — THEME: {theme.id} (on top of everything above: same chapters, same rules)",
+        theme.description.strip(),
+        f"Hook: {theme.hook.brief}",
+        "One narrator, talking to the viewer in the second person (\"you\", \"your\"). Never a dialogue.",
+    ])
+
+
 def _theme_beats_block(theme) -> str:
     from ..schema import MOTION_BEAT_ORDER
     lines = ["THE BEATS — every reel has these shots, in exactly this order:"]
@@ -2596,7 +2650,15 @@ def motion_system_for(template: str, theme=None) -> tuple[str, str]:
     (length, words, captions, code, visuals, icons) stays exactly as it is."""
     from ..motion_library import icon_names
     if template == "walkthrough":
-        return SYSTEM_MOTION_WALKTHROUGH, SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX
+        from ..motion_themes import registry
+        # every walkthrough theme uses the template's own beats; only the
+        # registry's walkthrough itself has no format of its own
+        if theme is None or theme.id == registry().fallback["walkthrough"]:
+            return SYSTEM_MOTION_WALKTHROUGH, SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX
+        # a walkthrough theme keeps the walkthrough's chapters and rules and
+        # adds its own format (the live code-along: the code is typed as it is said)
+        return (SYSTEM_MOTION_WALKTHROUGH + "\n\n" + _walkthrough_theme_block(theme),
+                SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX)
     system = SYSTEM_MOTION.replace("__ICONS__", ", ".join(sorted(icon_names())))
     if theme is None or theme.base:
         return system, SYSTEM_MOTION_HOOK_FIX

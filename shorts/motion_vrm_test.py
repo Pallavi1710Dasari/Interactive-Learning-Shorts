@@ -34,8 +34,13 @@ def _vrm_meta(path: Path) -> dict:
     return json.loads(b[20:20 + n])["extensions"]["VRMC_vrm"]
 
 
-def test_the_default_is_still_the_2d_rig_and_old_plans_keep_it():
-    assert config.MOTION_AVATARS == "rig"
+def test_the_default_is_vrm_and_old_plans_keep_the_2d_rig():
+    # VRM is the default for new reels since 2026-10-16 (MOTION_AVATARS=rig
+    # still switches back); staging alone never makes a plan 3D, so a plan
+    # made before keeps the rig it was made with
+    import os
+    if not os.getenv("MOTION_AVATARS"):
+        assert config.MOTION_AVATARS == "vrm"
     plan = motion_teach.stage_board(_plan())
     assert plan.avatars is None and all(t.vrm is None for t in plan.characters)
 

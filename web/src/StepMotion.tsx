@@ -58,6 +58,11 @@ const ASK: Record<string, [string, string]> = {
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
+/** "reel" or "video" (shorts/schema.py MotionFormat): what the job makes. */
+type Noun = "reel" | "video";
+/** A line said about a reel, said about a video instead. */
+const as = (text: string, noun: Noun) => noun === "reel" ? text : text.replace(/\breel\b/g, "video").replace(/\bReel\b/g, "Video");
+
 async function api<T>(url: string, body?: unknown): Promise<T> {
   let r: Response;
   try {
@@ -292,6 +297,7 @@ function Cast({ jobId, pick, setPick, onOpenVoice, version }: {
 function Choices2({ job, step, busy, onBack }: { job: Job; step: number; busy: boolean; onBack: (target: string) => void }) {
   const sum = job.summary ?? {};
   const o = job.options ?? {};
+  const noun: Noun = o.format === "video" ? "video" : "reel";
   const making = ["scenes", "voice", "timing", "done"].includes(job.stage);
   const rows: [string, number, string, string | undefined][] = [
     ["topic", 1, "Topic", sum.topic?.value],
@@ -303,7 +309,7 @@ function Choices2({ job, step, busy, onBack }: { job: Job; step: number; busy: b
   ];
   return (
     <aside className="mside">
-      <div className="mside-title">Your reel so far</div>
+      <div className="mside-title">Your {noun} so far</div>
       <ol className="mside-list">
         {rows.map(([k, idx, name, value]) => {
           const state = idx < step || job.status === "done" ? "done" : idx === step ? "now" : "next";
@@ -322,12 +328,39 @@ function Choices2({ job, step, busy, onBack }: { job: Job; step: number; busy: b
           );
         })}
       </ol>
-      <div className="mside-foot">{making ? "🔒 The reel is being made — choices are locked." : "Change any step until you approve the script."}</div>
+      <div className="mside-foot">{making ? `🔒 The ${noun} is being made — choices are locked.` : "Change any step until you approve the script."}</div>
     </aside>
   );
 }
 
 type Act = (action: string, o?: { reason?: string; choice?: unknown }) => void;
+
+/** A video's script to read: its opening, each chapter under its own
+ * heading, then the closing — every line, numbered through. */
+function VideoScript({ script }: { script: any }) {
+  const titles: Record<number, string> = Object.fromEntries((script.chapters ?? []).map((c: any) => [c.n, c.title]));
+  const groups: { key: string; title: string; shots: any[] }[] = [];
+  for (const sh of script.shots) {
+    const key = sh.chapter != null ? `c${sh.chapter}` : groups.length && groups[groups.length - 1].key !== "open" ? "close" : "open";
+    if (!groups.length || groups[groups.length - 1].key !== key)
+      groups.push({ key, title: sh.chapter != null ? `Chapter ${sh.chapter} · ${titles[sh.chapter] ?? ""}` : key === "open" ? "Opening" : "Closing", shots: [] });
+    groups[groups.length - 1].shots.push(sh);
+  }
+  let n = 0;
+  return <div className="mvscript">
+    {groups.map((g) => (
+      <section key={g.key}>
+        <h3>{g.title}</h3>
+        <ol className="mlines" start={n + 1}>
+          {g.shots.flatMap((sh: any) => sh.captions.map((c: any, i: number) => {
+            n += 1;
+            return <li key={`${sh.id}-${i}`}><Txt text={c.text.replace(/<\/?b>/g, "")} /></li>;
+          }))}
+        </ol>
+      </section>
+    ))}
+  </div>;
+}
 
 export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }: {
   jobId: string; onFinished: () => void;
@@ -383,7 +416,8 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
     const go = (f: () => void) => { autoDone.current = key; f(); };
     if (job.status === "options") {
       go(() => call(() => api(`/api/motion-jobs/${jobId}/start`, {
-        section: null, language: setup.language.recommended.value, characters: true, character: null })));
+        section: null, language: setup.language.recommended.value, characters: true, character: null,
+        format: job.options.format ?? "reel" })));
     } else if (job.stage === "scenes" && job.status === "preflight") {
       go(() => act("proceed"));
     } else if (job.stage === "scenes" && job.status === "review" && job.review?.passed) {
@@ -400,6 +434,7 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
   if (!job) return <div className="panel wide">{err ? <div className="error">{err}</div> : <div className="drafting"><Spinner label="Opening the reel…" /></div>}</div>;
 
   const step = stepIndex(job.stage, !!job.options.cast_confirmed);
+  const noun: Noun = job.options.format === "video" ? "video" : "reel";
   const key = MOTION_STEPS[step][0];
   const r = job.review;
   const done = job.status === "done";
@@ -415,7 +450,7 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
   } else if (job.status === "cap") {
     body = <ProblemBox p={{ title: "This step would go over the cost limit", what: job.message,
       lost: "Nothing you approved was lost, and nothing was charged for this step.",
-      next: "To continue, raise MAX_REEL_USD in the .env file and restart the server, then open this reel again.", action: "OK, stop here" }} />;
+      next: `To continue, raise ${noun === "video" ? "MAX_VIDEO_USD" : "MAX_REEL_USD"} in the .env file and restart the server, then open this ${noun} again.`, action: "OK, stop here" }} />;
     main = { label: "OK, stop here", run: () => act("stop") };
   } else if (job.status === "stopped") {
     body = <div className="outcome" style={{ fontSize: 14 }}>{job.message || "Paused."} Everything you chose is kept.</div>;
@@ -491,10 +526,12 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
           {failed.length > 0 && <ul className="mfails">{failed.map((x) => <li key={x.name}>{x.reason}</li>)}</ul>}</div>}
         {s && <>
           <div className="topic">{s.hook_question}</div>
-          <ol className="mlines">
+          {noun === "video" && <div className="hintline" style={{ marginBottom: 8 }}>
+            About {Math.round((s.estimated_seconds ?? 0) / 60)} minutes · {s.chapters?.length ?? 0} chapters · {s.shots.length} shots</div>}
+          {noun === "video" ? <VideoScript script={s} /> : <ol className="mlines">
             {s.shots.flatMap((sh: any) => sh.captions.map((c: any, i: number) => (
               <li key={`${sh.id}-${i}`}>{c.speaker && <span className="who">{c.speaker.toLowerCase()}</span>}<Txt text={c.text.replace(/<\/?b>/g, "")} /></li>)))}
-          </ol>
+          </ol>}
         </>}
         <div className="graders">
           {r.passed ? <span className="chip ok">✓ easy to follow, true to your material</span>
@@ -508,7 +545,7 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
       // the visuals are drawn next without asking again: their cost is said here
       const visuals = (setup?.estimate?.rows ?? []).filter((x: any) => String(x.label).startsWith("motion_scenes"))
         .reduce((n: number, x: any) => n + x.worst, 0);
-      main = { label: `Looks good — make the reel${job.stub || !visuals ? "" : ` (visuals up to ${money(visuals)}, voice free)`} →`,
+      main = { label: `Looks good — make the ${noun}${job.stub || !visuals ? "" : ` (visuals up to ${money(visuals)}, voice free)`} →`,
                run: () => act("approve"), disabled: !r.passed };
     }
   }
@@ -518,7 +555,7 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
       <div className="mprogress" aria-label={`step ${step + 1} of ${MOTION_STEPS.length}`}>
         {MOTION_STEPS.map(([k, name], i) => (
           <div key={k} className={`mdot ${i < step || done ? "done" : i === step ? "now" : ""}`}>
-            <span>{i < step || done ? "✓" : i + 1}</span><em>{name}</em>
+            <span>{i < step || done ? "✓" : i + 1}</span><em>{as(name, noun)}</em>
           </div>
         ))}
       </div>
@@ -527,19 +564,22 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
       <div className="mmain">
       {done ? (
         <div className="card approved mstepcard">
-          <h1>Your reel is ready 🎉</h1>
+          <h1>Your {noun} is ready 🎉</h1>
           <p className="lede">{job.summary.topic?.value ? <>It answers: <b><Txt text={job.summary.topic.value} /></b></> : null}</p>
           <div className="mrow">
-            <a className="primary big" href={`#reels/${job.short_id}`} data-testid="watch"
-               onClick={(e) => { e.preventDefault(); location.hash = `#reels/${job.short_id}`; location.reload(); }}>▶ Watch your reel</a>
+            {noun === "video"
+              ? <a className="primary big" href={`#motion-video/${job.short_id}`} data-testid="watch"
+                   onClick={(e) => { e.preventDefault(); location.hash = `#motion-video/${job.short_id}`; location.reload(); }}>▶ Watch your video</a>
+              : <a className="primary big" href={`#reels/${job.short_id}`} data-testid="watch"
+                   onClick={(e) => { e.preventDefault(); location.hash = `#reels/${job.short_id}`; location.reload(); }}>▶ Watch your reel</a>}
           </div>
           {job.message && <div className="error sm">{job.message}</div>}
         </div>
       ) : (
         <div className="card mstepcard" data-step={key}>
           <div className="mstepno">Step {step + 1} of {MOTION_STEPS.length}</div>
-          <h1>{ASK[key]?.[0]}</h1>
-          <p className="lede">{ASK[key]?.[1]}</p>
+          <h1>{as(ASK[key]?.[0] ?? "", noun)}</h1>
+          <p className="lede">{as(ASK[key]?.[1] ?? "", noun)}</p>
           <div className="mbody">{body}</div>
           {err && <div className="error">{err}</div>}
           <div className="mactions">
@@ -555,7 +595,7 @@ export function StepMotion({ jobId, onFinished, onOpenVoice, voiceVersion = 0 }:
       </div>
 
       <div className="mfoot">
-        From <b>{job.doc_name}</b> · this reel so far: <b>{money(job.cost.reel)}</b> of {money(job.cost.cap)} limit
+        From <b>{job.doc_name}</b> · {noun === "video" ? "a video, 6–12 min, 16:9" : "a reel"} · so far: <b>{money(job.cost.reel)}</b> of {money(job.cost.cap)} limit
         {job.stub && " · test mode: AI steps are free"}
         {job.status === "review" && !done && <button className="linkbtn" disabled={busy} onClick={() => act("skip")}>Stop here for now</button>}
       </div>

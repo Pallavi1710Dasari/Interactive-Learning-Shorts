@@ -120,6 +120,13 @@ def set_model_reasoning(mapping: dict[str, dict]) -> None:
     _MODEL_REASONING.update(mapping)
 
 
+#: The most output one NON-streaming request may ask for: the Anthropic SDK
+#: refuses a request it expects to run past 10 minutes (60 * 60 * max_tokens /
+#: 128000 > 600 s, i.e. over 21333 tokens) before sending anything. A long-form
+#: video's script is the one call that comes near it (2026-10-16).
+MAX_NONSTREAMING_TOKENS = 21000
+
+
 def thinking_budget(model: str) -> int:
     """Extra output tokens a configured model may spend thinking (0 if off or
     not configured). Added to max_tokens so the answer keeps its own room."""
@@ -334,7 +341,8 @@ def ask_json(
     for attempt in range(retries + 1):
         started = time.perf_counter()
         resp = client().messages.create(
-            model=model, max_tokens=budget + thinking_budget(model), system=_system(system, model),
+            model=model, max_tokens=min(budget + thinking_budget(model), MAX_NONSTREAMING_TOKENS),
+            system=_system(system, model),
             messages=messages,
             **_reasoning(model, think),
         )
@@ -348,7 +356,7 @@ def ask_json(
             last_err = ValueError(
                 f"empty response (stop_reason={resp.stop_reason}, "
                 f"output_tokens={resp.usage.output_tokens}, budget={budget})")
-            budget = min(budget * 2, 16000)
+            budget = max(budget, min(budget * 2, 16000))   # never smaller than asked
             messages = [{"role": "user", "content": content}]
             time.sleep(1)
             continue
@@ -371,7 +379,7 @@ def ask_json(
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
             last_err = e
             if resp.stop_reason == "max_tokens":
-                budget = min(budget * 2, 16000)      # truncated mid-JSON
+                budget = max(budget, min(budget * 2, 16000))      # truncated mid-JSON; never smaller
             messages = [
                 {"role": "user", "content": content},
                 {"role": "assistant", "content": raw[:4000]},

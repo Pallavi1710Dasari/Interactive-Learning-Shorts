@@ -1,9 +1,12 @@
 {
  "short_id": "audit_duo__motion",
  "template": "fix_story",
+ "format": "reel",
+ "width": 1080,
+ "height": 1920,
  "theme": "interview",
  "design": "classic",
- "rev": 3,
+ "rev": 4,
  "stage": null,
  "palette": null,
  "avatars": null,
@@ -183,6 +186,8 @@
    "label": "",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -358,6 +363,8 @@
    "label": "THE IDEA",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -494,6 +501,8 @@
    "label": "THE CODE",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -668,6 +677,8 @@
    "label": "WHY IT FAILS",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -826,6 +837,8 @@
    "label": "WHAT YOU SEE",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -993,6 +1006,8 @@
    "label": "HOW IT WORKS",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1178,6 +1193,8 @@
    "label": "THE FIX",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1322,6 +1339,8 @@
    "label": "THREE PARTS",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1476,6 +1495,8 @@
    "label": "THE RESULT",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1609,6 +1630,8 @@
    "label": "LOOK CLOSELY",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1768,6 +1791,8 @@
    "label": "THE SHELF",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1949,6 +1974,8 @@
    "label": "",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2086,6 +2113,8 @@
    "label": "IN MEMORY",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2239,6 +2268,8 @@
    "label": "HOW IT WORKS",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2379,6 +2410,8 @@
    "label": "THE FIX",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2486,6 +2519,8 @@
    "label": "AGAIN AND AGAIN",
    "layout": "duo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",

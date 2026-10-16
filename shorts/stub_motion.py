@@ -247,6 +247,92 @@ def _walkthrough(text: str, concept: str) -> dict:
     }
 
 
+# ================================================================== video
+
+#: Plain stub lines for a long video's chapter shots: short, beginner-level,
+#: no numbers and no technical terms, so every free grader accepts them.
+_VIDEO_LINES = (
+    "Here is the part that matters most.", "Take it slowly and watch each change.",
+    "Each piece has its own small job.", "Then the next piece takes over from there.",
+    "Look at what stays the same.", "Now look at what has changed.",
+    "This is where most people get stuck.", "Keep this picture in your head.",
+    "It helps to say it out loud.", "You can check it with a tiny test.",
+    "The rule is short and easy to keep.", "Try it once and it will stick.",
+    "Notice how the shape of it grows.", "Nothing here is magic at all.",
+    "We build it up one small step at a time.", "Every step leans on the step before.",
+    "So far the idea holds up well.", "Here is a small case to try.",
+    "Watch the left side and then the right.", "The same idea works in a new place.",
+    "A common slip is to skip this part.", "When that happens the result looks wrong.",
+    "The fix is to go back one step.", "Now it works the way you want.",
+    "Use it when the task fits this shape.", "Leave it out when a simple way is enough.",
+    "That is the whole trick in plain words.", "Let's link this to the next part.",
+)
+_VIDEO_TITLES = ("The problem it solves", "The core idea", "How it starts", "How it grows",
+                 "A second example", "Common mistakes")
+_STEP_WORDS = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+
+
+def _video(text: str, concept: str) -> dict:
+    """A stub long-form video (format "video"): the walkthrough's beats with
+    six chapters of seven shots, about seven minutes spoken. The first three
+    chapters carry the running example; the rest teach with their own."""
+    sp, sh = spoken(concept), shown(concept)
+    mine = iter(_plain_sentences(text, concept))
+    pool = iter(_VIDEO_LINES * 8)
+
+    def line() -> str:
+        return next(mine, None) or next(pool)
+
+    state = [concept]
+    shots = [
+        ("hook", ["How does this really work under the hood?",
+                  "Once you see it, you will use it every day."], None, None),
+        ("name_it", [f"This is called {sp}."], None, None),
+        ("example", [f"Let's follow one example, {sp}.", "Watch what each step does to it."],
+         None, state),
+    ]
+    chapters = []
+    for n, title in enumerate(_VIDEO_TITLES, start=1):
+        carries = n <= 3
+        chapters.append({"n": n, "title": title, "example_in": state if carries else [],
+                         "example_out": state if carries else []})
+        shots.append(("chapter_card", [f"Step {_STEP_WORDS[n - 1]}. {title}."], n, None))
+        for k in range(7):
+            shots.append(("chapter", [line(), line(), line()], n,
+                          state if carries and k in (0, 6) else None))
+    shots += [
+        ("result", ["So the example went from start to finish, one step at a time."], None, state),
+        ("takeaway", [f"So reach for {sp} when you need this to work."], None, None),
+        ("recap", [f"{sp} in six steps, from the start to the finish."], None, state),
+        ("cta", ["Follow for more, one idea at a time."], None, None),
+    ]
+    out = []
+    for beat, said, chapter, example in shots:
+        caps = [x.replace(sp, sh) if sp != concept else x for x in said]
+        out.append({"beat": beat, "chapter": chapter, "speech": " ".join(said),
+                    "captions": caps, "example": example or [], "code": [],
+                    "visual": f"Stub scene for the {beat.replace('_', ' ')}."})
+    return {
+        "hook_question": "How does this really work under the hood?", "concept_name": concept,
+        "promise": "Step by step, in depth",
+        "icon_vocabulary": [], "takeaways": [],
+        "running_example": {"text": concept, "items": state},
+        "chapters": chapters,
+        "shots": out,
+    }
+
+
+def video_draft(user: str, theme_id: str | None) -> dict:
+    """A MotionScriptDraft (as a dict) for a long-form video of `user`'s material."""
+    from .motion_themes import registry
+    theme = registry().get(theme_id) if theme_id else None
+    text = material_of(user)
+    body = _video(text, pick_concept(text))
+    for i, x in enumerate(body["shots"], start=1):
+        x["id"] = f"s{i:02d}"
+    return _with_speakers(body, theme)
+
+
 # ================================================================ speakers
 
 def _with_speakers(draft: dict, theme) -> dict:

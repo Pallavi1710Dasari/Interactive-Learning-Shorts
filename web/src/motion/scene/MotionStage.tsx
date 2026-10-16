@@ -39,12 +39,13 @@ import { CameraLayer, CursorLayer } from "../camera";
 import { STUDIO_DUR, STUDIO_TRANSITIONS, SectionRibbon, StudioBackground, StudioTransition, TimelineThread } from "../studio";
 import { STUDIO, applyPalette } from "../tokens";
 import { MIDNIGHT_STUDIO_VARS } from "../designs";
-import { BoardCharacters } from "../cast/ReelCharacters";
+import { BoardCharacters, presenceAt } from "../cast/ReelCharacters";
 import { BOARD, boardMap } from "../cast/teach";
 import { VrmCast } from "../vrm/VrmCast";
 import library from "../library.json";
 import { designOf, designVars } from "../designs";
 import { LabBackground, LabCamera, ZOOM_DUR, ZoomThrough } from "../lab";
+import { VideoStage } from "../video/VideoFrame";
 
 const FRAME = (library as {
   frame: { chat: { top: number; bottom: number }; badge: { x: number; y: number } }
@@ -337,7 +338,8 @@ export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
     : shot.transition === "type_scatter" ? "iris" : null;
   const zoom = design.transition === "zoom_through";
   const studioMove = design.transition === "studio" && kind ? STUDIO_TRANSITIONS[shot.transition] : null;
-  const transitioning = prev && kind && into < (zoom ? ZOOM_DUR : studioMove ? STUDIO_DUR : TRANSITION_DUR);
+  const transDur = prev && kind ? (zoom ? ZOOM_DUR : studioMove ? STUDIO_DUR : TRANSITION_DUR) : 0;
+  const transitioning = prev && kind && into < transDur;
   const full = shot.objects.some((o) => FULL_KINDS.has(o.kind));
   // rev 2: a recap's cards carry its words, so the caption does not repeat them
   const cardCaption = !shot.objects.some((o) => o.kind === "title_card" || o.kind === "end_card"
@@ -359,13 +361,19 @@ export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
       ) : (
         <ShotContent plan={plan} index={i} t={t} />
       )}
-      {onBoard(plan, shot) && plan.avatars === "vrm" && (
+      {/* the 3D cast stays mounted on a board reel (its models load once) and
+          comes and goes with the shots it is on (presenceAt) */}
+      {plan.stage === "board" && plan.avatars === "vrm" && (
         <VrmCast plan={plan} t={t}
-                 opacity={transitioning && !charactersOn(plan, prev!) ? clamp(into / (zoom ? ZOOM_DUR : TRANSITION_DUR)) : 1} />
+                 presence={rev(plan) >= 4 ? presenceAt(plan, i, t, transDur)
+                   : !onBoard(plan, shot) ? 0
+                   : transitioning && !charactersOn(plan, prev!) ? clamp(into / (zoom ? ZOOM_DUR : TRANSITION_DUR)) : 1}
+                 slide={rev(plan) >= 4} />
       )}
       {onBoard(plan, shot) && plan.avatars !== "vrm" && (
         <BoardCharacters plan={plan} t={t}
-                         opacity={transitioning && !charactersOn(plan, prev!) ? clamp(into / (zoom ? ZOOM_DUR : TRANSITION_DUR)) : 1} />
+                         opacity={rev(plan) >= 4 ? presenceAt(plan, i, t, transDur)
+                           : transitioning && !charactersOn(plan, prev!) ? clamp(into / (zoom ? ZOOM_DUR : TRANSITION_DUR)) : 1} />
       )}
       {charactersOn(plan, shot) && !onBoard(plan, shot) && (
         <ReelCharacters plan={plan} t={t} field={shot.field}
@@ -382,7 +390,9 @@ export function MotionFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
   );
 }
 
-/** The frame scaled to a screen width. */
+/** The frame scaled to a screen width: a reel's 1080 x 1920 frame, or a
+ * video's 1920 x 1080 one (video/VideoFrame.tsx). */
 export function MotionStage({ plan, t, width }: { plan: MotionPlan; t: number; width: number }) {
+  if (plan.format === "video") return <VideoStage plan={plan} t={t} width={width} />;
   return <Fit width={width}><MotionFrame plan={plan} t={t} /></Fit>;
 }

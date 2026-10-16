@@ -2999,6 +2999,13 @@ class QuestionWorkflow(BaseModel):
 MotionTemplate = Literal["fix_story", "walkthrough"]
 MOTION_TEMPLATES: tuple[str, ...] = get_args(MotionTemplate)
 
+#: What the job makes (2026-10-16): a "reel" (vertical, 40-120 s, as before)
+#: or a "video" — a long-form landscape lesson (16:9, 6-12 minutes) on the
+#: walkthrough's beats with many more chapters (checks.MOTION_VIDEO holds its
+#: limits). A file written before formats existed is a reel.
+MotionFormat = Literal["reel", "video"]
+MOTION_FORMATS: tuple[str, ...] = get_args(MotionFormat)
+
 #: Every beat either template uses. hook, recap and cta are shared.
 MotionBeat = Literal["hook", "title", "setup", "break_1", "break_2", "fix_idea",
                      "fix_flow", "code_map", "payoff", "recap", "cta",
@@ -3121,6 +3128,9 @@ class MotionScene(BaseModel):
     field: Literal["navy", "blue", "paper", "yellow"] = "paper"
     transition: str = "cut"
     label: str = ""
+    #: The presenters on this shot: "on", "off", or "" for the default
+    #: (motion_teach.avatar_presence; a visual-heavy shot is always off).
+    avatars: Literal["", "on", "off"] = ""
     objects: list[MotionSceneObject] = Field(default_factory=list)
     actions: list[MotionSceneAction] = Field(default_factory=list)
 
@@ -3172,6 +3182,12 @@ class MotionHookFix(BaseModel):
     visual: str = ""
 
 
+class MotionShotsFix(BaseModel):
+    """A video's targeted repair (skills.script.repair_video_shots): the
+    rewritten shots, and nothing else."""
+    shots: list[MotionShot]
+
+
 class MotionScript(BaseModel):
     """A motion reel's script, persisted as output/<short_id>.motion.json.
 
@@ -3181,6 +3197,8 @@ class MotionScript(BaseModel):
     explainer JSON written from now on, and explainer output must stay
     byte-identical."""
     reel_style: Literal["motion"] = "motion"
+    #: "reel" or "video" (MotionFormat). A video is always a walkthrough.
+    format: MotionFormat = "reel"
     #: Which script template this reel follows — chosen from the approved
     #: teaching approach in motion_reel, overridable by the reviewer. The
     #: default keeps every phase 1 script valid as the fix_story it was.
@@ -3375,6 +3393,14 @@ class MotionPlacedObject(BaseModel):
     box: Optional[MotionBox] = None  #: None for full-frame, overlay and link kinds
 
 
+class MotionView(BaseModel):
+    """A video shot's mapping (shorts/motion_video.py): src, a region of the
+    1080x1920 layout, drawn into dst on the 1920x1080 frame at scale s."""
+    src: list[float]
+    dst: list[float]
+    s: float
+
+
 class MotionShotPlan(BaseModel):
     id: str
     beat: str
@@ -3388,6 +3414,12 @@ class MotionShotPlan(BaseModel):
     #: The animated characters show on this shot (plan.characters non-empty,
     #: not a full-frame card, and the objects laid out above their region).
     characters: bool = False
+    #: The scene's own avatars choice (MotionScene.avatars), kept for staging.
+    avatars: str = ""
+    #: A video's shot only (shorts/motion_video.py): the region of the reel
+    #: layout [x, y, w, h] its visual is drawn from, and the landscape rect it
+    #: is drawn into — one uniform scale. None on a reel.
+    view: Optional["MotionView"] = None
     objects: list[MotionPlacedObject]
     actions: list[MotionActionTiming]
     captions: list[MotionCaptionTiming]
@@ -3474,6 +3506,11 @@ class MotionPlan(BaseModel):
     The player is a pure function of (plan, t)."""
     short_id: str
     template: str
+    #: "reel" (1080x1920) or "video" (1920x1080, web/src/motion/video). The
+    #: frame size the player and the renderer draw it at.
+    format: MotionFormat = "reel"
+    width: int = 1080
+    height: int = 1920
     theme: Optional[str] = None
     #: The look the player draws the reel in (config.MOTION_DESIGNS); a plan
     #: written before designs existed has none and is "classic".

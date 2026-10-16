@@ -11,13 +11,14 @@ Phase 1 — used only when a caller explicitly asks for it (config.REEL_STYLE ==
 "story"). The two prompts are independent; nothing in SYSTEM_EXPLAINER changed to
 make room for SYSTEM_STORY.
 """
+import json
 import re
 
 from ..schema import (Script, Topic, Section, SectionUnderstanding, QuestionWorkflow,
                       QuestionFraming, TeachingApproach,
                       Character, ConceptMapping, ConceptMappingSet, Shot, StoryScript,
                       StoryShotsSet, HookLineOnly,
-                      MotionScript, MotionScriptDraft, MotionHookFix, MOTION_TEMPLATES,
+                      MotionScript, MotionScriptDraft, MotionHookFix, MotionShotsFix, MOTION_TEMPLATES,
                       MIN_SECONDS, MAX_SECONDS, WORDS_PER_SECOND)
 from ..llm import ask_json
 from .. import revision, checks, config, motion_repair
@@ -2550,6 +2551,121 @@ Return JSON:
 }"""
 
 
+#: A long-form landscape VIDEO (format "video", 2026-10-16): the walkthrough's
+#: beats, 6-12 minutes, 5-10 chapters, explained in depth. Its limits are
+#: checks.MOTION_VIDEO; every other rule is the walkthrough's own.
+SYSTEM_MOTION_VIDEO = """You write the script for ONE long-form teaching VIDEO (6 to 12 minutes,
+landscape, like a YouTube lesson) that teaches ONE topic from the material below in depth:
+what it is, why it matters, how it works step by step, worked examples, the mistakes
+beginners make, and how to use it in practice.
+
+FORMAT
+One narrator, a friendly mentor talking to the viewer in the second person ("you",
+"your"). Never a dialogue, no speaker labels. The hook asks the question. Inside a
+chapter you may ask at most ONE short rhetorical question (at most 6 words), answered by
+the very next sentence. Every other sentence is a plain statement.
+
+THE BEATS — in exactly this order:
+  hook          A curiosity question opening with why, what or how ("Why does...",
+                "How does...", "What happens when..."), then why it matters to the viewer,
+                in a sentence that is not a question. Never name the concept. 10 to 25 words.
+  name_it       Name the concept: "This is called ...". 3 to 10 words.
+  example       Introduce the ONE running example: "Let's follow one example: ...".
+  then 5 to 10 CHAPTERS, each:
+    chapter_card  "Step one. <the chapter title, short>." 3 to 7 words. Its caption may be
+                  that one line: the "Step one." label is not counted as a sentence.
+    chapter       2 to 8 shots that teach this chapter fully.
+  result        The before and after of the running example.
+  takeaway      One practical rule the viewer can use.
+  recap         "<concept> in <n> steps: ..." naming each chapter, in one or two sentences.
+  cta           "Follow for more" plus the next topic. 6 to 12 words.
+
+A GOOD ARC FOR THE CHAPTERS (adapt it to the material; skip what the material cannot
+support, never invent facts to fill it):
+  1. The problem it solves — what goes wrong or is hard without it.
+  2. The core idea, in plain words, with an everyday comparison.
+  3-6. How it works, one step per chapter, on the running example.
+  then: a second worked example (a different, small case), the common mistakes and how
+  to spot them, and when to use it (and when not to).
+
+DEPTH
+- This is a lesson, not a reel: explain every step fully, show it on an example, then say
+  why it works. Repeat the key idea in new words when a chapter builds on it.
+- Every chapter ends with one sentence that links to the next chapter.
+
+THE RUNNING EXAMPLE
+- running_example.text is the example as the example shot says it; running_example.items
+  is its starting state as a list (one item per word, token or value).
+- The "how it works" chapters carry it: for each of them, example_in is the state before
+  and example_out after, chained — the first such chapter's example_in is
+  running_example.items, and each next one's example_in is EXACTLY the previous one's
+  example_out. Every chapter shot that shows it sets `example` to the state at the END of
+  that shot (its chapter's example_in or example_out; the last one shown is example_out).
+- Chapters that teach with their own small example (the problem, a second example, the
+  mistakes) leave example_in and example_out EMPTY and never set `example`.
+- The result and recap shots show the final state of the last chapter that carries it.
+- Give every chapter_card and chapter shot its chapter number in `chapter` (1, 2, ...).
+
+LENGTH
+- 936 to 1872 spoken words in total (6 to 12 minutes spoken). Aim for what the material
+  can support in depth; 12 minutes is a CAP. Never pad, never repeat a shot.
+- Every chapter: at most 300 spoken words, card included.
+- Every shot: 8 to 45 words, except name_it and chapter_card (3 or more).
+- Short spoken sentences. Contractions are fine.
+
+WORDS
+- Beginner language. No word longer than 4 syllables, except the concept's own name and
+  at most 8 other terms the material uses — each explained in plain words in the same
+  sentence ("..., called its vocabulary").
+- The viewer is a beginner with NO programming background. Short sentences (aim for 8-12
+  words), everyday words, about a grade 7 reading level.
+- Explain every technical term the first time you say it, in the same sentence or the
+  very next one, in plain words. TECHNICAL TERMS in the material block lists the ones it uses.
+- Every claim about the concept must be supported by the MATERIAL. concept_name is written
+  exactly as the material writes it. You MAY add your own small worked examples, everyday
+  comparisons and the mistakes beginners make, as long as they agree with the material and
+  add no new facts (no numbers, versions, names or rules the material does not state).
+- The explanation — every step, the running example — comes from MATERIAL. When a
+  SUPPORTING MATERIAL block is given, take only numbers and defined terms from it.
+- Every number you say must be one the MATERIAL states, a count of the running example's
+  own items, or a value your own example code shows.
+
+SPEECH AND CAPTIONS ARE SEPARATE FIELDS
+- speech: what the narrator says, spelled for text-to-speech. Write code as words.
+- captions: the SAME words as speech, in the same order — not a paraphrase. Code and
+  tokens are shown as they really are (`[CLS]`, `##ken`).
+- ONE CAPTION PER SPOKEN SENTENCE, ending in its own . ! or ?, at most 14 words, never
+  splitting a code token. At most 2 <b>...</b> highlights per caption. No other tags.
+
+CODE
+Only chapter shots may show code, in `code`: at most 10 shots, at most 4 lines each, each
+at most 30 characters. Show code when the material is about code; a worked example in
+code is the best way to teach it.
+
+VISUAL
+For every shot, `visual` is ONE line saying what is on screen: the colour field (navy,
+blue, paper or yellow — the field changes at chapter changes), the objects (kinetic
+title, chapter card, token row of chips, YES/NO tags, a stamp, a code window, a lookup
+grid, a lookup table, a flow of steps, a compare card, a big counter, a bracket or
+callout, the recap grid), and what moves. Vary the visuals from shot to shot.
+
+Return JSON:
+{
+  "hook_question": "the hook's question, ending in ?",
+  "concept_name": "exactly as the material writes it",
+  "promise": "one line, at most 6 words",
+  "running_example": {"text": "...", "items": ["..."]},
+  "chapters": [{"n": 1, "title": "at most 6 words", "example_in": [], "example_out": []}, ...],
+  "shots": [
+    {"id": "s01", "beat": "hook", "speech": "...", "captions": [{"text": "..."}],
+     "visual": "...", "code": []},
+    {"id": "s04", "beat": "chapter_card", "chapter": 1, "speech": "...", ...},
+    {"id": "s05", "beat": "chapter", "chapter": 1, "speech": "...", "example": [], ...},
+    ...
+  ]
+}"""
+
+
 #: The walkthrough's hook repair — same narrow contract as SYSTEM_MOTION_HOOK_FIX.
 SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX = """You are rewriting ONLY the opening hook shot of a short
 teaching reel that walks through how something works. Every other shot is final and
@@ -2642,13 +2758,20 @@ def _theme_beats_block(theme) -> str:
     return "\n".join(lines)
 
 
-def motion_system_for(template: str, theme=None) -> tuple[str, str]:
+def motion_system_for(template: str, theme=None, fmt: str = "reel") -> tuple[str, str]:
     """The (script, hook-fix) system prompts for a template and theme. A base
     theme (classic_explainer, step_by_step_walkthrough) or no theme gets its
     template's own prompts, unchanged. Any other theme gets SYSTEM_MOTION with
     its FORMAT and THE BEATS replaced by the theme's — every other rule
     (length, words, captions, code, visuals, icons) stays exactly as it is."""
     from ..motion_library import icon_names
+    if fmt == "video":
+        # a video is a walkthrough: its own length and depth, the theme's format on top
+        from ..motion_themes import registry
+        system = SYSTEM_MOTION_VIDEO
+        if theme is not None and theme.id != registry().fallback["walkthrough"]:
+            system += "\n\n" + _walkthrough_theme_block(theme)
+        return system, SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX.replace("8 to 16 words", "10 to 25 words")
     if template == "walkthrough":
         from ..motion_themes import registry
         # every walkthrough theme uses the template's own beats; only the
@@ -2770,7 +2893,8 @@ def regenerate_motion_hook(script: MotionScript, material: str, source_text: str
     passes, else (None, the last results)."""
     from ..motion_themes import registry
     hook = script.shots[0]
-    _, system = motion_system_for(script.template, registry().get(script.theme))
+    _, system = motion_system_for(script.template, registry().get(script.theme),
+                                  getattr(script, "format", "reel"))
     feedback = "; ".join(r.reason for r in results if not r.passed)
     for _ in range(config.MAX_MOTION_HOOK_FIX_RETRIES):
         user = (material +
@@ -2791,6 +2915,85 @@ def regenerate_motion_hook(script: MotionScript, material: str, source_text: str
             return candidate, results
         motion_repair.save_rejected(candidate, results, kind="hook_fix")
         feedback = "; ".join(r.reason for r in results if not r.passed)
+    return None, results
+
+
+#: A video's targeted repair: rewrite only the shots the checks named.
+SYSTEM_MOTION_VIDEO_SHOT_FIX = """You are REPAIRING some shots of a long-form teaching video script.
+Every other shot is final and not yours to change. Each shot below failed review for the
+reason given: rewrite it so it passes, and keep it doing the same job in the lesson.
+
+- Keep each shot's id, beat and chapter exactly as given. Keep its example and code unless
+  the reason is about them.
+- Every rule of the script still holds: beginner words (no word over 4 syllables unless the
+  material uses it and the same sentence explains it), short sentences, every claim supported
+  by the MATERIAL, every number one the material states.
+- speech is spelled for text-to-speech (code written as words). captions are the SAME words
+  in the same order: ONE caption per spoken sentence, ending in . ! or ?, at most 14 words,
+  at most 2 <b>...</b> highlights.
+- Keep each shot about as long as it was (8 to 45 words) unless the reason is its length.
+
+Return JSON: {"shots": [{"id": "...", "beat": "...", "chapter": ..., "speech": "...",
+"captions": [{"text": "..."}], "example": [...], "code": [...], "visual": "..."}, ...]}
+— only the shots you were asked to repair."""
+
+
+def _failing_shot_ids(results: list) -> list[str] | None:
+    """The shots every failure names, or None when a failure is not about
+    particular shots (the whole length, the chapter list, the beat order) —
+    then only a full rewrite can fix it."""
+    ids: list[str] = []
+    for r in results:
+        if r.passed:
+            continue
+        shots = (r.details or {}).get("shots") if hasattr(r, "details") else None
+        if not shots or (r.name == "motion_word_budget" and not r.details.get("length_ok", True)):
+            return None
+        ids += [s for s in shots if s not in ids]
+    return ids or None
+
+
+def repair_video_shots(script: MotionScript, material: str, results: list, grade,
+                       rounds: int | None = None) -> tuple[MotionScript | None, list]:
+    """A video script's targeted repair: rewrite ONLY the shots the failing
+    checks name, up to config.MAX_VIDEO_SHOT_FIX_ROUNDS times, regrading the
+    whole script after each. Returns (the passing script, its results), or
+    (None, the last results) when a failure is not about particular shots or
+    the rounds run out."""
+    rounds = config.MAX_VIDEO_SHOT_FIX_ROUNDS if rounds is None else rounds
+    for _ in range(rounds):
+        ids = _failing_shot_ids(results)
+        if not ids:
+            return None, results
+        by_id = {s.id: s for s in script.shots}
+        reasons: dict[str, list[str]] = {}
+        for r in results:
+            if not r.passed:
+                for sid in (r.details or {}).get("shots", []):
+                    reasons.setdefault(sid, []).append(f"{r.name}: {r.reason}")
+        todo = [by_id[i] for i in ids if i in by_id]
+        user = (material
+                + "\n\nTHE WHOLE SCRIPT (final apart from the shots below — do not contradict it):\n"
+                + "\n".join(f"  {s.id} {s.beat}{f' (chapter {s.chapter})' if s.chapter else ''}: {s.speech}"
+                            for s in script.shots)
+                + "\n\nTHE SHOTS TO REWRITE (JSON):\n"
+                + json.dumps([s.model_dump(exclude={"scene", "estimated_seconds"}) for s in todo],
+                             ensure_ascii=False)
+                + "\n\nWHY EACH FAILED:\n"
+                + "\n".join(f"- {sid}: {'; '.join(reasons.get(sid, []))[:1200]}" for sid in ids))
+        fix = ask_json(SYSTEM_MOTION_VIDEO_SHOT_FIX, user, MotionShotsFix,
+                       max_tokens=min(16000, 1200 + 450 * len(todo)), label="motion_shot_fix")
+        new = {s.id: s for s in fix.shots if s.id in by_id and s.id in ids}
+        shots = [by_id[s.id].model_copy(update={
+                     "speech": new[s.id].speech, "captions": new[s.id].captions,
+                     "example": new[s.id].example, "code": new[s.id].code,
+                     "visual": new[s.id].visual or by_id[s.id].visual})
+                 if s.id in new else s for s in script.shots]
+        script = script.model_copy(update={"shots": shots})
+        results = grade(script)
+        if checks.all_passed(results):
+            return script, results
+        motion_repair.save_rejected(script, results, kind="shot_fix")
     return None, results
 
 
@@ -2835,9 +3038,12 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                         template: str = "fix_story",
                         supporting_text: str = "",
                         theme: str | None = None,
-                        language: str | None = None) -> tuple[MotionScript | None, list]:
+                        language: str | None = None,
+                        fmt: str = "reel") -> tuple[MotionScript | None, list]:
     """
     Write and grade a motion script in `template` (fix_story or walkthrough).
+    `fmt` "video" writes a long-form landscape video (always a walkthrough:
+    SYSTEM_MOTION_VIDEO, checks.MOTION_VIDEO's limits).
     `source_text` is the selected section's own evidence — where the
     explanation comes from. `supporting_text` (a walkthrough's other session
     sections) may supply only numbers and defined terms; the graders accept
@@ -2867,10 +3073,14 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
         if spec.template != template:
             raise ValueError(f"theme {theme!r} is a {spec.template} theme, not {template}")
     series = config.MOTION_SERIES if series is None else series
-    system, _ = motion_system_for(template, spec)
+    if fmt == "video" and template != "walkthrough":
+        raise ValueError("a video is always a walkthrough")
+    system, _ = motion_system_for(template, spec, fmt)
     material = _motion_material_block(topic, section, understanding, source_text,
                                       approach, series, next_topic, template,
                                       supporting_text, spec)
+    if fmt == "video":
+        material = "FORMAT: video (6 to 12 minutes, landscape)\n" + material
     source_text, main_text, selected_text = _motion_grading_texts(
         section, source_text, supporting_text, template)
     user = material
@@ -2880,11 +3090,16 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
                                                 selected_text=selected_text, approach=approach)
 
     results: list = []
-    for _ in range(config.MAX_MOTION_SCRIPT_RETRIES):
-        draft = ask_json(system, user, MotionScriptDraft, max_tokens=6000,
+    attempts = config.MAX_VIDEO_SCRIPT_ATTEMPTS if fmt == "video" else config.MAX_MOTION_SCRIPT_RETRIES
+    for _ in range(attempts):
+        # a video's 6-12 minutes of speech, captions and visual lines need the room
+        draft = ask_json(system, user, MotionScriptDraft,
+                         max_tokens=18000 if fmt == "video" else 6000,
                          label="motion_script")
         script = _assemble_motion(draft, topic, section, short_id, series, next_topic,
                                   template, spec, language)
+        if fmt == "video":
+            script = script.model_copy(update={"format": "video"})
         results = checks.run_motion_script_graders(script, source_text, main_text=main_text,
                                                    selected_text=selected_text, approach=approach)
         if checks.all_passed(results):
@@ -2899,6 +3114,15 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
             fixed, fixed_results = regenerate_motion_hook(script, material, source_text, results,
                                                           main_text, selected_text, approach)
             if fixed is not None:
+                return fixed, fixed_results
+            results = fixed_results
+        elif fmt == "video" and _failing_shot_ids(results):
+            # only some shots failed: rewrite those, not the whole 6-12 minutes
+            fixed, fixed_results = repair_video_shots(script, material, results, grade)
+            if fixed is not None:
+                print("  repaired the failing shots only: "
+                      + ", ".join(sorted({sid for r in results if not r.passed
+                                          for sid in (r.details or {}).get("shots", [])})))
                 return fixed, fixed_results
             results = fixed_results
         reasons = "; ".join(r.reason for r in results if not r.passed)

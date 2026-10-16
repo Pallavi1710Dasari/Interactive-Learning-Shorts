@@ -194,8 +194,10 @@ def total_seconds(clocks: list[ShotClock]) -> float:
 _SOURCE_RANK = {"forced_alignment": 2, "whisper": 1, "even": 0}
 
 #: The layout rules a new plan is drawn by (MotionPlan.rev). 3: the studio
-#: look (palettes, type, cards, chrome) and the layout arrangements.
-PLAN_REV = 3
+#: look (palettes, type, cards, chrome) and the layout arrangements. 4: the
+#: presenters come and go per shot (motion_teach.avatar_presence), sliding in
+#: and out at the shot's edges.
+PLAN_REV = 4
 
 
 def palette_for(theme: str | None, design: str) -> str | None:
@@ -258,7 +260,7 @@ def build_plan(script: MotionScript, clocks: list[ShotClock], audio: str | None 
         shots.append(MotionShotPlan(
             id=shot.id, beat=shot.beat, chapter=shot.chapter, start=clock.start, end=clock.end,
             field=shot.scene.field, transition=shot.scene.transition, label=shot.scene.label,
-            layout="duo" if duo else "solo", characters=shown,
+            layout="duo" if duo else "solo", characters=shown, avatars=shot.scene.avatars,
             objects=layout_scene(shot.scene, duo=duo or shown, arrangement=arrangement), arrangement=arrangement,
             actions=actions, captions=clock.captions))
     from .motion_identities import identity, languages

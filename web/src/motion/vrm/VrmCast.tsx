@@ -13,33 +13,55 @@ import type { VRM } from "@pixiv/three-vrm";
 import type { MotionPlan } from "../scene/types";
 import type { CharacterTrack } from "../cast/performance";
 import { poseOf } from "../cast/performance";
-import { performanceFor } from "../cast/ReelCharacters";
+import { PRESENCE_SLIDE, performanceFor } from "../cast/ReelCharacters";
 import { toStage } from "../cast/teach";
 import { bulbAt } from "../cast/teach";
-import { loadVrm } from "./load";
+import { fingerprintOf, loadVrm, track as trackAsset } from "./load";
+import { STUDENT_LOOK, applyLook } from "./looks";
 import { armPrograms, faceAt, measureRest, poseArm, visemes } from "./pose3d";
 import library from "../library.json";
 import { clamp, ease, lerp, seg } from "../time";
 
 type Box = { x: number; y: number; w: number; h: number; yaw: number; body_x?: number };
-const VRM_STAGE = (library as unknown as { frame: { board: { vrm: Record<string, Box> } } }).frame.board.vrm;
+const FRAMES = (library as unknown as { frame: { board: { vrm: Record<string, Box> }; video: { vrm: Record<string, Box> } } }).frame;
+const VRM_STAGE = FRAMES.board.vrm;
+/** a VIDEO's canvases (library.json frame.video.vrm): the mentor right of the board */
+const VRM_VIDEO = FRAMES.video.vrm;
 
 /** Which model a track wears and where it stands. */
-function slotOf(track: CharacterTrack, n: number): { file: string; box: Box; boardSide: "left" | "right" } {
+function slotOf(track: CharacterTrack, n: number, video = false): { file: string; box: Box; boardSide: "left" | "right" } {
   const t = track as unknown as { vrm?: string };
-  if (n === 1 || track.side !== "left") return { file: t.vrm ?? "mentor", box: VRM_STAGE.explainer, boardSide: "right" };
-  return { file: t.vrm ?? "student", box: VRM_STAGE.asker, boardSide: "left" };
+  const boxes = video ? VRM_VIDEO : VRM_STAGE;
+  if (n === 1 || track.side !== "left") return { file: t.vrm ?? "mentor", box: boxes.explainer, boardSide: "right" };
+  return { file: t.vrm ?? "student", box: boxes.asker, boardSide: "left" };
 }
 
-export function VrmCast({ plan, t, opacity = 1 }: { plan: MotionPlan; t: number; opacity?: number }) {
+/** Where a point of the reel layout is drawn on the stage at t: a reel's
+ * board (cast/teach.ts toStage); a video's shot view (shorts/motion_video.py),
+ * the shot playing at t. */
+function stageOf(plan: MotionPlan, t: number): (full: boolean | string, x: number, y: number) => [number, number] {
+  if (plan.format !== "video") return toStage;
+  let k = 0;
+  for (let i = 0; i < plan.shots.length; i++) if (t >= plan.shots[i].start) k = i;
+  const v = plan.shots[k].view;
+  if (!v) return toStage;
+  return (_full, x, y) => [v.dst[0] + (x - v.src[0]) * v.s, v.dst[1] + (y - v.src[1]) * v.s];
+}
+
+/** `presence`: how far on screen the cast is (0 gone: nothing is drawn, but
+ * the models stay loaded). `slide`: it also slides out toward its own edge
+ * as it fades (rev 4 plans). */
+export function VrmCast({ plan, t, presence = 1, slide = false }: { plan: MotionPlan; t: number; presence?: number; slide?: boolean }) {
   if (!plan.characters?.length) return null;
   const n = plan.characters.length;
-  const slots = plan.characters.map((tr) => slotOf(tr, n));
+  const slots = plan.characters.map((tr) => slotOf(tr, n, plan.format === "video"));
   return (
-    <div data-part="characters" style={{ position: "absolute", inset: 0, opacity, pointerEvents: "none" }}>
+    <div data-part="characters" style={{ position: "absolute", inset: 0, opacity: presence, pointerEvents: "none",
+                                         visibility: presence > 0 ? "visible" : "hidden" }}>
       {plan.characters.map((track, i) => (
         <VrmView key={`${track.side}:${track.role ?? ""}`} plan={plan} track={track} t={t} slot={slots[i]}
-                 partner={n > 1 ? slots[1 - i].box : null} />
+                 partner={n > 1 ? slots[1 - i].box : null} shown={presence > 0}
+                 dx={slide ? (1 - presence) * PRESENCE_SLIDE * (slots[i].boardSide === "right" ? 1 : -1) : 0} />
       ))}
     </div>
   );
@@ -47,11 +69,41 @@ export function VrmCast({ plan, t, opacity = 1 }: { plan: MotionPlan; t: number;
 
 interface View {
   renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.OrthographicCamera; vrm: VRM;
-  look: THREE.Object3D; headY: number;
+  look: THREE.Object3D; headY: number; hair: HairBone[];
 }
 
-function VrmView({ plan, track, t, slot, partner }: {
+interface HairBone { node: THREE.Object3D; rest: THREE.Quaternion; depth: number; phase: number }
+
+/** The hair's bones (VRoid names them J_Sec_Hair…): their rest pose, how deep
+ * each is in its strand, and a phase per strand. */
+function hairChains(vrm: VRM): HairBone[] {
+  const out: HairBone[] = [];
+  let strand = 0;
+  vrm.scene.traverse((o) => {
+    if (!/hair/i.test(o.name) || !(o as THREE.Bone).isBone) return;
+    const parentIsHair = o.parent && /hair/i.test(o.parent.name) && (o.parent as THREE.Bone).isBone;
+    if (!parentIsHair) strand += 1;
+    let depth = 0;
+    for (let p = o.parent; p && /hair/i.test(p.name); p = p.parent) depth += 1;
+    out.push({ node: o, rest: o.quaternion.clone(), depth, phase: strand * 0.7 });
+  });
+  return out;
+}
+
+/** A gentle sway of the hair from the frame's time alone (no physics: the
+ * same frame always draws the same hair). Deeper bones in a strand sway more. */
+function swayHair(hair: HairBone[], t: number, motion: number) {
+  for (const h of hair) {
+    const a = (0.018 + 0.012 * motion) * (1 + h.depth * 0.6);
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      a * 0.5 * Math.sin(t * 1.3 + h.phase), 0, a * Math.sin(t * 0.9 + h.phase * 1.3)));
+    h.node.quaternion.copy(h.rest).multiply(q);
+  }
+}
+
+function VrmView({ plan, track, t, slot, partner, shown = true, dx = 0 }: {
   plan: MotionPlan; track: CharacterTrack; t: number; slot: ReturnType<typeof slotOf>; partner: Box | null;
+  shown?: boolean; dx?: number;
 }) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const view = useRef<View | null>(null);
@@ -70,14 +122,25 @@ function VrmView({ plan, track, t, slot, partner }: {
     key.position.set(-1, 1.6, 2.2);
     scene.add(key, new THREE.AmbientLight(0xffffff, 0.5));
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 20);
-    loadVrm(slot.file, `${track.side}:${track.role ?? ""}`).then((vrm) => {
+    // the student, while it wears the very same file as the mentor (the
+    // placeholder), is recoloured and drawn a little smaller (looks.ts)
+    const prepared = loadVrm(slot.file, `${track.side}:${track.role ?? ""}`).then(async (vrm) => {
+      if (slot.file !== "mentor" && slot.boardSide === "left") {
+        const [mine, mentor] = await Promise.all([fingerprintOf(slot.file), fingerprintOf("mentor").catch(() => "")]);
+        if (mine === mentor && !vrm.scene.userData.looked) { applyLook(vrm, STUDENT_LOOK); vrm.scene.userData.looked = true; }
+      }
+      return vrm;
+    });
+    trackAsset(prepared).then((vrm) => {
       if (gone) return;
       scene.add(vrm.scene);
       measureRest(vrm);
       // waist-up: from just below the hips to above the head, centred on the body
       const hips = vrm.humanoid.getNormalizedBoneNode("hips")!.getWorldPosition(new THREE.Vector3());
       const head = vrm.humanoid.getNormalizedBoneNode("head")!.getWorldPosition(new THREE.Vector3());
-      const top = head.y + 0.24, bottom = hips.y - 0.02;
+      // framed as if at full size, so a smaller look really draws smaller
+      const k = vrm.scene.scale.y || 1;
+      const top = head.y / k + 0.24, bottom = hips.y / k - 0.02;
       const hgt = top - bottom, wid = hgt * (box.w / box.h);
       camera.left = -wid / 2; camera.right = wid / 2; camera.top = hgt / 2; camera.bottom = -hgt / 2;
       // the body stands at body_x across the canvas (the rest of it is room for a gesture)
@@ -89,7 +152,7 @@ function VrmView({ plan, track, t, slot, partner }: {
       const look = new THREE.Object3D();
       scene.add(look);
       if (vrm.lookAt) vrm.lookAt.target = look;
-      view.current = { renderer, scene, camera, vrm, look, headY: head.y };
+      view.current = { renderer, scene, camera, vrm, look, headY: head.y, hair: hairChains(vrm) };
       setReady(true);
     });
     return () => { gone = true; renderer.dispose(); };
@@ -98,6 +161,7 @@ function VrmView({ plan, track, t, slot, partner }: {
   useLayoutEffect(() => {
     const v = view.current;
     if (!v || !ready) return;
+    if (!shown) { if (aim) setAim(null); return; }
     const out = drawAt(v, plan, track, t, slot, partner);
     const prev = aim;
     if ((out && (!prev || out.tip[0] !== prev.tip[0])) || (!out && prev)) setAim(out);
@@ -110,10 +174,10 @@ function VrmView({ plan, track, t, slot, partner }: {
             data-aim-tip={aim ? aim.tip.map(Math.round).join(",") : undefined}
             data-aim-miss={aim ? Math.round(aim.miss) : undefined}
             width={box.w} height={box.h}
-            style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h,
+            style={{ position: "absolute", left: box.x + dx, top: box.y, width: box.w, height: box.h,
                      WebkitMaskImage: "linear-gradient(to bottom, #000 86%, transparent 100%)",
                      maskImage: "linear-gradient(to bottom, #000 86%, transparent 100%)" }} />
-    <Bulb track={track} t={t} box={box} />
+    {shown && <Bulb track={track} t={t} box={box} />}
   </>;
 }
 
@@ -184,7 +248,7 @@ function drawAt(v: View, plan: MotionPlan, track: CharacterTrack, t: number, slo
     if (w <= 0) continue;
     let p: [number, number] | null = null;
     if (c.target === "partner" || !c.rect) p = partner ? [partner.x + partner.w * (partner.body_x ?? 0.5), partner.y + partner.h * 0.22] : null;
-    else p = toStage(c.full ?? false, c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] / 2);
+    else p = stageOf(plan, c.t)(c.full ?? false, c.rect[0] + c.rect[2] / 2, c.rect[1] + c.rect[3] / 2);
     if (!p) continue;
     gazeTarget = stageToWorld(v, box, p[0], p[1], headPos.z + 0.6);
     gw = Math.max(gw, w);
@@ -199,7 +263,12 @@ function drawAt(v: View, plan: MotionPlan, track: CharacterTrack, t: number, slo
   set("head", pitch * 0.6, yaw * 0.6, -(pose.headTilt ?? 0) * Math.PI / 180);
   v.look.position.copy(target);
   // arms
-  const toStageRect = (rect: number[], full: boolean | string) => toStage(full, rect[0] + rect[2] / 2, rect[1] + rect[3] / 2);
+  // the hand never covers the words it points at: a tall target (a card) is
+  // pointed at low on it, under its label; a short one (a pill, a token) from
+  // just under its bottom edge
+  const map = stageOf(plan, t);
+  const toStageRect = (rect: number[], full: boolean | string) =>
+    map(full, rect[0] + rect[2] / 2, rect[3] > 150 ? rect[1] + rect[3] * 0.82 : rect[1] + rect[3] + 8);
   const programs = armPrograms(track, t, words, slot.boardSide, toStageRect);
   const aimWorld = (st: [number, number]) => stageToWorld(v, box, st[0], st[1], headPos.z + 0.18);
   let report: { target: [number, number]; tip: [number, number]; miss: number } | null = null;
@@ -235,6 +304,8 @@ function drawAt(v: View, plan: MotionPlan, track: CharacterTrack, t: number, slo
     em.setValue("blinkRight", clamp(pose.blinkR ?? 0));
   }
   h.update();
+  // the hair sways a little more while the head moves (a nod, a turn)
+  swayHair(v.hair, t, clamp(Math.abs(pose.headNod ?? 0) * 3 + Math.abs(pose.headTurn ?? 0)));
   vrm.nodeConstraintManager?.update();
   vrm.lookAt?.update(0);
   em?.update();

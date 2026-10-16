@@ -7,8 +7,11 @@ teacher at a board would move.
 STAGING (plan.stage = "board", library.json frame.board). The visual is the
 board, upper left; the explaining character (the language speaker, or the
 narrator) stands large beside it on the right, half-body; the asking one is
-smaller, lower left. The characters stay on screen through every explanation
-shot — code and recap included; only the title and the CTA are theirs alone.
+smaller, lower left. They are not on screen the whole time
+(avatar_presence, library.json avatars): on for the hook, the main idea, the
+aha, a student's question, the recap and the end card; off while code, a code
+map, a flow, a panel or a table needs the whole frame. The voice and the chat
+(each line labelled with its speaker) go on while they are off.
 
 DIRECTION. On top of the rig's own life layer (blinks, breathing, sway):
   - the explainer AIMS an arm at the exact thing a scene action changes while
@@ -57,13 +60,92 @@ def board() -> dict:
 
 # ===================================================================== staging
 
+def rules() -> dict:
+    return lib.library()["avatars"]
+
+
+def heavy(shot, video: bool = False) -> bool:
+    """A shot whose visual needs the whole frame: never drawn with the presenters.
+    `video`: a landscape video's board has room for more beside the mentor
+    (library.json frame.video.off_kinds)."""
+    off = set(lib.library()["frame"]["video"]["off_kinds"] if video else rules()["off_kinds"])
+    return any(o.kind in off for o in shot.objects)
+
+
+def _asks(shot, asker_role: str | None) -> bool:
+    return bool(asker_role) and any(c.speaker == asker_role and "?" in c.text for c in shot.captions)
+
+
+def avatar_presence(plan, default_on: bool = False) -> list[bool]:
+    """Per shot: are the presenters on screen? A visual-heavy shot is always
+    off. Otherwise the scene's own choice (shot.avatars), else on for the
+    hook, the key beats (rules()["on_beats"]) and a shot where the student
+    asks a question, off elsewhere (`default_on`, a video: on wherever the
+    visual allows). Then every on or off run is made to last
+    at least min_on / min_off seconds: a short run takes its neighbours' state
+    (a short off run that is visual-heavy stays off, and the short on runs
+    beside it go off instead)."""
+    r = rules()
+    asker = next((t.role for t in plan.characters if t.side == "left"), None) if len(plan.characters) > 1 else None
+    video = getattr(plan, "format", "reel") == "video"
+    locked = [heavy(s, video) for s in plan.shots]
+    on = []
+    for i, s in enumerate(plan.shots):
+        if locked[i]:
+            on.append(False)
+        elif getattr(s, "avatars", "") in ("on", "off"):
+            on.append(s.avatars == "on")
+        else:
+            # (a video's mentor stays at the board unless the visual needs the frame)
+            on.append(default_on or i == 0 or s.beat in r["on_beats"] or _asks(s, asker))
+    for _ in range(len(on)):
+        runs, i = [], 0
+        while i < len(on):
+            j = i
+            while j + 1 < len(on) and on[j + 1] == on[i]:
+                j += 1
+            runs.append((i, j))
+            i = j + 1
+        changed = False
+        for a, b in runs:
+            if len(runs) == 1:
+                break
+            dur = plan.shots[b].end - plan.shots[a].start
+            if on[a] and dur < r["min_on"]:
+                on[a:b + 1] = [False] * (b - a + 1)
+                changed = True
+                break
+            if not on[a] and dur < r["min_off"] and not any(locked[a:b + 1]):
+                on[a:b + 1] = [True] * (b - a + 1)
+                changed = True
+                break
+        if not changed:
+            break
+    return on
+
+
+def _on_board(shot):
+    """`shot` with the presenters on, its placed objects laid out against the
+    board's right edge (arrangement "board_right"), so the mentor's pointing
+    hand reaches the far cards. A full-frame card keeps its own layout."""
+    from .motion_scenes import layout_scene
+    from .schema import MotionScene, MotionSceneObject
+    kinds = lib.object_kinds()
+    if not any(kinds[o.kind]["layout"] == "placed" for o in shot.objects) \
+            or any(kinds[o.kind]["layout"] == "full" for o in shot.objects):
+        return shot.model_copy(update={"characters": True})
+    scene = MotionScene(field=shot.field, objects=[MotionSceneObject(id=o.id, kind=o.kind, props=o.props)
+                                                   for o in shot.objects])
+    return shot.model_copy(update={"characters": True, "arrangement": "board_right",
+                                   "objects": layout_scene(scene, duo=True, arrangement="board_right")})
+
+
 def stage_board(plan, configs: dict | None = None):
-    """The plan staged as a board: characters on every shot but the title and
-    the CTA, each track re-directed to teach. `configs`: role -> a rig
+    """The plan staged as a board: the presenters on the shots avatar_presence
+    picks, each track re-directed to teach. `configs`: role -> a rig
     CharacterConfig to wear instead of the track's (a new look)."""
-    # off only where a full-frame title or end card is the whole shot
-    shots = [s.model_copy(update={"characters": not any(o.kind in ("title_card", "end_card") for o in s.objects)})
-             for s in plan.shots]
+    on = avatar_presence(plan) if plan.characters else [False] * len(plan.shots)
+    shots = [_on_board(s) if o else s.model_copy(update={"characters": False}) for s, o in zip(plan.shots, on)]
     staged = plan.model_copy(update={"stage": "board", "shots": shots})
     tracks = []
     for tr in staged.characters:

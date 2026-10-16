@@ -1,9 +1,12 @@
 {
  "short_id": "audit_solo__motion",
  "template": "fix_story",
+ "format": "reel",
+ "width": 1080,
+ "height": 1920,
  "theme": "classic_explainer",
  "design": "midnight_lab",
- "rev": 3,
+ "rev": 4,
  "stage": null,
  "palette": "midnight",
  "avatars": null,
@@ -77,6 +80,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -252,6 +257,8 @@
    "label": "THE IDEA",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -388,6 +395,8 @@
    "label": "THE CODE",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -562,6 +571,8 @@
    "label": "WHY IT FAILS",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -720,6 +731,8 @@
    "label": "WHAT YOU SEE",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -887,6 +900,8 @@
    "label": "HOW IT WORKS",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1072,6 +1087,8 @@
    "label": "THE FIX",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1216,6 +1233,8 @@
    "label": "THREE PARTS",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1370,6 +1389,8 @@
    "label": "THE RESULT",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1503,6 +1524,8 @@
    "label": "LOOK CLOSELY",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1662,6 +1685,8 @@
    "label": "THE SHELF",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1843,6 +1868,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -1980,6 +2007,8 @@
    "label": "IN MEMORY",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2133,6 +2162,8 @@
    "label": "HOW IT WORKS",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2273,6 +2304,8 @@
    "label": "THE FIX",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2380,6 +2413,8 @@
    "label": "AGAIN AND AGAIN",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2531,6 +2566,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2658,6 +2695,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2827,6 +2866,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -2955,6 +2996,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -3033,6 +3076,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",
@@ -3156,6 +3201,8 @@
    "label": "",
    "layout": "solo",
    "characters": false,
+   "avatars": "",
+   "view": null,
    "objects": [
     {
      "id": "o1",

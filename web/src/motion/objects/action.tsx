@@ -204,12 +204,16 @@ export function Flow({ x, y, w, h, steps, packet, travelAge, highlight, p, field
 
 // ------------------------------------------------------------- compare
 
-export function Compare({ x, y, w, h, left, right, leftIcon, rightIcon, leftNote, rightNote, revealAge, hasReveal, glow = 0, p, field, slideIn = false }: {
+export function Compare({ x, y, w, h, left, right, leftIcon, rightIcon, leftNote, rightNote, revealAge, hasReveal, glow = 0, p, field, slideIn = false, board = false }: {
   x: number; y: number; w: number; h: number; left: string; right: string; leftIcon: string; rightIcon: string;
   leftNote?: string; rightNote?: string; revealAge: number; hasReveal: boolean; glow?: number; p: number; field: FieldName;
   /** rev 2: the revealed side slides in solid from the right — no half-faded
    *  card that reads as an empty placeholder */
   slideIn?: boolean;
+  /** drawn on a board beside the presenter: the revealed side RISES into
+   *  place — sliding in from the right, it entered past the board's edge,
+   *  cut off by it (the 26 s glitch, docs/reference/motion-vrm-v2) */
+  board?: boolean;
 }) {
   const th = theme(field);
   const cw = (w - 40) / 2, ch = h - 20;
@@ -217,6 +221,7 @@ export function Compare({ x, y, w, h, left, right, leftIcon, rightIcon, leftNote
   const slid = (q: number) => {
     if (q <= 0) return { opacity: 0 };
     const k = ease.outCubic(clamp(revealAge / 0.45));
+    if (board) return { opacity: clamp(revealAge / 0.2), transform: `translateY(${(1 - k) * 60}px) scale(${0.96 + 0.04 * k})` };
     return { opacity: clamp(revealAge / 0.06), transform: `translateX(${(1 - k) * 220}px) scale(${0.96 + 0.04 * k})` };
   };
   const side = (title: string, icon: string, note: string | undefined, good: boolean, q: number, dx: number) => {

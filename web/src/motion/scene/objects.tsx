@@ -289,7 +289,7 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
       return <Compare x={b.x} y={b.y} w={b.w} h={b.h} left={p.left} right={p.right} leftIcon={p.left_icon ?? "x"}
                       rightIcon={p.right_icon ?? "check"} leftNote={p.left_note} rightNote={p.right_note}
                       revealAge={t - s.revealT} hasReveal={s.hasReveal} glow={pulseOf(s.pulseAge, 0, 0.6)} p={s.p} field={field}
-                      slideIn={rev >= 2} />;
+                      slideIn={rev >= 2} board={board} />;
     case "cycle":
       return <Cycle x={b.x} y={b.y} w={b.w} h={b.h} steps={p.steps} travelAge={t - s.travelT}
                     highlight={highlightOn(s) ? s.highlight : 0} p={s.p} field={field} />;
@@ -315,7 +315,8 @@ export function SceneObject({ obj, shot, t, field, series, identity, themeLabel 
         const tagAges = cued.map((v, i) => (v >= 0 || !settle ? v : t - settle.t - i * 0.08));
         return <EndCardCued series={series} upNext={p.up_next || "More soon"} tags={tags} local={s.local}
                             tapAge={age((a) => a.do === "tap")} revealAge={age((a) => a.do === "reveal")}
-                            tagAges={tagAges} settleAge={settle ? t - settle.t : -1} identity={identity} />;
+                            tagAges={tagAges} settleAge={settle ? t - settle.t : -1} identity={identity}
+                            solid={LOOK.studio && !th.dark} />;
       }
       return <>
         <EndCard upNext={p.up_next || "Follow for more"} chips={tags.map((label) => ({ label, done: false }))} t={s.local} />

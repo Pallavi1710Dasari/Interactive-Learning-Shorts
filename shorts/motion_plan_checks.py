@@ -283,6 +283,51 @@ def check_layout_variety(plan) -> GraderResult:
                         {"layouts": names})
 
 
+def check_avatar_presence(plan) -> GraderResult:
+    """motion_avatar_presence (rev 4 board reels): the presenters come and go
+    by the rules (library.json avatars, motion_teach.avatar_presence):
+      - a visual-heavy shot (code, code map, flow, panel, table, title) never
+        has them, so its visual is laid out at full size, never shrunk onto
+        the board, and nothing stands over it;
+      - a shot without them is never laid out for the board;
+      - the hook, the recap and the end card have them (unless visual-heavy);
+      - every on run and every off run lasts at least min_on / min_off s."""
+    name = "motion_avatar_presence"
+    if getattr(plan, "stage", "") != "board" or getattr(plan, "rev", 1) < 4 or not plan.characters:
+        return GraderResult(name, True, "not a rev 4 board reel with presenters — not checked")
+    from . import motion_teach
+    r = motion_teach.rules()
+    problems = []
+    for i, s in enumerate(plan.shots):
+        heavy = motion_teach.heavy(s)
+        if heavy and s.characters:
+            problems.append(f"{s.id} shows {', '.join(o.kind for o in s.objects)} with the presenters: "
+                            "its visual would be shrunk onto the board")
+        if not s.characters and s.arrangement == "board_right":
+            problems.append(f"{s.id} has no presenters but is laid out for the board")
+        key = i == 0 or s.beat in ("recap", "cta")
+        if key and not heavy and not s.characters:
+            problems.append(f"{s.id} ({s.beat}) should have the presenters")
+    runs, a = [], 0
+    for i in range(1, len(plan.shots) + 1):
+        if i == len(plan.shots) or plan.shots[i].characters != plan.shots[a].characters:
+            runs.append((a, i - 1))
+            a = i
+    if len(runs) > 1:
+        for a, b in runs:
+            on = plan.shots[a].characters
+            dur = plan.shots[b].end - plan.shots[a].start
+            least = r["min_on"] if on else r["min_off"]
+            if dur < least - 1e-6 and not (not on and any(motion_teach.heavy(s) for s in plan.shots[a:b + 1])):
+                problems.append(f"{plan.shots[a].id}-{plan.shots[b].id}: presenters {'on' if on else 'off'} "
+                                f"for only {dur:.1f} s (at least {least:.1f} s)")
+    pattern = "".join("+" if s.characters else "." for s in plan.shots)
+    if problems:
+        return GraderResult(name, False, "; ".join(problems), {"pattern": pattern})
+    return GraderResult(name, True, f"presenters on {pattern.count('+')} of {len(pattern)} shots ({pattern})",
+                        {"pattern": pattern})
+
+
 def run(plan) -> list[GraderResult]:
     return [check_caption_layout(plan), check_redundant_overlays(plan), check_decorative_elements(plan),
-            check_layout_variety(plan)]
+            check_layout_variety(plan), check_avatar_presence(plan)]

@@ -18,13 +18,23 @@ def _read(path: Path):
         return None
 
 
+#: The id namespaces of the motion runner: <topic>__motion for a reel,
+#: <topic>__video for a long-form video (motion_reel._next_free_motion_id).
+MOTION_ID_MARKS = ("__motion", "__video")
+
+
+def _motion_id(short_id: str) -> bool:
+    return any(m in short_id for m in MOTION_ID_MARKS)
+
+
 def is_motion_reel(out_dir: Path, short_id: str) -> bool:
-    return (out_dir / short_id / "setup.json").exists() and short_id.find("__motion") >= 0
+    """A motion reel or video (both play in the motion player)."""
+    return (out_dir / short_id / "setup.json").exists() and _motion_id(short_id)
 
 
 def list_reels(out_dir: Path) -> list[str]:
-    """Every motion reel in `out_dir`, newest first."""
-    ids = [p.parent.name for p in out_dir.glob("*/setup.json") if "__motion" in p.parent.name]
+    """Every motion reel and video in `out_dir`, newest first."""
+    ids = [p.parent.name for p in out_dir.glob("*/setup.json") if _motion_id(p.parent.name)]
     return sorted(ids, key=lambda i: (out_dir / i / "setup.json").stat().st_mtime, reverse=True)
 
 
@@ -54,6 +64,8 @@ def summary(out_dir: Path, short_id: str) -> dict:
              else "script" if script else "theme" if theme else "setup")
     return {
         "short_id": short_id,
+        # "reel" or "video" (a long-form landscape video lists apart, #videos)
+        "format": (plan or {}).get("format") or (script or {}).get("format") or setup.get("format") or "reel",
         "topic": (setup.get("topic") or {}).get("topic", ""),
         "stub": _stub(out_dir, short_id, cost),
         # no voice: its narration is silence (MOTION_VOICE=silent, or a stub

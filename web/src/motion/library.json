@@ -40,7 +40,7 @@
       "_comment": "The board staging (plan.stage = board): the visual drawn as a board in the upper left, the explaining character large beside it (right), the asking one smaller below it (left), the chat in its own band at the bottom. src_* is the region the visual is laid out in (placed objects / a full-frame card), dst the board it is drawn into.",
       "src_placed": [60, 240, 960, 600],
       "src_full": [0, 150, 1080, 1154],
-      "src_full_kind": {"code_map": [40, 380, 1000, 760], "takeaway_list": [40, 500, 1000, 900]},
+      "src_full_kind": {"code_map": [40, 380, 1000, 760], "takeaway_list": [40, 500, 1000, 900], "end_card": [70, 500, 940, 800]},
       "dst": [36, 236, 704, 590],
       "callout_right": 860,
       "explainer": {"cx": 880, "top": 610, "scale": 1.45},
@@ -53,6 +53,22 @@
         "asker": {"x": 30, "y": 810, "w": 410, "h": 520, "yaw": 0.45, "body_x": 0.5}
       },
       "chat": {"top": 1340, "bottom": 1574, "font": 38, "line_h": 48, "chars": 35, "label_h": 34, "pad_y": 22, "gap": 20}
+    },
+    "video": {
+      "_comment": "A long-form VIDEO (plan.format = video, shorts/motion_video.py, web/src/motion/video): a 1920x1080 frame. Each shot's visual is laid out as in a reel and drawn onto a landscape board (shot.view: src, a region of the reel layout, onto dst). With the presenter on, the board is board_on (left) and the mentor stands on the right (vrm.explainer); off, the board is board_off (centred, wider). Subtitles run along the bottom, never under the mentor. zoom_cap: how far a small visual may be enlarged.",
+      "w": 1920, "h": 1080,
+      "board_on": [64, 112, 1176, 756],
+      "board_off": [150, 100, 1620, 770],
+      "zoom_cap": 1.35,
+      "off_kinds": ["code_map", "system_panel", "app_screen", "lookup_table", "title_card", "chapter_card"],
+      "pad": 40,
+      "chapter": {"x": 64, "y": 38, "h": 48},
+      "subtitle": {"top": 896, "bottom": 1036, "side": 64, "font": 44, "line_h": 60, "lines": 2, "chars_on": 44, "chars_off": 66},
+      "progress": {"y": 1062, "h": 8},
+      "vrm": {
+        "explainer": {"x": 960, "y": 150, "w": 960, "h": 930, "yaw": -0.32, "body_x": 0.64},
+        "asker": {"x": 0, "y": 420, "w": 460, "h": 660, "yaw": 0.4, "body_x": 0.45}
+      }
     },
     "characters": {
       "top": 852,
@@ -337,6 +353,16 @@
     }
   },
   "camera_actions": ["focus", "click"],
+  "avatars": {
+    "_comment": "When the presenters are on screen (board staging; motion_teach.avatar_presence). A shot with an off_kinds object is always off, so its visual keeps the whole frame. Otherwise the scene's own avatars choice, else on for on_beats and a student's question, off elsewhere. Each on or off run lasts at least min_on / min_off seconds. They leave in the last exit seconds of their last shot and come back in the first enter seconds of the next on shot.",
+    "off_kinds": ["code_window", "code_map", "flow", "system_panel", "lookup_table", "app_screen", "token_row", "cycle", "title_card", "chapter_card"],
+    "on_beats": ["hook", "fix_idea", "name_it", "payoff", "result", "takeaway", "recap", "cta"],
+    "min_on": 2.0,
+    "min_off": 2.0,
+    "enter": 0.55,
+    "exit": 0.45,
+    "slide": 90
+  },
   "objects": {
     "identity_title": {
       "layout": "placed",

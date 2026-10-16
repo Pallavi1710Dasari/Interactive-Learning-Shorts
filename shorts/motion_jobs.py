@@ -46,7 +46,7 @@ from . import checks, config, motion_models, motion_themes, preflight, review, u
 from . import motion_reel as mr
 from . import workflow as question_workflow
 from .parse import find_section, parse_markdown
-from .schema import (MOTION_TEMPLATES, MotionScript, MotionThemeChoice, QuestionWorkflow,
+from .schema import (MOTION_FORMATS, MOTION_TEMPLATES, MotionScript, MotionThemeChoice, QuestionWorkflow,
                      SectionUnderstanding)
 from .skills.select import select_topics_with_selections
 from .skills.understanding import understanding_for
@@ -178,11 +178,13 @@ def _log(job: dict, stage: str, action: str, note: str = "") -> None:
                                           "note": note})
 
 
-def new_job(doc_path: Path, doc_name: str) -> dict:
+def new_job(doc_path: Path, doc_name: str, fmt: str = "reel") -> dict:
+    """A new job at its options screen. `fmt`: "reel" or "video" — what the
+    reviewer chose to make when uploading (start may still change it)."""
     job = {
         "job_id": uuid.uuid4().hex[:12], "created": _now(), "started": _now(),
         "doc_path": str(doc_path), "doc_name": doc_name,
-        "options": default_options(), "short_id": None,
+        "options": default_options() | {"format": fmt}, "short_id": None,
         "stage": "options", "status": "options", "activity": None, "activity_info": None,
         "progress": None, "review": None, "preflight": None, "message": "", "error": None,
         "calls": [], "data": {}, "history": [], "stub": bool(config.STUB),
@@ -193,7 +195,7 @@ def new_job(doc_path: Path, doc_name: str) -> dict:
 
 def default_options() -> dict:
     """The CLI's defaults, except characters: ON in the UI (one per speaker)."""
-    return {"section": None, "language": None, "theme": None, "template": None,
+    return {"format": "reel", "section": None, "language": None, "theme": None, "template": None,
             "characters": True, "character": None,
             # the Characters step (2026-10-13): who asks (two speakers), each
             # speaker's voice, and whether the reviewer has confirmed them
@@ -219,7 +221,7 @@ def spent(job: dict) -> dict:
     mine = round(sum(c["cost"] for c in job["calls"]), 6)
     earlier = mr.earlier_runs_cost(job["short_id"], job["started"]) if job["short_id"] else 0.0
     return {"reel": round(earlier + mine, 4), "job": round(mine, 4), "earlier": round(earlier, 4),
-            "cap": config.MAX_REEL_USD, "calls": len(job["calls"]),
+            "cap": _cap(job), "calls": len(job["calls"]),
             "estimated": any(c.get("estimated") for c in job["calls"])}
 
 
@@ -243,6 +245,7 @@ def summary(job: dict) -> dict:
     d, opts, sid = job["data"], job["options"], job["short_id"]
     if job["stage"] != "options":
         out["options"] = {"value": job["doc_name"], "detail": ", ".join(filter(None, [
+            "a video (6-12 min, landscape)" if opts.get("format") == "video" else "a reel",
             f"section {opts['section']}" if opts.get("section") else "AI picks the section",
             opts.get("language") or "language detected",
             "characters on" if opts.get("characters") else "characters off",
@@ -302,6 +305,35 @@ def _model_name(label: str) -> str:
     return " ".join(w.capitalize() if not re.match(r"\d", w) else w for w in name.split())
 
 
+def _video_rows(rows: list[dict]) -> list[dict]:
+    """The whole-reel estimate made a video's: its script calls cost what the
+    script gate plans for a video (motion_reel.SCRIPT_TOKENS), and its scenes
+    are asked in motion_reel.VIDEO_SCENE_CALLS batches."""
+    def ratio(plan) -> float:
+        reel, video = plan("reel")[0].cost_per_call, plan("video")[0].cost_per_call
+        return video / reel if reel else 1.0
+    out = []
+    for r in rows:
+        r = dict(r)
+        k = ratio(mr.script_plan) if r["label"] in ("motion_script", "motion_hook_fix") \
+            else ratio(mr.scenes_plan) if r["label"].startswith("motion_scenes") else 1.0
+        if r["label"] == "motion_scenes":
+            r["typical_calls"] = r["worst_calls"] = mr.VIDEO_SCENE_CALLS
+        if r["label"] == "motion_script":
+            r["worst_calls"] = config.MAX_VIDEO_SCRIPT_ATTEMPTS
+        if r["label"] == "motion_hook_fix":
+            r["worst_calls"] = config.MAX_VIDEO_SCRIPT_ATTEMPTS * config.MAX_MOTION_HOOK_FIX_RETRIES
+        if r["label"] == "motion_shot_fix":
+            # one targeted repair round is the usual case for 120+ captions
+            r["typical_calls"] = 1
+            r["worst_calls"] = config.MAX_VIDEO_SCRIPT_ATTEMPTS * config.MAX_VIDEO_SHOT_FIX_ROUNDS
+        r["per_call"], r["per_call_worst"] = round(r["per_call"] * k, 4), round(r["per_call_worst"] * k, 4)
+        r["typical"] = round(r["per_call"] * r["typical_calls"], 4)
+        r["worst"] = round(r["per_call_worst"] * r["worst_calls"], 4)
+        out.append(r)
+    return out
+
+
 def options_info(job: dict) -> dict:
     """The upload step's recommendations, each with its reason and every
     alternative with a short description, plus the whole-reel estimate.
@@ -311,6 +343,8 @@ def options_info(job: dict) -> dict:
     sections = _sections(job)
     doc = _doc_text(job)
     rows = motion_models.estimate(doc)
+    if _format(job) == "video":
+        rows = _video_rows(rows)
     lang, how = motion_themes.detect_language(doc, doc)
     how = re.sub(r"`{3}\s*", "", how)          # "the section's ```jsx code" -> "jsx code"
     presets = mcp.defaults()
@@ -361,7 +395,7 @@ def options_info(job: dict) -> dict:
         "estimate": {"rows": [r for r in rows if r["worst_calls"] or r["typical_calls"]],
                      "typical": round(sum(r["typical"] for r in rows), 4),
                      "worst": round(sum(r["worst"] for r in rows), 4),
-                     "cap": config.MAX_REEL_USD},
+                     "cap": _cap(job)},
         "sections_count": len(sections),
     }
 
@@ -544,16 +578,18 @@ def _gate(job: dict, stage: str, plan: list, then: str, arg=None) -> dict:
     preflight.write_preflight_json(job["short_id"], built)
     now = spent(job)["reel"]
     projected = round(now + built["total_cost"], 4)
-    fits = projected <= config.MAX_REEL_USD
+    cap = _cap(job)
+    fits = projected <= cap
+    what = "video (MAX_VIDEO_USD)" if _format(job) == "video" else "reel (MAX_REEL_USD)"
     job.update(stage=stage, status="preflight" if fits else "cap", review=None, error=None,
                preflight={"stage": stage, "models": built["models"],
                           "total": built["total_cost"], "spent": now,
-                          "projected": projected, "cap": config.MAX_REEL_USD, "fits": fits,
+                          "projected": projected, "cap": cap, "fits": fits,
                           "then": then, "arg": arg},
                message="" if fits else (
                    f"This step could cost up to ${built['total_cost']:.2f}. With "
                    f"${now:.2f} already spent, that could reach ${projected:.2f} — over the "
-                   f"${config.MAX_REEL_USD:.2f} limit for one reel. Nothing was spent."))
+                   f"${cap:.2f} limit for one {what}. Nothing was spent."))
     save(job)
     return job
 
@@ -566,6 +602,14 @@ def start(job: dict, options: dict) -> dict:
     for k in ("section", "language", "theme", "template", "character"):
         opts[k] = opts[k] or None
     opts["characters"] = bool(opts["characters"])
+    # the format chosen at upload stays unless start names another
+    opts["format"] = options.get("format") or job["options"].get("format") or "reel"
+    if opts["format"] not in MOTION_FORMATS:
+        raise ValueError(f"format {opts['format']!r} is not one of {MOTION_FORMATS}")
+    if opts["format"] == "video" and opts["template"] not in (None, "walkthrough"):
+        # a video is always a walkthrough (its chapters); the Template step
+        # still runs, as the UI's Language step, and pins it (_template_review)
+        raise ValueError("a video is always a walkthrough")
     opts["voices"] = dict(opts.get("voices") or {})
     opts["cast_confirmed"] = bool(opts.get("cast_confirmed"))
     if opts["template"] and opts["template"] not in MOTION_TEMPLATES:
@@ -681,22 +725,35 @@ def _op_regen_approach(job: dict, reason: str) -> None:
     _approach_review(job)
 
 
+def _format(job: dict) -> str:
+    """"reel" or "video": what this job makes."""
+    return job["options"].get("format") or "reel"
+
+
+def _cap(job: dict) -> float:
+    """This job's spend cap: MAX_VIDEO_USD for a video, MAX_REEL_USD for a reel."""
+    return config.MAX_VIDEO_USD if _format(job) == "video" else config.MAX_REEL_USD
+
+
 def _template_review(job: dict) -> dict:
     wf = _wf(job)
     approach = wf.approved_teaching_approach
-    default = mr.default_template(approach)
+    video = _format(job) == "video"
+    # a video is always a walkthrough: its one choice
+    default = "walkthrough" if video else mr.default_template(approach)
     kind = approach.primary.replace("_", " ") if approach else "the approach"
     _review(job, "template", {
         "default": default, "choices": list(MOTION_TEMPLATES),
         "approach": approach.primary if approach else None,
         "note": "Your choice locks the template: later steps only offer themes that use it.",
         "recommended": {"value": default, "label": default.replace("_", " "),
-                        "reason": (f"A {kind} approach walks through steps in order."
+                        "reason": ("A video teaches in chapters, step by step." if video else
+                                   f"A {kind} approach walks through steps in order."
                                    if default == "walkthrough" else
                                    f"A {kind} approach fits a problem-and-fix story."),
                         "description": TEMPLATES[default]},
         "options": [{"value": t, "label": t.replace("_", " "), "description": TEMPLATES[t]}
-                    for t in [default] + [t for t in MOTION_TEMPLATES if t != default]],
+                    for t in [default] + ([] if video else [t for t in MOTION_TEMPLATES if t != default])],
     })
     save(job)
     return job
@@ -708,13 +765,14 @@ def _finish_setup(job: dict, template: str, source: str) -> dict:
     sections = _sections(job)
     wf = _wf(job)
     und = job["data"].get("understanding")
+    fmt = job["options"].get("format", "reel")
     state = mr.build_setup_state(sections, wf, SectionUnderstanding(**und) if und else None,
-                                 template, source)
+                                 template, source, fmt)
     state["doc_path"] = job["doc_path"]
     state["ui_options"] = job["options"]
     state["design"] = config.MOTION_DESIGN
     # finished again after "Change": the same reel keeps its id (and cost log)
-    job["short_id"] = job.get("short_id") or mr._next_free_motion_id(state["topic"]["id"])
+    job["short_id"] = job.get("short_id") or mr._next_free_motion_id(state["topic"]["id"], fmt)
     mr._save_setup(job["short_id"], state)
     mr.record_cost(job["short_id"], job["calls"], job["started"])
     _log(job, "template", "approve", f"{template} ({source})")
@@ -763,17 +821,22 @@ def _theme_review(job: dict, choice: MotionThemeChoice, t: dict) -> None:
                   i, approach=t["approach"].primary if t["approach"] else None,
                   has_code=motion_themes.section_has_code(t["source_text"]),
                   template=t["pin"], history=None, language=t["language"])]
+    def said(text: str) -> str:
+        # a walkthrough theme's description counts a reel's chapters; a video has more
+        if _format(job) != "video":
+            return text
+        return re.sub(r"\b2 to 4 (numbered )?(chapters|steps)", r"5 to 10 \1\2", text)
     _review(job, "theme", {
-        "choice": choice.model_dump(), "label": spec.label, "description": spec.description,
+        "choice": choice.model_dump(), "label": spec.label, "description": said(spec.description),
         "speakers": who, "language_how": t["how"], "history": t["history"],
         "tag_checks": _results(mr.theme_tag_checks(choice, t)),
         "themes": [{"id": i, "label": reg.themes[i].label, "template": reg.themes[i].template}
                    for i in reg.ids()],
         "pinned_template": t["pin"],
         "recommended": {"value": choice.theme, "label": spec.label,
-                        "reason": _first_sentence(choice.reason), "description": spec.description},
+                        "reason": _first_sentence(choice.reason), "description": said(spec.description)},
         "options": [{"value": i, "label": reg.themes[i].label,
-                     "description": _first_sentence(reg.themes[i].description, 140),
+                     "description": _first_sentence(said(reg.themes[i].description), 140),
                      "speakers": "two speakers" if reg.themes[i].two_speaker else "one narrator"}
                     for i in [choice.theme] + [i for i in usable if i != choice.theme]],
     })
@@ -797,7 +860,7 @@ def _enter_script(job: dict, regenerate: bool = False) -> dict:
                                   f" — no new call was made.")
             save(job)
             return job
-    return _gate(job, "script", mr.script_plan(), "script")
+    return _gate(job, "script", mr.script_plan(_format(job)), "script")
 
 
 def _op_script(job: dict) -> None:
@@ -833,7 +896,7 @@ def _scripted(job: dict) -> MotionScript:
 
 def _enter_scenes(job: dict) -> dict:
     job["stage"] = "scenes"
-    return _gate(job, "scenes", mr.scenes_plan(), "scenes")
+    return _gate(job, "scenes", mr.scenes_plan(_format(job)), "scenes")
 
 
 def _op_scenes(job: dict) -> None:
@@ -1015,11 +1078,15 @@ def decide(job: dict, action: str, reason: str = "", choice=None) -> dict:
                 raise ValueError(f"no language {choice!r}")
             if choice:
                 job["options"]["language"] = choice
-            return _finish_setup(job, job["review"]["default"], "default")
+            # a video's walkthrough is pinned: the theme step offers walkthrough themes only
+            return _finish_setup(job, job["review"]["default"],
+                                 "flag" if _format(job) == "video" else "default")
         if action == "approve":
             template = choice or job["review"]["default"]
             if template not in MOTION_TEMPLATES:
                 raise ValueError(f"template {template!r} is not one of {MOTION_TEMPLATES}")
+            if _format(job) == "video" and template != "walkthrough":
+                raise ValueError("a video is always a walkthrough")
             # the reviewer saw it and chose it: it pins the theme (CLI fix 2026-10-12)
             return _finish_setup(job, template, "reviewer")
     if stage == "theme":
@@ -1144,13 +1211,18 @@ def cast_info(job: dict) -> dict:
         rows = [{"role": "narrator", "label": "Narrator", "does": "tells the whole story",
                  "avatar": lang, "voice": vids[0] if vids else None}]
     th = job["data"].get("theme") or {}
-    recommend = bool(th.get("show_avatars", True))
+    video = _format(job) == "video"
+    # a video's mentor presents it, beside the board: always recommended there
+    recommend = True if video else bool(th.get("show_avatars", True))
+    reason = ("A video is presented: the mentor stands beside the board and points at what "
+              "changes, and steps aside while code or a table needs the whole frame."
+              if video else th.get("avatar_reason") or "")
     return {"speakers": rows, "avatars": avatar_opts, "voices": voice_opts,
             "characters": bool(job["options"].get("characters", True)) if job["options"].get("cast_confirmed") else recommend,
             "avatars_recommended": recommend,
-            "avatars_reason": th.get("avatar_reason") or "",
+            "avatars_reason": reason,
             "reason": (f"The {spec.label} style has {len(rows)} speaker{'s' if len(rows) > 1 else ''}, "
-                       f"so the reel needs {len(rows)} avatar{'s' if len(rows) > 1 else ''} and "
+                       f"so the {'video' if video else 'reel'} needs {len(rows)} avatar{'s' if len(rows) > 1 else ''} and "
                        f"{len(rows)} voice{'s' if len(rows) > 1 else ''}; each language has its own character.")}
 
 
@@ -1314,6 +1386,7 @@ def job_for_reel(short_id: str) -> dict:
                          f"shorts.motion_reel <doc.md> --topic {short_id}")
     job = new_job(doc, doc.name)
     opts = default_options() | (state.get("ui_options") or {})
+    opts["format"] = state.get("format") or opts.get("format") or "reel"   # a video stays a video
     job.update(short_id=short_id, options=opts, stage="theme", status="stopped",
                message="This reel was started from the command line. Resume to carry on "
                        "from where it stopped.")

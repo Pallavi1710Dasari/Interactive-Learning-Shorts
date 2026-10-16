@@ -2,7 +2,7 @@
 Characters that teach (shorts/motion_teach.py), on the real reel of job
 f64077e78448 (fixtures evals/fixtures/motion/variable_points_to_value_*):
 
-  - board staging: characters on every shot but the title and the CTA, the
+  - board staging: characters on only for the key shots (hook, main idea, aha, recap, end card), the
     explainer the one on the right;
   - the explainer points at what changes on the board, counts "two things /
     first / then" with a HELD count (the hand stays up between counts), and
@@ -35,15 +35,36 @@ def _staged():
     return motion_teach.stage_board(_plan())
 
 
-def test_characters_stay_on_every_explanation_shot():
+def test_characters_come_on_for_the_key_shots_only():
+    # rev 4 (motion_presence_test has the rules): on for the hook, the main
+    # idea, the aha, the recap and the end card; off for the title, code,
+    # panels, flows and the code map
     plan = _staged()
     assert plan.stage == "board"
     on = {s.id: s.characters for s in plan.shots}
-    assert all(v for k, v in on.items() if k not in ("s02", "s10")) and not on["s02"] and not on["s10"], on
+    assert "".join("+" if on[k] else "." for k in sorted(on)) == "+...+..+++", on
+
+
+def _all_on():
+    """The director on every shot but the title and the CTA (the rev 3
+    staging), so every kind of cue in the fixture is exercised."""
+    plan = _staged()
+    shots = [s.model_copy(update={"characters": s.id not in ("s02", "s10")}) for s in plan.shots]
+    tracks = [t.model_copy(update={"cues": []}) for t in plan.characters]
+    return motion_teach.direct(plan.model_copy(update={"shots": shots, "characters": tracks}))
+
+
+def test_off_shots_get_no_cues():
+    plan = _staged()
+    off = [(s.start, s.end) for s in plan.shots if not s.characters]
+    for t in plan.characters:
+        for c in t.cues:
+            if c.kind in ("aim", "count", "aha"):
+                assert not any(a <= c.t < b for a, b in off), (t.role, c.kind, c.t)
 
 
 def test_the_explainer_points_counts_and_the_asker_gets_it():
-    plan = _staged()
+    plan = _all_on()
     mentor = next(t for t in plan.characters if t.role == "MENTOR")
     student = next(t for t in plan.characters if t.role == "STUDENT")
     assert mentor.side == "right"

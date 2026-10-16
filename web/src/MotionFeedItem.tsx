@@ -10,6 +10,8 @@ import type { Feedback } from "./types";
 export interface MotionSummary {
   short_id: string; topic: string; stub: boolean; silent?: boolean; theme: string | null; template: string | null;
   duration: number | null; stage: string; has_plan: boolean; created?: number;
+  /** "video": a long-form landscape video (listed on #videos, not in the feed) */
+  format?: "reel" | "video";
   cost?: number; cost_estimated?: boolean; tokens?: number;
 }
 

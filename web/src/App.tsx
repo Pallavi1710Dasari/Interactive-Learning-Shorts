@@ -16,6 +16,7 @@ import { CaptureStage } from "./CaptureStage";
 import { StoryCaptureStage } from "./StoryStage";
 import { MotionGallery } from "./motion/gallery/Gallery";
 import { MotionPlayer } from "./motion/scene/MotionPlayer";
+import { VideoLibrary } from "./motion/video/VideoLibrary";
 import { MotionSection } from "./motion/MotionSection";
 import { pickVoices, useVoices } from "./useNarration";
 import type { Feedback, QuestionWorkflow, StoryReel, Unit } from "./types";
@@ -47,6 +48,10 @@ export default function App() {
   // #motion-reel/<short_id> — a motion reel in the full-reel player (phase 3):
   // its plan and narration from the API, or any plan with ?src=<url>.
   if (location.hash.startsWith("#motion-reel")) return <MotionPlayer />;
+  // #motion-video/<short_id> — a long-form video (16:9) in the same player
+  if (location.hash.startsWith("#motion-video")) return <MotionPlayer />;
+  // #videos — every long-form video, as a grid of cards
+  if (location.hash.startsWith("#videos")) return <VideoLibrary />;
   // #motion-vrm-lab — every 3D avatar gesture side by side (a dev page)
   if (location.hash.startsWith("#motion-vrm-lab")) return <VrmLab />;
   // #motion/job/<id> — a motion reel being made: its steps, in the workspace.
@@ -256,6 +261,10 @@ function Workspace() {
                 onClick={() => { location.hash = "#motion"; location.reload(); }}>
           Motion
         </button>}
+        {step !== "motion" && <button className="ghost sm" title="long-form videos (16:9)"
+                onClick={() => { location.hash = "#videos"; location.reload(); }}>
+          Videos
+        </button>}
         <span className="spacer" />
         {total && costOpen && <CostPill total={total} delta={delta} />}
         <button className="ghost sm costtoggle" onClick={() => setCostOpen((v) => !v)}
@@ -397,7 +406,8 @@ function Reels({ shorts, motion, focus, onReplace }: {
   // newest, so they come first.
   const items = [
     ...shorts.map((u) => ({ kind: "explainer" as const, id: u.short_id, created: u.created ?? 0, unit: u })),
-    ...motion.filter((m) => m.has_plan).map((m) => ({ kind: "motion" as const, id: m.short_id, created: m.created ?? 0, motion: m })),
+    // a long-form video (16:9) is not a reel: it lists on its own page (#videos)
+    ...motion.filter((m) => m.has_plan && m.format !== "video").map((m) => ({ kind: "motion" as const, id: m.short_id, created: m.created ?? 0, motion: m })),
   ].sort((a, b) => b.created - a.created || (a.kind === "motion" ? -1 : 1));
   const [active, setActive] = useState(0);
   const [voiceOn, setVoiceOn] = useState(true);

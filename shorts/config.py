@@ -707,6 +707,11 @@ MOTION_SERIES = os.getenv("MOTION_SERIES", "").strip() or BRAND_HANDLE
 #: story mode keeps between MAX_STORY_MAPPING_RETRIES and MAX_HOOK_FIX_RETRIES.
 MAX_MOTION_SCRIPT_RETRIES = _i("MAX_MOTION_SCRIPT_RETRIES", 3)
 MAX_MOTION_HOOK_FIX_RETRIES = _i("MAX_MOTION_HOOK_FIX_RETRIES", 2)
+#: A long-form VIDEO's script (2026-10-16): full attempts, and the targeted
+#: repair rounds after each failed attempt (only the failing shots rewritten —
+#: a video is 120+ captions, and a whole rewrite costs three reels' scripts).
+MAX_VIDEO_SCRIPT_ATTEMPTS = _i("MAX_VIDEO_SCRIPT_ATTEMPTS", 2)
+MAX_VIDEO_SHOT_FIX_ROUNDS = _i("MAX_VIDEO_SHOT_FIX_ROUNDS", 2)
 #: Phase 3: repair calls for failing scenes after the first scenes call.
 MAX_MOTION_SCENE_RETRIES = _i("MAX_MOTION_SCENE_RETRIES", 2)
 #: A 1-second language intro sting before a motion reel's first shot (the
@@ -739,10 +744,11 @@ MOTION_DESIGNS = ("classic", "midnight_lab", "studio")
 #: visual as a board, the explaining character large beside it, teaching —
 #: shorts/motion_teach.py) or "band" (the earlier strip under the visual).
 MOTION_STAGE = os.getenv("MOTION_STAGE", "board").strip().lower() or "board"
-#: How the characters are drawn: "rig" (the 2D characters) or "vrm" (3D VRM
-#: avatars from assets/avatars/mentor.vrm and student.vrm — web/src/motion/vrm).
-#: Reels made before keep what they were made with.
-MOTION_AVATARS = os.getenv("MOTION_AVATARS", "rig").strip().lower() or "rig"
+#: How the characters are drawn: "vrm" (3D VRM avatars from
+#: assets/avatars/mentor.vrm and student.vrm — web/src/motion/vrm; the default
+#: since 2026-10-16) or "rig" (the 2D characters). Reels made before keep what
+#: they were made with. A video always uses "vrm".
+MOTION_AVATARS = os.getenv("MOTION_AVATARS", "vrm").strip().lower() or "vrm"
 MOTION_VOICE = os.getenv("MOTION_VOICE", "chatterbox").strip().lower() or "chatterbox"
 MOTION_SILENT = MOTION_VOICE == "silent"
 MOTION_DESIGN = os.getenv("MOTION_DESIGN", "studio").strip() or "studio"
@@ -1093,3 +1099,8 @@ WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8").strip()
 # total past this, rather than starting it and discovering the overrun mid-
 # stage. A single reel's own budget, not the project's lifetime total.
 MAX_REEL_USD = _f_late("MAX_REEL_USD", 2.00)
+#: The same cap for one long-form VIDEO (format "video", 6-12 minutes): its
+#: script is three times a reel's and its scenes are asked in about five
+#: batches. About $2.50 typical, about $5.20 with every retry (a 16k-character
+#: document, Opus 5.5; motion_jobs._video_rows).
+MAX_VIDEO_USD = _f_late("MAX_VIDEO_USD", 6.00)

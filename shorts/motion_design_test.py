@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def test_new_reels_are_studio_with_their_themes_palette():
     assert config.MOTION_DESIGN == "studio" and "studio" in config.MOTION_DESIGNS
-    assert PLAN_REV == 3
+    assert PLAN_REV == 4
     assert palette_for("mentor_student", "studio") == "chalkboard"
     assert palette_for("interview", "studio") == "deep_teal"
     assert palette_for("myth_vs_fact", "studio") == "plum_gold"
@@ -36,7 +36,7 @@ def test_new_reels_are_studio_with_their_themes_palette():
     assert palette_for("mentor_student", "midnight_lab") == "midnight"
     assert palette_for("mentor_student", "classic") is None
     plan = _plan()
-    assert plan.rev == 3 and plan.palette == "midnight"      # the fixture's reel was set up in Midnight Lab
+    assert plan.rev == PLAN_REV and plan.palette == "midnight"      # the fixture's reel was set up in Midnight Lab
 
 
 def test_every_palette_keeps_the_fixed_meanings():

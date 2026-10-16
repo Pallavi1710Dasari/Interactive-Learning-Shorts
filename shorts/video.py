@@ -1,5 +1,6 @@
 """
-Render one short to a real MP4, the shape a phone expects: 1080x1920, H.264, AAC.
+Render one short to a real MP4, the shape a phone expects: 1080x1920, H.264, AAC
+(a long-form motion VIDEO, plan.format = "video": 1920x1080).
 
     python -m shorts.video <short_id>          # -> output/<short_id>/reel.mp4
     python -m shorts.video <short_id> --force  # re-render even if it is cached
@@ -206,7 +207,8 @@ class _Devtools:
             pass
 
 
-def _launch(chrome: str, port: int, profile: Path) -> subprocess.Popen:
+def _launch(chrome: str, port: int, profile: Path,
+            size: tuple[int, int] = (WIDTH, HEIGHT)) -> subprocess.Popen:
     """
     Headless Chrome, sized to the video, with WebGL actually working.
 
@@ -222,7 +224,7 @@ def _launch(chrome: str, port: int, profile: Path) -> subprocess.Popen:
          "--enable-unsafe-swiftshader",
          "--force-device-scale-factor=1",
          "--autoplay-policy=no-user-gesture-required",
-         f"--window-size={WIDTH},{HEIGHT}",
+         f"--window-size={size[0]},{size[1]}",
          f"--user-data-dir={profile}",
          f"--remote-debugging-port={port}",
          "about:blank"],
@@ -299,11 +301,12 @@ def _bg_scale_for(workers: int) -> float:
 
 def _capture_slice(chrome: str, base: str, short_id: str, outdir: Path,
                    indices: list[int], fps: int, on_frame, bg_scale: float = 0.5,
-                   route: str | None = None) -> None:
-    """Photograph one worker's share of the frames. Owns its own browser."""
+                   route: str | None = None, size: tuple[int, int] = (WIDTH, HEIGHT)) -> None:
+    """Photograph one worker's share of the frames. Owns its own browser.
+    `size`: the frame (a long-form video is 1920x1080)."""
     port = _free_port()
     profile = outdir / f"profile-{port}"
-    proc = _launch(chrome, port, profile)
+    proc = _launch(chrome, port, profile, size)
     dev = None
     try:
         dev = _Devtools(_page_ws(port))
@@ -314,7 +317,7 @@ def _capture_slice(chrome: str, base: str, short_id: str, outdir: Path,
         # came out 139px short and ffmpeg's scale+pad quietly letterboxed it back.
         # A chunk of every frame was not the reel at all.
         dev.send("Emulation.setDeviceMetricsOverride",
-                 {"width": WIDTH, "height": HEIGHT, "deviceScaleFactor": 1,
+                 {"width": size[0], "height": size[1], "deviceScaleFactor": 1,
                   "mobile": False})
         # a motion reel is photographed in its own player, drawn alone at
         # 1080x1920 (#motion-reel/<id>?bare=1) — the same window.__capture.seek
@@ -441,11 +444,18 @@ def render(short_id: str, force: bool = False,
                  and motion_bundle.is_motion_reel(config.OUTPUT_DIR, short_id))
 
     unit: ShortUnit | None = None
+    size = (WIDTH, HEIGHT)
+    video_format = False
     if is_motion:
         # MOTION REELS (2026-10-13): the plan is the timeline, the mixed
         # narration is audio/reel.wav, and the player is the motion player
         path = config.OUTPUT_DIR / short_id / "plan.json"
-        total = float(json.loads(path.read_text(encoding="utf-8"))["duration"])
+        plan_data = json.loads(path.read_text(encoding="utf-8"))
+        total = float(plan_data["duration"])
+        # a long-form video (2026-10-16) is photographed at its own 1920x1080
+        video_format = plan_data.get("format") == "video"
+        if video_format:
+            size = (int(plan_data.get("width") or 1920), int(plan_data.get("height") or 1080))
         if total <= 0:
             raise RuntimeError(f"{short_id} has a zero-length plan")
     elif is_story:
@@ -521,9 +531,10 @@ def render(short_id: str, force: bool = False,
         bg_scale = _bg_scale_for(workers)
         errors: list[BaseException] = []
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            route = f"#motion-reel/{short_id}?bare=1" if is_motion else None
+            route = (f"#motion-video/{short_id}?bare=1" if video_format
+                     else f"#motion-reel/{short_id}?bare=1" if is_motion else None)
             futures = [pool.submit(_capture_slice, chrome, base, short_id,
-                                   tmpdir, part, fps, tick, bg_scale, route)
+                                   tmpdir, part, fps, tick, bg_scale, route, size)
                        for part in slices if part]
             for f in futures:
                 try:
@@ -549,8 +560,8 @@ def render(short_id: str, force: bool = False,
         if audio.exists():
             cmd += ["-i", str(audio)]
         cmd += [
-            "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
-                   f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=0x0B0F0E",
+            "-vf", f"scale={size[0]}:{size[1]}:force_original_aspect_ratio=decrease,"
+                   f"pad={size[0]}:{size[1]}:(ow-iw)/2:(oh-ih)/2:color=0x0B0F0E",
             "-r", str(fps),
             # crf 20 -> 23 and preset medium -> slow: a pure encoding-efficiency
             # trade, not a visual one. ThreeStage's depth field never holds still —

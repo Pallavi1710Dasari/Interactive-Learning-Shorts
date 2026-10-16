@@ -27,12 +27,21 @@ export interface PlanShot {
   camera?: CameraCue[];
   /** the virtual cursor's moves (shorts/motion_camera.py); absent = none */
   cursor?: CursorCue[];
+  /** a VIDEO's shot (shorts/motion_video.py): the reel-layout region src it
+   *  is drawn from, into dst on the 1920x1080 frame, at scale s */
+  view?: PlanView | null;
 }
+export interface PlanView { src: Rect; dst: Rect; s: number }
 export type Rect = [number, number, number, number];
 export interface CameraCue { t0: number; t1: number; target: string; part: number | null; rect: Rect; zoom: number; viewport: Rect; why?: string }
 export interface CursorCue { t: number; do: "click" | "type"; target: string; part: number | null; rect: Rect; text?: string; t_end?: number }
 export type PlanCast = CastMember;
 export interface MotionPlan {
+  /** "video": a long-form landscape video (1920x1080, web/src/motion/video);
+   *  absent or "reel": a vertical reel (1080x1920) */
+  format?: "reel" | "video";
+  width?: number;
+  height?: number;
   /** The look it is drawn in (designs.ts); absent = "classic". */
   design?: string;
   /** The layout rules it is drawn by (shorts/schema.py MotionPlan.rev); absent = 1. */

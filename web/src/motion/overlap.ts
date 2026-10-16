@@ -156,7 +156,13 @@ function findCaptionBoxes(root: HTMLElement, frame: DOMRect, add: (o: Overlap) =
       }).map((c) => ({ part, r: clipped(c.getBoundingClientRect(), c.parentElement, root) }))
         .filter((x): x is { part: string; r: DOMRect } => !!x.r && x.r.width < frame.width * 0.97 && x.r.height < frame.height * 0.9);
     });
-  const safe = { left: frame.left + 1080 * 0.06 * k - 12 * k, right: frame.right - 1080 * 0.06 * k + 12 * k, bottom: frame.top + 1920 * 0.82 * k };
+  // a video's frame (1920 x 1080, video/VideoFrame.tsx): subtitles inside a
+  // 64-unit side margin, above the progress bar
+  const video = root.getAttribute("data-format") === "video" || root.querySelector("[data-format='video']") !== null;
+  const kv = frame.width / 1920;
+  const safe = video
+    ? { left: frame.left + 52 * kv, right: frame.right - 52 * kv, bottom: frame.top + 1046 * kv }
+    : { left: frame.left + 1080 * 0.06 * k - 12 * k, right: frame.right - 1080 * 0.06 * k + 12 * k, bottom: frame.top + 1920 * 0.82 * k };
   for (const b of boxes) {
     for (const f of figures) {
       if (inter(b.r, f) > 0) add({ kind: "caption-character", a: b.part, b: "character", textA: b.text, textB: "", share: +(inter(b.r, f) / (b.r.width * b.r.height)).toFixed(2) });

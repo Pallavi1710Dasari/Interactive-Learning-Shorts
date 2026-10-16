@@ -155,8 +155,9 @@ def _reel_exists(short_id: str) -> bool:
         out / f"{short_id}.motion.json", out / short_id))
 
 
-def _next_free_motion_id(base_id: str) -> str:
-    candidate = f"{base_id}__motion"
+def _next_free_motion_id(base_id: str, fmt: str = "reel") -> str:
+    """A free id for a new reel (<topic>__motion) or video (<topic>__video)."""
+    candidate = f"{base_id}__{'video' if fmt == 'video' else 'motion'}"
     if not _reel_exists(candidate):
         return candidate
     n = 2
@@ -306,7 +307,7 @@ def _run_setup(sections: list, doc_text: str, yes: bool,
 
 def build_setup_state(sections: list, wf: QuestionWorkflow,
                       understanding: SectionUnderstanding | None,
-                      template: str, template_source: str) -> dict:
+                      template: str, template_source: str, fmt: str = "reel") -> dict:
     """The setup state saved as output/<short_id>/setup.json, once the topic,
     the teaching approach and the template are decided. Shared by the CLI's
     setup and the web UI's (shorts/motion_jobs.py)."""
@@ -322,6 +323,10 @@ def build_setup_state(sections: list, wf: QuestionWorkflow,
     # 2026-10-01; checks.check_walkthrough_main_source).
     support_ids = ([sid for sid in walkthrough_session_ids(sections, topic.source_section_id)
                     if sid not in pool_ids] if template == "walkthrough" else [])
+    if fmt == "video" and not support_ids:
+        # a 6-12 minute lesson needs more than one heading's notes: with no
+        # numbered session, the rest of the document is its material too
+        support_ids = [s.section_id for s in sections if s.section_id not in pool_ids]
     return {
         "topic": topic.model_dump(),
         "section_id": section.section_id,
@@ -329,6 +334,8 @@ def build_setup_state(sections: list, wf: QuestionWorkflow,
         "workflow": wf.model_dump(),
         "template": template,
         "template_source": template_source,
+        # "reel" or "video" (schema.MotionFormat): what the job makes
+        "format": fmt,
         "pool_ids": list(pool_ids),
         "support_ids": support_ids,
         "next_topic": next_topic_for(sections, section.section_id,
@@ -612,21 +619,26 @@ def stage_script(short_id: str, state: dict, sections: list, yes: bool,
 
 def _script_kwargs(short_id: str, state: dict, sections: list,
                    theme: MotionThemeChoice | None) -> dict:
-    """The script stage's inputs from a reel's setup state and approved theme."""
+    """The script stage's inputs from a reel's setup state and approved theme.
+    A VIDEO explains from its whole pool and session (support_ids) — all of it
+    MATERIAL, not only numbers and terms: one heading's notes are rarely
+    enough for 6-12 minutes."""
+    video = state.get("format", "reel") == "video"
+    ids = list(state["pool_ids"]) + (list(state.get("support_ids", [])) if video else [])
     return {
         "topic": Topic(**state["topic"]),
         "section": find_section(sections, state["section_id"]),
         "understanding": (SectionUnderstanding(**state["understanding"])
                           if state.get("understanding") else None),
         "approach": QuestionWorkflow(**state["workflow"]).approved_teaching_approach,
-        "source_text": "\n\n".join(find_section(sections, sid).text
-                                    for sid in state["pool_ids"]),
-        "supporting_text": "\n\n".join(find_section(sections, sid).text
-                                        for sid in state.get("support_ids", [])),
+        "source_text": "\n\n".join(find_section(sections, sid).text for sid in ids),
+        "supporting_text": "" if video else "\n\n".join(find_section(sections, sid).text
+                                                       for sid in state.get("support_ids", [])),
         "template": theme.template if theme else state.get("template", "fix_story"),
         "theme": theme.theme if theme else None,
         "language": theme.language if theme else None,
         "next_topic": state.get("next_topic", ""),
+        "fmt": state.get("format", "reel"),
     }
 
 
@@ -639,12 +651,24 @@ def reuse_script(short_id: str, state: dict, sections: list,
         template=k["template"], supporting_text=k["supporting_text"], theme=k["theme"])
 
 
-def script_plan() -> list:
-    """The script stage's pre-flight plan: every attempt and hook fix."""
-    return [preflight.ModelPlan(
+#: Tokens (in, out) one script call takes: a video writes 6-12 minutes.
+SCRIPT_TOKENS = {"reel": (7000, 4500), "video": (9000, 16000)}
+
+
+def script_plan(fmt: str = "reel") -> list:
+    """The script stage's pre-flight plan: every attempt and hook fix (a
+    hook fix is planned at a full call's price: a safe overestimate), plus a
+    video's targeted shot repairs."""
+    attempts = config.MAX_VIDEO_SCRIPT_ATTEMPTS if fmt == "video" else config.MAX_MOTION_SCRIPT_RETRIES
+    plan = [preflight.ModelPlan(
         "motion_script", _model("motion_script"),
-        config.MAX_MOTION_SCRIPT_RETRIES * (1 + config.MAX_MOTION_HOOK_FIX_RETRIES),
-        preflight.text_cost_per_call(_model("motion_script"), 7000, 4500))]
+        attempts * (1 + config.MAX_MOTION_HOOK_FIX_RETRIES),
+        preflight.text_cost_per_call(_model("motion_script"), *SCRIPT_TOKENS[fmt]))]
+    if fmt == "video":
+        plan.append(preflight.ModelPlan(
+            "motion_shot_fix", _model("motion_shot_fix"), attempts * config.MAX_VIDEO_SHOT_FIX_ROUNDS,
+            preflight.text_cost_per_call(_model("motion_shot_fix"), 12000, 4000)))
+    return plan
 
 
 def write_script(short_id: str, state: dict, sections: list,
@@ -655,7 +679,7 @@ def write_script(short_id: str, state: dict, sections: list,
         k["topic"], k["section"], short_id=short_id, source_text=k["source_text"],
         understanding=k["understanding"], approach=k["approach"], next_topic=k["next_topic"],
         template=k["template"], supporting_text=k["supporting_text"], theme=k["theme"],
-        language=k["language"])
+        language=k["language"], fmt=k["fmt"])
 
 
 def save_script(short_id: str, script: MotionScript, facts: list[dict]) -> None:
@@ -712,13 +736,23 @@ def stage_scenes(short_id: str, script: MotionScript, yes: bool,
     return scripted
 
 
-def scenes_plan() -> list:
-    """The scenes stage's pre-flight plan: the first call and every repair."""
+#: Scenes calls a video's first pass takes (skills.scenes.scene_batches): a
+#: 6-12 minute video is about 40-70 shots, in batches of 14.
+VIDEO_SCENE_CALLS = 5
+
+
+def scenes_plan(fmt: str = "reel") -> list:
+    """The scenes stage's pre-flight plan: the first call (a video: one per
+    batch, each reading the whole script) and every repair."""
     from .skills.scenes import SYSTEM_MOTION_SCENES
+    from .skills.scenes import VIDEO_REPAIR_BATCHES
+    first = VIDEO_SCENE_CALLS if fmt == "video" else 1
+    repairs = config.MAX_MOTION_SCENE_RETRIES * (VIDEO_REPAIR_BATCHES if fmt == "video" else 1)
+    script_in = 22000 if fmt == "video" else 3500
     return [preflight.ModelPlan(
-        "motion_scenes", _model("motion_scenes"), 1 + config.MAX_MOTION_SCENE_RETRIES,
+        "motion_scenes", _model("motion_scenes"), first + repairs,
         preflight.text_cost_per_call(_model("motion_scenes"),
-                                     len(SYSTEM_MOTION_SCENES) // 3 + 3500, 6000))]
+                                     len(SYSTEM_MOTION_SCENES) // 3 + script_in, 6000))]
 
 
 def write_scenes(short_id: str, script: MotionScript, log=print, note: str = "") -> tuple[MotionScript, list]:
@@ -821,7 +855,7 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
     --characters / --character)."""
     characters = config.MOTION_CHARACTERS if characters is None else characters
     character = config.MOTION_CHARACTER_PRESET if character is None else character
-    from . import (motion_align, motion_camera, motion_plan_checks, motion_teach, motion_tidy,
+    from . import (motion_align, motion_camera, motion_plan_checks, motion_teach, motion_video, motion_tidy,
                    motion_timeline, motion_voice)
     print(f"\n=== timing: {short_id} ===")
     tags = []
@@ -872,17 +906,25 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
                                       tags=tags, intro=intro, characters=characters,
                                       character=character, design=design,
                                       host_character=host_character)
-    # characters that teach, beside the visual as at a board (shorts/motion_teach.py);
-    # the voice envelope reads the mix written above
-    if plan.characters and config.MOTION_STAGE == "board":
-        plan = motion_teach.stage_board(plan)
-        if config.MOTION_AVATARS == "vrm":
-            plan = motion_teach.with_vrm(plan)
-    # the virtual camera and cursor, on the words (shorts/motion_camera.py)
-    plan = motion_camera.direct(plan)
+    if getattr(script, "format", "reel") == "video":
+        # a long-form video: every shot drawn onto a 1920x1080 frame, the mentor
+        # a 3D avatar beside the board (shorts/motion_video.py); no virtual
+        # camera — the view already frames each visual
+        plan = motion_video.stage_video(plan)
+        layout_checks = motion_video.run_checks(plan)
+    else:
+        # characters that teach, beside the visual as at a board (shorts/motion_teach.py);
+        # the voice envelope reads the mix written above
+        if plan.characters and config.MOTION_STAGE == "board":
+            plan = motion_teach.stage_board(plan)
+            if config.MOTION_AVATARS == "vrm":
+                plan = motion_teach.with_vrm(plan)
+        # the virtual camera and cursor, on the words (shorts/motion_camera.py)
+        plan = motion_camera.direct(plan)
+        layout_checks = [*motion_plan_checks.run(plan), motion_camera.check_camera(plan)]
     results = checks.run_motion_scene_graders(script, clocks, dropped=dropped) + [
         checks.check_motion_duration_cap(script, measured_seconds=motion_timeline.total_seconds(clocks)),
-        *motion_plan_checks.run(plan), motion_camera.check_camera(plan)]
+        *layout_checks]
     for r in results:
         print(f"  {r}")
     if plan.characters:

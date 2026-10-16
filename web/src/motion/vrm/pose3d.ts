@@ -277,9 +277,9 @@ function solveAim(vrm: VRM, side: Side, target: THREE.Vector3, root: THREE.Quate
   const dist = toT.length();
   const u = toT.clone().normalize();
   const reach = len.upper + len.fore;
-  // never a straight arm: the chain is solved at most 78 % of its reach, so the
+  // never a straight arm: the chain is solved at most 86 % of its reach, so the
   // elbow always bends, down and a little back from the shoulder-target line
-  const d = clamp(dist, Math.abs(len.upper - len.fore) + 0.02, reach * 0.78);
+  const d = clamp(dist, Math.abs(len.upper - len.fore) + 0.02, reach * 0.86);
   const pole = new THREE.Vector3(0, -1, -0.25).applyQuaternion(root);
   const w = pole.sub(u.clone().multiplyScalar(pole.dot(u))).normalize();
   const cosA = clamp((len.upper ** 2 + d * d - len.fore ** 2) / (2 * len.upper * d), -1, 1);

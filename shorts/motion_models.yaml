@@ -55,6 +55,8 @@ steps:
   motion_theme:                 {tier: deliberate, worst: 2, typical: 1, input: 5500, output: 300}
   motion_script:                {tier: deliberate, worst: 3, typical: 1, input: 7000, output: 4500}
   motion_hook_fix:              {tier: deliberate, worst: 6, typical: 0, input: 7000, output: 400}
+  # a video's targeted repair: only the failing shots rewritten (skills/script.py)
+  motion_shot_fix:              {tier: deliberate, worst: 0, typical: 0, input: 12000, output: 4000}
   motion_scenes:                {tier: deliberate, worst: 1, typical: 1, input: 14000, output: 9000}
   motion_scenes_repair:         {tier: deliberate, worst: 2, typical: 0, input: 9000, output: 4000}
   motion_judge:                 {tier: deliberate, worst: 0, typical: 0, input: 8000, output: 1500}   # phase 4

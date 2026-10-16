@@ -86,6 +86,11 @@ def fake(model_cls, system: str, user: str):
         return model_cls(**_motion_script(user))
     if name == "MotionHookFix":
         return model_cls(**_motion_hook_fix(user))
+    if name == "MotionShotsFix":
+        # the stub hands the shots back as they were (a stub has nothing better)
+        import json as _json
+        blob = user.split("THE SHOTS TO REWRITE (JSON):\n", 1)[1].split("\n\n", 1)[0]
+        return model_cls(shots=_json.loads(blob))
     if name == "MotionThemeDraft":
         return model_cls(**_motion_theme(user))
     if name == "MotionScenesDraft":
@@ -1018,6 +1023,10 @@ def _motion_fixture_for(user: str) -> dict:
                       user, re.S) or user)
     template = _find(r"^TEMPLATE:\s*(\w+)", user, re.M) or "fix_story"
     theme = _find(r"^THEME:\s*(\w+)", user, re.M) or _MOTION_BASE_THEMES[template]
+    if re.search(r"^FORMAT:\s*video", user, re.M):
+        # a long-form video: no golden is that long — built from the material
+        from . import stub_motion
+        return stub_motion.video_draft(user, theme)
     for _path, data in _motion_fixtures_teaching(material):
         if _fixture_kind(data) == (template, theme) and _states_its_numbers(data, user):
             return data

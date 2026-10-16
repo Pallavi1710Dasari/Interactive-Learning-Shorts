@@ -1,4 +1,6 @@
-// #motion-reel/<short_id> — play a motion reel in the browser (phase 3):
+// #motion-reel/<short_id> — play a motion reel in the browser (phase 3);
+// #motion-video/<short_id> the same for a long-form video (plan.format =
+// "video": a 16:9 stage with its controls under it and its chapters):
 // the plan from /api/motion/<short_id>/plan and its narration from
 // /api/motion/<short_id>/audio, or any plan URL with #motion-reel?src=<url>
 // (the stub demo in web/public/motion-demo/ works with only Vite running).
@@ -8,7 +10,7 @@
 // a scrubbed frame and a captured frame at the same t are the same frame.
 // window.__capture.seek(t) puts the page at t for the phase 4 renderer.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MotionStage, shotIndexAt } from "./MotionStage";
 import { findOverlaps } from "../overlap";
 import type { MotionPlan } from "./types";
@@ -35,7 +37,7 @@ export function MotionPlayer() {
     // ?variant=<name>: a preview plan beside the reel's (output/<id>/plan.<name>.json)
     const url = route.src ?? (route.id ? `/api/motion/${encodeURIComponent(route.id)}/plan`
       + (route.variant ? `?variant=${encodeURIComponent(route.variant)}` : "") : null);
-    if (!url) { setError("Open #motion-reel/<short_id>, or #motion-reel?src=<plan url>."); return; }
+    if (!url) { setError("Open #motion-reel/<short_id> (or #motion-video/<short_id>), or #motion-reel?src=<plan url>."); return; }
     loadPlan(url).then(setPlan).catch((e) => setError(`Could not load the plan from ${url}: ${e.message}`));
   }, [route]);
 
@@ -62,6 +64,11 @@ export async function loadPlan(url: string): Promise<MotionPlan> {
  * clock while it plays), a scrubber, a button per shot, and the captions of
  * the shot on screen with their timing source. `bare` draws the frame alone
  * at full size (screenshots, capture). */
+function chapterButton(on: boolean): CSSProperties {
+  return { padding: "7px 12px", borderRadius: 999, border: "1px solid #3B4478", cursor: "pointer", fontSize: 13, fontWeight: 700,
+           background: on ? "#FDD13E" : "#1B2140", color: on ? "#151936" : "#C9CCF0" };
+}
+
 export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
   plan: MotionPlan; initialT?: number; bare?: boolean; width?: number;
 }) {
@@ -126,7 +133,8 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
     try { localStorage.setItem("motion_volume", String(volume)); localStorage.setItem("motion_muted", muted ? "1" : "0"); } catch { /* private window */ }
   }, [volume, muted, plan.audio_url]);
 
-  if (bare) return <MotionStage plan={plan} t={t} width={1080} />;
+  const video = plan.format === "video";
+  if (bare) return <MotionStage plan={plan} t={t} width={video ? 1920 : 1080} />;
 
   const toggle = () => {
     const a = audio.current;
@@ -149,12 +157,27 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
   };
   const i = shotIndexAt(plan, t);
   const shot = plan.shots[i];
+  const fmt = (x: number) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
+  const cards = video ? plan.shots.filter((s) => s.objects.some((o) => o.kind === "chapter_card")) : [];
   return (
-    <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-start" }}>
-      <div style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.45)" }}>
-        <MotionStage plan={plan} t={t} width={Math.min(width, window.innerWidth - 56)} />
+    <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-start",
+                  flexDirection: video ? "column" : "row" }}>
+      <div style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.45)", cursor: "pointer" }}
+           onClick={video ? toggle : undefined}>
+        <MotionStage plan={plan} t={t} width={Math.min(video ? 1120 : width, window.innerWidth - 56)} />
       </div>
-      <div style={{ flex: "1 1 320px", maxWidth: 560 }}>
+      <div style={{ flex: "1 1 320px", maxWidth: video ? 1120 : 560, width: video ? "100%" : undefined }}>
+        {video && cards.length > 0 && (
+          <div data-testid="chapters" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            <button onClick={() => seek(0)} style={chapterButton(i < plan.shots.indexOf(cards[0]))}>0:00 Intro</button>
+            {cards.map((c, k) => {
+              const next = cards[k + 1];
+              const here = t >= c.start && (!next || t < next.start) && t < (plan.shots.find((s) => s.beat === "result")?.start ?? Infinity);
+              return <button key={c.id} onClick={() => seek(c.start)} style={chapterButton(here)}>
+                {fmt(c.start)} {c.chapter}. {String(c.objects.find((o) => o.kind === "chapter_card")?.props.title ?? "")}</button>;
+            })}
+          </div>
+        )}
         <div style={{ color: "#9AA0C0", fontSize: 14, marginBottom: 14 }}>
           {plan.template}{plan.theme ? ` · ${plan.theme}` : ""} · {plan.duration.toFixed(1)}s ·
           caption timing: {plan.timing_source}{plan.audio_url ? "" : " · no audio"}
@@ -164,7 +187,7 @@ export function PlanPlayer({ plan, initialT = 0, bare = false, width = 420 }: {
                                             background: "#FDD13E", color: "#151936", cursor: "pointer" }}>
             {playing ? "Pause" : "Play"}
           </button>
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>{t.toFixed(2)}s / {plan.duration.toFixed(2)}s</span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{video ? `${fmt(t)} / ${fmt(plan.duration)}` : `${t.toFixed(2)}s / ${plan.duration.toFixed(2)}s`}</span>
         </div>
         {plan.voice === "stub" ? (
           <div data-testid="stub-voice" style={{ background: "rgba(253,209,62,0.12)", color: "#FFE28A", borderRadius: 10,

@@ -81,6 +81,11 @@ A SCENE is:
               never the same one twice in a row. type_scatter may only leave the hook.
               (Transitions are corrected automatically to fit your fields; choose fields well.)
   label       optional tracked-caps section label ("THE SETUP", "WHY IT FAILS"), <= 30 chars.
+  avatars     optional, only for reels with on-screen presenters: "on" or "off" for this
+              shot, or "" for the default — on for the hook, the main idea, the aha, a
+              student's question, the recap and the end card; off for code, code maps,
+              flows, memory panels and tables, so the visual gets the whole frame. A shot
+              showing code, a code map, a flow, a panel or a table is always drawn without them.
   objects     what is on screen, each with an id ("o1", "o2", ...) and the props its kind
               takes — nothing else.
   actions     the timeline: {"at": cue, "do": action, "target": object id, "value"?, "tone"?}.
@@ -364,6 +369,59 @@ def fall_back(script: MotionScript, failing: list[str], log=print) -> tuple[Moti
     return out, checks.run_motion_scene_graders(out), ids
 
 
+#: A video's scenes are asked in batches of at most this many shots (whole
+#: chapters kept together), so one answer never outgrows its output budget.
+VIDEO_SCENE_BATCH = 14
+#: A video's repair round sends at most this many batches; shots past them
+#: keep their scenes for the next round (or the fallback). It bounds the
+#: spend the scenes gate planned for (motion_reel.scenes_plan).
+VIDEO_REPAIR_BATCHES = 2
+
+
+def _batch_note(script: MotionScript, only: list[str], done: MotionScript | None = None) -> str:
+    """What a batch call is told: answer ONLY its own shots (it sees the whole
+    script for context), and what the shot just before them shows, so the
+    first one is not a repeat of it."""
+    ids = [s.id for s in script.shots]
+    lines = [f"THIS CALL: design the scenes of ONLY these {len(only)} shots: {', '.join(only)}. "
+             f"Return exactly those shots and no others — the other shots are designed in "
+             f"other calls. This is a long-form LANDSCAPE video ({len(ids)} shots): vary the "
+             f"object kinds from shot to shot, as you would across a reel. The rule \"no kind is "
+             f"the main object of more than 3 shots\" holds in every 11 shots in a row, and a "
+             f"video may use one stamp per chapter."]
+    i = ids.index(only[0])
+    prev = (done or script).shots[i - 1] if i > 0 else None
+    if prev is not None and prev.scene is not None:
+        kinds = ", ".join(o.kind for o in prev.scene.objects) or "nothing"
+        lines.append(f"The shot before this batch ({prev.id}) shows: {kinds} on {prev.scene.field} — "
+                     f"the first shot here must show something else.")
+    return "\n".join(lines)
+
+
+def scene_batches(script: MotionScript) -> list[list[str]]:
+    """The shot ids each scenes call covers: every shot in one call for a reel;
+    for a video, consecutive runs of at most VIDEO_SCENE_BATCH shots that break
+    at a chapter card (a chapter longer than the batch is split on its own)."""
+    ids = [s.id for s in script.shots]
+    if getattr(script, "format", "reel") != "video":
+        return [ids]
+    groups: list[list[str]] = []
+    for s in script.shots:
+        if not groups or s.beat == "chapter_card" or s.beat == "result":
+            groups.append([])
+        groups[-1].append(s.id)
+    out: list[list[str]] = []
+    for g in groups:
+        while len(g) > VIDEO_SCENE_BATCH:
+            out.append(g[:VIDEO_SCENE_BATCH])
+            g = g[VIDEO_SCENE_BATCH:]
+        if out and len(out[-1]) + len(g) <= VIDEO_SCENE_BATCH:
+            out[-1] = out[-1] + g
+        else:
+            out.append(g)
+    return out
+
+
 def write_motion_scenes(script: MotionScript, log=print,
                         attempts: list | None = None, note: str = "") -> tuple[MotionScript, list]:
     """Every shot's scene, graded. Returns (the script with scenes, the scene
@@ -371,14 +429,24 @@ def write_motion_scenes(script: MotionScript, log=print,
     fallback never leaves a grader failing. `attempts` (a list) receives every
     attempt's scenes, per-shot reasons and fallbacks. `note`: the reviewer's
     words when the scenes are redrawn from the reels feed ("redraw")."""
-    block = _script_block(script)
-    if note.strip():
-        # first, before the script (whatever reads the script reads to the end)
-        block = ("REVIEWER'S NOTE — the scenes are being redrawn because of this; answer it "
-                 "while keeping every rule:\n" + note.strip() + "\n\n" + block)
-    draft = ask_json(system_prompt(), block, MotionScenesDraft,
-                     max_tokens=12000, label="motion_scenes")
-    out = _apply(script, draft)
+    out = script
+    batches = scene_batches(script)
+    for n, only in enumerate(batches, 1):
+        block = _script_block(script, only=only if len(batches) > 1 else None)
+        if len(batches) > 1:
+            block = _batch_note(script, only, out) + "\n\n" + block
+        if note.strip():
+            # first, before the script (whatever reads the script reads to the end)
+            block = ("REVIEWER'S NOTE — the scenes are being redrawn because of this; answer it "
+                     "while keeping every rule:\n" + note.strip() + "\n\n" + block)
+        if len(batches) > 1:
+            log(f"  scenes: batch {n} of {len(batches)} ({only[0]}-{only[-1]})")
+        draft = ask_json(system_prompt(), block, MotionScenesDraft,
+                         max_tokens=12000, label="motion_scenes")
+        if len(batches) > 1:
+            # a shot outside this batch is another call's to design
+            draft = draft.model_copy(update={"shots": [s for s in draft.shots if s.id in only]})
+        out = _apply(out, draft)
     results = checks.run_motion_scene_graders(out)
     failing = _failing_shots(out, results)
     _record(attempts, "first", out, results, failing)
@@ -388,14 +456,22 @@ def write_motion_scenes(script: MotionScript, log=print,
         log(f"  scenes: {len(failing)} of {len(out.shots)} shot(s) failing — repair {attempt + 1}:")
         for sid, why in failing.items():
             log(f"    {sid}: {'; '.join(why)[:300]}")
-        reasons = "\n".join(f"- {sid}: {'; '.join(r)}" for sid, r in failing.items())
-        user = (_script_block(out, only=list(failing)) + "\n\nTHE CURRENT SCENES OF THESE SHOTS "
-                "FAILED REVIEW:\n" + reasons + "\n\nTHE CURRENT SCENES:\n" +
-                json.dumps({s.id: s.scene.model_dump() if s.scene else None
-                            for s in out.shots if s.id in failing}))
-        fix = ask_json(system_prompt(repair=True), user, MotionScenesDraft, max_tokens=6000,
-                       label="motion_scenes_repair")
-        out = _apply(out, fix)
+        ids = list(failing)
+        video = getattr(script, "format", "reel") == "video"
+        # a video's repairs go in batches too (a long video may have many failing shots)
+        groups = ([ids[k:k + VIDEO_SCENE_BATCH] for k in range(0, len(ids), VIDEO_SCENE_BATCH)]
+                  [:VIDEO_REPAIR_BATCHES] if video else [ids])
+        for group in groups:
+            reasons = "\n".join(f"- {sid}: {'; '.join(failing[sid])}" for sid in group)
+            user = (_script_block(out, only=group) + "\n\nTHE CURRENT SCENES OF THESE SHOTS "
+                    "FAILED REVIEW:\n" + reasons + "\n\nTHE CURRENT SCENES:\n" +
+                    json.dumps({s.id: s.scene.model_dump() if s.scene else None
+                                for s in out.shots if s.id in group}))
+            fix = ask_json(system_prompt(repair=True), user, MotionScenesDraft,
+                           max_tokens=12000 if video else 6000, label="motion_scenes_repair")
+            if video:
+                fix = fix.model_copy(update={"shots": [s for s in fix.shots if s.id in group]})
+            out = _apply(out, fix)
         results = checks.run_motion_scene_graders(out)
         failing = _failing_shots(out, results)
         _record(attempts, f"repair {attempt + 1}", out, results, failing)

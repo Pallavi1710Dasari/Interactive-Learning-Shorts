@@ -7462,6 +7462,39 @@ MOTION_DEFINER_CUES = ("called", "means", "meaning", "known as", "is a ", "is an
 #: answered by the very next sentence (decision 2026-10-01).
 MOTION_CHAPTER_QUESTION_MAX_WORDS = 6
 
+#: A long-form VIDEO (format "video", 2026-10-16: "videos like YouTube ... the
+#: content explaining the topic in an elaborate way"). The walkthrough's beats,
+#: 6-12 minutes long, in 5-10 chapters of 2-8 shots, landscape. Every other
+#: rule (beginner words, one caption per sentence, grounding) is the reel's.
+#: Each key overrides the module constant of the same name for a video script
+#: (_limit); a reel reads the constants as before.
+MOTION_VIDEO: dict = {
+    "MOTION_MAX_SECONDS": 750.0,             #: measured audio may run a little over 12 min
+    "MOTION_SECONDS": (360.0, 720.0),
+    "MOTION_WORDS": (936, 1872),             #: 6-12 min at MOTION_WORDS_PER_SECOND
+    "MOTION_CHAPTERS": (5, 10),
+    "MOTION_CHAPTER_SHOTS": (2, 8),
+    "MOTION_CHAPTER_MAX_WORDS": 300,
+    "MOTION_SHOT_WORDS": (8, 45),
+    "MOTION_BEAT_MAX_SECONDS": {"hook": 10.0, "name_it": 4.0, "chapter_card": 3.0, "cta": 5.0},
+    "MOTION_MAX_CODE_SHOTS": 10,
+    "MOTION_MAX_CODE_LINES": 4,
+    "MOTION_MAX_EXTRA_TERMS": 8,
+}
+
+
+def motion_format(script) -> str:
+    """"video" for a long-form video script or plan, else "reel"."""
+    return "video" if getattr(script, "format", "reel") == "video" else "reel"
+
+
+def _limit(script, name: str):
+    """The limit `name` (a module constant) for this script's format."""
+    if motion_format(script) == "video" and name in MOTION_VIDEO:
+        return MOTION_VIDEO[name]
+    return globals()[name]
+
+
 #: How a fix_story hook may open. Wider than story mode's HOOK_OPENERS: the
 #: change request names "Why does...", "What actually happens when..." as well
 #: as "Have you ever wondered why...".
@@ -7516,7 +7549,7 @@ _MOTION_SENTENCE_END = re.compile(r"[.!?…]+[\"'”’)\]]*(?=\s|$)")
 #: A chapter card's leading step label: "Step one. ", "Step 2: ", "Chapter three. ".
 #: Only stripped when something follows it, so a bare "Step one." stays a sentence.
 _MOTION_STEP_LABEL = re.compile(
-    r"^(?:step|chapter|part)\s+(?:\d+|one|two|three|four|five)\s*[.:]\s+(?=\S)", re.I)
+    r"^(?:step|chapter|part)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*[.:]\s+(?=\S)", re.I)
 
 
 def _motion_words(text: str) -> list[str]:
@@ -7677,8 +7710,9 @@ def _walkthrough_beats(script) -> list[str]:
     shots = list(script.shots)
     beats = [s.beat for s in shots]
     opening, closing = list(MOTION_WALKTHROUGH_OPENING), list(MOTION_WALKTHROUGH_CLOSING)
-    order = (" > ".join(opening) + " > (chapter_card > chapter x1-3) x2-4 > "
-             + " > ".join(closing))
+    per, many = _limit(script, "MOTION_CHAPTER_SHOTS"), _limit(script, "MOTION_CHAPTERS")
+    order = (" > ".join(opening) + f" > (chapter_card > chapter x{per[0]}-{per[1]}) "
+             f"x{many[0]}-{many[1]} > " + " > ".join(closing))
     problems: list[str] = []
     if beats[:len(opening)] != opening:
         problems.append(f"opens with {beats[:len(opening)]}, needs {opening} (order: {order})")
@@ -7687,6 +7721,7 @@ def _walkthrough_beats(script) -> list[str]:
     if problems:
         return problems
     middle = shots[len(opening):len(shots) - len(closing)]
+    per = _limit(script, "MOTION_CHAPTER_SHOTS")
     if not middle or middle[0].beat != "chapter_card":
         problems.append("the chapters must start with a chapter_card right after the "
                         f"example (order: {order})")
@@ -7694,9 +7729,9 @@ def _walkthrough_beats(script) -> list[str]:
     expected_n = 0
     for s in middle:
         if s.beat == "chapter_card":
-            if expected_n and not MOTION_CHAPTER_SHOTS[0] <= run <= MOTION_CHAPTER_SHOTS[1]:
+            if expected_n and not per[0] <= run <= per[1]:
                 problems.append(f"chapter {expected_n} has {run} shot(s) after its card, "
-                                f"needs {MOTION_CHAPTER_SHOTS[0]}-{MOTION_CHAPTER_SHOTS[1]}")
+                                f"needs {per[0]}-{per[1]}")
             expected_n += 1
             run = 0
         elif s.beat == "chapter":
@@ -7708,9 +7743,9 @@ def _walkthrough_beats(script) -> list[str]:
         if s.chapter != expected_n:
             problems.append(f"{s.id} ({s.beat}) is marked chapter {s.chapter}, "
                             f"it sits in chapter {expected_n}")
-    if expected_n and not MOTION_CHAPTER_SHOTS[0] <= run <= MOTION_CHAPTER_SHOTS[1]:
+    if expected_n and not per[0] <= run <= per[1]:
         problems.append(f"chapter {expected_n} has {run} shot(s) after its card, "
-                        f"needs {MOTION_CHAPTER_SHOTS[0]}-{MOTION_CHAPTER_SHOTS[1]}")
+                        f"needs {per[0]}-{per[1]}")
     outside = [s.id for s in shots if s.beat not in ("chapter_card", "chapter")
                and s.chapter is not None]
     if outside:
@@ -7741,13 +7776,14 @@ def check_motion_duration_cap(script, measured_seconds: float | None = None) -> 
     seconds = script.estimated_seconds if measured_seconds is None else measured_seconds
     kind = "estimated" if measured_seconds is None else "measured"
     details = {"seconds": seconds, "kind": kind}
-    if seconds > MOTION_MAX_SECONDS:
+    cap = _limit(script, "MOTION_MAX_SECONDS")
+    if seconds > cap:
         return GraderResult("motion_duration_cap", False,
                             f"{seconds:.1f}s ({kind}) is over the hard cap of "
-                            f"{MOTION_MAX_SECONDS:g}s — cut it, or split the topic into a "
+                            f"{cap:g}s — cut it, or split the topic into a "
                             f"series", details)
     return GraderResult("motion_duration_cap", True,
-                        f"{seconds:.1f}s ({kind}), under {MOTION_MAX_SECONDS:g}s", details)
+                        f"{seconds:.1f}s ({kind}), under {cap:g}s", details)
 
 
 def check_motion_has_fix_and_payoff(script, source_text: str) -> GraderResult:
@@ -7890,10 +7926,11 @@ def check_motion_word_budget(script) -> GraderResult:
     off: list[str] = []
     total = sum(len(s.speech.split()) for s in script.shots)
     seconds = script.estimated_seconds
-    lo, hi = MOTION_TEMPLATE_WORDS[template]
-    slo_s, shi_s = MOTION_TEMPLATE_SECONDS[template]
+    video = motion_format(script) == "video"
+    lo, hi = MOTION_VIDEO["MOTION_WORDS"] if video else MOTION_TEMPLATE_WORDS[template]
+    slo_s, shi_s = MOTION_VIDEO["MOTION_SECONDS"] if video else MOTION_TEMPLATE_SECONDS[template]
     theme = _motion_theme(script)
-    kind = f"a {template}" if theme.base else f"a {theme.id} reel"
+    kind = "a video" if video else f"a {template}" if theme.base else f"a {theme.id} reel"
     if not lo <= total <= hi:
         problems.append(f"{total} spoken words, {kind} needs {lo}-{hi} "
                         f"({'too long' if total > hi else 'too short'})")
@@ -7901,8 +7938,8 @@ def check_motion_word_budget(script) -> GraderResult:
         problems.append(f"~{seconds:.1f}s estimated, {kind} needs {slo_s:g}-{shi_s:g}s "
                         f"({'too long' if seconds > shi_s else 'too short'})")
     length_ok = not problems
-    slo, shi = MOTION_SHOT_WORDS
-    caps = MOTION_BEAT_MAX_SECONDS[template]
+    slo, shi = _limit(script, "MOTION_SHOT_WORDS")
+    caps = MOTION_VIDEO["MOTION_BEAT_MAX_SECONDS"] if video else MOTION_BEAT_MAX_SECONDS[template]
     for s in script.shots:
         n = len(s.speech.split())
         lo_n = MOTION_BEAT_MIN_WORDS.get(s.beat, slo)
@@ -8186,13 +8223,14 @@ def check_motion_code_shots(script, source_text: str = "") -> GraderResult:
     allowed = MOTION_CODE_BEATS[template]
     problems: list[str] = []
     coded = [s for s in script.shots if any(line.strip() for line in s.code)]
-    if len(coded) > MOTION_MAX_CODE_SHOTS:
-        problems.append(f"{len(coded)} shots show code, max {MOTION_MAX_CODE_SHOTS}")
+    max_shots, max_lines = _limit(script, "MOTION_MAX_CODE_SHOTS"), _limit(script, "MOTION_MAX_CODE_LINES")
+    if len(coded) > max_shots:
+        problems.append(f"{len(coded)} shots show code, max {max_shots}")
     for s in coded:
         if s.beat not in allowed:
             problems.append(f"{s.id} ({s.beat}) shows code — only {allowed} may")
-        if len(s.code) > MOTION_MAX_CODE_LINES:
-            problems.append(f"{s.id} shows {len(s.code)} code lines, max {MOTION_MAX_CODE_LINES}")
+        if len(s.code) > max_lines:
+            problems.append(f"{s.id} shows {len(s.code)} code lines, max {max_lines}")
         for line in s.code:
             if len(line) > MOTION_MAX_CODE_CHARS:
                 problems.append(f"{s.id} code line {line!r} is {len(line)} chars, "
@@ -8301,9 +8339,10 @@ def check_motion_plain_words(script, source_text: str = "") -> GraderResult:
         problems.append(f"word(s) over {MOTION_MAX_SYLLABLES} syllables: {long_words} — use "
                         f"plainer words for beginners, or explain a term the source uses "
                         f"in the same sentence ('..., called its vocabulary')")
-    if len(terms) > MOTION_MAX_EXTRA_TERMS:
+    most = _limit(script, "MOTION_MAX_EXTRA_TERMS")
+    if len(terms) > most:
         problems.append(f"{len(terms)} long terms {sorted(terms)}, max "
-                        f"{MOTION_MAX_EXTRA_TERMS} per reel beyond the concept's name")
+                        f"{most} per {motion_format(script)} beyond the concept's name")
     if problems:
         return GraderResult("motion_plain_words", False, "; ".join(problems))
     extra = f", explained term(s) {sorted(terms)}" if terms else ""
@@ -8528,7 +8567,8 @@ def check_walkthrough_chapters(script) -> GraderResult:
     if template != "walkthrough":
         return _not_this_template("walkthrough_chapters", template)
     problems: list[str] = []
-    lo, hi = MOTION_CHAPTERS
+    lo, hi = _limit(script, "MOTION_CHAPTERS")
+    most = _limit(script, "MOTION_CHAPTER_MAX_WORDS")
     n = len(script.chapters)
     if not lo <= n <= hi:
         problems.append(f"{n} chapters, needs {lo}-{hi}"
@@ -8551,9 +8591,9 @@ def check_walkthrough_chapters(script) -> GraderResult:
             problems.append(f"chapter {k} needs exactly one chapter_card, first "
                             f"(has {len(cards)})")
         words = sum(len(s.speech.split()) for s in shots)
-        if words > MOTION_CHAPTER_MAX_WORDS:
+        if words > most:
             problems.append(f"chapter {k} is {words} spoken words, max "
-                            f"{MOTION_CHAPTER_MAX_WORDS}")
+                            f"{most}")
     if problems:
         return GraderResult("walkthrough_chapters", False, "; ".join(problems))
     return GraderResult("walkthrough_chapters", True,
@@ -8586,8 +8626,16 @@ def check_walkthrough_running_example(script) -> GraderResult:
             problems.append(f"the example shot shows {intro.example}, the running example "
                             f"starts as {ex.items}")
     chapters = script.chapters
+    if motion_format(script) == "video":
+        # a long video may teach some chapters with their own examples: only
+        # the chapters that carry the running example (a state in or out) must
+        # chain, in order, from the example's items; at least one carries it
+        chapters = [c for c in chapters if c.example_in or c.example_out]
+        if not chapters:
+            problems.append("no chapter carries the running example (give at least one "
+                            "chapter example_in / example_out)")
     if chapters and chapters[0].example_in != ex.items:
-        problems.append(f"chapter 1 starts from {chapters[0].example_in}, but the running "
+        problems.append(f"chapter {chapters[0].n} starts from {chapters[0].example_in}, but the running "
                         f"example is {ex.items}")
     for prev, cur in zip(chapters, chapters[1:]):
         if cur.example_in != prev.example_out:
@@ -8660,6 +8708,9 @@ def check_motion_numbers_sourced(script, source_text: str) -> GraderResult:
     states = ([ex.items] if ex else []) + [c.example_in for c in script.chapters] \
         + [c.example_out for c in script.chapters]
     derived |= {str(len(s)) for s in states if s}
+    if motion_format(script) == "video":
+        # a video works its own examples in code: a number its code shows may be said
+        derived |= {n for sh in script.shots for line in sh.code for n in _numbers_in(line)}
     problems: list[str] = []
     off: list[str] = []
     for s in script.shots:
@@ -8769,7 +8820,9 @@ def check_walkthrough_main_source(script, main_text: str | None = None,
         if borrowed:
             problems.append(f"chapter {c.n} {c.title!r}: {borrowed} not in the main section — "
                             f"each step must be explained there, not only in a supporting one")
-        elif words and not any(_title_stem(w) in main_stems for w in words):
+        elif words and motion_format(script) != "video" and not any(_title_stem(w) in main_stems for w in words):
+            # (a video's chapters include the narrator's own: "Common mistakes",
+            # "Try it yourself" — only a step borrowed from a supporting section fails)
             problems.append(f"chapter {c.n} {c.title!r}: none of {words} is in the main "
                             f"section — name the step in the main section's words")
     if problems:
@@ -9180,8 +9233,10 @@ def check_motion_scene_valid(script) -> GraderResult:
                 off.append(s.id)
             last_kind = sc.transition
         prev = s
-    if stamps > 1:
-        problems.append(f"{stamps} stamps — at most one verdict stamp per reel")
+    # a video: one verdict stamp per chapter (a reel's one, per stretch of the lesson)
+    most = max(1, len(script.chapters)) if motion_format(script) == "video" else 1
+    if stamps > most:
+        problems.append(f"{stamps} stamps — at most {'one verdict stamp per chapter' if most > 1 else 'one verdict stamp per reel'}")
     if problems:
         return GraderResult("motion_scene_valid", False, "; ".join(problems),
                             {"shots": sorted(set(off))})
@@ -9198,7 +9253,7 @@ def check_motion_payoff_mirrors_hook(script, dropped=()) -> GraderResult:
     by_beat = {s.beat: s for s in script.shots}
     if _template(script) == "walkthrough":
         res = by_beat.get("result")
-        final = script.chapters[-1].example_out if script.chapters else []
+        final = next((c.example_out for c in reversed(script.chapters) if c.example_out), [])
         if res is None or res.scene is None:
             return GraderResult("motion_payoff_mirrors_hook", False, "no result scene")
         rows = [o for o in res.scene.objects if o.kind == "token_row"]
@@ -9297,6 +9352,10 @@ _SCENE_ACCESSORIES = frozenset({"status_pill", "connector", "stamp", "identity_t
 _SCENE_OWN_TEXT = frozenset({"title_card", "end_card", "takeaway_list", "recap_grid", "identity_title"})
 MOTION_MAX_KIND_SHOTS = 3          #: one main object kind on at most this many shots
 MOTION_MIN_MAIN_KINDS = 4          #: distinct main kinds in a reel of 8+ shots
+#: A VIDEO's variety window: the per-kind cap holds in every run of this many
+#: shots in a row — a reel's length — not across the whole 6-12 minutes, where
+#: about a dozen kinds cannot each stay under 3 of 50+ shots (2026-10-16).
+MOTION_VIDEO_VARIETY_WINDOW = 11
 
 
 def _main_kinds(script, shot) -> frozenset:
@@ -9328,7 +9387,21 @@ def check_motion_scene_variety(script) -> GraderResult:
     for s in shots:
         for k in _main_kinds(script, s):
             counts.setdefault(k, []).append(s.id)
+    video = motion_format(script) == "video"
     for k, ids in counts.items():
+        if video and k != "chapter_card":
+            # a video: at most MOTION_MAX_KIND_SHOTS in any window of a reel's length
+            pos = {s.id: i for i, s in enumerate(shots)}
+            at = [pos[i] for i in ids]
+            for j in range(len(at) - MOTION_MAX_KIND_SHOTS):
+                if at[j + MOTION_MAX_KIND_SHOTS] - at[j] < MOTION_VIDEO_VARIETY_WINDOW:
+                    near = ids[j:j + MOTION_MAX_KIND_SHOTS + 1]
+                    problems.append(f"{k} is the main object on {len(near)} shots within "
+                                    f"{MOTION_VIDEO_VARIETY_WINDOW} in a row ({', '.join(near)}), max "
+                                    f"{MOTION_MAX_KIND_SHOTS} — use another kind from the library")
+                    off.append(near[-1])
+                    break
+            continue
         # one chapter card per chapter is the walkthrough's structure
         if len(ids) > MOTION_MAX_KIND_SHOTS and k != "chapter_card":
             problems.append(f"{k} is the main object on {len(ids)} shots ({', '.join(ids)}), max "

@@ -149,9 +149,12 @@ export function CodeAnnotated({ lines, parts, active, reached = active, firstAge
 
 /** The CTA end card, rev 2. Ages are seconds since each step (negative or
  * 99 = not yet). `tagsShown`: how many hashtags have popped. */
-export function EndCardCued({ series, upNext, tags, local, tapAge, revealAge, tagAges, settleAge, identity }: {
+export function EndCardCued({ series, upNext, tags, local, tapAge, revealAge, tagAges, settleAge, identity, solid = false }: {
   series: string; upNext: string; tags: string[]; local: number; tapAge: number; revealAge: number;
   tagAges: number[]; settleAge: number; identity?: IdentitySpec | null;
+  /** keep the card's own indigo even where the design draws cards
+   *  transparent: its words are white, and a light field would lose them */
+  solid?: boolean;
 }) {
   const press = tapAge >= 0 && tapAge < 0.35 ? Math.sin((tapAge / 0.35) * Math.PI) : 0;
   const followed = tapAge >= 0.15;
@@ -159,7 +162,9 @@ export function EndCardCued({ series, upNext, tags, local, tapAge, revealAge, ta
   const settle = settleAge >= 0 && settleAge < 0.6 ? Math.sin((settleAge / 0.6) * Math.PI) * 0.025 : 0;
   const ring = identity ? toneOn(identity, "navy") : C.yellow;
   return (
-    <div style={{ position: "absolute", inset: 0, background: "var(--motion-card-bg, linear-gradient(to bottom, #5B4BF5, #4234D6))",
+    <div style={{ position: "absolute", inset: 0,
+                  background: solid ? "linear-gradient(to bottom, #5B4BF5, #4234D6)"
+                    : "var(--motion-card-bg, linear-gradient(to bottom, #5B4BF5, #4234D6))",
                   color: C.white, transform: `scale(${1 + settle})` }}>
       <At x={W / 2} y={560} center style={popStyle(seg(local, 0, 0.5))}>
         <div style={{ fontSize: 58, fontWeight: 800, letterSpacing: -1, whiteSpace: "nowrap" }}>{series}</div>

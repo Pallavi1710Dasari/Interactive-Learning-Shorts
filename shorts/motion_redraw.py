@@ -26,15 +26,26 @@ _LOCK = threading.Lock()
 _JOBS: dict[str, dict] = {}
 
 
-def estimate() -> float:
-    """The most a redraw can cost: the scenes call and every repair."""
-    return 0.0 if config.STUB else round(sum(p.cost for p in mr.scenes_plan()), 4)
+def _format(short_id: str | None) -> str:
+    """"video" for a long-form video's script, else "reel"."""
+    if short_id and mr.motion_path(short_id).exists():
+        try:
+            return MotionScript.model_validate_json(mr.motion_path(short_id).read_text(encoding="utf-8")).format
+        except ValueError:
+            pass
+    return "reel"
+
+
+def estimate(short_id: str | None = None) -> float:
+    """The most a redraw can cost: the scenes call (a video: one per batch)
+    and every repair."""
+    return 0.0 if config.STUB else round(sum(p.cost for p in mr.scenes_plan(_format(short_id))), 4)
 
 
 def status(short_id: str) -> dict:
     with _LOCK:
         job = dict(_JOBS.get(short_id) or {"status": "idle"})
-    job.update(short_id=short_id, estimate=estimate(), stub=bool(config.STUB))
+    job.update(short_id=short_id, estimate=estimate(short_id), stub=bool(config.STUB))
     return job
 
 

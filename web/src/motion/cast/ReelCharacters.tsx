@@ -65,6 +65,29 @@ export function charactersOn(plan: MotionPlan, shot: PlanShot): boolean {
   return shot.layout === "duo" && !shot.objects.some((o) => FULL_KINDS.has(o.kind));   // older plans
 }
 
+const COME_GO = (library as unknown as { avatars: { enter: number; exit: number; slide: number } }).avatars;
+/** How far a slide-out pushes a presenter toward its own edge, in px. */
+export const PRESENCE_SLIDE = COME_GO.slide;
+
+/** How far the board presenters are on screen at t, on shot i (0 gone, 1 in
+ * place). Rev 4 plans: they come in over `enter` seconds once an on shot
+ * after an off one has finished its transition, and leave over the last `exit` seconds of an on shot
+ * before an off one (library.json avatars). Older plans: in place on every
+ * shot they are on (their fade rides the shot's transition). */
+export function presenceAt(plan: MotionPlan, i: number, t: number, transition = 0): number {
+  const shot = plan.shots[i];
+  if (!charactersOn(plan, shot)) return 0;
+  if ((plan.rev ?? 1) < 4) return 1;
+  const prev = plan.shots[i - 1], next = plan.shots[i + 1];
+  let p = 1;
+  // they come in once the shot's own transition (`transition` s) has brought
+  // the board in, never over the outgoing visual
+  if (prev && !charactersOn(plan, prev)) p = Math.min(p, (t - shot.start - transition) / COME_GO.enter);
+  if (next && !charactersOn(plan, next)) p = Math.min(p, (shot.end - t) / COME_GO.exit);
+  p = Math.max(0, Math.min(1, p));
+  return p * p * (3 - 2 * p);
+}
+
 function centreX(side: CharacterTrack["side"]): number {
   return side === "center" ? STAGE.center_x : STAGE.cx[side === "left" ? 0 : 1];
 }

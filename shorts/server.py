@@ -1942,10 +1942,15 @@ def _motion_job_call(fn, *args, **kw) -> dict:
 
 @app.post("/api/motion-jobs")
 async def motion_job_create(text: str | None = Form(default=None),
-                            file: UploadFile | None = File(default=None)):
-    """Upload reading material for a new MOTION reel. Free: it saves the
-    document and returns the job at its options screen."""
+                            file: UploadFile | None = File(default=None),
+                            format: str = Form(default="reel")):
+    """Upload reading material for a new MOTION reel — or, with format
+    "video", a long-form landscape video. Free: it saves the document and
+    returns the job at its options screen."""
     from . import motion_jobs
+    from .schema import MOTION_FORMATS
+    if format not in MOTION_FORMATS:
+        raise HTTPException(400, f"format must be one of {MOTION_FORMATS}")
     if file is not None:
         raw = (await file.read()).decode("utf-8", errors="replace")
         name = Path(file.filename or "upload.md").name
@@ -1964,7 +1969,7 @@ async def motion_job_create(text: str | None = Form(default=None),
         path.unlink(missing_ok=True)
         raise HTTPException(422, "no sections found. Use markdown headings like "
                                  "'## 3.1 Why paging exists' so the reel can cite where it came from.")
-    return motion_jobs.view(motion_jobs.new_job(path, name))
+    return motion_jobs.view(motion_jobs.new_job(path, name, fmt=format))
 
 
 @app.get("/api/motion-jobs")

@@ -161,6 +161,15 @@ NARROW_KINDS = frozenset({"status_pill", "trigger_chip", "big_counter", "token_r
 ARRANGEMENTS = ("column", "inset_left", "offset", "split", "inset_right")
 #: How wide an inset shot's objects are drawn.
 INSET_W = 820
+#: A shot drawn on the board beside the presenters ("board_right",
+#: motion_teach.stage_board): every placed object against the board's right
+#: edge, the mentor's side, so a pointing hand reaches it — the compact kinds
+#: this narrow, the rest INSET_W (their content needs the width).
+BOARD_RIGHT_W = 620
+#: How far a board_right object stays in from the board's right edge, so a
+#: corner badge (a compare card's ✓, a stamp) is not cut off by the board.
+BOARD_RIGHT_PAD = 24
+BOARD_COMPACT = NARROW_KINDS | {"compare", "entity_card", "callout", "kinetic_title"}
 #: A full-frame card is its own layout.
 FULL_LAYOUT = {"title_card": "cover", "end_card": "end", "takeaway_list": "notes", "recap_grid": "grid",
                "chapter_card": "chapter", "code_map": "code"}
@@ -214,7 +223,8 @@ def layout_scene(scene: MotionScene, duo: bool, arrangement: str = "column") -> 
     region's centre. Full-frame objects draw themselves.
     `arrangement` (rev 3, choose_arrangements): "offset" pushes the narrow
     objects alternately left and right; "split" sets two side by side;
-    "inset_left" / "inset_right" draw every object INSET_W wide against one side."""
+    "inset_left" / "inset_right" draw every object INSET_W wide against one side;
+    "board_right" BOARD_RIGHT_W wide against the right (a shot on the board)."""
     f = lib.library()["frame"]
     top, bottom = _region(duo)
     x = (f["w"] - f["content_w"]) / 2
@@ -232,10 +242,13 @@ def layout_scene(scene: MotionScene, duo: bool, arrangement: str = "column") -> 
         h = object_height(o)
         boxes[o.id] = MotionBox(x=x, y=round(y, 1), w=f["content_w"], h=round(h, 1))
         y += h
-    if arrangement in ("inset_left", "inset_right"):
-        ix = x if arrangement == "inset_left" else x + f["content_w"] - INSET_W
+    if arrangement in ("inset_left", "inset_right", "board_right"):
         for o in placed:
-            boxes[o.id] = boxes[o.id].model_copy(update={"x": ix, "w": INSET_W})
+            compact = o.kind in BOARD_COMPACT or (o.kind == "memory_box" and not o.props.get("points_to"))
+            w = BOARD_RIGHT_W if arrangement == "board_right" and compact else INSET_W
+            ix = (x if arrangement == "inset_left"
+                  else x + f["content_w"] - w - (BOARD_RIGHT_PAD if arrangement == "board_right" else 0))
+            boxes[o.id] = boxes[o.id].model_copy(update={"x": ix, "w": w})
     elif arrangement == "offset":
         narrow_w = 620
         for i, o in enumerate(o for o in placed if _narrow(o)):
@@ -739,6 +752,31 @@ def _nudge_for(kind: str) -> str:
     return "enter"
 
 
+def _video_turn(script: MotionScript, shot: MotionShot) -> int:
+    """Which chapter shot this is, 0-based, within its chapter."""
+    mine = [s.id for s in script.shots if s.beat == "chapter" and s.chapter == shot.chapter]
+    return mine.index(shot.id) if shot.id in mine else 0
+
+
+def final_state(script: MotionScript) -> list[str]:
+    """The running example's final state: the last chapter that carries it
+    (a video's later chapters may teach with their own examples)."""
+    return next((c.example_out for c in reversed(script.chapters) if c.example_out), [])
+
+
+def _key_words(shot: MotionShot, most: int = 4) -> list[str]:
+    """The shot's own key words, in the order said: the longer plain words,
+    once each — what a chapter shot with no example to show puts in chips."""
+    out: list[str] = []
+    for w in shot_words(shot):
+        k = _key(w)
+        if len(k) >= 4 and k not in _WEAK_CUES and k not in {_key(x) for x in out}:
+            out.append(w.strip(".,!?;:\"'"))
+        if len(out) == most:
+            break
+    return out or [_fit(_first_sentence(shot), 14)]
+
+
 def _chips(items: list[str], cap: int = 44) -> list[str]:
     """As many items as fit one chip row."""
     out: list[str] = []
@@ -1108,7 +1146,7 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         b.act("enter", o1)
         primary_nudge = (o1, "highlight")
     elif beat == "recap":
-        final = script.chapters[-1].example_out if script.chapters else []
+        final = final_state(script)
         o1 = b.add("recap_grid", concept=_fit(concept, 16), steps=[c.title for c in script.chapters],
                    final=_chips(final, 60))
         b.act("enter", o1)
@@ -1136,13 +1174,45 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         o1 = b.add("chapter_card", n=shot.chapter or 1, of=len(script.chapters) or 1,
                    title=_fit(ch.title if ch else _first_sentence(shot), 32))
         b.act("enter", o1)
+    elif (beat == "chapter" and getattr(script, "format", "reel") == "video" and not shot.example
+          and _video_turn(script, shot) % 4 in (1, 2, 3)):
+        # A VIDEO's chapter of up to eight shots: the fallback picture turns
+        # through four looks (chips, a flow, a card, a memory box), so a
+        # chapter whose AI scenes failed does not show one picture eight times
+        turn = _video_turn(script, shot) % 4
+        ch = next((c for c in script.chapters if c.n == shot.chapter), None)
+        words = _key_words(shot)
+        if turn == 1:
+            o1 = b.add("flow", steps=_steps(script, shot))
+            b.act("enter", o1)
+            b.act("travel", o1, _later_word(shot, 2))
+        elif turn == 2:
+            # a named thing whose value changes as the line is said
+            o1 = b.add("entity_card", label=_fit(words[0] if words else concept, 16),
+                       value=_fit(words[1] if len(words) > 1 else "?", 14))
+            b.act("enter", o1)
+            if len(words) > 2:
+                b.act("state", o1, _cue_for(words[2]), value=_fit(words[2], 14))
+        else:
+            o1 = _memory(b, shot, script, words[0] if words else concept)
+            b.act("enter", o1)
+            if len(words) > 1:
+                b.act("state", o1, _cue_for(words[1]), value=_fit(words[1], 14))
+        label = _fit((ch.title if ch else "").upper(), 30)
+        primary_nudge = (o1, _nudge_for(b.objects[-1].kind))
     elif beat == "chapter":
         ch = next((c for c in script.chapters if c.n == shot.chapter), None)
-        state = shot.example or (ch.example_out if ch else hl)
+        # a video's chapter may teach with its own example (no running state):
+        # its highlighted words, else the shot's own key words, as they are said
+        # (a video's chapter shot shows its own state or words: a chapter of
+        # up to eight shots showing one state every time would hold still)
+        video = getattr(script, "format", "reel") == "video"
+        state = (shot.example or ([] if video else (ch.example_out if ch else []))
+                 or hl or _key_words(shot))
         items = _chips(state, 44)
         o1 = b.add("token_row", items=items, tones=["plain"] * len(items))
         b.act("enter", o1)
-        for h in hl[:2]:
+        for h in (hl[:2] if hl or shot.example or (ch and ch.example_out and not video) else items):
             if any(_key(h) == _key(it) for it in items):
                 b.act("highlight", o1, _cue_for(h),
                       value=str([_key(i) for i in items].index(_key(h)) + 1))
@@ -1150,7 +1220,7 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         primary_nudge = (o1, "highlight")
     elif beat == "result":
         first = script.running_example.items if script.running_example else []
-        final = script.chapters[-1].example_out if script.chapters else []
+        final = final_state(script)
         o1 = b.add("big_counter", value=f"{len(first)} → {len(final)}", label="items")
         b.act("enter", o1)
         b.act("count", o1)

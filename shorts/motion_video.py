@@ -103,11 +103,12 @@ def _relayout(shot, on: bool):
     return shot
 
 
-def stage_video(plan):
+def stage_video(plan, vrm: dict | None = None):
     """The plan staged as a landscape video: the presenter (one VRM mentor
     per speaker) on the shots avatar_presence picks, every shot given its
     view, the characters directed to teach. A plan without characters gets
-    only the views."""
+    only the views. `vrm`: role -> the 3D avatar picked for it (the
+    Characters step; motion_teach.vrm_for)."""
     g = geometry()
     kinds = lib.object_kinds()
     plan = plan.model_copy(update={"format": "video"})
@@ -122,7 +123,8 @@ def stage_video(plan):
     video = plan.model_copy(update={"format": "video", "width": W, "height": H, "stage": "video",
                                     "shots": shots})
     if plan.characters:
-        tracks = [t.model_copy(update={"cues": [], "vrm": "student" if t.side == "left" else "mentor"})
+        n = len(plan.characters)
+        tracks = [t.model_copy(update={"cues": [], "vrm": motion_teach.vrm_for(t, n, vrm)})
                   for t in plan.characters]
         video = motion_teach.direct(video.model_copy(update={"avatars": "vrm", "characters": tracks}))
     return video

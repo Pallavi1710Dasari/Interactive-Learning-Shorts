@@ -255,8 +255,19 @@ def summary(job: dict) -> dict:
         from . import motion_voice
         names = mcp.defaults()
         vlabels = {k: v[1] for k, v in motion_voice.available_voices().items()}
-        parts = [f"{(names.get(a, {}).get('name') or a)}{' (host)' if a == 'host' else ''} · "
-                 f"{vlabels.get(opts['voices'].get(r, ''), 'voice')}" for r, a in opts["avatars"].items()]
+        # the 3D avatar each speaker wears, when the reel draws them (else the 2D character)
+        from . import motion_teach
+        labels3d = {a["value"]: a["label"] for a in motion_teach.vrm_avatars()}
+        three_d = opts.get("format") == "video" or config.MOTION_AVATARS == "vrm"
+
+        def who(r: str, a: str) -> str:
+            if three_d:
+                # unpicked: the asker (the host) wears the student, everyone else the mentor
+                v = (opts.get("vrm") or {}).get(r) or ("student" if a == "host" and len(opts["avatars"]) > 1 else "mentor")
+                return labels3d.get(v, v)
+            return f"{(names.get(a, {}).get('name') or a)}{' (host)' if a == 'host' else ''}"
+        parts = [f"{who(r, a)} · {vlabels.get(opts['voices'].get(r, ''), 'voice')}"
+                 for r, a in opts["avatars"].items()]
         out["cast"] = {"value": ", ".join(parts) + ("" if opts.get("characters") else " — avatars off"),
                        "detail": f"{len(parts)} speaker{'s' if len(parts) > 1 else ''}"}
     if d.get("workflow"):
@@ -986,7 +997,8 @@ def _op_voice_timing(job: dict) -> None:
     done = mr.stage_timing(job["short_id"], script, manifest, progress=tell("Line"),
                            characters=bool(opts.get("characters")),
                            character=opts.get("character"),
-                           host_character=opts.get("host_character"))
+                           host_character=opts.get("host_character"),
+                           vrm=opts.get("vrm") or None)
     if done is None:
         _fail(job, "Timing the words failed",
               "The words could not be lined up with the recorded audio.")
@@ -1217,7 +1229,15 @@ def cast_info(job: dict) -> dict:
     reason = ("A video is presented: the mentor stands beside the board and points at what "
               "changes, and steps aside while code or a table needs the whole frame."
               if video else th.get("avatar_reason") or "")
+    # the 3D avatars (MOTION_AVATARS=vrm, and every video): what the reel draws
+    from . import motion_teach
+    three_d = video or config.MOTION_AVATARS == "vrm"
+    picked_vrm = job["options"].get("vrm") or {}
+    for r in rows:
+        r["vrm"] = picked_vrm.get(r["role"]) or (
+            "student" if len(rows) > 1 and r["does"] == "asks the questions" else "mentor")
     return {"speakers": rows, "avatars": avatar_opts, "voices": voice_opts,
+            "three_d": three_d, "vrm_avatars": motion_teach.vrm_avatars() if three_d else [],
             "characters": bool(job["options"].get("characters", True)) if job["options"].get("cast_confirmed") else recommend,
             "avatars_recommended": recommend,
             "avatars_reason": reason,
@@ -1259,6 +1279,12 @@ def _set_cast(job: dict, choice: dict) -> dict:
     for role, vid in voices.items():
         if role not in rows or vid not in have_v:
             raise ValueError(f"no voice {vid!r} for {role!r}")
+    from . import motion_teach
+    have_3d = {a["value"] for a in motion_teach.vrm_avatars()}
+    vrm = {r: v for r, v in (choice.get("vrm") or {}).items() if v}
+    for role, name in vrm.items():
+        if role not in rows or name not in have_3d:
+            raise ValueError(f"no 3D avatar {name!r} for {role!r}")
     picked_v = {r: voices.get(r, rows[r]["voice"]) for r in rows}
     picked_a = {r: avatars.get(r, rows[r]["avatar"]) for r in rows}
     if len(rows) > 1 and len(set(picked_v.values())) < len(rows):
@@ -1267,6 +1293,7 @@ def _set_cast(job: dict, choice: dict) -> dict:
     opts["characters"] = bool(choice.get("characters", True))
     opts["voices"] = picked_v
     opts["avatars"] = picked_a
+    opts["vrm"] = {r: vrm.get(r) or rows[r].get("vrm") for r in rows} if vrm else (opts.get("vrm") or {})
     host_role = next((r for r, row in rows.items() if row["does"] == "asks the questions"), None)
     lang_role = next((r for r in rows if r != host_role), None)
     opts["host_character"] = picked_a.get(host_role) if host_role else None

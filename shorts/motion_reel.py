@@ -846,13 +846,15 @@ def _cast(script: MotionScript) -> list:
 def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=None,
                  characters: bool | None = None,
                  character: str | None = None,
-                 host_character: str | None = None) -> tuple[Path, list] | None:
+                 host_character: str | None = None,
+                 vrm: dict | None = None) -> tuple[Path, list] | None:
     """Word times from the real audio (motion_align: forced alignment, then
     whisper, then an even split), every shot on one clock, the scene graders
     again on that clock, the narration mixed, and the player's plan written.
     `progress(done, total)` is told after every clip is aligned. `characters`
     and `character` default to config.MOTION_CHARACTERS / _PRESET (the CLI's
-    --characters / --character)."""
+    --characters / --character). `vrm`: role -> the 3D avatar picked for it
+    in the Characters step ("narrator" on a one-narrator reel)."""
     characters = config.MOTION_CHARACTERS if characters is None else characters
     character = config.MOTION_CHARACTER_PRESET if character is None else character
     from . import (motion_align, motion_camera, motion_plan_checks, motion_teach, motion_video, motion_tidy,
@@ -910,7 +912,7 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
         # a long-form video: every shot drawn onto a 1920x1080 frame, the mentor
         # a 3D avatar beside the board (shorts/motion_video.py); no virtual
         # camera — the view already frames each visual
-        plan = motion_video.stage_video(plan)
+        plan = motion_video.stage_video(plan, vrm)
         layout_checks = motion_video.run_checks(plan)
     else:
         # characters that teach, beside the visual as at a board (shorts/motion_teach.py);
@@ -918,7 +920,7 @@ def stage_timing(short_id: str, script: MotionScript, manifest: dict, progress=N
         if plan.characters and config.MOTION_STAGE == "board":
             plan = motion_teach.stage_board(plan)
             if config.MOTION_AVATARS == "vrm":
-                plan = motion_teach.with_vrm(plan)
+                plan = motion_teach.with_vrm(plan, vrm)
         # the virtual camera and cursor, on the words (shorts/motion_camera.py)
         plan = motion_camera.direct(plan)
         layout_checks = [*motion_plan_checks.run(plan), motion_camera.check_camera(plan)]

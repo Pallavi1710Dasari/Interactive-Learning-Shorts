@@ -62,8 +62,9 @@ def _past_preflight(job: dict) -> dict:
     return job
 
 
-def _make(fmt: str) -> tuple[dict, MotionScript, dict]:
-    """A job from upload to its finished plan, every recommended choice."""
+def _make(fmt: str, vrm: dict | None = None) -> tuple[dict, MotionScript, dict]:
+    """A job from upload to its finished plan, every recommended choice
+    (`vrm`: the Characters step's 3D avatar picks, role -> name)."""
     job = _wait(mj.start(_upload(DOC), {"format": fmt}))
     assert (job["stage"], job["status"]) == ("topic", "review"), (job["stage"], job["status"])
     job = _wait(mj.decide(job, "approve", choice=0))
@@ -88,6 +89,11 @@ def _make(fmt: str) -> tuple[dict, MotionScript, dict]:
     job = mj.decide(job, "approve", choice=job["review"]["recommended"]["value"])
     job = _past_preflight(job)
     assert job["stage"] == "script", job["stage"]
+    if vrm is not None:
+        info = mj.cast_info(job)
+        assert info["three_d"] and {a["value"] for a in info["vrm_avatars"]} >= {"mentor", "student"}
+        job = mj.decide(job, "cast", choice={"characters": True, "vrm": vrm})
+        assert job["options"]["vrm"] == vrm, job["options"].get("vrm")
     assert job["review"] is not None, (job["status"], job["message"], job.get("error"))
     rv = job["review"]
     assert rv["passed"], [r for r in rv["results"] if not r["passed"]]
@@ -127,8 +133,32 @@ def test_a_video_from_upload_to_its_landscape_plan():
           + "".join("+" if o else "." for o in on))
 
 
+def test_the_3d_avatar_picked_in_the_characters_step_is_drawn():
+    """Step 6 lists the 3D avatars (assets/avatars/*.vrm); the one picked for
+    the narrator is the one the video draws."""
+    job, script, plan = _make("video", vrm={"narrator": "student"})
+    assert [c["vrm"] for c in plan["characters"]] == ["student"], plan["characters"]
+    assert "Student" in mj.view(mj.load(job["job_id"]))["summary"]["cast"]["value"]
+
+
+def test_a_reel_wears_its_picks_too():
+    from shorts import motion_teach
+    from shorts.schema import MotionCharacterTrack
+    tr = lambda role, side: MotionCharacterTrack(role=role, preset="react", config={}, side=side)
+    tracks = [tr("STUDENT", "left"), tr("MENTOR", "right")]
+    # nothing picked: the asker the student, the explainer the mentor
+    assert [motion_teach.vrm_for(t, 2) for t in tracks] == ["student", "mentor"]
+    # picked: swapped
+    assert [motion_teach.vrm_for(t, 2, {"STUDENT": "mentor", "MENTOR": "student"}) for t in tracks] == ["mentor", "student"]
+    narrator = tr(None, "center")
+    assert motion_teach.vrm_for(narrator, 1) == "mentor"
+    assert motion_teach.vrm_for(narrator, 1, {"narrator": "student"}) == "student"
+
+
 def test_a_reel_is_still_a_portrait_reel():
-    job, script, plan = _make("reel")
+    # (and a reel wears the 3D avatar picked in the Characters step too)
+    job, script, plan = _make("reel", vrm={"narrator": "student"})
+    assert plan["avatars"] == "vrm" and [c["vrm"] for c in plan["characters"]] == ["student"], plan["characters"]
     assert job["short_id"].endswith("__motion")
     assert script.format == "reel"
     assert plan["format"] == "reel" and (plan["width"], plan["height"]) == (1080, 1920)

@@ -3,6 +3,7 @@ import { Spinner } from "./Spinner";
 import { Figure } from "./motion/cast/CharacterSheet";
 import { defaultPreset } from "./motion/cast/presets";
 import { buildPerformance } from "./motion/cast/performance";
+import { VrmPortrait } from "./motion/vrm/VrmPortrait";
 
 /**
  * Making a motion reel: ONE STEP AT A TIME, like the old app (2026-10-13).
@@ -177,9 +178,13 @@ function Building({ job }: { job: Job }) {
   );
 }
 
-interface CastPick { characters: boolean; avatars: Record<string, string>; voices: Record<string, string> }
+interface CastPick { characters: boolean; avatars: Record<string, string>; voices: Record<string, string>;
+                    /** the 3D avatar each speaker wears (assets/avatars/<name>.vrm) */
+                    vrm: Record<string, string> }
 interface CastInfo {
-  speakers: { role: string; label: string; does: string; avatar: string; voice: string | null }[];
+  speakers: { role: string; label: string; does: string; avatar: string; voice: string | null; vrm?: string }[];
+  /** the reel draws 3D avatars (MOTION_AVATARS=vrm, and every video): pick one of vrm_avatars */
+  three_d?: boolean; vrm_avatars?: { value: string; label: string; description?: string }[];
   avatars: { value: string; label: string; gender?: string | null }[];
   voices: { value: string; label: string; stamp?: number }[]; characters: boolean; reason: string;
   avatars_recommended: boolean; avatars_reason: string;
@@ -221,7 +226,8 @@ function Cast({ jobId, pick, setPick, onOpenVoice, version }: {
       setInfo(i);
       // keep the reviewer's picks when the voices are listed again
       setPick(pick ?? { characters: i.characters, avatars: Object.fromEntries(i.speakers.map((s) => [s.role, s.avatar])),
-                        voices: Object.fromEntries(i.speakers.map((s) => [s.role, s.voice ?? ""])) });
+                        voices: Object.fromEntries(i.speakers.map((s) => [s.role, s.voice ?? ""])),
+                        vrm: Object.fromEntries(i.speakers.map((s) => [s.role, s.vrm ?? "mentor"])) });
     }).catch((e) => setErr((e as Error).message));
   }, [jobId, version]); // eslint-disable-line react-hooks/exhaustive-deps
   if (err) return <div className="error">{err}</div>;
@@ -251,7 +257,17 @@ function Cast({ jobId, pick, setPick, onOpenVoice, version }: {
         return (
           <div key={sp.role} className="mspeaker">
             <div className="mspeakerhead"><b>{sp.label}</b><span className="hintline">{sp.does}</span></div>
-            {pick.characters && <div className="mavatars">
+            {pick.characters && info.three_d && <div className="mavatars m3d">
+              {(info.vrm_avatars ?? []).map((a) => (
+                <button key={a.value} type="button" className={`mavatar${(pick.vrm ?? {})[sp.role] === a.value ? " on" : ""}`}
+                        data-vrm={a.value} title={a.description}
+                        onClick={() => setPick({ ...pick, vrm: { ...(pick.vrm ?? {}), [sp.role]: a.value } })}>
+                  <VrmPortrait name={a.value} />
+                  <span>{a.label}{a.value === sp.vrm && <em className="pilltag">recommended</em>}</span>
+                </button>))}
+              <div className="hintline m3dhint">3D presenters from <code>assets/avatars/</code>. Add your own <code>.vrm</code> file there and it shows up here.</div>
+            </div>}
+            {pick.characters && !info.three_d && <div className="mavatars">
               {shown.map((a) => (
                 <button key={a.value} type="button" className={`mavatar${pick.avatars[sp.role] === a.value ? " on" : ""}`}
                         onClick={() => setPick({ ...pick, avatars: { ...pick.avatars, [sp.role]: a.value } })}>

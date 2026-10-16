@@ -125,7 +125,8 @@ function VrmView({ plan, track, t, slot, partner, shown = true, dx = 0 }: {
     // the student, while it wears the very same file as the mentor (the
     // placeholder), is recoloured and drawn a little smaller (looks.ts)
     const prepared = loadVrm(slot.file, `${track.side}:${track.role ?? ""}`).then(async (vrm) => {
-      if (slot.file !== "mentor" && slot.boardSide === "left") {
+      // whoever wears the student file (the asker, or a narrator who picked it)
+      if (slot.file !== "mentor") {
         const [mine, mentor] = await Promise.all([fingerprintOf(slot.file), fingerprintOf("mentor").catch(() => "")]);
         if (mine === mentor && !vrm.scene.userData.looked) { applyLook(vrm, STUDENT_LOOK); vrm.scene.userData.looked = true; }
       }

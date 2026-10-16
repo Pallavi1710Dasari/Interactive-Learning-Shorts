@@ -1584,3 +1584,9 @@ a.primary, a.ghost { text-decoration: none; display: inline-block; }
 /* a video's script, grouped by chapter (StepMotion VideoScript) */
 .mvscript h3 { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-hi); margin: 18px 0 6px; }
 .mvscript section:first-child h3 { margin-top: 4px; }
+
+/* the Characters step's 3D avatars (vrm/VrmPortrait.tsx) */
+.mavatars.m3d { align-items: flex-start; flex-wrap: wrap; }
+.mavatars.m3d .mavatar { padding: 6px; }
+.m3dhint { flex-basis: 100%; margin-top: 4px; }
+.mavatars.m3d .mavatar span .pilltag { position: static; }

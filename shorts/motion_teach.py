@@ -378,8 +378,38 @@ def with_envelopes(plan):
 
 # ===================================================================== 3D avatars
 
-def with_vrm(plan):
+#: The 3D avatars' names in assets/avatars (<name>.vrm), with the labels the
+#: Characters step shows. Any other .vrm dropped there is listed too.
+VRM_LABELS = {"mentor": ("Mentor", "long brown hair, white top"),
+              "student": ("Student", "dark hair, orange top")}
+
+
+def vrm_avatars() -> list[dict]:
+    """Every 3D avatar the reels can wear: assets/avatars/*.vrm, the mentor and
+    the student first. {value, label, description}."""
+    folder = config.ROOT / "assets" / "avatars"
+    names = sorted((p.stem for p in folder.glob("*.vrm") if re.fullmatch(r"[a-z0-9_-]{1,40}", p.stem)),
+                   key=lambda n: (n not in VRM_LABELS, list(VRM_LABELS).index(n) if n in VRM_LABELS else 0, n))
+    return [{"value": n, "label": VRM_LABELS.get(n, (n.replace("_", " ").title(),))[0],
+             "description": VRM_LABELS.get(n, ("", "your own model"))[1]} for n in names]
+
+
+def vrm_for(track, n: int, picks: dict | None = None) -> str:
+    """The 3D avatar a track wears: the reviewer's pick for its role (the
+    Characters step; "narrator" for a one-narrator reel), else the student
+    for the asker and the mentor for everyone else."""
+    picks = picks or {}
+    key = track.role if track.role else "narrator"
+    pick = picks.get(key) or (picks.get("narrator") if n == 1 else None)
+    if pick:
+        return pick
+    return "student" if n > 1 and track.side == "left" else "mentor"
+
+
+def with_vrm(plan, picks: dict | None = None):
     """The plan's characters drawn as 3D VRM avatars (web/src/motion/vrm):
-    the explainer wears assets/avatars/mentor.vrm, the asker student.vrm."""
-    tracks = [t.model_copy(update={"vrm": "student" if t.side == "left" else "mentor"}) for t in plan.characters]
+    each wears the avatar picked for its role (`picks`, role -> name in
+    assets/avatars), else the explainer mentor.vrm and the asker student.vrm."""
+    n = len(plan.characters)
+    tracks = [t.model_copy(update={"vrm": vrm_for(t, n, picks)}) for t in plan.characters]
     return plan.model_copy(update={"avatars": "vrm", "characters": tracks})

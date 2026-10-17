@@ -82,17 +82,21 @@ def to_frame(view: MotionView, x: float, y: float) -> tuple[float, float]:
     return (view.dst[0] + (x - view.src[0]) * view.s, view.dst[1] + (y - view.src[1]) * view.s)
 
 
-def _relayout(shot, on: bool):
+def _relayout(shot, on: bool, duo: bool = False):
     """The shot's placed objects laid out for the board it is drawn on: with
     the presenter, against the right edge (board_right, the mentor's side, as
-    a reel's board does); without, in the upper region when the stack fits
-    there (wider and shorter: the landscape board's shape), else as it is."""
+    a reel's board does); with two presenters, centred between them (column);
+    without, in the upper region when the stack fits there (wider and
+    shorter: the landscape board's shape), else as it is."""
     from .motion_scenes import layout_scene, stack_height
     kinds = lib.object_kinds()
     if not any(kinds[o.kind]["layout"] == "placed" for o in shot.objects):
         return shot
     scene = MotionScene(field=shot.field, objects=[MotionSceneObject(id=o.id, kind=o.kind, props=o.props)
                                                    for o in shot.objects])
+    if on and duo:
+        return shot.model_copy(update={"arrangement": "column",
+                                       "objects": layout_scene(scene, duo=True, arrangement="column")})
     if on:
         return shot.model_copy(update={"arrangement": "board_right",
                                        "objects": layout_scene(scene, duo=True, arrangement="board_right")})
@@ -114,11 +118,13 @@ def stage_video(plan, vrm: dict | None = None):
     plan = plan.model_copy(update={"format": "video"})
     on = (motion_teach.avatar_presence(plan, default_on=True) if plan.characters
           else [False] * len(plan.shots))
+    duo = is_duo(plan)
+    board = g["board_duo"] if duo else g["board_on"]
     shots = []
     for shot, o in zip(plan.shots, on):
         full = next((x.kind for x in shot.objects if kinds[x.kind]["layout"] == "full"), None)
-        staged = shot if full else _relayout(shot, o)
-        view = view_for(staged.objects, g["board_on"] if o else g["board_off"], full)
+        staged = shot if full else _relayout(shot, o, duo)
+        view = view_for(staged.objects, board if o else g["board_off"], full)
         shots.append(staged.model_copy(update={"characters": o, "view": view}))
     video = plan.model_copy(update={"format": "video", "width": W, "height": H, "stage": "video",
                                     "shots": shots})
@@ -136,10 +142,18 @@ def _overlap(a, b) -> bool:
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
-def mentor_box() -> tuple[float, float, float, float]:
-    """The mentor's visible body on the frame: about 0.42 of the canvas height
-    wide, centred at body_x (as motion_plan_checks reads a reel's canvas)."""
-    b = geometry()["vrm"]["explainer"]
+def is_duo(plan) -> bool:
+    """Two presenters (a two-speaker theme): the asker left, the explainer
+    right, the board between them (frame.video.board_duo)."""
+    return len(plan.characters or []) == 2
+
+
+def mentor_box(slot: str = "explainer") -> tuple[float, float, float, float]:
+    """A presenter's visible body on the frame (`slot`: explainer, the mentor;
+    asker, the second presenter of a two-speaker video): about 0.42 of the
+    canvas height wide, centred at body_x (as motion_plan_checks reads a
+    reel's canvas)."""
+    b = geometry()["vrm"][slot]
     cx = b["x"] + b["w"] * b.get("body_x", 0.5)
     return (cx - 0.21 * b["h"], b["y"], cx + 0.21 * b["h"], b["y"] + b["h"])
 
@@ -151,7 +165,8 @@ def check_video_layout(plan) -> GraderResult:
     name = "motion_video_layout"
     g = geometry()
     sub_top = g["subtitle"]["top"]
-    mentor = mentor_box()
+    bodies = [("the mentor", mentor_box())] + ([("the asker", mentor_box("asker"))]
+                                               if is_duo(plan) else [])
     problems: list[str] = []
     for s in plan.shots:
         v = s.view
@@ -169,8 +184,9 @@ def check_video_layout(plan) -> GraderResult:
             if x0 < -1 or y0 < -1 or x1 > W + 1 or y1 > sub_top + 1:
                 problems.append(f"{s.id} {o.id} ({o.kind}) lands at "
                                 f"{x0:.0f},{y0:.0f}-{x1:.0f},{y1:.0f}, outside the picture area")
-            if s.characters and _overlap((x0, y0, x1, y1), mentor):
-                problems.append(f"{s.id} {o.id} ({o.kind}) runs under the mentor")
+            for who, body in bodies:
+                if s.characters and _overlap((x0, y0, x1, y1), body):
+                    problems.append(f"{s.id} {o.id} ({o.kind}) runs under {who}")
     if problems:
         return GraderResult(name, False, "; ".join(problems[:12]))
     return GraderResult(name, True, f"all {len(plan.shots)} shots fit the 1920x1080 frame")

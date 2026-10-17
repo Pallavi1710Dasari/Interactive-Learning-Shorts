@@ -144,7 +144,18 @@ def save(job: dict) -> None:
         job["updated"] = _now()
         tmp = _path(job["job_id"]).with_suffix(".tmp")
         tmp.write_text(json.dumps(job, indent=1), encoding="utf-8")
-        tmp.replace(_path(job["job_id"]))
+        # Windows refuses to replace a file another reader has open (the
+        # page's progress poll, an antivirus scan): "Access is denied" for a
+        # few milliseconds. Wait it out rather than fail the step (2026-10-17:
+        # a video's voice step, which saves after every line, failed on it).
+        for attempt in range(40):
+            try:
+                tmp.replace(_path(job["job_id"]))
+                return
+            except PermissionError:
+                if attempt == 39:
+                    raise
+                time.sleep(0.05)
 
 
 def load(job_id: str) -> dict:
@@ -831,7 +842,9 @@ def _theme_review(job: dict, choice: MotionThemeChoice, t: dict) -> None:
               if not motion_themes.theme_problems(
                   i, approach=t["approach"].primary if t["approach"] else None,
                   has_code=motion_themes.section_has_code(t["source_text"]),
-                  template=t["pin"], history=None, language=t["language"])]
+                  # a video offers every theme: the walkthrough is only recommended
+                  template=None if t["video"] else t["pin"], history=None,
+                  language=t["language"])]
     def said(text: str) -> str:
         # a walkthrough theme's description counts a reel's chapters; a video has more
         if _format(job) != "video":
@@ -1090,7 +1103,8 @@ def decide(job: dict, action: str, reason: str = "", choice=None) -> dict:
                 raise ValueError(f"no language {choice!r}")
             if choice:
                 job["options"]["language"] = choice
-            # a video's walkthrough is pinned: the theme step offers walkthrough themes only
+            # a video is written as a walkthrough: the theme step recommends a
+            # walkthrough theme and offers every other theme too (2026-10-17)
             return _finish_setup(job, job["review"]["default"],
                                  "flag" if _format(job) == "video" else "default")
         if action == "approve":

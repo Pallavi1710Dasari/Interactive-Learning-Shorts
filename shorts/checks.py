@@ -7843,9 +7843,10 @@ def check_motion_hook_curiosity(script) -> GraderResult:
     lower = speech.lower().lstrip("\"'")
     problems: list[str] = []
     theme = _motion_theme(script)
-    if not theme.base:
+    if not theme.base and motion_format(script) != "video":
         problems = _themed_hook_problems(script, theme, speech, lower)
     elif template == "walkthrough":
+        # (a video keeps the walkthrough's hook whatever its theme, 2026-10-17)
         if not re.match(r"(?:%s)\b" % "|".join(map(re.escape, MOTION_WALKTHROUGH_HOOK_OPENERS)),
                         lower):
             problems.append(f"hook {speech[:60]!r} does not open with a curiosity question "
@@ -8355,8 +8356,11 @@ def check_motion_not_qa(script) -> GraderResult:
     rhetorical question, answered by the very next sentence of the same shot."""
     template = _template(script)
     theme = _motion_theme(script)
-    if not theme.base:
-        return _themed_not_qa(script, theme)
+    video = motion_format(script) == "video"
+    # a video with a one-narrator theme speaks like any video narrator; a
+    # two-speaker video: only the asking role asks (its beats are the video's)
+    if not theme.base and not (video and not theme.two_speaker):
+        return _themed_not_qa(script, theme, beats={} if video else None)
     problems: list[str] = []
     asked: dict[int, str] = {}
     for s in script.shots:
@@ -8400,13 +8404,15 @@ def _speech_label(speech: str) -> bool:
                            or label.group(1).isupper()))
 
 
-def _themed_not_qa(script, theme) -> GraderResult:
+def _themed_not_qa(script, theme, beats: dict | None = None) -> GraderResult:
     """A non-base theme (phase 2b): speaker labels never go in the speech
     (they belong on the captions, where TTS does not read them), and a
     question may come only from the hook, a beat the theme lets ask, or a
-    speaker role that asks (the interviewer, the student)."""
+    speaker role that asks (the interviewer, the student). `beats` replaces
+    the theme's beat template (a video has its own beats: {})."""
     problems: list[str] = []
-    beats = theme.beats if isinstance(theme.beats, dict) else {}
+    if beats is None:
+        beats = theme.beats if isinstance(theme.beats, dict) else {}
     askers = [s.role for s in theme.speakers if s.asks]
     for s in script.shots:
         if _speech_label(s.speech):
@@ -8442,7 +8448,9 @@ def check_motion_theme_speakers(script) -> GraderResult:
     theme: every caption is labelled with one of the theme's roles, each
     beat uses only the speakers its beat template names and is opened by the
     first of them, both roles speak, and both are cast. The script's template
-    is the theme's."""
+    is the theme's — except a video's, always a walkthrough (2026-10-17): its
+    beats are not the theme's, so any role may speak in them, and the first
+    role (the one who asks) opens the hook."""
     from .motion_themes import registry
     theme_id = getattr(script, "theme", None)
     if theme_id and registry().get(theme_id) is None:
@@ -8451,7 +8459,8 @@ def check_motion_theme_speakers(script) -> GraderResult:
     theme = _motion_theme(script)
     problems: list[str] = []
     off: list[str] = []
-    if theme.template != _template(script):
+    video = motion_format(script) == "video"
+    if theme.template != _template(script) and not video:
         problems.append(f"the {theme.id} theme is a {theme.template} theme, the script is "
                         f"a {_template(script)}")
     cast = [sp.role for sp in getattr(script, "speakers", [])]
@@ -8463,10 +8472,12 @@ def check_motion_theme_speakers(script) -> GraderResult:
         if cast:
             problems.append(f"{theme.id} has one narrator, but speakers are cast: {cast}")
     else:
-        beats = theme.beats if isinstance(theme.beats, dict) else {}
+        beats = theme.beats if isinstance(theme.beats, dict) and not video else {}
         spoke: set[str] = set()
         for s in script.shots:
             allowed = beats[s.beat].speakers if s.beat in beats else theme.roles
+            # a video's own beats: either role may open them, the asker opens the hook
+            opener_rule = not video or s.beat == "hook"
             who = [c.speaker for c in s.captions]
             unknown = [w for w in who if w not in theme.roles]
             if unknown:
@@ -8480,7 +8491,7 @@ def check_motion_theme_speakers(script) -> GraderResult:
                 problems.append(f"{s.id} ({s.beat}) has {stray} speaking; the {theme.id} beat "
                                 f"template gives it to {allowed}")
                 off.append(s.id)
-            elif who and who[0] != allowed[0]:
+            elif who and opener_rule and who[0] != allowed[0]:
                 problems.append(f"{s.id} ({s.beat}) is opened by {who[0]}; the {theme.id} "
                                 f"beat template opens it with {allowed[0]}")
                 off.append(s.id)

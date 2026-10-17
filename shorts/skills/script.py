@@ -2733,12 +2733,36 @@ def _theme_format_block(theme) -> str:
 
 def _walkthrough_theme_block(theme) -> str:
     """The format a walkthrough theme adds on top of the walkthrough prompt:
-    what the reel is, its hook, and its one narrator."""
+    what the reel is, its hook, and its one narrator. A video with a
+    fix_story theme keeps the video's own hook (why/what/how), so the theme
+    only sets the voice of the chapters."""
     return "\n".join([
         f"FORMAT — THEME: {theme.id} (on top of everything above: same chapters, same rules)",
         theme.description.strip(),
-        f"Hook: {theme.hook.brief}",
+        f"Hook: {theme.hook.brief}" if theme.template == "walkthrough" else
+        "Hook: the why / what / how question above, never the theme's own opener. The "
+        "theme shapes what each chapter does, not the beats.",
         "One narrator, talking to the viewer in the second person (\"you\", \"your\"). Never a dialogue.",
+    ])
+
+
+def _video_dialogue_block(theme) -> str:
+    """A two-speaker theme's FORMAT for a long-form video: the video's own
+    beats and chapters, spoken as a dialogue. The first role asks (it opens
+    the hook); the second explains and carries the teaching."""
+    a, b = theme.roles
+    askers = [s.role for s in theme.speakers if s.asks]
+    return "\n".join([
+        f"FORMAT — THEME: {theme.id} (a dialogue; the beats and chapters below are unchanged)",
+        theme.description.strip(),
+        f"Two speakers: {a} and {b}. {a} opens the hook with the question; {b} does the "
+        f"teaching in every chapter, and {a} keeps the viewer's side of it: short questions, "
+        f"guesses and reactions, never the explanation itself. Both speak in every chapter.",
+        f"Every caption carries \"speaker\": the role that says that sentence. A shot may hold "
+        f"lines from both, in the order they are spoken. Never write a speaker label into "
+        f"speech (\"{a}: ...\"): speech is only the words, and the label goes on the caption.",
+        f"Questions: only the hook and {' and '.join(askers) or a} may ask; every question is "
+        f"answered by the very next line. Every other line is a statement.",
     ])
 
 
@@ -2766,12 +2790,25 @@ def motion_system_for(template: str, theme=None, fmt: str = "reel") -> tuple[str
     (length, words, captions, code, visuals, icons) stays exactly as it is."""
     from ..motion_library import icon_names
     if fmt == "video":
-        # a video is a walkthrough: its own length and depth, the theme's format on top
+        # a video keeps its own chaptered beats whatever the theme (2026-10-17):
+        # the theme sets the voice and, for a two-speaker theme, who says what
         from ..motion_themes import registry
         system = SYSTEM_MOTION_VIDEO
-        if theme is not None and theme.id != registry().fallback["walkthrough"]:
+        hook_fix = SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX.replace("8 to 16 words", "10 to 25 words")
+        if theme is not None and theme.two_speaker:
+            system = re.sub(r"FORMAT\n.*?\n\n(?=THE BEATS)",
+                            lambda m: _video_dialogue_block(theme) + "\n\n", system,
+                            count=1, flags=re.S)
+            system = system.replace('"captions": [{"text": "..."}],',
+                                    f'"captions": [{{"text": "...", "speaker": "{theme.roles[0]}"}}],')
+            hook_fix = (hook_fix.replace("highlights. hook_question",
+                                         f'highlights. Every caption carries "speaker": '
+                                         f'"{theme.roles[0]}". hook_question')
+                        .replace('"captions": [{"text": "..."}]',
+                                 f'"captions": [{{"text": "...", "speaker": "{theme.roles[0]}"}}]'))
+        elif theme is not None and theme.id != registry().fallback["walkthrough"]:
             system += "\n\n" + _walkthrough_theme_block(theme)
-        return system, SYSTEM_MOTION_WALKTHROUGH_HOOK_FIX.replace("8 to 16 words", "10 to 25 words")
+        return system, hook_fix
     if template == "walkthrough":
         from ..motion_themes import registry
         # every walkthrough theme uses the template's own beats; only the
@@ -2981,7 +3018,15 @@ def repair_video_shots(script: MotionScript, material: str, results: list, grade
                              ensure_ascii=False)
                 + "\n\nWHY EACH FAILED:\n"
                 + "\n".join(f"- {sid}: {'; '.join(reasons.get(sid, []))[:1200]}" for sid in ids))
-        fix = ask_json(SYSTEM_MOTION_VIDEO_SHOT_FIX, user, MotionShotsFix,
+        system = SYSTEM_MOTION_VIDEO_SHOT_FIX
+        if script.speakers:
+            # a two-speaker video: the repair keeps every line's speaker label
+            roles = " or ".join(sp.role for sp in script.speakers)
+            system = (system.replace('"captions": [{"text": "..."}]',
+                                     f'"captions": [{{"text": "...", "speaker": "{script.speakers[0].role}"}}]')
+                      + f"\n\nThis video is a dialogue: every caption carries \"speaker\" ({roles}), "
+                        f"as in the shot you are given. Never put a speaker label in speech.")
+        fix = ask_json(system, user, MotionShotsFix,
                        max_tokens=min(16000, 1200 + 450 * len(todo)), label="motion_shot_fix")
         new = {s.id: s for s in fix.shots if s.id in by_id and s.id in ids}
         shots = [by_id[s.id].model_copy(update={
@@ -3070,7 +3115,8 @@ def write_motion_script(topic: Topic, section: Section, *, short_id: str,
         spec = registry().get(theme)
         if spec is None:
             raise ValueError(f"theme {theme!r} is not in the theme registry")
-        if spec.template != template:
+        # a video is always written as a walkthrough; any theme sets its voice
+        if spec.template != template and fmt != "video":
             raise ValueError(f"theme {theme!r} is a {spec.template} theme, not {template}")
     series = config.MOTION_SERIES if series is None else series
     if fmt == "video" and template != "walkthrough":

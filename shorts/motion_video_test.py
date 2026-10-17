@@ -1,8 +1,10 @@
 """
 Long-form VIDEOS (format "video", 2026-10-16), end to end and in parts:
 
-  - the job: Upload with "video" skips the Template step (a video is always a
-    walkthrough), the theme step offers walkthrough themes only, the script
+  - the job: Upload with "video" skips the Template step (a video is always
+    written as a walkthrough), the theme step recommends a walkthrough theme
+    and offers every other theme too (2026-10-17: a one-narrator or a
+    two-speaker theme sets the video's voice, its chapters stay), the script
     is 6-12 minutes in 5-10 chapters and passes every free grader, the
     scenes are asked in chapter batches, and the finished plan is a
     1920x1080 landscape plan whose every shot has a view, with the mentor as
@@ -62,9 +64,11 @@ def _past_preflight(job: dict) -> dict:
     return job
 
 
-def _make(fmt: str, vrm: dict | None = None) -> tuple[dict, MotionScript, dict]:
+def _make(fmt: str, vrm: dict | None = None,
+          theme: str | None = None) -> tuple[dict, MotionScript, dict]:
     """A job from upload to its finished plan, every recommended choice
-    (`vrm`: the Characters step's 3D avatar picks, role -> name)."""
+    (`vrm`: the Characters step's 3D avatar picks, role -> name; `theme`: the
+    theme picked instead of the recommended one)."""
     job = _wait(mj.start(_upload(DOC), {"format": fmt}))
     assert (job["stage"], job["status"]) == ("topic", "review"), (job["stage"], job["status"])
     job = _wait(mj.decide(job, "approve", choice=0))
@@ -85,8 +89,15 @@ def _make(fmt: str, vrm: dict | None = None) -> tuple[dict, MotionScript, dict]:
     job = _past_preflight(job)
     assert job["stage"] == "theme", job["stage"]
     if fmt == "video":
-        assert all(REG.themes[o["value"]].template == "walkthrough" for o in job["review"]["options"])
-    job = mj.decide(job, "approve", choice=job["review"]["recommended"]["value"])
+        # the walkthrough is recommended; the other themes are offered after it
+        offered = [o["value"] for o in job["review"]["options"]]
+        assert REG.themes[job["review"]["recommended"]["value"]].template == "walkthrough"
+        assert offered[0] == job["review"]["recommended"]["value"]
+        assert {REG.themes[o].template for o in offered} == {"walkthrough", "fix_story"}, offered
+        assert any(REG.themes[o].two_speaker for o in offered), offered
+    if theme is not None:
+        assert theme in [o["value"] for o in job["review"]["options"]], theme
+    job = mj.decide(job, "approve", choice=theme or job["review"]["recommended"]["value"])
     job = _past_preflight(job)
     assert job["stage"] == "script", job["stage"]
     if vrm is not None:
@@ -131,6 +142,34 @@ def test_a_video_from_upload_to_its_landscape_plan():
     print(f"  video {job['short_id']}: {len(plan['shots'])} shots, {plan['duration']:.0f} s, "
           f"{len(script.chapters)} chapters, presenter "
           + "".join("+" if o else "." for o in on))
+
+
+def test_a_video_in_a_one_narrator_theme_keeps_its_chapters():
+    job, script, plan = _make("video", theme="myth_vs_fact")
+    assert script.theme == "myth_vs_fact" and script.template == "walkthrough"
+    assert not script.speakers
+    clo, chi = checks.MOTION_VIDEO["MOTION_CHAPTERS"]
+    assert clo <= len(script.chapters) <= chi
+    assert plan["format"] == "video" and len(plan["characters"]) == 1
+    assert mj.view(mj.load(job["job_id"]))["summary"]["theme"]["value"] == "Myth vs fact"
+
+
+def test_a_two_speaker_video():
+    """Mentor & student as a video: the student asks, the mentor teaches,
+    every line is labelled, two 3D avatars stand beside the board, and the
+    video's layout checks pass with both of them on."""
+    job, script, plan = _make("video", theme="mentor_student")
+    assert script.theme == "mentor_student" and script.template == "walkthrough"
+    roles = [sp.role for sp in script.speakers]
+    assert sorted(roles) == sorted(REG.themes["mentor_student"].roles), roles
+    assert all(c.speaker in roles for s in script.shots for c in s.captions)
+    assert script.shots[0].captions[0].speaker == REG.themes["mentor_student"].roles[0]
+    assert plan["format"] == "video" and len(plan["characters"]) == 2, plan["characters"]
+    assert sorted(c["vrm"] for c in plan["characters"]) == ["mentor", "student"]
+    assert {c["role"] for c in plan["cast"]} == set(roles)
+    assert all(s["view"] for s in plan["shots"])
+    print(f"  two-speaker video {job['short_id']}: {len(plan['shots'])} shots, "
+          f"{plan['duration']:.0f} s, {len(script.chapters)} chapters")
 
 
 def test_the_3d_avatar_picked_in_the_characters_step_is_drawn():

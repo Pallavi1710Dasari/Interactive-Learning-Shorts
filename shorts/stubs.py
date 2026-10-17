@@ -168,7 +168,8 @@ def _topics(user: str) -> dict:
             "source_section_id": section_id.strip(),
             "difficulty": "medium",
         })
-    return {"topics": topics}
+    # TopicList accepts at most 12; a real model picks a subset of a long doc.
+    return {"topics": topics[:12]}
 
 
 def _regenerated_question(user: str) -> dict:

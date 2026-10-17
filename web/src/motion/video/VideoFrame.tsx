@@ -9,7 +9,8 @@
 //
 // Around it:
 //   - the mentor, a 3D VRM avatar, beside the board on the shots that have
-//     the presenter (shot.characters), sliding in and out (presenceAt);
+//     the presenter (shot.characters), sliding in and out (presenceAt); a
+//     two-speaker video adds the asker on the left, the board between them;
 //   - subtitles along the bottom, one spoken sentence at a time, the words
 //     lighting as they are said — never under the mentor;
 //   - the chapter top left ("CHAPTER 2 · How it grows"), the series top right;
@@ -28,6 +29,7 @@ import { VrmCast } from "../vrm/VrmCast";
 import { presenceAt } from "../cast/ReelCharacters";
 import { designOf, designVars, MIDNIGHT_STUDIO_VARS } from "../designs";
 import { applyPalette } from "../tokens";
+import { textToneOn } from "../identity/contrast";
 import { designed, paletteOf, rev, shotIndexAt, studio } from "../scene/MotionStage";
 import type { MotionPlan, PlanShot, PlanView } from "../scene/types";
 import library from "../library.json";
@@ -39,6 +41,8 @@ export const VIDEO_H = 1080;
 
 interface VideoGeometry {
   board_on: number[]; board_off: number[];
+  /** a two-speaker video, both presenters on: the board between them */
+  board_duo: number[];
   chapter: { x: number; y: number; h: number };
   subtitle: { top: number; bottom: number; side: number; font: number; line_h: number; lines: number };
   progress: { y: number; h: number };
@@ -90,6 +94,15 @@ function viewOf(shot: PlanShot): PlanView {
   return { src, dst: [dx + (dw - src[2] * s) / 2, dy, src[2] * s, src[3] * s], s };
 }
 
+/** Two presenters (a two-speaker theme): the asker left, the mentor right. */
+const duo = (plan: MotionPlan) => (plan.characters?.length ?? 0) === 2;
+
+/** The board a shot is drawn on: beside the presenter(s), or wide without. */
+function boardOf(plan: MotionPlan, shot: PlanShot): number[] {
+  if (!shot.characters) return VIDEO.board_off;
+  return duo(plan) ? VIDEO.board_duo : VIDEO.board_on;
+}
+
 /** One shot's layer: its board panel and its visual. */
 function ShotLayer({ plan, index, t, opacity = 1 }: { plan: MotionPlan; index: number; t: number; opacity?: number }) {
   const shot = plan.shots[index];
@@ -97,7 +110,7 @@ function ShotLayer({ plan, index, t, opacity = 1 }: { plan: MotionPlan; index: n
   const full = shot.objects.some((o) => FULL_KINDS.has(o.kind));
   return (
     <div style={{ position: "absolute", inset: 0, opacity }}>
-      {!full && <BoardPanel rect={shot.characters ? VIDEO.board_on : VIDEO.board_off} field={shot.field} opacity={1} />}
+      {!full && <BoardPanel rect={boardOf(plan, shot)} field={shot.field} opacity={1} />}
       <ShotVisual plan={plan} shot={shot} t={t} view={view} />
     </div>
   );
@@ -118,19 +131,26 @@ function sentences(shot: PlanShot): CaptionSentence[] {
 
 /** The sentence being said, as a subtitle: spoken words full white, the rest
  * dimmed, a highlighted keyword in yellow — on a dark band, centred under
- * the board (presenter on) or across the frame (off). */
-function Subtitle({ shot, t, on }: { shot: PlanShot; t: number; on: boolean }) {
+ * the board (presenter on) or across the frame (off). In a two-speaker
+ * video it opens with the speaker's name, in their identity's colour. */
+function Subtitle({ plan, shot, t, on }: { plan: MotionPlan; shot: PlanShot; t: number; on: boolean }) {
   const s = sentenceAt(sentences(shot), t);
   if (!s || t > s.end + 0.6) return null;
   const g = VIDEO.subtitle;
-  const [bx, , bw] = on ? VIDEO.board_on : [g.side, 0, VIDEO_W - 2 * g.side];
+  const [bx, , bw] = on ? boardOf(plan, shot) : [g.side, 0, VIDEO_W - 2 * g.side];
   const appear = ease.outCubic(seg(t, s.start - 0.05, 0.18));
+  const said = shot.captions.find((c) => c.start === s.start && c.end === s.end);
+  const member = said?.speaker ? plan.cast.find((m) => m.role === said.speaker) : undefined;
   return (
     <div data-part="caption" style={{ position: "absolute", left: bx, width: bw, top: g.top, height: g.bottom - g.top,
                                       display: "flex", alignItems: "center", justifyContent: "center", opacity: appear }}>
       <div style={{ maxWidth: bw, padding: "10px 26px", borderRadius: 16, background: "rgba(8,10,28,0.74)",
                     fontFamily: FONT.body, fontWeight: 700, fontSize: g.font, lineHeight: `${g.line_h}px`,
                     textAlign: "center", color: "#FFFFFF" }}>
+        {member && <span data-part="speaker" style={{ fontFamily: FONT.mono, fontSize: 24, letterSpacing: 3,
+                                                      textTransform: "uppercase", marginRight: 16, verticalAlign: "middle",
+                                                      color: member.identity ? textToneOn(member.identity, "navy") : "#9FB4FF" }}>
+          {member.label}</span>}
         {s.words.map((w, i) => {
           const said = t >= w.start - 0.02;
           return <span key={i} style={{ color: w.hl ? "#FDD13E" : "#FFFFFF", opacity: said ? 1 : 0.42 }}>
@@ -223,7 +243,7 @@ export function VideoFrame({ plan: raw, t }: { plan: MotionPlan; t: number }) {
       {plan.avatars === "vrm" && plan.characters?.length > 0 && (
         <VrmCast plan={plan} t={t} presence={presenceAt(plan, i, t, fading ? VIDEO_FADE : 0)} slide />
       )}
-      <Subtitle shot={shot} t={t} on={!!shot.characters} />
+      <Subtitle plan={plan} shot={shot} t={t} on={!!shot.characters} />
       <Progress plan={plan} t={t} field={shot.field} />
     </div>
   );

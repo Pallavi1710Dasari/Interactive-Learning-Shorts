@@ -467,14 +467,17 @@ def theme_inputs(short_id: str, state: dict, sections: list, doc_text: str,
                                      if sid != section.section_id])
     return {"section": section, "source_text": source_text, "language": language, "how": how,
             "history": history, "pin": pin, "approach": approach, "eligible": eligible,
-            "plan": plan, "headings": headings}
+            "plan": plan, "headings": headings, "video": state.get("format", "reel") == "video"}
 
 
 def run_theme_choice(t: dict, override: str | None = None) -> MotionThemeChoice:
     """The theme call itself (skills/theme.choose_theme) on theme_inputs.
-    Raises ValueError when --theme cannot be used here."""
+    Raises ValueError when --theme cannot be used here. A video's AI pick
+    stays among the walkthrough themes (the recommended way to teach in
+    chapters), but the reviewer may pick any theme (2026-10-17)."""
+    pin = None if override and t.get("video") else t["pin"]
     return choose_theme(t["section"], source_text=t["source_text"], approach=t["approach"],
-                        language=t["language"], history=t["history"], template_pin=t["pin"],
+                        language=t["language"], history=t["history"], template_pin=pin,
                         override=override, headings=t["headings"])
 
 
@@ -634,7 +637,9 @@ def _script_kwargs(short_id: str, state: dict, sections: list,
         "source_text": "\n\n".join(find_section(sections, sid).text for sid in ids),
         "supporting_text": "" if video else "\n\n".join(find_section(sections, sid).text
                                                        for sid in state.get("support_ids", [])),
-        "template": theme.template if theme else state.get("template", "fix_story"),
+        # a video is always written as a walkthrough; its theme only sets the voice
+        "template": ("walkthrough" if video else
+                     theme.template if theme else state.get("template", "fix_story")),
         "theme": theme.theme if theme else None,
         "language": theme.language if theme else None,
         "next_topic": state.get("next_topic", ""),

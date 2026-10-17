@@ -55,9 +55,10 @@
       "chat": {"top": 1340, "bottom": 1574, "font": 38, "line_h": 48, "chars": 35, "label_h": 34, "pad_y": 22, "gap": 20}
     },
     "video": {
-      "_comment": "A long-form VIDEO (plan.format = video, shorts/motion_video.py, web/src/motion/video): a 1920x1080 frame. Each shot's visual is laid out as in a reel and drawn onto a landscape board (shot.view: src, a region of the reel layout, onto dst). With the presenter on, the board is board_on (left) and the mentor stands on the right (vrm.explainer); off, the board is board_off (centred, wider). Subtitles run along the bottom, never under the mentor. zoom_cap: how far a small visual may be enlarged.",
+      "_comment": "A long-form VIDEO (plan.format = video, shorts/motion_video.py, web/src/motion/video): a 1920x1080 frame. Each shot's visual is laid out as in a reel and drawn onto a landscape board (shot.view: src, a region of the reel layout, onto dst). With the presenter on, the board is board_on (left) and the mentor stands on the right (vrm.explainer); off, the board is board_off (centred, wider). A two-speaker video (2026-10-17) with both presenters on: the asker (vrm.asker) left, the explainer right, the board between them (board_duo). Subtitles run along the bottom, never under a presenter. zoom_cap: how far a small visual may be enlarged.",
       "w": 1920, "h": 1080,
       "board_on": [64, 112, 1176, 756],
+      "board_duo": [480, 112, 860, 756],
       "board_off": [150, 100, 1620, 770],
       "zoom_cap": 1.35,
       "off_kinds": ["code_map", "system_panel", "app_screen", "lookup_table", "title_card", "chapter_card"],
@@ -67,7 +68,7 @@
       "progress": {"y": 1062, "h": 8},
       "vrm": {
         "explainer": {"x": 960, "y": 150, "w": 960, "h": 930, "yaw": -0.32, "body_x": 0.64},
-        "asker": {"x": 0, "y": 420, "w": 460, "h": 660, "yaw": 0.4, "body_x": 0.45}
+        "asker": {"x": -40, "y": 200, "w": 720, "h": 880, "yaw": 0.34, "body_x": 0.4}
       }
     },
     "characters": {

@@ -428,6 +428,20 @@ def test_the_upload_step_recommends_each_option_with_a_reason():
     assert info["characters"]["recommended"]["value"] is True
 
 
+def test_a_save_waits_while_a_reader_has_the_job_open():
+    """Windows: replacing a job file another reader has open is "Access is
+    denied" for a moment (the page's poll). save waits it out instead of
+    failing the step (2026-10-17, a video's voice step)."""
+    import threading
+    job = {"job_id": "0123456789ab", "status": "review", "stage": "topic"}
+    mj.save(job)
+    held = open(mj._path(job["job_id"]), encoding="utf-8")      # a poll mid-read
+    threading.Timer(0.4, held.close).start()
+    job["stage"] = "voice"
+    mj.save(job)
+    assert json.loads(mj._path(job["job_id"]).read_text(encoding="utf-8"))["stage"] == "voice"
+
+
 def test_a_double_click_is_applied_once():
     """Two clicks on the same step, at the same moment, on the server's
     threads: one acts, the other is refused — setup never runs twice."""

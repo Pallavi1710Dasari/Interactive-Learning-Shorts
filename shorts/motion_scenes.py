@@ -323,7 +323,10 @@ def _type_ok(value, kind: str) -> bool:
     return False
 
 
-def object_problems(obj: MotionSceneObject) -> list[str]:
+def object_problems(obj: MotionSceneObject, code_lines: int = 3, code_chars: int = 30) -> list[str]:
+    """Why one object cannot be drawn as given. `code_lines`, `code_chars`:
+    how many lines, of how many characters, a code_window may show (3 of 30
+    in a reel; a video's, checks.MOTION_VIDEO)."""
     kinds = lib.object_kinds()
     spec = kinds.get(obj.kind)
     if spec is None:
@@ -356,13 +359,16 @@ def object_problems(obj: MotionSceneObject) -> list[str]:
             problems.append(f"{obj.id} (kinetic_title) wraps to {len(lines)} line(s), max "
                             f"{k['max_lines']} of about {k['chars_per_line']} characters")
     if obj.kind == "code_window" and obj.props.get("lines"):
-        if len(obj.props["lines"]) > 3 or any(len(l) > 30 for l in obj.props["lines"]):
-            problems.append(f"{obj.id} (code_window) shows more than 3 lines of 30 characters")
+        if len(obj.props["lines"]) > code_lines or any(len(l) > code_chars for l in obj.props["lines"]):
+            problems.append(f"{obj.id} (code_window) shows more than {code_lines} lines of "
+                            f"{code_chars} characters")
     return problems
 
 
-def scene_problems(shot: MotionShot, scene: MotionScene | None = None, duo: bool = False) -> list[str]:
-    """Why a shot's scene cannot be drawn as given. Empty when it can."""
+def scene_problems(shot: MotionShot, scene: MotionScene | None = None, duo: bool = False,
+                   video: bool = False) -> list[str]:
+    """Why a shot's scene cannot be drawn as given. Empty when it can.
+    `video`: a long-form video's shot, whose code window may be longer."""
     scene = scene if scene is not None else shot.scene
     if scene is None:
         return [f"{shot.id} has no scene"]
@@ -375,8 +381,11 @@ def scene_problems(shot: MotionShot, scene: MotionScene | None = None, duo: bool
         p.append("no objects — every shot shows something")
     if len(set(ids)) != len(ids):
         p.append(f"object ids repeat: {ids}")
+    from .checks import MOTION_VIDEO
+    code_lines, code_chars = ((MOTION_VIDEO["MOTION_MAX_CODE_LINES"], MOTION_VIDEO["MOTION_MAX_CODE_CHARS"])
+                              if video else (3, 30))
     for o in scene.objects:
-        p += object_problems(o)
+        p += object_problems(o, code_lines, code_chars)
     known = [o for o in scene.objects if o.kind in kinds]
     full = [o for o in known if kinds[o.kind]["layout"] == "full"]
     placed = [o for o in known if kinds[o.kind]["layout"] == "placed"]
@@ -698,6 +707,9 @@ def _fill_cadence(b: _Builder, shot: MotionShot, primary: str, nudge: str, scrip
                 # to the next item would point at something not being said
                 cur = [x.value for x in b.actions[:pos] if x.do == "highlight" and x.target == target.id and x.value]
                 value = cur[-1] if cur else "1"
+            elif do == "highlight" and target.kind == "code_window" and shot.code_focus:
+                # a line-by-line walk keeps the bar on the line being explained
+                value = str(shot.code_focus[0])
             elif do == "highlight":
                 n = sum(1 for x in b.actions[:pos] if x.do == "highlight" and x.target == target.id)
                 value = str(n % _highlight_count(b, target.id) + 1)
@@ -1025,9 +1037,15 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
     elif beat in ("setup", "chapter") and shot.code:
         o1 = b.add("code_window", file=_code_file(script.language), lines=shot.code)
         b.act("enter", o1)
-        b.act("type", o1)
-        for i, h in enumerate(hl[:2]):
-            b.act("highlight", o1, _cue_for(h), value=str(min(i + 1, len(shot.code))))
+        prev = script.shots[index - 1] if index > 0 else None
+        if not (shot.code_focus and prev is not None and prev.code == shot.code):
+            b.act("type", o1)        # a line-by-line walk types its code once
+        if shot.code_focus:
+            # the line this shot explains, lit from the start and held
+            b.act("highlight", o1, "start", value=str(shot.code_focus[0]))
+        else:
+            for i, h in enumerate(hl[:2]):
+                b.act("highlight", o1, _cue_for(h), value=str(min(i + 1, len(shot.code))))
         label = "THE CODE"
         primary_nudge = (o1, "highlight")
     elif beat in ("setup", "break_1", "break_2", "fix_idea", "fix_flow", "takeaway") and not walk:
@@ -1174,16 +1192,23 @@ def default_scene(shot: MotionShot, script: MotionScript, index: int) -> MotionS
         o1 = b.add("chapter_card", n=shot.chapter or 1, of=len(script.chapters) or 1,
                    title=_fit(ch.title if ch else _first_sentence(shot), 32))
         b.act("enter", o1)
-    elif (beat == "chapter" and getattr(script, "format", "reel") == "video" and not shot.example
-          and _video_turn(script, shot) % 4 in (1, 2, 3)):
-        # A VIDEO's chapter of up to eight shots: the fallback picture turns
-        # through four looks (chips, a flow, a card, a memory box), so a
-        # chapter whose AI scenes failed does not show one picture eight times
-        turn = _video_turn(script, shot) % 4
+    elif (beat == "chapter" and getattr(script, "format", "reel") == "video"
+          and _video_turn(script, shot) > 0):
+        # A VIDEO's chapter of up to eight shots: the fallback picture shows
+        # the chips (the running example, or the key words) on the chapter's
+        # first shot only, then turns through four other looks (a flow, a
+        # card, a memory box, a loop), so a chapter whose AI scenes failed
+        # does not show one picture eight times (2026-10-23: the example's
+        # chips on every shot were "the same visual throughout")
+        turn = (_video_turn(script, shot) - 1) % 4 + 1
         ch = next((c for c in script.chapters if c.n == shot.chapter), None)
         words = _key_words(shot)
         if turn == 1:
             o1 = b.add("flow", steps=_steps(script, shot))
+            b.act("enter", o1)
+            b.act("travel", o1, _later_word(shot, 2))
+        elif turn == 4:
+            o1 = b.add("cycle", steps=_steps(script, shot))
             b.act("enter", o1)
             b.act("travel", o1, _later_word(shot, 2))
         elif turn == 2:

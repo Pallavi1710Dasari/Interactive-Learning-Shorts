@@ -3088,6 +3088,10 @@ class MotionShot(BaseModel):
     #: The code a CodeWindow shows, one string per line. Only setup and
     #: code_map may carry code (checks.check_motion_code_shots).
     code: list[str] = Field(default_factory=list)
+    #: video only: the line(s) of `code` this shot explains, 1-based. A video
+    #: walks its code line by line, one shot per line, each showing the same
+    #: snippet with its own line lit (checks.check_video_code_walk).
+    code_focus: list[int] = Field(default_factory=list)
     #: The SceneSpec (objects + timeline actions) — filled by the scenes
     #: stage (phase 3). None until then. A dict is accepted and validated
     #: into a MotionScene, so phase 1/2 files (scene: null) load unchanged.

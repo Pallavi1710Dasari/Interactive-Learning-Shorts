@@ -2559,6 +2559,10 @@ landscape, like a YouTube lesson) that teaches ONE topic from the material below
 what it is, why it matters, how it works step by step, worked examples, the mistakes
 beginners make, and how to use it in practice.
 
+THE GOAL: a student watches this video ONCE, with no book, no notes and no teacher beside
+them. When it ends they understand the topic and could explain it back to a friend. Every
+rule below serves that.
+
 FORMAT
 One narrator, a friendly mentor talking to the viewer in the second person ("you",
 "your"). Never a dialogue, no speaker labels. The hook asks the question. Inside a
@@ -2585,6 +2589,7 @@ support, never invent facts to fill it):
   1. The problem it solves — what goes wrong or is hard without it.
   2. The core idea, in plain words, with an everyday comparison.
   3-6. How it works, one step per chapter, on the running example.
+  When the material has code: the code, walked line by line (see CODE, LINE BY LINE).
   then: a second worked example (a different, small case), the common mistakes and how
   to spot them, and when to use it (and when not to).
 
@@ -2592,6 +2597,20 @@ DEPTH
 - This is a lesson, not a reel: explain every step fully, show it on an example, then say
   why it works. Repeat the key idea in new words when a chapter builds on it.
 - Every chapter ends with one sentence that links to the next chapter.
+
+TEACH SO ONE WATCH IS ENOUGH
+- Never lean on something the video has not taught yet. Teach each idea before you use
+  it: every chapter builds only on what earlier chapters taught. Open each chapter by
+  linking to what the student now knows ("You saw that ... Now ...").
+- The notes may be terse: bullets, one-line definitions, bare code. Each bullet or line is
+  an idea to TEACH, never a line to read out. Every idea gets all three, in its own words:
+    1. WHAT it says, in plain words.
+    2. WHAT IT LOOKS LIKE: a small concrete case (a value, what you would see happen).
+    3. WHY: why it is true, why it is needed, or what goes wrong without it.
+  A one-line definition gets all three too. Never move on after only restating a line.
+- Cover every idea the material gives about this topic. Skip none, add no new facts.
+- Say what the computer (or the system) actually DOES at each step, not only what the
+  programmer writes or sees.
 
 THE RUNNING EXAMPLE
 - running_example.text is the example as the example shot says it; running_example.items
@@ -2638,16 +2657,44 @@ SPEECH AND CAPTIONS ARE SEPARATE FIELDS
   splitting a code token. At most 2 <b>...</b> highlights per caption. No other tags.
 
 CODE
-Only chapter shots may show code, in `code`: at most 10 shots, at most 4 lines each, each
-at most 30 characters. Show code when the material is about code; a worked example in
-code is the best way to teach it.
+Only chapter shots may show code, in `code`: at most 30 shots, at most 6 lines each, each
+at most 52 characters (indentation counts: indent with 2 spaces). Show code when the material is about code; a
+worked example in code is the best way to teach it. Use the material's own code; a longer
+program is split into snippets of at most 6 lines, each walked on its own.
+
+CODE, LINE BY LINE — the heart of a coding video
+When you show a snippet of two or more lines, walk through it:
+- One shot shows the whole snippet (`code_focus` empty) and says in one or two sentences
+  what it does as a whole.
+- Then ONE SHOT PER LINE, in order. Each shows the SAME snippet in `code` (identical
+  lines) and gives the line it explains in `code_focus` ([1] = the first line). Its speech
+  says, in plain words:
+    WHAT this line does,
+    WHY it is there (what would break, or be missing, without it),
+    WHAT CHANGES when it runs (a value stored, a method picked, something printed).
+  Say which line you are on ("The first line...", "Next, ..."); never read the code
+  out symbol by symbol.
+- A line that only closes a block (}, ), end) or is blank needs no shot of its own. Every
+  other line must be explained: a line you skip is a line the student cannot follow.
+- Then run it: one shot that follows the code top to bottom and says what it prints or
+  returns, and why.
+- A walk may run across chapter shots of one chapter; the chapter's 8-shot and 300-word
+  limits still hold, so give a long walk a chapter of its own or split the snippet.
 
 VISUAL
-For every shot, `visual` is ONE line saying what is on screen: the colour field (navy,
-blue, paper or yellow — the field changes at chapter changes), the objects (kinetic
-title, chapter card, token row of chips, YES/NO tags, a stamp, a code window, a lookup
-grid, a lookup table, a flow of steps, a compare card, a big counter, a bracket or
-callout, the recap grid), and what moves. Vary the visuals from shot to shot.
+For every shot, `visual` is ONE line saying what is on screen and what MOVES, as the
+sentence is said: the colour field (navy, blue, paper or yellow — the field changes at
+chapter changes) and the picture that SHOWS this shot's idea happening. Pick from: a flow
+of steps something travels through, a memory box whose value changes, a compare card
+(wrong vs right, before vs after), a loop of steps, a tiny app screen being tapped, a
+system panel, a lookup table, a big counter, a code window with the line being explained
+lit up, a code map with callouts on parts of the code, a row of chips, a callout.
+- Never the same picture two shots in a row (a line-by-line code walk aside: there the
+  lit line moves, and under it what that line does).
+- The running example as a row of chips: at most ONCE per chapter. The chapter's other
+  shots show what the step DOES to it (a box getting its new value, a flow it travels
+  through, before vs after).
+- Name the actual labels and values: "memory box `pet` gets the value Dog", not "a box".
 
 Return JSON:
 {
@@ -2661,6 +2708,8 @@ Return JSON:
      "visual": "...", "code": []},
     {"id": "s04", "beat": "chapter_card", "chapter": 1, "speech": "...", ...},
     {"id": "s05", "beat": "chapter", "chapter": 1, "speech": "...", "example": [], ...},
+    {"id": "s14", "beat": "chapter", "chapter": 4, "speech": "...", "code": ["...", "..."],
+     "code_focus": [2], ...},
     ...
   ]
 }"""
@@ -2960,8 +3009,11 @@ SYSTEM_MOTION_VIDEO_SHOT_FIX = """You are REPAIRING some shots of a long-form te
 Every other shot is final and not yours to change. Each shot below failed review for the
 reason given: rewrite it so it passes, and keep it doing the same job in the lesson.
 
-- Keep each shot's id, beat and chapter exactly as given. Keep its example and code unless
-  the reason is about them.
+- Keep each shot's id, beat and chapter exactly as given. Keep its example, code and
+  code_focus unless the reason is about them.
+- A shot with a code_focus explains THAT line of its code: what it does, why it is there,
+  and what changes when it runs. A reason naming an unexplained line is fixed by giving
+  that line to a shot (same code, code_focus [n]) and saying those three things about it.
 - Every rule of the script still holds: beginner words (no word over 4 syllables unless the
   material uses it and the same sentence explains it), short sentences, every claim supported
   by the MATERIAL, every number one the material states.
@@ -2971,7 +3023,8 @@ reason given: rewrite it so it passes, and keep it doing the same job in the les
 - Keep each shot about as long as it was (8 to 45 words) unless the reason is its length.
 
 Return JSON: {"shots": [{"id": "...", "beat": "...", "chapter": ..., "speech": "...",
-"captions": [{"text": "..."}], "example": [...], "code": [...], "visual": "..."}, ...]}
+"captions": [{"text": "..."}], "example": [...], "code": [...], "code_focus": [...],
+"visual": "..."}, ...]}
 — only the shots you were asked to repair."""
 
 
@@ -3032,6 +3085,7 @@ def repair_video_shots(script: MotionScript, material: str, results: list, grade
         shots = [by_id[s.id].model_copy(update={
                      "speech": new[s.id].speech, "captions": new[s.id].captions,
                      "example": new[s.id].example, "code": new[s.id].code,
+                     "code_focus": new[s.id].code_focus,
                      "visual": new[s.id].visual or by_id[s.id].visual})
                  if s.id in new else s for s in script.shots]
         script = script.model_copy(update={"shots": shots})

@@ -97,7 +97,7 @@ def test_the_realistic_walkthrough_passes_every_grader():
     assert APPROACH is not None and APPROACH.primary == "process_demonstration"
     failed = _failed(SCRIPT)
     assert not failed, failed
-    assert len(_grade(SCRIPT)) == 21      # + reading level, terms explained (2026-10-12)
+    assert len(_grade(SCRIPT)) == 22      # + reading level, terms explained (2026-10-12); + video code walk (2026-10-23)
 
 
 # ===================================================================== 1. hook

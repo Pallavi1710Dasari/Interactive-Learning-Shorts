@@ -82,6 +82,28 @@ def to_frame(view: MotionView, x: float, y: float) -> tuple[float, float]:
     return (view.dst[0] + (x - view.src[0]) * view.s, view.dst[1] + (y - view.src[1]) * view.s)
 
 
+#: A code window's width (reel units) for its longest line: the line-number
+#: gutter, then 43-unit monospace characters (web/src/motion/objects/
+#: reference.tsx CodeWindow).
+CODE_GUTTER, CODE_CHAR_W = 160, 26
+
+
+def widen_code(objects):
+    """A video's code windows drawn as wide as their longest line (never
+    narrower than laid out), centred where they were: a real code line runs
+    past a reel's 30 characters, and the landscape board has the room."""
+    out = []
+    for o in objects:
+        if o.kind == "code_window" and o.box is not None:
+            longest = max((len(line) for line in o.props.get("lines") or []), default=0)
+            w = float(CODE_GUTTER + CODE_CHAR_W * longest)
+            if w > o.box.w:
+                o = o.model_copy(update={"box": o.box.model_copy(
+                    update={"x": round(o.box.x - (w - o.box.w) / 2, 1), "w": w})})
+        out.append(o)
+    return out
+
+
 def _relayout(shot, on: bool, duo: bool = False):
     """The shot's placed objects laid out for the board it is drawn on: with
     the presenter, against the right edge (board_right, the mentor's side, as
@@ -124,6 +146,7 @@ def stage_video(plan, vrm: dict | None = None):
     for shot, o in zip(plan.shots, on):
         full = next((x.kind for x in shot.objects if kinds[x.kind]["layout"] == "full"), None)
         staged = shot if full else _relayout(shot, o, duo)
+        staged = staged.model_copy(update={"objects": widen_code(staged.objects)})
         view = view_for(staged.objects, board if o else g["board_off"], full)
         shots.append(staged.model_copy(update={"characters": o, "view": view}))
     video = plan.model_copy(update={"format": "video", "width": W, "height": H, "stage": "video",

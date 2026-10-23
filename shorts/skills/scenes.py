@@ -241,7 +241,8 @@ def _budget(script: MotionScript) -> dict[str, str]:
     changes that needs, and which colours its beat allows."""
     from ..motion_timeline import shot_timings
     f = lib.library()["frame"]
-    duo = bool(script.speakers)
+    # a video draws every visual onto its board: the one-narrator region
+    duo = bool(script.speakers) and getattr(script, "format", "reel") != "video"
     region = f["duo" if duo else "solo"]
     height = region["bottom"] - region["top"]
     out = {}
@@ -286,6 +287,10 @@ def _script_block(script: MotionScript, only: list[str] | None = None) -> str:
             parts.append(f"      cue words: {motion_plain_text(c.text)}")
         if s.code:
             parts.append(f"    code: {s.code}")
+        if s.code_focus:
+            parts.append(f"    code focus: line {', '.join(map(str, s.code_focus))} "
+                         f"({' / '.join(repr(s.code[n - 1]) for n in s.code_focus if 0 < n <= len(s.code))}) "
+                         f"— the line this shot explains: light it")
         if s.example:
             parts.append(f"    example state: {s.example}")
         parts.append(f"    brief: {s.visual}")
@@ -306,10 +311,11 @@ def _apply(script: MotionScript, draft: MotionScenesDraft) -> MotionScript:
 def _failing_shots(script: MotionScript, results) -> dict[str, list[str]]:
     """shot id -> reasons, for every shot a scene grader named. A failure
     naming no shot (the stamp count) is put on every shot with a stamp."""
-    duo = bool(script.speakers)
+    video = getattr(script, "format", "reel") == "video"
+    duo = bool(script.speakers) and not video
     out: dict[str, list[str]] = {}
     for s in script.shots:
-        found = scene_problems(s, duo=duo)
+        found = scene_problems(s, duo=duo, video=video)
         if found:
             out[s.id] = found
     for r in results:
@@ -378,6 +384,32 @@ VIDEO_SCENE_BATCH = 14
 VIDEO_REPAIR_BATCHES = 2
 
 
+def _video_rules() -> str:
+    """What every scenes call of a VIDEO is told on top of the reel's rules
+    (2026-10-23: the explanation must be understood in one watch, the code
+    walked line by line, and no one picture repeated through a chapter)."""
+    return "\n".join([
+        "VIDEO RULES (on top of the rules above):",
+        "- The picture TEACHES: a student watching once, with nothing else open, must see "
+        "what each sentence means. Show the step HAPPENING (a value dropping into a "
+        "memory_box, something travelling a flow, a compare reveal), not its words.",
+        "- The running example as a token_row is the main object of AT MOST ONE shot per "
+        "chapter. Its other shots show what the step DOES to it with another kind.",
+        f"- Every shot is drawn on the one-narrator region (1000 tall), speakers or not. A "
+        f"code_window may show up to {checks.MOTION_VIDEO['MOTION_MAX_CODE_LINES']} lines "
+        f"(174 + 120 per line) of up to {checks.MOTION_VIDEO['MOTION_MAX_CODE_CHARS']} characters: "
+        f"always the shot's code exactly as the script gives it.",
+        "- A LINE-BY-LINE CODE WALK: a shot with a \"code focus\" shows its whole code in a "
+        "code_window (all of its lines, unchanged) and highlights the focus line at "
+        "\"start\" ({\"at\": \"start\", \"do\": \"highlight\", \"target\": <the window>, "
+        "\"value\": \"<line>\"}), and any later highlight in the shot names that same line. "
+        "Only the first shot of a walk types the code; the next ones just enter. Under the "
+        "window, when it fits, show what the line DOES: a memory_box getting its value, a "
+        "status_pill with what it prints. Consecutive shots of one walk may all show the "
+        "code_window: the lit line moving is the picture.",
+    ])
+
+
 def _batch_note(script: MotionScript, only: list[str], done: MotionScript | None = None) -> str:
     """What a batch call is told: answer ONLY its own shots (it sees the whole
     script for context), and what the shot just before them shows, so the
@@ -435,6 +467,8 @@ def write_motion_scenes(script: MotionScript, log=print,
         block = _script_block(script, only=only if len(batches) > 1 else None)
         if len(batches) > 1:
             block = _batch_note(script, only, out) + "\n\n" + block
+        if getattr(script, "format", "reel") == "video":
+            block = _video_rules() + "\n\n" + block
         if note.strip():
             # first, before the script (whatever reads the script reads to the end)
             block = ("REVIEWER'S NOTE — the scenes are being redrawn because of this; answer it "
@@ -463,7 +497,8 @@ def write_motion_scenes(script: MotionScript, log=print,
                   [:VIDEO_REPAIR_BATCHES] if video else [ids])
         for group in groups:
             reasons = "\n".join(f"- {sid}: {'; '.join(failing[sid])}" for sid in group)
-            user = (_script_block(out, only=group) + "\n\nTHE CURRENT SCENES OF THESE SHOTS "
+            user = ((_video_rules() + "\n\n" if video else "")
+                    + _script_block(out, only=group) + "\n\nTHE CURRENT SCENES OF THESE SHOTS "
                     "FAILED REVIEW:\n" + reasons + "\n\nTHE CURRENT SCENES:\n" +
                     json.dumps({s.id: s.scene.model_dump() if s.scene else None
                                 for s in out.shots if s.id in group}))

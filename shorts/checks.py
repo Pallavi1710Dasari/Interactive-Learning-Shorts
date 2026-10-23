@@ -7477,8 +7477,16 @@ MOTION_VIDEO: dict = {
     "MOTION_CHAPTER_MAX_WORDS": 300,
     "MOTION_SHOT_WORDS": (8, 45),
     "MOTION_BEAT_MAX_SECONDS": {"hook": 10.0, "name_it": 4.0, "chapter_card": 3.0, "cta": 5.0},
-    "MOTION_MAX_CODE_SHOTS": 10,
-    "MOTION_MAX_CODE_LINES": 4,
+    #: a video walks its code line by line (check_video_code_walk): one shot
+    #: per line, each showing the whole snippet of up to 6 lines (a code
+    #: window of 6 lines, 894 units, still fits the board)
+    "MOTION_MAX_CODE_SHOTS": 30,
+    "MOTION_MAX_CODE_LINES": 6,
+    #: real code lines run long ('System.out.println("This animal eats
+    #: food.");' is 45): a video's code window is drawn as wide as its longest
+    #: line (motion_video.widen_code) and the landscape board has the room —
+    #: 52 characters still draw at about 32 px on the 1080p frame
+    "MOTION_MAX_CODE_CHARS": 52,
     "MOTION_MAX_EXTRA_TERMS": 8,
 }
 
@@ -8225,6 +8233,7 @@ def check_motion_code_shots(script, source_text: str = "") -> GraderResult:
     problems: list[str] = []
     coded = [s for s in script.shots if any(line.strip() for line in s.code)]
     max_shots, max_lines = _limit(script, "MOTION_MAX_CODE_SHOTS"), _limit(script, "MOTION_MAX_CODE_LINES")
+    max_chars = _limit(script, "MOTION_MAX_CODE_CHARS")
     if len(coded) > max_shots:
         problems.append(f"{len(coded)} shots show code, max {max_shots}")
     for s in coded:
@@ -8233,9 +8242,9 @@ def check_motion_code_shots(script, source_text: str = "") -> GraderResult:
         if len(s.code) > max_lines:
             problems.append(f"{s.id} shows {len(s.code)} code lines, max {max_lines}")
         for line in s.code:
-            if len(line) > MOTION_MAX_CODE_CHARS:
+            if len(line) > max_chars:
                 problems.append(f"{s.id} code line {line!r} is {len(line)} chars, "
-                                f"max {MOTION_MAX_CODE_CHARS}")
+                                f"max {max_chars}")
     code_map = _shots_by_beat(script).get("code_map")
     if (template == "fix_story" and code_map is not None and _source_has_code(source_text)
             and not any(line.strip() for line in code_map.code)):
@@ -8244,6 +8253,68 @@ def check_motion_code_shots(script, source_text: str = "") -> GraderResult:
     if problems:
         return GraderResult("motion_code_shots", False, "; ".join(problems))
     return GraderResult("motion_code_shots", True, f"{len(coded)} code shot(s)")
+
+
+#: A code line that only closes a block, or is blank: nothing to explain.
+_CLOSING_LINE = re.compile(r"^[\s\})\]\;,]*(end|fi|done|esac)?[\s\})\]\;,]*$")
+
+
+#: A line that is only a comment: a note to the reader, nothing that runs.
+_COMMENT_OPENERS = ("//", "#", "/*", "*", "<!--", "--")
+
+
+def code_walk_lines(code: list[str]) -> list[int]:
+    """The 1-based lines of a snippet that a line-by-line walk explains:
+    every line but blank ones, comments and lines that only close a block."""
+    return [i for i, line in enumerate(code, 1)
+            if not _CLOSING_LINE.match(line) and not line.strip().startswith(_COMMENT_OPENERS)]
+
+
+def check_video_code_walk(script) -> GraderResult:
+    """A VIDEO walks its code line by line (2026-10-23: "if it is specific to
+    coding it should explain line by line what is happening and why"). Every
+    code shot of two or more lines says which line it explains (code_focus,
+    1-based, inside the snippet), and every line of every snippet worth
+    explaining (code_walk_lines) is some shot's focus. A reel is not checked."""
+    name = "video_code_walk"
+    if motion_format(script) != "video":
+        return GraderResult(name, True, "a reel — not checked")
+    problems: list[str] = []
+    off: list[str] = []
+    focused: dict[tuple, set[int]] = {}
+    last_shot: dict[tuple, str] = {}
+    for s in script.shots:
+        code = s.code
+        if not any(line.strip() for line in code):
+            if s.code_focus:
+                problems.append(f"{s.id} has code_focus {s.code_focus} but no code")
+                off.append(s.id)
+            continue
+        # (a shot showing the whole snippet with no focus — the overview, the
+        # run — is fine: it is the walk as a whole that must cover every line)
+        key = tuple(line.rstrip() for line in code)
+        last_shot[key] = s.id
+        bad = [n for n in s.code_focus if not 1 <= n <= len(code)]
+        if bad:
+            problems.append(f"{s.id} code_focus {bad} is outside its {len(code)} lines")
+            off.append(s.id)
+        focused.setdefault(key, set()).update(n for n in s.code_focus if 1 <= n <= len(code))
+    for key, lines in focused.items():
+        need = code_walk_lines(list(key))
+        if len(need) < 2:
+            continue
+        missing = [n for n in need if n not in lines]
+        if missing:
+            shown = ", ".join(f"{n} ({key[n - 1].strip()!r})" for n in missing[:6])
+            problems.append(f"the snippet shown in {last_shot[key]} never explains line(s) {shown} — "
+                            f"give each its own shot (same code, code_focus [n]) saying what the "
+                            f"line does and why it is there")
+            off.append(last_shot[key])
+    if problems:
+        return GraderResult(name, False, "; ".join(problems[:10]), {"shots": sorted(set(off))})
+    walked = sum(1 for k in focused if len(code_walk_lines(list(k))) >= 2)
+    return GraderResult(name, True, f"{walked} snippet(s) explained line by line" if walked
+                        else "no multi-line code to walk")
 
 
 def walkthrough_recap_heading(script) -> str:
@@ -9131,6 +9202,7 @@ def run_motion_script_graders(script, source_text: str, icon_names=None,
         check_motion_captions_match_speech(script),
         check_motion_speech_vs_caption(script),
         check_motion_code_shots(script, source_text),
+        check_video_code_walk(script),
         check_motion_recap_icons(script, icon_names),
         check_motion_plain_words(script, source_text),
         check_motion_reading_level(script),
@@ -9205,12 +9277,15 @@ def check_motion_scene_valid(script) -> GraderResult:
     from .motion_scenes import scene_problems
     problems: list[str] = []
     off: list[str] = []
-    duo = bool(getattr(script, "speakers", []))
+    # (a video draws every visual onto its board, never above a chat: the
+    # one-narrator region is its budget whatever the speakers)
+    video = motion_format(script) == "video"
+    duo = bool(getattr(script, "speakers", [])) and not video
     prev = None
     last_kind = None
     stamps = 0
     for i, s in enumerate(script.shots):
-        found = scene_problems(s, duo=duo)
+        found = scene_problems(s, duo=duo, video=video)
         if found:
             problems.append(f"{s.id} ({s.beat}): " + "; ".join(found))
             off.append(s.id)
@@ -9388,17 +9463,24 @@ def check_motion_scene_variety(script) -> GraderResult:
     shots = [s for s in script.shots if s.scene is not None]
     problems: list[str] = []
     off: list[str] = []
+    video = motion_format(script) == "video"
+
+    def walking(a, b) -> bool:
+        # a video's line-by-line code walk: the same snippet, the lit line moving
+        return video and bool(b.code) and a.code == b.code and a.code_focus != b.code_focus
+
     for a, b in zip(shots, shots[1:]):
         ka, kb = _main_kinds(script, a), _main_kinds(script, b)
-        if ka and ka == kb:
+        if ka and ka == kb and not walking(a, b):
             problems.append(f"{a.id} and {b.id} show the same objects ({', '.join(sorted(ka))}) — "
                             f"vary the second")
             off.append(b.id)
     counts: dict[str, list[str]] = {}
-    for s in shots:
+    for prev, s in zip([None] + shots, shots):
         for k in _main_kinds(script, s):
+            if prev is not None and walking(prev, s) and k in _main_kinds(script, prev):
+                continue             # one walk through a snippet is one picture
             counts.setdefault(k, []).append(s.id)
-    video = motion_format(script) == "video"
     for k, ids in counts.items():
         if video and k != "chapter_card":
             # a video: at most MOTION_MAX_KIND_SHOTS in any window of a reel's length
@@ -9418,6 +9500,20 @@ def check_motion_scene_variety(script) -> GraderResult:
             problems.append(f"{k} is the main object on {len(ids)} shots ({', '.join(ids)}), max "
                             f"{MOTION_MAX_KIND_SHOTS} — use another kind from the library")
             off += ids[MOTION_MAX_KIND_SHOTS:]
+    if video:
+        # the running example as chips is continuity once a chapter, not the
+        # chapter's picture (2026-10-23: "the visuals are the same throughout")
+        chips: dict[int, list[str]] = {}
+        for s in shots:
+            if s.beat == "chapter" and s.chapter and not _main_kinds(script, s) and any(
+                    o.kind == "token_row" for o in s.scene.objects):
+                chips.setdefault(s.chapter, []).append(s.id)
+        for n, ids in chips.items():
+            if len(ids) > 1:
+                problems.append(f"chapter {n} shows the example as a row of chips on {len(ids)} "
+                                f"shots ({', '.join(ids)}), max 1 — show what each step does to it "
+                                f"with another kind (memory_box, flow, compare...)")
+                off += ids[1:]
     if len(shots) >= 8 and len(counts) < MOTION_MIN_MAIN_KINDS:
         problems.append(f"only {len(counts)} kinds of object in the whole reel ({', '.join(sorted(counts))}), "
                         f"use at least {MOTION_MIN_MAIN_KINDS}")
@@ -9529,6 +9625,11 @@ def check_motion_scene_shows_action(script) -> GraderResult:
         # and changes the same row of items
         example = (_template(script) == "walkthrough" and s.beat in ("example", "chapter", "result")
                    and any(o.kind == "token_row" for o in sc.objects))
+        # a video's line-by-line code walk acts through its code: the lit
+        # line moving to the line being explained is the change
+        example = example or (motion_format(script) == "video" and bool(s.code_focus) and any(
+            a.do == "highlight" and o.kind == "code_window"
+            for a in sc.actions for o in sc.objects if o.id == a.target))
         if not example and not any(a.do in MOTION_MOVING_ACTIONS for a in sc.actions):
             still.append(s.id)
         if example or any(o.kind in MOTION_ACTION_KINDS for o in sc.objects):
@@ -9579,6 +9680,33 @@ def check_motion_scene_code_only_with_code(script) -> GraderResult:
     return GraderResult("motion_scene_code_only_with_code", True, "code appears only where the script has code")
 
 
+def check_video_code_focus_lit(script) -> GraderResult:
+    """A video's code walk SHOWS which line is being explained: every shot
+    with a code_focus draws its code (a code_window or a code_map), and its
+    code_window lights a focus line (a highlight whose value is that line)."""
+    name = "video_code_focus_lit"
+    if motion_format(script) != "video":
+        return GraderResult(name, True, "a reel — not checked")
+    bad: list[str] = []
+    for s in script.shots:
+        if s.scene is None or not s.code_focus:
+            continue
+        code = [o for o in s.scene.objects if o.kind in ("code_window", "code_map")]
+        windows = {o.id for o in code if o.kind == "code_window"}
+        focus = {str(n) for n in s.code_focus}
+        lit = any(a.do == "highlight" and a.target in windows and str(a.value) in focus
+                  for a in s.scene.actions)
+        if not code:
+            bad.append(f"{s.id} explains line {s.code_focus[0]} but shows no code")
+        elif windows and not lit:
+            bad.append(f"{s.id} explains line {s.code_focus[0]} but never highlights it "
+                       f"(a highlight on the code_window, value \"{s.code_focus[0]}\")")
+    if bad:
+        return GraderResult(name, False, "; ".join(bad[:10]),
+                            {"shots": [b.split()[0] for b in bad]})
+    return GraderResult(name, True, "every explained code line is lit as it is explained")
+
+
 def run_motion_scene_graders(script, clocks=None, dropped=()) -> list[GraderResult]:
     """The phase 3 scene graders. `clocks`: the real timings, when audio
     exists. `dropped`: shot ids the timing stage dropped as low value."""
@@ -9592,4 +9720,5 @@ def run_motion_scene_graders(script, clocks=None, dropped=()) -> list[GraderResu
         check_motion_scene_shows_action(script),
         check_motion_scene_text_light(script),
         check_motion_scene_code_only_with_code(script),
+        check_video_code_focus_lit(script),
     ]

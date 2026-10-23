@@ -134,6 +134,9 @@ def test_a_video_from_upload_to_its_landscape_plan():
     assert plan["characters"][0]["vrm"] == "mentor"
     on = [s["characters"] for s in plan["shots"]]
     assert on[0] and not all(on), "".join("+" if o else "." for o in on)
+    # the code walk survives to the finished video: no line's shot is dropped
+    walk = [s.id for s in script.shots if s.code_focus]
+    assert walk and set(walk) <= {s["id"] for s in plan["shots"]}, (walk, [s["id"] for s in plan["shots"]])
     assert mj.view(job)["summary"]["options"]["detail"].startswith("a video")
     # listed as a motion item, marked a video (the #videos page; out of the reel feed)
     from shorts import motion_bundle
@@ -340,6 +343,138 @@ def test_a_view_fits_the_board_and_never_over_enlarges():
     x1, y1 = motion_video.to_frame(v, 1020, 1300)
     bx, by, bw, bh = g["board_on"]
     assert bx - 0.5 <= x0 and x1 <= bx + bw + 0.5 and by - 0.5 <= y0 and y1 <= by + bh + 0.5
+
+
+def _walk(video: MotionScript) -> list:
+    """The shots that walk the video's code, line by line (code_focus set)."""
+    return [s for s in video.shots if s.code_focus]
+
+
+def test_a_video_walks_its_code_line_by_line():
+    """2026-10-23: a coding video explains every line — what it does and why.
+    Each line worth explaining is some shot's code_focus, on the same snippet;
+    a line no shot explains fails, naming the shot to repair."""
+    video = _video_script()
+    walk = _walk(video)
+    assert walk, "the material has code: the stub video walks it"
+    snippet = walk[0].code
+    assert all(s.code == snippet for s in walk)
+    need = checks.code_walk_lines(snippet)
+    assert sorted(n for s in walk for n in s.code_focus) == need, (need, [s.code_focus for s in walk])
+    # a closing brace needs no shot of its own
+    assert all(snippet[n - 1].strip() != "}" for n in need)
+    r = checks.check_video_code_walk(video)
+    assert r.passed, r.reason
+    # one line left unexplained
+    shots = [s.model_copy(update={"code_focus": []}) if s.id == walk[-1].id else s for s in video.shots]
+    r = checks.check_video_code_walk(video.model_copy(update={"shots": shots}))
+    assert not r.passed and "never explains line" in r.reason and r.details["shots"], r.reason
+    # a focus outside the snippet
+    shots = [s.model_copy(update={"code_focus": [len(snippet) + 1]}) if s.id == walk[0].id else s
+             for s in video.shots]
+    assert not checks.check_video_code_walk(video.model_copy(update={"shots": shots})).passed
+    # a reel is not checked
+    assert checks.check_video_code_walk(video.model_copy(update={"format": "reel"})).passed
+
+
+def test_a_video_shows_longer_code_than_a_reel():
+    """A video's code shot holds up to 6 lines of up to 52 characters (real
+    code runs past a reel's 30), and its code window is drawn that wide."""
+    long = 'String a = new String("hello");'           # 31 characters
+    video = _video_script()
+    i = next(k for k, s in enumerate(video.shots) if s.code)
+    code = [long] * 6
+    shots = [s.model_copy(update={"code": code}) if s.code else s for s in video.shots]
+    six = video.model_copy(update={"shots": shots})
+    assert checks.check_motion_code_shots(six).passed, checks.check_motion_code_shots(six).reason
+    seven = video.model_copy(update={"shots": [s.model_copy(update={"code": code + [long]}) if s.code else s
+                                               for s in video.shots]})
+    assert not checks.check_motion_code_shots(seven).passed
+    assert not checks.check_motion_code_shots(six.model_copy(update={"format": "reel"})).passed
+    from shorts.motion_scenes import default_scene, scene_problems
+    sc = default_scene(six.shots[i], six, i)
+    assert not scene_problems(six.shots[i], sc, video=True), scene_problems(six.shots[i], sc, video=True)
+    assert scene_problems(six.shots[i], sc), "a reel's code window holds 3 lines of 30"
+    win = [MotionPlacedObject(id="o1", kind="code_window", props={"lines": [long + "  // x"]},
+                              box=MotionBox(x=60, y=300, w=960, h=294))]
+    wide = motion_video.widen_code(win)[0]
+    assert wide.box.w >= motion_video.CODE_GUTTER + motion_video.CODE_CHAR_W * len(long + "  // x")
+    assert abs((wide.box.x + wide.box.w / 2) - 540) < 1, "widened about its centre"
+
+
+def test_the_code_walk_lights_its_line_and_may_repeat_the_window():
+    """Each walk shot lights the line it explains (and keeps the bar there);
+    the walk's code windows in a row are one picture, not a repeat — but
+    the same window with the same line lit twice in a row still is."""
+    from shorts.motion_scenes import with_default_scenes
+    video = with_default_scenes(_video_script())
+    for s in _walk(video):
+        win = next(o for o in s.scene.objects if o.kind == "code_window")
+        lit = {a.value for a in s.scene.actions if a.do == "highlight" and a.target == win.id}
+        assert lit == {str(s.code_focus[0])}, (s.id, s.code_focus, lit)
+    for name in ("video_code_focus_lit", "motion_scene_variety", "motion_scene_shows_action",
+                 "motion_scene_matches_narration", "motion_scene_valid"):
+        r = next(r for r in checks.run_motion_scene_graders(video) if r.name == name)
+        assert r.passed, (name, r.reason)
+    walk = _walk(video)
+    # the line explained but never lit
+    unlit = [s.model_copy(update={"scene": s.scene.model_copy(update={"actions": [
+        a for a in s.scene.actions if a.do != "highlight"]})}) if s.id == walk[0].id else s
+        for s in video.shots]
+    r = checks.check_video_code_focus_lit(video.model_copy(update={"shots": unlit}))
+    assert not r.passed and r.details["shots"] == [walk[0].id], r.reason
+    # two shots on the same line: a repeated picture
+    same = [s.model_copy(update={"code_focus": walk[0].code_focus}) if s.id == walk[1].id else s
+            for s in video.shots]
+    r = checks.check_motion_scene_variety(video.model_copy(update={"shots": same}))
+    assert not r.passed and walk[1].id in r.details["shots"], r.reason
+
+
+def test_a_walk_shot_is_never_dropped_as_a_repeat():
+    """The same code window with a new line lit is a new picture: the timing
+    stage's low-value pass (motion_tidy) keeps every walk shot — dropping one
+    drops the explanation of its line."""
+    from shorts import motion_tidy
+    from shorts.motion_scenes import with_default_scenes
+    video = with_default_scenes(_video_script())
+    walk = {s.id for s in _walk(video)}
+    assert not walk & {sid for sid, _ in motion_tidy.low_value_shots(video)}
+    kept, _ = motion_tidy.drop_low_value(video)
+    assert walk <= {s.id for s in kept.shots}
+
+
+def test_the_example_chips_show_once_per_chapter():
+    """2026-10-23: the running example's chips on every shot made a video
+    "the same visual throughout". The fallback shows them once a chapter and
+    turns through other looks; a second chip shot in a chapter fails."""
+    from shorts.motion_scenes import with_default_scenes
+    video = with_default_scenes(_video_script())
+    for n in {s.chapter for s in video.shots if s.beat == "chapter"}:
+        shots = [s for s in video.shots if s.beat == "chapter" and s.chapter == n]
+        kinds = [s.scene.objects[0].kind for s in shots]
+        assert kinds.count("token_row") <= 1, (n, kinds)
+        if len(shots) >= 5:
+            assert len(set(kinds)) >= 4, (n, kinds)
+    chips = next(s for s in video.shots if s.beat == "chapter" and s.scene.objects[0].kind == "token_row")
+    other = next(s for s in video.shots if s.beat == "chapter" and s.chapter == chips.chapter
+                 and s.id != chips.id and not s.code)
+    shots = [s.model_copy(update={"scene": chips.scene}) if s.id == other.id else s for s in video.shots]
+    r = checks.check_motion_scene_variety(video.model_copy(update={"shots": shots}))
+    assert not r.passed and "row of chips" in r.reason and other.id in r.details["shots"], r.reason
+
+
+def test_the_video_prompt_asks_for_one_watch_and_line_by_line():
+    """The script and scenes prompts carry the 2026-10-23 rules."""
+    from shorts.skills.scenes import _video_rules
+    from shorts.skills.script import SYSTEM_MOTION_VIDEO, SYSTEM_MOTION_VIDEO_SHOT_FIX, motion_system_for
+    for rule in ("TEACH SO ONE WATCH IS ENOUGH", "CODE, LINE BY LINE", "code_focus",
+                 "WHY it is there", "at most ONCE per chapter", "at most 52 characters"):
+        assert rule in SYSTEM_MOTION_VIDEO, rule
+    two = motion_system_for("walkthrough", REG.themes[next(t for t in REG.themes
+                                                           if REG.themes[t].two_speaker)], fmt="video")[0]
+    assert "CODE, LINE BY LINE" in two and "TEACH SO ONE WATCH" in two
+    assert "code_focus" in SYSTEM_MOTION_VIDEO_SHOT_FIX
+    assert "LINE-BY-LINE CODE WALK" in _video_rules() and "AT MOST ONE shot per chapter" in _video_rules()
 
 
 def main() -> int:

@@ -351,8 +351,16 @@ function Choices2({ job, step, busy, onBack }: { job: Job; step: number; busy: b
 
 type Act = (action: string, o?: { reason?: string; choice?: unknown }) => void;
 
+/** A shot's code as the video shows it, the line it explains marked. */
+function ShotCode({ code, focus }: { code: string[]; focus: number[] }) {
+  return <pre className="mvcode">{code.map((line, i) => (
+    <div key={i} className={focus.includes(i + 1) ? "on" : ""}>
+      <span className="ln">{focus.includes(i + 1) ? "▶" : i + 1}</span>{line || " "}</div>))}</pre>;
+}
+
 /** A video's script to read: its opening, each chapter under its own
- * heading, then the closing — every line, numbered through. */
+ * heading, then the closing — every line, numbered through. A code shot
+ * shows its code under its first line, the line it explains marked. */
 function VideoScript({ script }: { script: any }) {
   const titles: Record<number, string> = Object.fromEntries((script.chapters ?? []).map((c: any) => [c.n, c.title]));
   const groups: { key: string; title: string; shots: any[] }[] = [];
@@ -370,7 +378,8 @@ function VideoScript({ script }: { script: any }) {
         <ol className="mlines" start={n + 1}>
           {g.shots.flatMap((sh: any) => sh.captions.map((c: any, i: number) => {
             n += 1;
-            return <li key={`${sh.id}-${i}`}><Txt text={c.text.replace(/<\/?b>/g, "")} /></li>;
+            return <li key={`${sh.id}-${i}`}><Txt text={c.text.replace(/<\/?b>/g, "")} />
+              {i === 0 && sh.code?.length > 0 && <ShotCode code={sh.code} focus={sh.code_focus ?? []} />}</li>;
           }))}
         </ol>
       </section>

@@ -209,7 +209,10 @@ def low_value_shots(script: MotionScript) -> list[tuple[str, str]]:
         if sc is None:
             continue
         main = [o for o in sc.objects if o.kind not in minor]
-        if main and sh.beat not in _STRUCTURAL and not any(a.do in _DOING for a in sc.actions):
+        # a video's line-by-line code walk shows the same code with a new line
+        # lit: that line, and what it does, is what is new (2026-10-23)
+        walk = bool(sh.code_focus) and getattr(script, "format", "reel") == "video"
+        if main and not walk and sh.beat not in _STRUCTURAL and not any(a.do in _DOING for a in sc.actions):
             twins = [next((sid for sid, e in seen if _same_object(o, e)), None) for o in main]
             if all(twins):
                 out.append((sh.id, f"repeats {twins[0]}'s {main[0].kind} and only relabels it"))

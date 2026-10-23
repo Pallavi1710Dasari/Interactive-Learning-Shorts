@@ -270,12 +270,38 @@ _VIDEO_LINES = (
 _VIDEO_TITLES = ("The problem it solves", "The core idea", "How it starts", "How it grows",
                  "A second example", "Common mistakes")
 _STEP_WORDS = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+#: The chapter a stub video walks its code in, line by line, when the
+#: material has a code block (checks.check_video_code_walk).
+_CODE_CHAPTER = 4
+_WALK_OPENERS = ("Start with the top line.", "Now the next line.", "Then this line.",
+                 "Look at the line after that.", "Next comes this line.", "And now this line.")
+
+
+def _word_of(line: str) -> str:
+    """A plain word a stub line can say about a code line (its first word of
+    three or more letters, lower case), so the shot says what it shows."""
+    words = [w.lower() for w in re.findall(r"[A-Za-z]{3,}", line)]
+    return words[0] if words else "code"
+
+
+def _walk_snippet(text: str) -> list[str]:
+    """The material's first code block, as a video's code shot shows it: up to
+    six lines that fit, indentation kept; empty when there are not two."""
+    for block in _code_blocks(text):
+        lines = [ln.rstrip() for ln in block.splitlines()
+                 if ln.strip() and len(ln.rstrip()) <= checks.MOTION_VIDEO["MOTION_MAX_CODE_CHARS"]]
+        lines = lines[:checks.MOTION_VIDEO["MOTION_MAX_CODE_LINES"]]
+        if len(checks.code_walk_lines(lines)) >= 2:
+            return lines
+    return []
 
 
 def _video(text: str, concept: str) -> dict:
     """A stub long-form video (format "video"): the walkthrough's beats with
     six chapters of seven shots, about seven minutes spoken. The first three
-    chapters carry the running example; the rest teach with their own."""
+    chapters carry the running example; the rest teach with their own. When
+    the material has code, chapter four walks it line by line: the whole
+    snippet, one shot per line, then the run."""
     sp, sh = spoken(concept), shown(concept)
     mine = iter(_plain_sentences(text, concept))
     pool = iter(_VIDEO_LINES * 8)
@@ -284,6 +310,7 @@ def _video(text: str, concept: str) -> dict:
         return next(mine, None) or next(pool)
 
     state = [concept]
+    snippet = _walk_snippet(text)
     shots = [
         ("hook", ["How does this really work under the hood?",
                   "Once you see it, you will use it every day."], None, None),
@@ -297,6 +324,18 @@ def _video(text: str, concept: str) -> dict:
         chapters.append({"n": n, "title": title, "example_in": state if carries else [],
                          "example_out": state if carries else []})
         shots.append(("chapter_card", [f"Step {_STEP_WORDS[n - 1]}. {title}."], n, None))
+        if n == _CODE_CHAPTER and snippet:
+            walk = checks.code_walk_lines(snippet)
+            first = _word_of(snippet[0])
+            shots.append(("chapter", [f"Here is the whole piece of code, from {first} down.",
+                                      line(), line()], n, None, snippet, []))
+            for i, ln in enumerate(walk):
+                shots.append(("chapter", [_WALK_OPENERS[i % len(_WALK_OPENERS)],
+                                          f"This one starts with {_word_of(snippet[ln - 1])}.",
+                                          line()], n, None, snippet, [ln]))
+            shots.append(("chapter", [f"Now run it from the top, from {first} down.", line(),
+                                      line()], n, None, snippet, []))
+            continue
         for k in range(7):
             shots.append(("chapter", [line(), line(), line()], n,
                           state if carries and k in (0, 6) else None))
@@ -307,10 +346,12 @@ def _video(text: str, concept: str) -> dict:
         ("cta", ["Follow for more, one idea at a time."], None, None),
     ]
     out = []
-    for beat, said, chapter, example in shots:
+    for beat, said, chapter, example, *code in shots:
         caps = [x.replace(sp, sh) if sp != concept else x for x in said]
+        lines, focus = code if code else ([], [])
         out.append({"beat": beat, "chapter": chapter, "speech": " ".join(said),
-                    "captions": caps, "example": example or [], "code": [],
+                    "captions": caps, "example": example or [], "code": lines,
+                    "code_focus": focus,
                     "visual": f"Stub scene for the {beat.replace('_', ' ')}."})
     return {
         "hook_question": "How does this really work under the hood?", "concept_name": concept,

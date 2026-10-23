@@ -1584,6 +1584,11 @@ a.primary, a.ghost { text-decoration: none; display: inline-block; }
 /* a video's script, grouped by chapter (StepMotion VideoScript) */
 .mvscript h3 { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-hi); margin: 18px 0 6px; }
 .mvscript section:first-child h3 { margin-top: 4px; }
+.mvcode { margin: 6px 0 4px; padding: 6px 0; background: #0B0F22; border-radius: 8px; font-size: 13px; line-height: 1.5; overflow-x: auto; }
+.mvcode div { padding: 0 10px 0 0; white-space: pre; }
+.mvcode div.on { background: rgba(255, 181, 36, 0.14); box-shadow: inset 3px 0 0 #FFB524; }
+.mvcode .ln { display: inline-block; width: 28px; text-align: right; margin-right: 10px; opacity: 0.5; }
+.mvcode div.on .ln { opacity: 1; color: #FFB524; }
 
 /* the Characters step's 3D avatars (vrm/VrmPortrait.tsx) */
 .mavatars.m3d { align-items: flex-start; flex-wrap: wrap; }

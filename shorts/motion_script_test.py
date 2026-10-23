@@ -186,7 +186,7 @@ def test_walkthrough_stub_script_passes_every_grader_at_no_cost():
         topic, section, short_id="t__motion", source_text=source, template="walkthrough")
     assert script is not None, [str(r) for r in results if not r.passed]
     # 19 graders, plus reading level and terms explained (simple language, 2026-10-12)
-    assert checks.all_passed(results) and len(results) == 21, [r for r in results if not r.passed]
+    assert checks.all_passed(results) and len(results) == 22, [r for r in results if not r.passed]
     assert script.template == "walkthrough" and len(script.chapters) == 4
     assert script.running_example is not None
     assert script.estimated_seconds <= checks.MOTION_MAX_SECONDS
